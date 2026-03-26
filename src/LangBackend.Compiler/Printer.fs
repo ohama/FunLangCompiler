@@ -116,6 +116,12 @@ let private printOp (indent: string) (op: MlirOp) : string =
             let argList = args |> List.map (fun v -> v.Name) |> String.concat ", "
             let argTypes = args |> List.map (fun v -> printType v.Type) |> String.concat ", "
             sprintf "%sllvm.call %s(%s) : (%s) -> ()" indent callee argList argTypes
+    // Phase 10: list null pointer and null checks
+    | LlvmNullOp(result) ->
+        sprintf "%s%s = llvm.mlir.zero : !llvm.ptr" indent result.Name
+    | LlvmIcmpOp(result, predicate, lhs, rhs) ->
+        sprintf "%s%s = llvm.icmp \"%s\" %s, %s : !llvm.ptr"
+            indent result.Name predicate lhs.Name rhs.Name
     | ReturnOp [] ->
         sprintf "%sreturn" indent
     | ReturnOp operands ->
