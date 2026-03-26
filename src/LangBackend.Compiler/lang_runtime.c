@@ -48,3 +48,31 @@ void lang_match_failure(void) {
     fprintf(stderr, "Fatal: non-exhaustive match\n");
     exit(1);
 }
+
+void lang_failwith(const char* msg) {
+    fprintf(stderr, "%s\n", msg);
+    exit(1);
+}
+
+LangString* lang_string_sub(LangString* s, int64_t start, int64_t len) {
+    if (start < 0) start = 0;
+    if (start > s->length) start = s->length;
+    if (len < 0) len = 0;
+    if (start + len > s->length) len = s->length - start;
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    memcpy(buf, s->data + start, (size_t)len);
+    buf[len] = '\0';
+    LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->length = len;
+    r->data = buf;
+    return r;
+}
+
+int64_t lang_string_contains(LangString* s, LangString* sub) {
+    if (sub->length == 0) return 1;
+    return strstr(s->data, sub->data) != NULL ? 1 : 0;
+}
+
+int64_t lang_string_to_int(LangString* s) {
+    return (int64_t)strtol(s->data, NULL, 10);
+}
