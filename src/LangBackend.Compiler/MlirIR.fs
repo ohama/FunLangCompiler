@@ -5,6 +5,7 @@ type MlirType =
     | I64
     | I32
     | I1
+    | Ptr   // Phase 5: represents !llvm.ptr (opaque pointer, LLVM 20 convention)
 
 // SSA value — a named result from an operation
 type MlirValue = {
@@ -15,6 +16,9 @@ type MlirValue = {
 // Operations — one DU case per MLIR op
 // Phase 1: arith.constant and func.return
 // Phase 2: binary arith ops
+// Phase 3: arith.cmpi, cf.cond_br, cf.br
+// Phase 4: func.call (direct)
+// Phase 5: LLVM-level ops for closure mechanics
 // Future phases add cases here without changing MlirModule/FuncOp/Block/Region shape
 type MlirOp =
     | ArithConstantOp of result: MlirValue * value: int64
@@ -26,6 +30,14 @@ type MlirOp =
     | CfCondBrOp      of cond: MlirValue * trueLabel: string * trueArgs: MlirValue list * falseLabel: string * falseArgs: MlirValue list
     | CfBrOp          of label: string * args: MlirValue list
     | DirectCallOp    of result: MlirValue * callee: string * args: MlirValue list
+    // Phase 5: LLVM-level ops for closure representation
+    | LlvmAllocaOp    of result: MlirValue * count: MlirValue * numCaptures: int
+    | LlvmStoreOp     of value: MlirValue * ptr: MlirValue
+    | LlvmLoadOp      of result: MlirValue * ptr: MlirValue
+    | LlvmAddressOfOp of result: MlirValue * fnName: string
+    | LlvmGEPLinearOp of result: MlirValue * ptr: MlirValue * index: int
+    | LlvmReturnOp    of operands: MlirValue list
+    | IndirectCallOp  of result: MlirValue * fnPtr: MlirValue * envPtr: MlirValue * arg: MlirValue
     | ReturnOp        of operands: MlirValue list
 
 // A basic block: optional label, block arguments, sequence of ops
@@ -40,12 +52,13 @@ type MlirRegion = {
     Blocks: MlirBlock list
 }
 
-// A func.func definition
+// A func.func or llvm.func definition
 type FuncOp = {
-    Name:       string           // e.g. "@main" (include the @ sigil)
-    InputTypes: MlirType list    // [] for @main with no parameters
-    ReturnType: MlirType option  // Some I64; None means void (not needed in Phase 1)
-    Body:       MlirRegion
+    Name:        string           // e.g. "@main" (include the @ sigil)
+    InputTypes:  MlirType list    // [] for @main with no parameters
+    ReturnType:  MlirType option  // Some I64; None means void (not needed in Phase 1)
+    Body:        MlirRegion
+    IsLlvmFunc:  bool             // Phase 5: true -> emit "llvm.func"; false -> emit "func.func"
 }
 
 // Top-level MLIR module
@@ -59,9 +72,10 @@ let return42Module : MlirModule =
     {
         Funcs = [
             {
-                Name       = "@main"
-                InputTypes = []
-                ReturnType = Some I64
+                Name        = "@main"
+                InputTypes  = []
+                ReturnType  = Some I64
+                IsLlvmFunc  = false
                 Body = {
                     Blocks = [
                         {

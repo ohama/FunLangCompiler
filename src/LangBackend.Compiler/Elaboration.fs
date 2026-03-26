@@ -164,7 +164,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             { Name = "@" + name
               InputTypes = [I64]
               ReturnType = Some bodyVal.Type
-              Body = { Blocks = allBodyBlocks } }
+              Body = { Blocks = allBodyBlocks }
+              IsLlvmFunc = false }
         env.Funcs.Value <- env.Funcs.Value @ [funcOp]
         let env' = { env with KnownFuncs = Map.add name { sig_ with ReturnType = bodyVal.Type } env.KnownFuncs }
         elaborateExpr env' inExpr
@@ -197,8 +198,9 @@ let elaborateModule (expr: Expr) : MlirModule =
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
     let mainFunc : FuncOp =
-        { Name       = "@main"
-          InputTypes = []
-          ReturnType = Some resultVal.Type
-          Body = { Blocks = allBlocks } }
+        { Name        = "@main"
+          InputTypes  = []
+          ReturnType  = Some resultVal.Type
+          Body        = { Blocks = allBlocks }
+          IsLlvmFunc  = false }
     { Funcs = env.Funcs.Value @ [mainFunc] }

@@ -6,6 +6,7 @@ let private printType = function
     | I64 -> "i64"
     | I32 -> "i32"
     | I1  -> "i1"
+    | Ptr -> "!llvm.ptr"
 
 let private printOp (indent: string) (op: MlirOp) : string =
     match op with
@@ -47,6 +48,36 @@ let private printOp (indent: string) (op: MlirOp) : string =
         let argTypes = args |> List.map (fun (v: MlirValue) -> printType v.Type) |> String.concat ", "
         sprintf "%s%s = func.call %s(%s) : (%s) -> %s"
             indent result.Name callee argNames argTypes (printType result.Type)
+    // Phase 5: LLVM-level ops for closure mechanics
+    | LlvmAllocaOp(result, count, numCaptures) ->
+        let fields =
+            if numCaptures = 0 then "ptr"
+            else "ptr" + String.concat "" (List.replicate numCaptures ", i64")
+        sprintf "%s%s = llvm.alloca %s x !llvm.struct<(%s)> : (i64) -> !llvm.ptr"
+            indent result.Name count.Name fields
+    | LlvmStoreOp(value, ptr) ->
+        sprintf "%sllvm.store %s, %s : %s, !llvm.ptr"
+            indent value.Name ptr.Name (printType value.Type)
+    | LlvmLoadOp(result, ptr) ->
+        sprintf "%s%s = llvm.load %s : !llvm.ptr -> %s"
+            indent result.Name ptr.Name (printType result.Type)
+    | LlvmAddressOfOp(result, fnName) ->
+        sprintf "%s%s = llvm.mlir.addressof %s : !llvm.ptr"
+            indent result.Name fnName
+    | LlvmGEPLinearOp(result, ptr, index) ->
+        sprintf "%s%s = llvm.getelementptr %s[%d] : (!llvm.ptr) -> !llvm.ptr, i64"
+            indent result.Name ptr.Name index
+    | LlvmReturnOp [] ->
+        sprintf "%sllvm.return" indent
+    | LlvmReturnOp operands ->
+        let vals =
+            operands
+            |> List.map (fun v -> sprintf "%s : %s" v.Name (printType v.Type))
+            |> String.concat ", "
+        sprintf "%sllvm.return %s" indent vals
+    | IndirectCallOp(result, fnPtr, envPtr, arg) ->
+        sprintf "%s%s = llvm.call %s(%s, %s) : !llvm.ptr, (!llvm.ptr, %s) -> %s"
+            indent result.Name fnPtr.Name envPtr.Name arg.Name (printType arg.Type) (printType result.Type)
     | ReturnOp [] ->
         sprintf "%sreturn" indent
     | ReturnOp operands ->
@@ -71,6 +102,7 @@ let private printBlock (indent: string) (block: MlirBlock) : string =
     labelLine + opLines
 
 let private printFuncOp (func: FuncOp) : string =
+    let keyword = if func.IsLlvmFunc then "llvm.func" else "func.func"
     let retStr =
         match func.ReturnType with
         | None   -> ""
@@ -81,7 +113,7 @@ let private printFuncOp (func: FuncOp) : string =
             let ps = func.InputTypes |> List.mapi (fun i t -> sprintf "%%arg%d: %s" i (printType t)) |> String.concat ", "
             sprintf "(%s)" ps
     let bodyLines = func.Body.Blocks |> List.map (printBlock "    ") |> String.concat "\n"
-    sprintf "  func.func %s%s%s {\n%s\n  }" func.Name paramStr retStr bodyLines
+    sprintf "  %s %s%s%s {\n%s\n  }" keyword func.Name paramStr retStr bodyLines
 
 /// Serialize an MlirModule to valid MLIR 20 text.
 /// Pure function — no I/O. Caller is responsible for writing to disk.
