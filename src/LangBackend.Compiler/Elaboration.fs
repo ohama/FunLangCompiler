@@ -1247,5 +1247,6 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
         { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false }
         { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false }
+        { ExtName = "@lang_range";           ExtParams = [I64; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
