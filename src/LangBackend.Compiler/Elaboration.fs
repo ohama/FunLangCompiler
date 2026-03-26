@@ -267,6 +267,25 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (rv, rops) = elaborateExpr env rhs
         let result = { Name = freshName env; Type = I64 }
         (result, lops @ rops @ [ArithRemSIOp(result, lv, rv)])
+    | PipeRight (left, right, span) ->
+        // x |> f  ≡  f x  ≡  App(right, left)
+        elaborateExpr env (App(right, left, span))
+    | ComposeRight (f, g, span) ->
+        // f >> g  ≡  fun x -> g (f x)
+        let n = env.Counter.Value
+        env.Counter.Value <- n + 1
+        let paramName = sprintf "__comp_%d" n
+        let innerApp = App(f, Var(paramName, span), span)
+        let outerApp = App(g, innerApp, span)
+        elaborateExpr env (Lambda(paramName, outerApp, span))
+    | ComposeLeft (f, g, span) ->
+        // f << g  ≡  fun x -> f (g x)
+        let n = env.Counter.Value
+        env.Counter.Value <- n + 1
+        let paramName = sprintf "__comp_%d" n
+        let innerApp = App(g, Var(paramName, span), span)
+        let outerApp = App(f, innerApp, span)
+        elaborateExpr env (Lambda(paramName, outerApp, span))
     | Negate (inner, _) ->
         let (iv, iops) = elaborateExpr env inner
         let zero = { Name = freshName env; Type = I64 }
@@ -1023,6 +1042,82 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
 
         (mergeArg, scrutOps @ chainEntryOps)
+
+    // Phase 12: bare Lambda as a value — create inline closure struct
+    // Used by ComposeRight/ComposeLeft which desugar to Lambda(...) as expressions
+    | Lambda (param, body, _) ->
+        // Free variables relative to param, restricted to those in env.Vars (not KnownFuncs — they are direct calls)
+        let allFree = freeVars (Set.singleton param) body
+        let captures =
+            allFree
+            |> Set.filter (fun name -> Map.containsKey name env.Vars)
+            |> Set.toList
+            |> List.sort
+        let numCaptures = captures.Length
+
+        // Generate closure function name
+        let closureFnIdx = env.ClosureCounter.Value
+        env.ClosureCounter.Value <- closureFnIdx + 1
+        let closureFnName = sprintf "@closure_fn_%d" closureFnIdx
+
+        // Build inner llvm.func: (%arg0: !llvm.ptr, %arg1: i64) -> i64
+        let arg0Val = { Name = "%arg0"; Type = Ptr }
+        let arg1Val = { Name = "%arg1"; Type = I64 }
+        let innerEnv : ElabEnv =
+            { Vars = Map.ofList [(param, arg1Val)]
+              Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
+              KnownFuncs = env.KnownFuncs
+              Funcs = env.Funcs
+              ClosureCounter = env.ClosureCounter
+              Globals = env.Globals
+              GlobalCounter = env.GlobalCounter }
+        let captureLoadOps, innerEnvWithCaptures =
+            captures |> List.mapi (fun i capName ->
+                let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
+                let capVal = { Name = sprintf "%%t%d" (i + numCaptures); Type = I64 }
+                (gepVal, capVal, capName, i)
+            )
+            |> List.fold (fun (opsAcc, envAcc: ElabEnv) (gepVal, capVal, capName, i) ->
+                let gepOp  = LlvmGEPLinearOp(gepVal, arg0Val, i + 1)
+                let loadOp = LlvmLoadOp(capVal, gepVal)
+                let envAcc' = { envAcc with Vars = Map.add capName capVal envAcc.Vars }
+                (opsAcc @ [gepOp; loadOp], envAcc')
+            ) ([], innerEnv)
+        innerEnvWithCaptures.Counter.Value <- numCaptures * 2
+        let (bodyVal, bodyEntryOps) = elaborateExpr innerEnvWithCaptures body
+        let bodySideBlocks = innerEnvWithCaptures.Blocks.Value
+        let allBodyBlocks =
+            if bodySideBlocks.IsEmpty then
+                [ { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps @ [LlvmReturnOp [bodyVal]] } ]
+            else
+                let entryBlock = { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps }
+                let lastBlock = List.last bodySideBlocks
+                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [LlvmReturnOp [bodyVal]] }
+                let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
+                entryBlock :: sideBlocksPatched
+        let innerFuncOp : FuncOp =
+            { Name = closureFnName; InputTypes = [Ptr; I64]; ReturnType = Some I64
+              Body = { Blocks = allBodyBlocks }; IsLlvmFunc = true }
+        env.Funcs.Value <- env.Funcs.Value @ [innerFuncOp]
+
+        // Inline-allocate closure struct and populate it
+        let bytesVal  = { Name = freshName env; Type = I64 }
+        let envPtrVal = { Name = freshName env; Type = Ptr }
+        let fnPtrVal  = { Name = freshName env; Type = Ptr }
+        let allocOps = [
+            ArithConstantOp(bytesVal, int64 ((numCaptures + 1) * 8))
+            LlvmCallOp(envPtrVal, "@GC_malloc", [bytesVal])
+            LlvmAddressOfOp(fnPtrVal, closureFnName)
+            LlvmStoreOp(fnPtrVal, envPtrVal)
+        ]
+        let captureStoreOps =
+            captures |> List.mapi (fun i capName ->
+                let slotVal = { Name = freshName env; Type = Ptr }
+                let capVal  = Map.find capName env.Vars
+                [ LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
+                  LlvmStoreOp(capVal, slotVal) ]
+            ) |> List.concat
+        (envPtrVal, allocOps @ captureStoreOps)
 
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
