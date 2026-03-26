@@ -127,7 +127,7 @@ Plans:
 
 **Milestone Goal:** Extend the compiler with heap-allocated types (string, tuple, list) and pattern matching, backed by Boehm GC runtime. Every heap allocation goes through `GC_malloc`. After this milestone, programs using strings, tuples, lists, and `match` expressions compile and produce correct results.
 
-- [ ] **Phase 7: GC Runtime Integration** - Boehm GC linked into emitted binaries; `GC_INIT` emitted in `@main`; v1 closure `llvm.alloca` environments migrated to `GC_malloc`; `print`/`println` builtins wired
+- [x] **Phase 7: GC Runtime Integration** - Boehm GC linked into emitted binaries; `GC_INIT` emitted in `@main`; v1 closure `llvm.alloca` environments migrated to `GC_malloc`; `print`/`println` builtins wired
 - [ ] **Phase 8: Strings** - String literals compiled to heap-allocated `{i64 length, ptr data}` structs; string equality, `string_length`, `string_concat`, `to_string` builtins working end-to-end
 - [ ] **Phase 9: Tuples** - Tuple construction compiled to `GC_malloc`'d structs; `let (a, b) = ...` tuple destructuring via GEP + load; `TuplePat` in match working
 - [ ] **Phase 10: Lists** - `[]` compiled as null pointer; `h :: t` as GC_malloc'd cons cell; list literal desugaring; list pattern matching via null check + GEP
@@ -145,9 +145,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — MlirIR GC infrastructure (MlirGlobal, ExternalFuncDecl, LlvmCallOp, LlvmCallVoidOp), Printer serialization, Pipeline -lgc linking
-- [ ] 07-02-PLAN.md — Elaborate GC_init in @main, migrate closure alloca to GC_malloc, escaped-closure E2E test
-- [ ] 07-03-PLAN.md — Elaborate print/println builtins as llvm.call @printf with string globals, E2E tests
+- [x] 07-01-PLAN.md — MlirIR GC infrastructure (MlirGlobal, ExternalFuncDecl, LlvmCallOp, LlvmCallVoidOp), Printer serialization, Pipeline -lgc linking
+- [x] 07-02-PLAN.md — Elaborate GC_init in @main, migrate closure alloca to GC_malloc, escaped-closure E2E test
+- [x] 07-03-PLAN.md — Elaborate print/println builtins as llvm.call @printf with string globals, E2E tests
 
 ### Phase 8: Strings
 **Goal**: String literals compile to heap-allocated `{i64 length, ptr data}` two-field structs managed by Boehm GC; the string builtins `print`, `println`, `string_length`, `string_concat`, and `to_string` all work in compiled programs
@@ -224,7 +224,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 4. Known Functions via Elaboration | v1.0 | 1/1 | Complete | 2026-03-26 |
 | 5. Closures via Elaboration | v1.0 | 2/2 | Complete | 2026-03-26 |
 | 6. CLI | v1.0 | 1/1 | Complete | 2026-03-26 |
-| 7. GC Runtime Integration | v2.0 | 0/3 | Not started | - |
+| 7. GC Runtime Integration | v2.0 | 3/3 | Complete | 2026-03-26 |
 | 8. Strings | v2.0 | 0/TBD | Not started | - |
 | 9. Tuples | v2.0 | 0/TBD | Not started | - |
 | 10. Lists | v2.0 | 0/TBD | Not started | - |

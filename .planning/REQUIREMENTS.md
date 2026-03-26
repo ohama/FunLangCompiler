@@ -98,9 +98,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| GC-01 | Phase 7 | Pending |
-| GC-02 | Phase 7 | Pending |
-| GC-03 | Phase 7 | Pending |
+| GC-01 | Phase 7 | Complete |
+| GC-02 | Phase 7 | Complete |
+| GC-03 | Phase 7 | Complete |
 | STR-01 | Phase 8 | Pending |
 | STR-02 | Phase 8 | Pending |
 | STR-03 | Phase 8 | Pending |
