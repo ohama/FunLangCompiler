@@ -343,15 +343,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let result = { Name = freshName env; Type = sig_.ReturnType }
                 (result, argOps @ [DirectCallOp(result, sig_.MlirName, [argVal])])
             | Some sig_ ->
-                // CLOSURE-MAKING CALL — allocate env in current frame, then call
+                // CLOSURE-MAKING CALL — allocate env on GC heap, then call
                 let ci = sig_.ClosureInfo.Value
                 let (argVal, argOps) = elaborateExpr env argExpr
-                let countVal = { Name = freshName env; Type = I64 }
+                let bytesVal = { Name = freshName env; Type = I64 }
                 let envPtrVal = { Name = freshName env; Type = Ptr }
                 let resultVal = { Name = freshName env; Type = Ptr }
                 let setupOps = [
-                    ArithConstantOp(countVal, 1L)
-                    LlvmAllocaOp(envPtrVal, countVal, ci.NumCaptures)
+                    ArithConstantOp(bytesVal, int64 ((ci.NumCaptures + 1) * 8))
+                    LlvmCallOp(envPtrVal, "@GC_malloc", [bytesVal])
                 ]
                 let callOp = DirectCallOp(resultVal, sig_.MlirName, [argVal; envPtrVal])
                 (resultVal, argOps @ setupOps @ [callOp])
@@ -386,10 +386,20 @@ let elaborateModule (expr: Expr) : MlirModule =
             let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [resultVal]] }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
+    let gcInitOp = LlvmCallVoidOp("@GC_init", [])
+    let allBlocksWithGC =
+        match allBlocks with
+        | [] -> allBlocks
+        | entryBlock :: rest ->
+            { entryBlock with Body = gcInitOp :: entryBlock.Body } :: rest
     let mainFunc : FuncOp =
         { Name        = "@main"
           InputTypes  = []
           ReturnType  = Some resultVal.Type
-          Body        = { Blocks = allBlocks }
+          Body        = { Blocks = allBlocksWithGC }
           IsLlvmFunc  = false }
-    { Globals = []; ExternalFuncs = []; Funcs = env.Funcs.Value @ [mainFunc] }
+    let externalFuncs = [
+        { ExtName = "@GC_init";   ExtParams = [];    ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@GC_malloc"; ExtParams = [I64]; ExtReturn = Some Ptr; IsVarArg = false }
+    ]
+    { Globals = []; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
