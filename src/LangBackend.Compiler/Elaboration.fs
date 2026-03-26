@@ -811,13 +811,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 11 (v2): General Match compiler — Jules Jacobs decision tree algorithm.
     // Compiles pattern matching to a binary decision tree, then emits MLIR from the tree.
     // Handles: VarPat, WildcardPat, ConstPat(Int/Bool/String), EmptyListPat, ConsPat, TuplePat.
+    // Phase 13: adds OrPat expansion (PAT-07), when-guard (PAT-06), CharConst (PAT-08).
     | Match(scrutineeExpr, clauses, _) ->
         let (scrutVal, scrutOps) = elaborateExpr env scrutineeExpr
         let mergeLabel = freshLabel env "match_merge"
         let failLabel  = freshLabel env "match_fail"
 
-        // Build arms for MatchCompiler: (Pattern * bodyIndex) list
-        let arms = clauses |> List.mapi (fun i (pat, _guard, _body) -> (pat, i))
+        // PAT-07: Expand OrPat arms into individual arms sharing same guard and body
+        let clauses =
+            clauses |> List.collect (fun (pat, guard, body) ->
+                match pat with
+                | OrPat (alts, _) -> alts |> List.map (fun altPat -> (altPat, guard, body))
+                | _ -> [(pat, guard, body)]
+            )
+
+        // Build arms for MatchCompiler: (Pattern * hasGuard * bodyIndex) list
+        let arms = clauses |> List.mapi (fun i (pat, guardOpt, _body) -> (pat, guardOpt.IsSome, i))
         let rootAcc = MatchCompiler.Root scrutVal.Name
 
         // Compile to decision tree
@@ -1026,6 +1035,32 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     [ { Label = Some matchLabel; Args = []; Body = preloadOps @ matchOps }
                       { Label = Some noMatchLabel; Args = []; Body = noMatchOps } ]
                 resolveOps @ testOps @ [ CfCondBrOp(cond, matchLabel, [], noMatchLabel, []) ]
+            | MatchCompiler.Guard (bindings, bodyIdx, ifFalse) ->
+                // 1. Resolve variable bindings (same as Leaf)
+                let mutable bindOps = []
+                let mutable bindEnv = env
+                for (varName, acc) in bindings do
+                    let (v, ops) = resolveAccessor acc
+                    bindOps <- bindOps @ ops
+                    bindEnv <- { bindEnv with Vars = Map.add varName v bindEnv.Vars }
+                // 2. Evaluate the when-guard under bindEnv → I1 value
+                let (_pat, guardOpt, bodyExpr) = clauses.[bodyIdx]
+                let guard = guardOpt.Value  // HasGuard=true guarantees Some
+                let (guardVal, guardOps) = elaborateExpr bindEnv guard
+                // 3. Emit the ifFalse subtree as a separate block
+                let guardFailLabel = freshLabel env (sprintf "guard_fail%d" bodyIdx)
+                let guardFailOps = emitDecisionTree ifFalse
+                env.Blocks.Value <- env.Blocks.Value @
+                    [ { Label = Some guardFailLabel; Args = []; Body = guardFailOps } ]
+                // 4. Emit the body block (same as Leaf)
+                let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
+                resultType.Value <- bodyVal.Type
+                let bodyLabel = freshLabel env (sprintf "match_body%d" bodyIdx)
+                env.Blocks.Value <- env.Blocks.Value @
+                    [ { Label = Some bodyLabel; Args = [];
+                        Body = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                // 5. Return: bind ops + guard eval + conditional branch
+                bindOps @ guardOps @ [CfCondBrOp(guardVal, bodyLabel, [], guardFailLabel, [])]
 
         let chainEntryOps = emitDecisionTree tree
 
