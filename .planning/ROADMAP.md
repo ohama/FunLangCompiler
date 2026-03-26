@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: MlirIR Foundation** - MlirIR DU (Region/Block/Op/Value/Type), `.mlir` text printer, mlir-opt/translate/clang shell pipeline, E2E smoke test with hardcoded `return 42`
 - [x] **Phase 2: Scalar Codegen via MlirIR** - Elaboration pass introduced for scalar expressions; MlirIR gains scalar arith ops and SSA let/var bindings; integer arithmetic programs compile end-to-end
 - [x] **Phase 3: Booleans, Comparisons, Control Flow** - MlirIR extended with bool/comparison ops and cond_br; Elaboration handles bool literals, comparison, short-circuit logic, and if-else
-- [ ] **Phase 4: Known Functions via Elaboration** - MlirIR extended with FuncOp and direct call; Elaboration handles let rec (no free variables) as forward-declared func.func calls
+- [x] **Phase 4: Known Functions via Elaboration** - MlirIR extended with FuncOp and direct call; Elaboration handles let rec (no free variables) as forward-declared func.func calls
 - [ ] **Phase 5: Closures via Elaboration** - MlirIR extended with closure struct representation and indirect call; Elaboration handles lambda capture, closure allocation, and call dispatch
 - [ ] **Phase 6: CLI** - `.lt` file to native binary CLI driver, module-level declarations
 
@@ -84,7 +84,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 04-01-PLAN.md — DirectCallOp in MlirIR, LetRec/App elaboration with KnownFuncs, factorial and fibonacci E2E tests
+- [x] 04-01-PLAN.md — DirectCallOp in MlirIR, LetRec/App elaboration with KnownFuncs, factorial and fibonacci E2E tests
 
 ### Phase 5: Closures via Elaboration
 **Goal**: Lambda expressions that capture free variables are elaborated into MlirIR closure representations (flat struct with `{fn_ptr, env_fields}`) and emitted with indirect call dispatch, enabling higher-order functions to work correctly
@@ -125,6 +125,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. MlirIR Foundation | 3/3 | Complete | 2026-03-26 |
 | 2. Scalar Codegen via MlirIR | 2/2 | Complete | 2026-03-26 |
 | 3. Booleans, Comparisons, Control Flow | 2/2 | Complete | 2026-03-26 |
-| 4. Known Functions via Elaboration | 0/1 | Not started | - |
+| 4. Known Functions via Elaboration | 1/1 | Complete | 2026-03-26 |
 | 5. Closures via Elaboration | 0/2 | Not started | - |
 | 6. CLI | 0/1 | Not started | - |
