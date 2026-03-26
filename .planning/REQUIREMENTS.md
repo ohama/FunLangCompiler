@@ -92,10 +92,10 @@
 | CTRL-02 | Phase 2 | Complete |
 | CTRL-03 | Phase 2 | Complete |
 | ELAB-01 | Phase 2 | Complete |
-| SCALAR-03 | Phase 3 | Pending |
-| SCALAR-04 | Phase 3 | Pending |
-| SCALAR-05 | Phase 3 | Pending |
-| CTRL-01 | Phase 3 | Pending |
+| SCALAR-03 | Phase 3 | Complete |
+| SCALAR-04 | Phase 3 | Complete |
+| SCALAR-05 | Phase 3 | Complete |
+| CTRL-01 | Phase 3 | Complete |
 | ELAB-02 | Phase 4 | Pending |
 | ELAB-03 | Phase 5 | Pending |
 | ELAB-04 | Phase 5 | Pending |
