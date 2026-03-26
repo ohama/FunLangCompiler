@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 8 of 11 (Strings) — COMPLETE
-Plan: 2 of 2 in phase 8
-Status: Phase complete
-Last activity: 2026-03-26 — Completed 08-02-PLAN.md (string builtins: strcmp equality, string_concat, to_string, ArithExtuIOp, 22 tests passing)
+Phase: 9 of 11 (Tuples) — In progress
+Plan: 1 of 1 in phase 9
+Status: Plan 09-01 complete
+Last activity: 2026-03-26 — Completed 09-01-PLAN.md (tuples: GC_malloc heap structs, GEP+store/load destructuring, 25 tests passing)
 
-Progress: [████████░░░░░░░░░░░░] 8/11 phases started (Phase 8 Strings complete)
+Progress: [█████████░░░░░░░░░░░] 9/11 phases started (Phase 9 Tuples plan 01 complete)
 
 ## Performance Metrics
 
@@ -71,6 +71,9 @@ Recent decisions affecting current work:
 - [08-02]: to_string bool path: elaborate arg (I1), ArithExtuIOp to I64, call @lang_to_string_bool with I64
 - [08-02]: FsLit tests must be single-line — LangThree parser does not accept newlines between sub-expressions
 - [08-02]: string_concat nested App matched before general App: App(App(Var("string_concat"),...),...)  ordered before general App dispatch
+- [09-01]: typeOfPat heuristic for tuple destructuring: TuplePat sub-pattern → load as Ptr; VarPat/WildcardPat → load as I64
+- [09-01]: Sequential let (x,inner) = ... in let (y,z) = inner requires type info to load inner as Ptr; use inline nested TuplePat form instead
+- [09-01]: Match(single TuplePat arm) desugars to LetPat(TuplePat) at elaboration time — no full match compiler needed for TUP-03
 
 ### Pending Todos
 
@@ -84,5 +87,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 08-02-PLAN.md (string builtins: strcmp equality, string_concat, to_string, ArithExtuIOp I1→I64, 22 tests passing — Phase 8 complete)
+Stopped at: Completed 09-01-PLAN.md (tuples: GC_malloc heap structs, GEP+store/load destructuring, typeOfPat heuristic, 25 tests passing)
 Resume file: None
