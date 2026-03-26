@@ -24,11 +24,24 @@ type ElabEnv = {
     KnownFuncs:     Map<string, FuncSignature>
     Funcs:          FuncOp list ref
     ClosureCounter: int ref   // Phase 5: generates unique closure function names
+    Globals:        (string * string) list ref   // Phase 7: (name, rawValue) pairs for string constants
+    GlobalCounter:  int ref                       // Phase 7: counter for unique global names
 }
 
 let emptyEnv () : ElabEnv =
     { Vars = Map.empty; Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
-      KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0 }
+      KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0
+      Globals = ref []; GlobalCounter = ref 0 }
+
+let private addStringGlobal (env: ElabEnv) (rawValue: string) : string =
+    match env.Globals.Value |> List.tryFind (fun (_, v) -> v = rawValue) with
+    | Some (name, _) -> name
+    | None ->
+        let idx = env.GlobalCounter.Value
+        env.GlobalCounter.Value <- idx + 1
+        let name = sprintf "@__str_%d" idx
+        env.Globals.Value <- env.Globals.Value @ [(name, rawValue)]
+        name
 
 let private freshName (env: ElabEnv) : string =
     let n = env.Counter.Value
@@ -125,7 +138,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
               KnownFuncs = env.KnownFuncs
               Funcs = env.Funcs
-              ClosureCounter = env.ClosureCounter }
+              ClosureCounter = env.ClosureCounter
+              Globals = env.Globals
+              GlobalCounter = env.GlobalCounter }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -233,6 +248,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let env' = { env with Vars = Map.add name bv env.Vars }
         let (rv, rops) = elaborateExpr env' bodyExpr
         (rv, bops @ rops)
+    // Phase 7: LetPat with wildcard or var pattern — enables "let _ = print ... in ..."
+    | LetPat (WildcardPat _, bindExpr, bodyExpr, _) ->
+        let (_bv, bops) = elaborateExpr env bindExpr
+        let (rv, rops) = elaborateExpr env bodyExpr
+        (rv, bops @ rops)
+    | LetPat (VarPat (name, _), bindExpr, bodyExpr, _) ->
+        let (bv, bops) = elaborateExpr env bindExpr
+        let env' = { env with Vars = Map.add name bv env.Vars }
+        let (rv, rops) = elaborateExpr env' bodyExpr
+        (rv, bops @ rops)
     | Bool (b, _) ->
         let v = { Name = freshName env; Type = I1 }
         let n = if b then 1L else 0L
@@ -312,7 +337,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
               KnownFuncs = Map.ofList [(name, sig_)]
               Funcs = env.Funcs
-              ClosureCounter = env.ClosureCounter }
+              ClosureCounter = env.ClosureCounter
+              Globals = env.Globals
+              GlobalCounter = env.GlobalCounter }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
@@ -333,6 +360,31 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         env.Funcs.Value <- env.Funcs.Value @ [funcOp]
         let env' = { env with KnownFuncs = Map.add name { sig_ with ReturnType = bodyVal.Type } env.KnownFuncs }
         elaborateExpr env' inExpr
+    // Phase 7: print/println builtins — handle BEFORE general App to match first
+    | App (Var ("print", _), String (s, _), _) ->
+        let globalName = addStringGlobal env s
+        let ptrVal  = { Name = freshName env; Type = Ptr }
+        let fmtRes  = { Name = freshName env; Type = I32 }
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmAddressOfOp(ptrVal, globalName)
+            LlvmCallOp(fmtRes, "@printf", [ptrVal])
+            ArithConstantOp(unitVal, 0L)
+        ]
+        (unitVal, ops)
+
+    | App (Var ("println", _), String (s, _), _) ->
+        let globalName = addStringGlobal env (s + "\n")
+        let ptrVal  = { Name = freshName env; Type = Ptr }
+        let fmtRes  = { Name = freshName env; Type = I32 }
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmAddressOfOp(ptrVal, globalName)
+            LlvmCallOp(fmtRes, "@printf", [ptrVal])
+            ArithConstantOp(unitVal, 0L)
+        ]
+        (unitVal, ops)
+
     | App (funcExpr, argExpr, _) ->
         match funcExpr with
         | Var (name, _) ->
@@ -398,8 +450,10 @@ let elaborateModule (expr: Expr) : MlirModule =
           ReturnType  = Some resultVal.Type
           Body        = { Blocks = allBlocksWithGC }
           IsLlvmFunc  = false }
+    let globals = env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value))
     let externalFuncs = [
         { ExtName = "@GC_init";   ExtParams = [];    ExtReturn = None;     IsVarArg = false }
         { ExtName = "@GC_malloc"; ExtParams = [I64]; ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@printf";    ExtParams = [Ptr]; ExtReturn = Some I32; IsVarArg = true  }
     ]
-    { Globals = []; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
+    { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
