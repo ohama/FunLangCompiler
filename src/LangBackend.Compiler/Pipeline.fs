@@ -1,16 +1,29 @@
 module Pipeline
 
+open System
 open System.Diagnostics
 open System.IO
 open MlirIR
 
-// Absolute tool paths — verified on this machine (LLVM 20.1.4)
-[<Literal>]
-let private MlirOpt       = "/usr/local/bin/mlir-opt"
-[<Literal>]
-let private MlirTranslate = "/usr/local/bin/mlir-translate"
-[<Literal>]
-let private Clang         = "/usr/local/bin/clang"
+/// Resolve an LLVM tool binary by name.
+/// Search order:
+///   1. $LLVM_BIN_DIR/<name>            (explicit override)
+///   2. /opt/homebrew/opt/llvm/bin/<name> (macOS Homebrew)
+///   3. /usr/local/bin/<name>            (Linux / manual install)
+let private resolveTool (name: string) : string =
+    let candidates =
+        [ let envDir = Environment.GetEnvironmentVariable("LLVM_BIN_DIR")
+          if not (String.IsNullOrEmpty envDir) then
+              yield Path.Combine(envDir, name)
+          yield Path.Combine("/opt/homebrew/opt/llvm/bin", name)
+          yield Path.Combine("/usr/local/bin", name) ]
+    candidates
+    |> List.tryFind File.Exists
+    |> Option.defaultValue (Path.Combine("/usr/local/bin", name))  // last resort; will fail with clear message
+
+let private MlirOpt       = resolveTool "mlir-opt"
+let private MlirTranslate = resolveTool "mlir-translate"
+let private Clang         = resolveTool "clang"
 
 type CompileError =
     | MlirOptFailed   of exitCode: int * stderr: string
