@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v2.0 — Phase 7: GC Runtime Integration
+**Current focus:** v2.0 — Phase 8: Strings
 
 ## Current Position
 
-Phase: 7 of 11 (GC Runtime Integration)
-Plan: 3 of TBD in current phase
+Phase: 8 of 11 (Strings)
+Plan: 1 of TBD in current phase
 Status: In progress
-Last activity: 2026-03-26 — Completed 07-03-PLAN.md (print/println builtins via @printf, string globals, LetPat elaboration)
+Last activity: 2026-03-26 — Completed 08-01-PLAN.md (string struct foundation: LlvmGEPStructOp, lang_runtime.c, string_length, 19 tests passing)
 
-Progress: [██████░░░░░░░░░░░░░░] 6/11 phases complete (v1.0 done, v2.0 in progress)
+Progress: [███████░░░░░░░░░░░░░] 7/11 phases complete (v1.0 done, v2.0 in progress)
 
 ## Performance Metrics
 
@@ -63,6 +63,10 @@ Recent decisions affecting current work:
 - [07-03]: print/println special-cased as App(Var("print"|"println"), String(s)) before general App branch
 - [07-03]: LetPat(WildcardPat) added to support "let _ = expr in body" sequencing idiom
 - [07-03]: @printf always declared in ExternalFuncs unconditionally alongside GC_init and GC_malloc
+- [08-01]: LlvmGEPStructOp hardcodes !llvm.struct<(i64, ptr)> — generic StructType deferred to Phase 9 tuples
+- [08-01]: lang_runtime.c compiled per-invocation to temp .runtime.o — consistent with temp-file pipeline pattern
+- [08-01]: @strcmp, @lang_string_concat, @lang_to_string_int, @lang_to_string_bool always declared in ExternalFuncs unconditionally
+- [08-01]: gcIncludeFlag added to Pipeline for macOS bdw-gc header path when compiling lang_runtime.c
 
 ### Pending Todos
 
@@ -76,5 +80,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 07-03-PLAN.md (print/println builtins — string globals, @printf, LetPat, 18 tests passing)
+Stopped at: Completed 08-01-PLAN.md (string struct foundation — LlvmGEPStructOp, lang_runtime.c, string_length builtin, 19 tests passing)
 Resume file: None
