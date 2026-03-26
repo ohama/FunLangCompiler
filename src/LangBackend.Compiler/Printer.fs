@@ -12,6 +12,18 @@ let private printOp (indent: string) (op: MlirOp) : string =
     | ArithConstantOp(result, value) ->
         sprintf "%s%s = arith.constant %d : %s"
             indent result.Name value (printType result.Type)
+    | ArithAddIOp(result, lhs, rhs) ->
+        sprintf "%s%s = arith.addi %s, %s : %s"
+            indent result.Name lhs.Name rhs.Name (printType result.Type)
+    | ArithSubIOp(result, lhs, rhs) ->
+        sprintf "%s%s = arith.subi %s, %s : %s"
+            indent result.Name lhs.Name rhs.Name (printType result.Type)
+    | ArithMulIOp(result, lhs, rhs) ->
+        sprintf "%s%s = arith.muli %s, %s : %s"
+            indent result.Name lhs.Name rhs.Name (printType result.Type)
+    | ArithDivSIOp(result, lhs, rhs) ->
+        sprintf "%s%s = arith.divsi %s, %s : %s"
+            indent result.Name lhs.Name rhs.Name (printType result.Type)
     | ReturnOp [] ->
         sprintf "%sreturn" indent
     | ReturnOp operands ->

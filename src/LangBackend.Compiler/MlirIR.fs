@@ -14,9 +14,14 @@ type MlirValue = {
 
 // Operations — one DU case per MLIR op
 // Phase 1: arith.constant and func.return
+// Phase 2: binary arith ops
 // Future phases add cases here without changing MlirModule/FuncOp/Block/Region shape
 type MlirOp =
     | ArithConstantOp of result: MlirValue * value: int64
+    | ArithAddIOp     of result: MlirValue * lhs: MlirValue * rhs: MlirValue
+    | ArithSubIOp     of result: MlirValue * lhs: MlirValue * rhs: MlirValue
+    | ArithMulIOp     of result: MlirValue * lhs: MlirValue * rhs: MlirValue
+    | ArithDivSIOp    of result: MlirValue * lhs: MlirValue * rhs: MlirValue
     | ReturnOp        of operands: MlirValue list
 
 // A basic block: optional label, block arguments, sequence of ops
