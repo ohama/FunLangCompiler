@@ -107,6 +107,17 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         Set.union bindFree bodyFree
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
+/// Detect whether a LetRec body uses list patterns on the parameter,
+/// indicating the parameter should be typed Ptr (list pointer) rather than I64.
+let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
+    match bodyExpr with
+    | Match(Var(scrutinee, _), clauses, _) when scrutinee = paramName ->
+        clauses |> List.exists (fun (pat, _, _) ->
+            match pat with
+            | EmptyListPat _ | ConsPat _ -> true
+            | _ -> false)
+    | _ -> false
+
 let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     match expr with
     | Number (n, _) ->
@@ -431,10 +442,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         (mergeArg, leftOps @ [CfCondBrOp(leftVal, mergeLabel, [leftVal], evalRightLabel, [])])
     | LetRec (name, param, body, inExpr, _) ->
+        let paramType = if isListParamBody param body then Ptr else I64
         let sig_ : FuncSignature =
-            { MlirName = "@" + name; ParamTypes = [I64]; ReturnType = I64; ClosureInfo = None }
+            { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = I64; ClosureInfo = None }
         let bodyEnv : ElabEnv =
-            { Vars = Map.ofList [(param, { Name = "%arg0"; Type = I64 })]
+            { Vars = Map.ofList [(param, { Name = "%arg0"; Type = paramType })]
               Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
               KnownFuncs = Map.ofList [(name, sig_)]
               Funcs = env.Funcs
@@ -454,7 +466,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 entryBlock :: sideBlocksPatched
         let funcOp : FuncOp =
             { Name = "@" + name
-              InputTypes = [I64]
+              InputTypes = [paramType]
               ReturnType = Some bodyVal.Type
               Body = { Blocks = allBodyBlocks }
               IsLlvmFunc = false }
@@ -620,6 +632,93 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Match (scrutinee, [(TuplePat (pats, patSpan), None, body)], span) ->
         let syntheticPat = TuplePat(pats, patSpan)
         elaborateExpr env (LetPat(syntheticPat, scrutinee, body, span))
+
+    // Phase 10: EmptyList — null pointer constant
+    | EmptyList _ ->
+        let v = { Name = freshName env; Type = Ptr }
+        (v, [LlvmNullOp(v)])
+
+    // Phase 10: Cons — GC_malloc(16) cons cell with head at slot 0, tail at slot 1
+    | Cons(headExpr, tailExpr, _) ->
+        let (headVal, headOps) = elaborateExpr env headExpr
+        let (tailVal, tailOps) = elaborateExpr env tailExpr
+        let bytesVal = { Name = freshName env; Type = I64 }
+        let cellPtr  = { Name = freshName env; Type = Ptr }
+        let tailSlot = { Name = freshName env; Type = Ptr }
+        let allocOps = [
+            ArithConstantOp(bytesVal, 16L)
+            LlvmCallOp(cellPtr, "@GC_malloc", [bytesVal])
+            LlvmStoreOp(headVal, cellPtr)               // head at slot 0 (base ptr)
+            LlvmGEPLinearOp(tailSlot, cellPtr, 1)       // slot 1 for tail
+            LlvmStoreOp(tailVal, tailSlot)              // store tail ptr at slot 1
+        ]
+        (cellPtr, headOps @ tailOps @ allocOps)
+
+    // Phase 10: List literal — desugar [e1; e2; e3] to Cons(e1, Cons(e2, Cons(e3, EmptyList)))
+    | List(elems, span) ->
+        let desugared = List.foldBack (fun elem acc -> Cons(elem, acc, span)) elems (EmptyList span)
+        elaborateExpr env desugared
+
+    // Phase 10: Match with EmptyListPat + ConsPat arms — null-check CfCondBrOp chain
+    | Match(scrutineeExpr, clauses, _) ->
+        let (scrutVal, scrutOps) = elaborateExpr env scrutineeExpr
+
+        // Find EmptyListPat arm and ConsPat arm
+        let emptyArm =
+            clauses |> List.tryFind (fun (pat, guard, _) ->
+                guard.IsNone && match pat with EmptyListPat _ -> true | _ -> false)
+        let consArm =
+            clauses |> List.tryFind (fun (pat, guard, _) ->
+                guard.IsNone && match pat with ConsPat _ -> true | _ -> false)
+
+        match emptyArm, consArm with
+        | Some(_, _, emptyExpr), Some(ConsPat(hPat, tPat, _), _, consExpr) ->
+            // Null check: isNull = (scrutVal == null)
+            let nullVal    = { Name = freshName env; Type = Ptr }
+            let isNull     = { Name = freshName env; Type = I1 }
+            let emptyLabel = freshLabel env "list_empty"
+            let consLabel  = freshLabel env "list_cons"
+            let mergeLabel = freshLabel env "list_merge"
+
+            // Elaborate empty arm
+            let (emptyVal, emptyOps) = elaborateExpr env emptyExpr
+
+            // Elaborate cons arm: bind head and tail vars, then elaborate body
+            let headName = match hPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failwithf "Elaboration: ConsPat head pattern must be VarPat or WildcardPat"
+            let tailName = match tPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failwithf "Elaboration: ConsPat tail pattern must be VarPat or WildcardPat"
+
+            let headVal  = { Name = freshName env; Type = I64 }   // head is i64 for integer lists
+            let tailSlot = { Name = freshName env; Type = Ptr }
+            let tailVal  = { Name = freshName env; Type = Ptr }
+
+            let headLoadOp = LlvmLoadOp(headVal, scrutVal)
+            let tailGepOp  = LlvmGEPLinearOp(tailSlot, scrutVal, 1)
+            let tailLoadOp = LlvmLoadOp(tailVal, tailSlot)
+
+            let consEnv =
+                env
+                |> (fun e -> match headName with Some n -> { e with Vars = Map.add n headVal e.Vars } | None -> e)
+                |> (fun e -> match tailName with Some n -> { e with Vars = Map.add n tailVal e.Vars } | None -> e)
+
+            let (consBodyVal, consBodyOps) = elaborateExpr consEnv consExpr
+            let mergeArg = { Name = freshName env; Type = emptyVal.Type }
+
+            // Build blocks
+            env.Blocks.Value <- env.Blocks.Value @
+                [ { Label = Some emptyLabel; Args = []; Body = emptyOps @ [CfBrOp(mergeLabel, [emptyVal])] } ]
+            env.Blocks.Value <- env.Blocks.Value @
+                [ { Label = Some consLabel; Args = []; Body = [headLoadOp; tailGepOp; tailLoadOp] @ consBodyOps @ [CfBrOp(mergeLabel, [consBodyVal])] } ]
+            env.Blocks.Value <- env.Blocks.Value @
+                [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
+
+            let nullCheckOps = [
+                LlvmNullOp(nullVal)
+                LlvmIcmpOp(isNull, "eq", scrutVal, nullVal)
+            ]
+            (mergeArg, scrutOps @ nullCheckOps @ [CfCondBrOp(isNull, emptyLabel, [], consLabel, [])])
+
+        | _ ->
+            failwithf "Elaboration: Match only supports two-arm EmptyListPat + ConsPat pattern in Phase 10 (found unsupported pattern combination)"
 
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
