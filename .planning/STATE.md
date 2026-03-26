@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 14-builtin-extensions (1/1 plans complete)
-Plan: 14-01 of 01
+Phase: 15-range (1/1 plans complete)
+Plan: 15 of 01
 Status: Phase complete
-Last activity: 2026-03-26 — Completed 14-01-PLAN.md (failwith, string_sub, string_contains, string_to_int, char_to_int, int_to_char)
+Last activity: 2026-03-26 — Completed 15-PLAN.md ([start..stop] and [start..step..stop] range syntax)
 
-Progress: [████░░░░░░] 40% (4 plans done, v3.0 in progress)
+Progress: [█████░░░░░] 50% (5 plans done, v3.0 in progress)
 
 ## Performance Metrics
 
@@ -41,6 +41,8 @@ Progress: [████░░░░░░] 40% (4 plans done, v3.0 in progress)
 - char_to_int and int_to_char are identity elaborations — char is already i64 (14-01)
 - string_contains: C returns I64 0/1; ArithCmpIOp(ne, 0) converts to I1 for boolean use (14-01)
 - failwith: LlvmCallVoidOp + dead ArithConstantOp(0L) for unit return type (14-01)
+- Range -> lang_range(start, stop, step): C runtime returns ptr to Phase-10-compatible cons list; default step=1 is ArithConstantOp(v, 1L) (15)
+- FsLit test inputs must not have trailing newlines — indent-sensitive lexer emits NEWLINE tokens that break the parser (15)
 
 ### Pending Todos
 
@@ -53,5 +55,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 14-01-PLAN.md — phase 14-builtin-extensions complete
+Stopped at: Completed 15-PLAN.md — phase 15-range complete
 Resume file: None
