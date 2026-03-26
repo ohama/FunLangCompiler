@@ -8,6 +8,21 @@ let private printType = function
     | I1  -> "i1"
     | Ptr -> "!llvm.ptr"
 
+let private printGlobal (g: MlirGlobal) : string =
+    match g with
+    | StringConstant(name, value) ->
+        let escaped = value.Replace("\n", "\\0A") + "\\00"
+        sprintf "  llvm.mlir.global internal constant %s(\"%s\") {addr_space = 0 : i32}" name escaped
+
+let private printExternalDecl (d: ExternalFuncDecl) : string =
+    let paramStr = d.ExtParams |> List.map printType |> String.concat ", "
+    let varargSuffix = if d.IsVarArg then ", ..." else ""
+    let retStr =
+        match d.ExtReturn with
+        | None -> ""
+        | Some t -> sprintf " -> %s" (printType t)
+    sprintf "  llvm.func %s(%s%s)%s" d.ExtName paramStr varargSuffix retStr
+
 let private printOp (indent: string) (op: MlirOp) : string =
     match op with
     | ArithConstantOp(result, value) ->
@@ -78,6 +93,23 @@ let private printOp (indent: string) (op: MlirOp) : string =
     | IndirectCallOp(result, fnPtr, envPtr, arg) ->
         sprintf "%s%s = llvm.call %s(%s, %s) : !llvm.ptr, (!llvm.ptr, %s) -> %s"
             indent result.Name fnPtr.Name envPtr.Name arg.Name (printType arg.Type) (printType result.Type)
+    // Phase 7: GC/external calls
+    | LlvmCallOp(result, callee, args) ->
+        let argList = args |> List.map (fun v -> v.Name) |> String.concat ", "
+        let argTypes = args |> List.map (fun v -> printType v.Type) |> String.concat ", "
+        if callee = "@printf" then
+            sprintf "%s%s = llvm.call %s(%s) vararg(!llvm.func<i32 (ptr, ...)>) : (%s) -> %s"
+                indent result.Name callee argList argTypes (printType result.Type)
+        else
+            sprintf "%s%s = llvm.call %s(%s) : (%s) -> %s"
+                indent result.Name callee argList argTypes (printType result.Type)
+    | LlvmCallVoidOp(callee, args) ->
+        if args.IsEmpty then
+            sprintf "%sllvm.call %s() : () -> ()" indent callee
+        else
+            let argList = args |> List.map (fun v -> v.Name) |> String.concat ", "
+            let argTypes = args |> List.map (fun v -> printType v.Type) |> String.concat ", "
+            sprintf "%sllvm.call %s(%s) : (%s) -> ()" indent callee argList argTypes
     | ReturnOp [] ->
         sprintf "%sreturn" indent
     | ReturnOp operands ->
@@ -117,6 +149,13 @@ let private printFuncOp (func: FuncOp) : string =
 
 /// Serialize an MlirModule to valid MLIR 20 text.
 /// Pure function — no I/O. Caller is responsible for writing to disk.
+/// Output order: globals, then external func decls, then func definitions (required by MLIR 20).
 let printModule (m: MlirModule) : string =
-    let funcTexts = m.Funcs |> List.map printFuncOp |> String.concat "\n"
-    sprintf "module {\n%s\n}" funcTexts
+    let globalTexts = m.Globals |> List.map printGlobal |> String.concat "\n"
+    let externTexts = m.ExternalFuncs |> List.map printExternalDecl |> String.concat "\n"
+    let funcTexts   = m.Funcs |> List.map printFuncOp |> String.concat "\n"
+    let sections =
+        [ if globalTexts <> "" then globalTexts
+          if externTexts <> "" then externTexts
+          funcTexts ]
+    sprintf "module {\n%s\n}" (sections |> String.concat "\n")
