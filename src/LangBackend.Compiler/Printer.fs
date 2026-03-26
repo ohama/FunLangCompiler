@@ -42,6 +42,11 @@ let private printOp (indent: string) (op: MlirOp) : string =
                 let inner = args |> List.map (fun (v: MlirValue) -> sprintf "%s : %s" v.Name (printType v.Type)) |> String.concat ", "
                 sprintf "(%s)" inner
         sprintf "%scf.br ^%s%s" indent label (fmtArgs args)
+    | DirectCallOp(result, callee, args) ->
+        let argNames = args |> List.map (fun (v: MlirValue) -> v.Name) |> String.concat ", "
+        let argTypes = args |> List.map (fun (v: MlirValue) -> printType v.Type) |> String.concat ", "
+        sprintf "%s%s = func.call %s(%s) : (%s) -> %s"
+            indent result.Name callee argNames argTypes (printType result.Type)
     | ReturnOp [] ->
         sprintf "%sreturn" indent
     | ReturnOp operands ->

@@ -3,15 +3,24 @@ module Elaboration
 open Ast
 open MlirIR
 
+type FuncSignature = {
+    MlirName:   string
+    ParamTypes: MlirType list
+    ReturnType: MlirType
+}
+
 type ElabEnv = {
     Vars:         Map<string, MlirValue>
     Counter:      int ref
     LabelCounter: int ref
     Blocks:       MlirBlock list ref
+    KnownFuncs:   Map<string, FuncSignature>
+    Funcs:        FuncOp list ref
 }
 
 let emptyEnv () : ElabEnv =
-    { Vars = Map.empty; Counter = ref 0; LabelCounter = ref 0; Blocks = ref [] }
+    { Vars = Map.empty; Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
+      KnownFuncs = Map.empty; Funcs = ref [] }
 
 let private freshName (env: ElabEnv) : string =
     let n = env.Counter.Value
@@ -133,6 +142,44 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         (mergeArg, leftOps @ [CfCondBrOp(leftVal, mergeLabel, [leftVal], evalRightLabel, [])])
+    | LetRec (name, param, body, inExpr, _) ->
+        let sig_ : FuncSignature = { MlirName = "@" + name; ParamTypes = [I64]; ReturnType = I64 }
+        let bodyEnv : ElabEnv =
+            { Vars = Map.ofList [(param, { Name = "%arg0"; Type = I64 })]
+              Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
+              KnownFuncs = Map.ofList [(name, sig_)]
+              Funcs = env.Funcs }
+        let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
+        let bodySideBlocks = bodyEnv.Blocks.Value
+        let allBodyBlocks =
+            if bodySideBlocks.IsEmpty then
+                [ { Label = None; Args = []; Body = bodyEntryOps @ [ReturnOp [bodyVal]] } ]
+            else
+                let entryBlock = { Label = None; Args = []; Body = bodyEntryOps }
+                let lastBlock = List.last bodySideBlocks
+                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [bodyVal]] }
+                let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
+                entryBlock :: sideBlocksPatched
+        let funcOp : FuncOp =
+            { Name = "@" + name
+              InputTypes = [I64]
+              ReturnType = Some bodyVal.Type
+              Body = { Blocks = allBodyBlocks } }
+        env.Funcs.Value <- env.Funcs.Value @ [funcOp]
+        let env' = { env with KnownFuncs = Map.add name { sig_ with ReturnType = bodyVal.Type } env.KnownFuncs }
+        elaborateExpr env' inExpr
+    | App (funcExpr, argExpr, _) ->
+        match funcExpr with
+        | Var (name, _) ->
+            match Map.tryFind name env.KnownFuncs with
+            | Some sig_ ->
+                let (argVal, argOps) = elaborateExpr env argExpr
+                let result = { Name = freshName env; Type = sig_.ReturnType }
+                (result, argOps @ [DirectCallOp(result, sig_.MlirName, [argVal])])
+            | None ->
+                failwithf "Elaboration: unsupported App — '%s' is not a known function in Phase 4" name
+        | _ ->
+            failwithf "Elaboration: unsupported App (only direct calls to known functions supported in Phase 4)"
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
@@ -149,13 +196,9 @@ let elaborateModule (expr: Expr) : MlirModule =
             let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [resultVal]] }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
-    {
-        Funcs = [
-            {
-                Name       = "@main"
-                InputTypes = []
-                ReturnType = Some resultVal.Type
-                Body = { Blocks = allBlocks }
-            }
-        ]
-    }
+    let mainFunc : FuncOp =
+        { Name       = "@main"
+          InputTypes = []
+          ReturnType = Some resultVal.Type
+          Body = { Blocks = allBlocks } }
+    { Funcs = env.Funcs.Value @ [mainFunc] }
