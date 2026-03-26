@@ -76,3 +76,39 @@ int64_t lang_string_contains(LangString* s, LangString* sub) {
 int64_t lang_string_to_int(LangString* s) {
     return (int64_t)strtol(s->data, NULL, 10);
 }
+
+/* Cons cell layout: {int64_t head @ offset 0, ConsCell* tail @ offset 8} — 16 bytes total */
+/* Matches Phase 10 GC_malloc(16) cons cell layout exactly. */
+typedef struct LangCons {
+    int64_t         head;
+    struct LangCons* tail;
+} LangCons;
+
+/* lang_range: build inclusive cons list [start..step..stop].
+   step must be non-zero. Returns NULL (empty list) when range is immediately empty. */
+LangCons* lang_range(int64_t start, int64_t stop, int64_t step) {
+    if (step == 0) {
+        fprintf(stderr, "Fatal: range step cannot be zero\n");
+        exit(1);
+    }
+    LangCons* head = NULL;
+    LangCons** cursor = &head;
+    if (step > 0) {
+        for (int64_t i = start; i <= stop; i += step) {
+            LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+            cell->head = i;
+            cell->tail = NULL;
+            *cursor = cell;
+            cursor = &cell->tail;
+        }
+    } else {
+        for (int64_t i = start; i >= stop; i += step) {
+            LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+            cell->head = i;
+            cell->tail = NULL;
+            *cursor = cell;
+            cursor = &cell->tail;
+        }
+    }
+    return head;
+}
