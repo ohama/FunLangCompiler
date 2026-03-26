@@ -97,9 +97,9 @@
 | SCALAR-05 | Phase 3 | Complete |
 | CTRL-01 | Phase 3 | Complete |
 | ELAB-02 | Phase 4 | Complete |
-| ELAB-03 | Phase 5 | Pending |
-| ELAB-04 | Phase 5 | Pending |
-| TEST-02 | Phase 5 | Pending |
+| ELAB-03 | Phase 5 | Complete |
+| ELAB-04 | Phase 5 | Complete |
+| TEST-02 | Phase 5 | Complete |
 | CLI-01 | Phase 6 | Pending |
 
 **Coverage:**
