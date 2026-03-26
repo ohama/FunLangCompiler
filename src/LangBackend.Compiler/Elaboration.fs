@@ -97,6 +97,14 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         let innerBound = Set.add name (Set.add param boundVars)
         Set.union (freeVars innerBound body) (freeVars (Set.add name boundVars) inExpr)
     | String _ -> Set.empty
+    | Tuple (exprs, _) ->
+        exprs |> List.map (freeVars boundVars) |> Set.unionMany
+    | LetPat (TuplePat (pats, _), bindExpr, bodyExpr, _) ->
+        let bindFree = freeVars boundVars bindExpr
+        let extractVarName p = match p with | VarPat (name, _) -> [name] | _ -> []
+        let patBound = pats |> List.collect extractVarName |> Set.ofList
+        let bodyFree = freeVars (Set.union boundVars patBound) bodyExpr
+        Set.union bindFree bodyFree
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
@@ -280,6 +288,37 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let env' = { env with Vars = Map.add name bv env.Vars }
         let (rv, rops) = elaborateExpr env' bodyExpr
         (rv, bops @ rops)
+    // Phase 9: LetPat with TuplePat — destructure a heap-allocated tuple via GEP + load
+    | LetPat (TuplePat (pats, _), bindExpr, bodyExpr, _) ->
+        let (tupPtrVal, bindOps) = elaborateExpr env bindExpr
+        // Recursively bind patterns to extracted values from a tuple ptr
+        let rec bindTuplePat (envAcc: ElabEnv) (ptrVal: MlirValue) (subPats: Pattern list) : MlirOp list * ElabEnv =
+            let loadTypeOfPat = function
+                | TuplePat _ -> Ptr
+                | _          -> I64
+            subPats
+            |> List.mapi (fun i pat -> (i, pat))
+            |> List.fold (fun (opsAcc, eAcc: ElabEnv) (i, pat) ->
+                let slotVal  = { Name = freshName env; Type = Ptr }
+                let fieldVal = { Name = freshName env; Type = loadTypeOfPat pat }
+                let gepOp    = LlvmGEPLinearOp(slotVal, ptrVal, i)
+                let loadOp   = LlvmLoadOp(fieldVal, slotVal)
+                match pat with
+                | VarPat (vname, _) ->
+                    let eAcc' = { eAcc with Vars = Map.add vname fieldVal eAcc.Vars }
+                    (opsAcc @ [gepOp; loadOp], eAcc')
+                | WildcardPat _ ->
+                    (opsAcc @ [gepOp; loadOp], eAcc)
+                | TuplePat (innerPats, _) ->
+                    // fieldVal is a Ptr to the inner tuple — recurse
+                    let (innerOps, innerEnv) = bindTuplePat eAcc fieldVal innerPats
+                    (opsAcc @ [gepOp; loadOp] @ innerOps, innerEnv)
+                | _ ->
+                    failwithf "Elaboration: unsupported sub-pattern in TuplePat: %A" pat
+            ) ([], envAcc)
+        let (extractOps, env') = bindTuplePat env tupPtrVal pats
+        let (bodyVal, bodyOps) = elaborateExpr env' bodyExpr
+        (bodyVal, bindOps @ extractOps @ bodyOps)
     | Bool (b, _) ->
         let v = { Name = freshName env; Type = I1 }
         let n = if b then 1L else 0L
@@ -554,6 +593,34 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     failwithf "Elaboration: unsupported App — '%s' is not a known function or closure value" name
         | _ ->
             failwithf "Elaboration: unsupported App (only named function application supported in Phase 5)"
+    // Phase 9: Tuple construction — GC_malloc(n*8) + sequential GEP + store
+    | Tuple (exprs, _) ->
+        let n = List.length exprs
+        // Elaborate all field expressions first
+        let fieldResults = exprs |> List.map (fun e -> elaborateExpr env e)
+        let allFieldOps  = fieldResults |> List.collect snd
+        let fieldVals    = fieldResults |> List.map fst
+        // GC_malloc(n * 8) to allocate the tuple struct
+        let bytesVal  = { Name = freshName env; Type = I64 }
+        let tupPtrVal = { Name = freshName env; Type = Ptr }
+        let allocOps  = [
+            ArithConstantOp(bytesVal, int64 (n * 8))
+            LlvmCallOp(tupPtrVal, "@GC_malloc", [bytesVal])
+        ]
+        // Store each field: GEP ptr[i] + store value at slot
+        let storeOps =
+            fieldVals |> List.mapi (fun i fv ->
+                let slotVal = { Name = freshName env; Type = Ptr }
+                [ LlvmGEPLinearOp(slotVal, tupPtrVal, i)
+                  LlvmStoreOp(fv, slotVal) ]
+            ) |> List.concat
+        (tupPtrVal, allFieldOps @ allocOps @ storeOps)
+
+    // Phase 9: Match with single TuplePat arm — desugar to LetPat(TuplePat)
+    | Match (scrutinee, [(TuplePat (pats, patSpan), None, body)], span) ->
+        let syntheticPat = TuplePat(pats, patSpan)
+        elaborateExpr env (LetPat(syntheticPat, scrutinee, body, span))
+
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
