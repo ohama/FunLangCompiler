@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 5 — Closures via Elaboration
+**Current focus:** Phase 5 complete — Phase 6 next
 
 ## Current Position
 
-Phase: 5 of 6 (Closures via Elaboration) — In progress
-Plan: 1 of N in phase 05 — Plan 01 complete
-Status: Phase 5 Plan 01 complete — closure IR types + Printer + Elaboration Lambda handler done
-Last activity: 2026-03-26 — Completed 05-01-PLAN.md (Ptr type, 7 LLVM ops, IsLlvmFunc, freeVars, ClosureInfo, Lambda in Let handler, 11/11 FsLit pass)
+Phase: 5 of 6 (Closures via Elaboration) — COMPLETE
+Plan: 2 of 2 in phase 05 — Plan 02 complete
+Status: Phase 5 complete — closure E2E pipeline verified, 13/13 FsLit tests green, add_n exits 8
+Last activity: 2026-03-26 — Completed 05-02-PLAN.md (freeVars bug fix, 2 new closure FsLit tests, 13/13 pass)
 
-Progress: [███████░░░] 65%
+Progress: [████████░░] 75%
 
 ## Performance Metrics
 
@@ -31,11 +31,11 @@ Progress: [███████░░░] 65%
 | 02-scalar-codegen-via-mlirir | 2 | ~4 min | ~2 min |
 | 03-booleans-comparisons-control-flow | 2 | ~4 min | ~2 min |
 | 04-known-functions-via-elaboration | 1 | ~3 min | ~3 min |
-| 05-closures-via-elaboration | 1 | ~6 min | ~6 min |
+| 05-closures-via-elaboration | 2 | ~9 min | ~4.5 min |
 
 **Recent Trend:**
-- Last 9 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min), 04-01 (3 min), 05-01 (6 min)
-- Trend: Stable ~2-3 min/plan; 05-01 longer due to complexity of closure machinery
+- Last 10 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min), 04-01 (3 min), 05-01 (6 min), 05-02 (3 min)
+- Trend: Stable ~2-3 min/plan; closure plans slightly longer due to MLIR IR complexity
 
 *Updated after each plan completion*
 
@@ -76,6 +76,7 @@ Recent decisions affecting current work:
 - [05-01]: Caller-allocates closure (alloca in caller's frame before calling closure-maker) — callee-allocates causes stack-use-after-return UB
 - [05-01]: Lambda body functions are llvm.func (IsLlvmFunc = true); closure-maker wrappers are func.func (IsLlvmFunc = false)
 - [05-01]: freeVars {outerParam, innerParam} innerBody equivalent to freeVars {outerParam} (Lambda(innerParam, body)) — avoids Span.empty which doesn't exist (only unknownSpan)
+- [05-02 CORRECTS 05-01]: Captures computed as freeVars (Set.singleton innerParam) innerBody — NOT {outerParam, innerParam}. Using both params as bound incorrectly excluded outerParam from captures list; fix: only innerParam is bound when computing variables that need to be captured into the closure struct
 - [05-01]: Captures sorted (List.sort) for deterministic GEP index assignment
 - [05-01]: ClosureCounter shared across module elaboration (same ref in ElabEnv) for globally unique closure function names
 - [05-01]: LlvmReturnOp in llvm.func bodies; ReturnOp in func.func bodies — never mixed (critical anti-pattern)
@@ -93,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T03:41:43Z
-Stopped at: Completed 05-01-PLAN.md — Ptr type, 7 LLVM MlirOps, IsLlvmFunc, freeVars, ClosureInfo, Lambda in Let handler; 11/11 FsLit pass
+Last session: 2026-03-26T03:48:16Z
+Stopped at: Completed 05-02-PLAN.md — freeVars bug fix, 2 closure E2E tests, 13/13 FsLit pass; Phase 5 complete
 Resume file: None
