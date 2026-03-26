@@ -40,6 +40,9 @@ let private printOp (indent: string) (op: MlirOp) : string =
     | ArithDivSIOp(result, lhs, rhs) ->
         sprintf "%s%s = arith.divsi %s, %s : %s"
             indent result.Name lhs.Name rhs.Name (printType result.Type)
+    | ArithRemSIOp(result, lhs, rhs) ->
+        sprintf "%s%s = arith.remsi %s, %s : %s"
+            indent result.Name lhs.Name rhs.Name (printType result.Type)
     | ArithCmpIOp(result, predicate, lhs, rhs) ->
         sprintf "%s%s = arith.cmpi %s, %s, %s : %s"
             indent result.Name predicate lhs.Name rhs.Name (printType lhs.Type)
