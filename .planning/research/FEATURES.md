@@ -1,6 +1,6 @@
 # Feature Landscape
 
-**Domain:** Functional language compiler backend (ML-style, MLIR → LLVM → native)
+**Domain:** Compiled ML-style functional language — v2.0 Data Types & Pattern Matching
 **Researched:** 2026-03-26
 **Confidence:** HIGH
 
@@ -8,220 +8,292 @@
 
 ## Scope Anchor
 
-This file addresses the v1 compiler for LangThree: integers, booleans, arithmetic, comparisons, logical operators, let bindings, let rec (recursion), lambda, function application, if-else. Strings, tuples, lists, pattern matching, and ADTs are explicitly deferred to v2+.
+This file addresses the v2.0 milestone: adding GC runtime, strings, tuples, lists, and
+pattern matching to the existing LangBackend compiler. v1 already handles int, bool,
+arithmetic, comparisons, logical ops, if-else, let, let rec, lambda, closures, and the
+CLI. The LangThree AST already defines all target nodes — the work is entirely in the
+compiler backend (Elaboration, MlirIR, Printer).
+
+---
+
+## What the LangThree AST Defines (Authoritative Source)
+
+Read from `../LangThree/src/LangThree/Ast.fs` and `Eval.fs` (direct inspection).
+
+### Values already in the runtime model
+
+| Value | AST Node | Eval representation |
+|-------|----------|---------------------|
+| String | `String of string * Span` | `StringValue of string` |
+| Char | `Char of char * Span` | `CharValue of char` |
+| Tuple | `Tuple of Expr list * Span` | `TupleValue of Value list` |
+| Empty list | `EmptyList of Span` | `ListValue []` |
+| List literal | `List of Expr list * Span` | `ListValue of Value list` |
+| Cons | `Cons of Expr * Expr * Span` | `ListValue (h :: t)` |
+
+### Patterns already in the runtime model
+
+| Pattern | AST Node |
+|---------|----------|
+| Variable | `VarPat of string * Span` |
+| Wildcard | `WildcardPat of Span` |
+| Tuple destructure | `TuplePat of Pattern list * Span` |
+| List empty | `EmptyListPat of Span` |
+| List cons | `ConsPat of Pattern * Pattern * Span` |
+| Constant | `ConstPat of Constant * Span` (int, bool, string, char) |
+| Or-pattern | `OrPat of Pattern list * Span` |
+
+### Match expression
+
+`Match of scrutinee: Expr * clauses: MatchClause list * Span`
+where `MatchClause = Pattern * Expr option * Expr` (pattern, optional when-guard, body).
+
+LangThree's evaluator compiles pattern matching to a decision tree via `MatchCompile.fs`
+(Jacobs-style algorithm). The compiler can reuse this tree structure directly.
+
+### String builtins already in Eval.initialBuiltinEnv
+
+`string_length`, `string_concat`, `string_sub`, `string_contains`, `to_string`,
+`string_to_int`, `print`, `println`, `printf`, `printfn`, `sprintf`, `failwith`.
+
+These need corresponding compiled implementations — either inlined as LLVM/libc calls or
+as a compiled stdlib. The compiler must emit correct ABI-compatible code that matches what
+the interpreter treats as built-in.
 
 ---
 
 ## Table Stakes
 
-Features a v1 functional language compiler must have to be minimally useful. Missing any of these = compiler is incomplete for its stated scope.
+Features users expect. Missing any of these means v2.0 is incomplete for its stated scope.
 
 | Feature | Why Expected | Complexity | Runtime Requirement |
 |---------|--------------|------------|---------------------|
-| Integer literals | Foundation of all computation | Low | Stack (i64 SSA value) |
-| Boolean literals | Needed for conditionals | Low | Stack (i1 SSA value) |
-| Arithmetic (+, -, *, /) | Core operations on integers | Low | `arith` dialect ops |
-| Unary negation | Natural integer counterpart | Low | `arith.subi 0, x` |
-| Comparison ops (=, <>, <, >, <=, >=) | Needed for non-trivial control flow | Low | `arith.cmpi` variants |
-| Logical ops (&& and \|\|) with short-circuit | Conditional evaluation semantics | Medium | Branch-based `cf` or `scf` |
-| If-else expression | Basic control flow | Low | `scf.if` → `cf` blocks |
-| Let binding (non-recursive) | Scoped variable introduction | Low | SSA value naming, no heap |
-| Variable reference | Core of any expression language | Low | SSA value lookup |
-| Function definition (lambda) | First-class functions | High | Closure struct on heap |
-| Function application | Calling functions | High | Indirect call through closure |
-| Let rec (recursive functions) | Enables recursion | High | Self-reference in closure env |
-| Module-level let declarations | Top-level program structure | Medium | Top-level MLIR func ops |
-| Main entry point / program output | Compiler output is executable | Medium | `printf` via LLVM libc call or exit code |
-| E2E test harness (compile → run → verify) | Proves the compiler works | Medium | Shell or F# test runner |
-
-**Threshold note:** A compiler that can handle let rec factorial and let rec fib, producing correct output, is the v1 success criterion. All table stakes above are prerequisites for this.
+| GC integration (Boehm GC) | All heap-allocated types (string, tuple, list) require automatic memory management; without GC, every allocation leaks | High | `GC_malloc` replaces `malloc` everywhere; link `-lgc` or `-l:libgc.a`; requires `GC_INIT()` call at program start |
+| String literals | `String` AST node is a fundamental LangThree value; programs cannot do I/O without strings | Medium | Heap-allocated null-terminated C string (GC_malloc'd), represented as `!llvm.ptr` |
+| String equality (= and <>) | Pattern matching on string constants requires structural equality | Medium | `strcmp` from libc; `arith.cmpi eq, i32, i32` on result |
+| String concatenation (+ operator) | Already works in the interpreter; `Add` on `StringValue` dispatches to concat | Medium | Allocate new string, `memcpy` both halves; depends on GC |
+| Tuple construction | `Tuple` AST node; needed for let-pattern and match | Medium | GC_malloc'd struct of N pointers (boxed values); tag first word with arity |
+| Tuple destructure (let pat and match) | `TuplePat` is the primary way to extract tuple components | Medium | GEP into tuple struct by index |
+| List empty `[]` | Required for any list program | Low | Null pointer or singleton sentinel; `!llvm.ptr` null |
+| List cons `h :: t` | `Cons` AST node; fundamental list construction | Medium | GC_malloc'd two-word struct: `{head: ptr, tail: ptr}` (cons cell) |
+| List literal `[e1; e2; ...]` | Sugar for nested cons; already in `List` AST node | Low | Desugar to repeated cons; no new IR nodes needed |
+| Pattern matching on lists ([] and h::t) | The primary way to process lists in ML-style code | High | Decision tree compilation: test head pointer for null (empty) vs non-null (cons) |
+| Pattern matching on tuples | Tuple destructuring via `match` | Medium | GEP by component index after arity check |
+| Pattern matching on constants (int, bool) | `ConstPat` for integers and booleans; already partially handled via comparison ops | Low | `arith.cmpi eq` against constant value |
+| Pattern matching on string constants | `ConstPat (StringConst s, _)` — common in dispatch-style code | Medium | `strcmp` call to test equality |
+| Wildcard and variable patterns | Universal in any real match expression | Low | No test needed; variable patterns just bind the scrutinee value |
+| Non-exhaustive match failure at runtime | The interpreter raises `"Match failure: no pattern matched"`; the compiled program must also fail usefully | Low | Call `abort()` or `exit(1)` with a printed error |
+| `print` / `println` builtins | Required for any program to produce output | Low | `printf("%s", str)` / `printf("%s\n", str)` via libc; already linked via `clang` |
+| `string_length` builtin | Fundamental string operation | Low | `strlen` from libc |
+| `string_concat` builtin | Core string operation; also implied by `+` on strings | Low | Allocate + `memcpy` |
+| `to_string` builtin | Converts int/bool to string; used in nearly every output program | Low | `sprintf` for int; conditional string for bool |
 
 ---
 
 ## Differentiators
 
-Features that go beyond minimum viability. Not expected by users at v1, but meaningfully improve the compiler.
+Features that go beyond minimum viability for v2.0. Not required for correctness, but
+meaningfully improve the compiler.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Known-function optimization | `let rec f x = ...` with no captured free vars can be compiled as a direct MLIR `func.func` call, eliminating closure allocation entirely | Medium | MinCaml approach: attempt direct-call first, fall back to closure if free vars detected. Most recursive functions qualify. |
-| Tail call recognition for let rec | Self-tail calls in `let rec` bodies become loops instead of stack frames, enabling unbounded recursion | High | LLVM `musttail` attribute or `scf.while` transformation. Critical for language credibility. |
-| Reuse LangThree type info | Type-directed codegen: use inferred `TInt`/`TBool`/`TArrow` to select MLIR types statically, no runtime type tags needed | Medium | The typechecker already provides `Type` for each node; codegen can consume this directly. Eliminates boxing for int/bool. |
-| Meaningful error messages for codegen failures | Propagate `Span` from AST into MLIR source location attributes | Low | AST already carries span info on every node. Free improvement with small implementation cost. |
-| CLI interface (`langbackend <file.lt>`) | Makes the compiler usable as a standalone tool | Low | Already in project scope (`FunLang.Compiler.Cli`). |
+| Tagged value representation (uniform boxing) | Using a uniform `ptr` representation for all heap values enables polymorphic list elements, higher-order functions over mixed types, and future ADT support without changing the calling convention | High | Tag the low bits of a pointer with a type tag (standard in OCaml, GHC). Alternatively, use a `{tag: i64, payload: ptr}` header on every GC-allocated object. The tag approach is more efficient but requires alignment guarantees. |
+| or-pattern compilation (`| P1 \| P2`) | `OrPat` is already in the AST. Compiling it avoids duplicating match arms in the emitted LLVM IR | Medium | Expand `OrPat` into multiple decision-tree branches that share the same leaf body (emit one basic block, branch from multiple test paths). |
+| `when` guard compilation | Guards are already in `MatchClause = Pattern * Expr option * Expr`. Compiling them is needed for programs with conditional matches | Medium | After pattern bindings are set up, evaluate guard expression as `i1`; if false, fall through to next clause. |
+| String pattern matching via trie | For large numbers of string constant patterns, a character-by-character trie is more efficient than sequential `strcmp` calls | High | Not needed for v2; linear `strcmp` chain is correct and sufficient. Defer if string dispatch appears in hot paths. |
+| `string_sub` / `string_contains` builtins | Used in string-processing programs | Low | `strncpy`-based substring; `strstr`-based contains. Mostly libc calls wrapped as builtins. |
+| `sprintf` builtin | Needed for formatted string construction | Medium | Requires `asprintf` or a fixed-size buffer + `snprintf`; GC-managed result buffer. |
+| `char` type and `char_to_int` / `int_to_char` | `CharValue` already exists in the interpreter | Low | A `char` is just `i8` in LLVM; `char_to_int` is a zero-extend, `int_to_char` is a trunc + range check. |
+| GC_malloc with size-of-type calculation | The compiler statically knows the layout of every heap object; using precise sizing prevents wasted GC scan time | Medium | Compute size as `num_fields * sizeof(ptr)` at codegen time; emit `GC_malloc(constant_size)`. This is straightforward since all fields are uniformly boxed pointers or scalars. |
 
 ---
 
 ## Anti-Features
 
-Features to explicitly NOT build in v1. These are common mistakes or tempting scope creep.
+Features to explicitly NOT build in v2.0.
 
 | Anti-Feature | Why Avoid | What to Do Instead |
 |--------------|-----------|-------------------|
-| Garbage collector (GC) | Full GC requires runtime, object headers, root sets. Massively increases scope. | Use heap allocation only for closure environments; rely on program exit for deallocation. Closures are short-lived in v1 test programs. |
-| String support | Strings require heap allocation, null termination semantics, and GC interaction. The interpreter already handles strings. | Defer to v2. Stub out `String` AST node as a codegen error. |
-| Tuple / list support | Both require heap boxing, layout decisions, and (for lists) recursive struct types in LLVM. | Defer to v2. Stub out `Tuple`/`List`/`Cons` as codegen errors. |
-| Pattern matching compilation | Depends on tuples and lists; without them, only trivial const patterns possible. | Defer to v2. The interpreter handles this already. |
-| REPL integration | The interpreter REPL already exists in LangThree. Incremental compilation adds JIT complexity. | Not needed; the compiler handles file → binary. |
-| Polymorphic generics at codegen | Type variables in HM inference are resolved before codegen; monomorphization or boxing required. | v1 only handles monomorphic programs (int/bool). Type variables that remain unresolved at codegen = compile error. |
-| Register allocation tuning | LLVM already performs register allocation. Manual allocation is wasted effort. | Emit valid MLIR → LLVM IR and let LLVM optimize. |
-| Custom calling convention | Non-standard calling conventions break interop and debugging. | Use standard C calling convention (cdecl / System V AMD64 ABI). |
-| ADT / variant types | No ADT in LangThree v1. | Not applicable for v1. |
-| Exception handling / error propagation at runtime | Division by zero, etc. produce undefined behavior at LLVM level; runtime error handling needs a runtime. | In v1, these produce undefined behavior or abort. Document this limitation clearly. |
-| Incremental compilation | Requires module system, separate compilation, caching infrastructure. | Whole-program compilation only in v1. |
-
----
-
-## Feature Details: Implementation Concerns
-
-### Integer Arithmetic
-- MLIR type: `i64` (matches typical 64-bit platform int)
-- Ops: `arith.addi`, `arith.subi`, `arith.muli`, `arith.divsi` (signed division)
-- Unary negate: `arith.subi(constant 0, x)`
-- Division by zero: undefined behavior in v1 (LLVM sdiv semantics)
-- No overflow checking needed in v1
-
-### Boolean Literals and Comparisons
-- MLIR type: `i1` (boolean as 1-bit integer, standard in MLIR/LLVM)
-- Integer comparisons: `arith.cmpi` with predicates: `eq`, `ne`, `slt`, `sgt`, `sle`, `sge`
-- Boolean equality (`=` on bools): `arith.cmpi eq, i1, i1`
-- Boolean inequality: `arith.cmpi ne`
-
-### Logical Operators (&&, ||)
-- Short-circuit evaluation requires conditional branches, not just `arith.andi`/`arith.ori`
-- Implementation: `scf.if` with result type or explicit `cf` basic blocks
-- Recommended: lower to `cf` blocks directly; easier to control short-circuit semantics
-
-### If-Else Expression
-- LangThree if-else is an expression (both branches must produce the same type)
-- MLIR: `scf.if` produces a result value when both regions yield a value
-- Must handle nested if-else correctly (each becomes its own `scf.if`)
-- `scf.yield` terminates each branch and provides the result
-
-### Let Binding
-- Non-recursive: pure SSA. Bind expression result to a named SSA value; substitute all occurrences of the variable in the body with this SSA value
-- No heap allocation needed for simple let bindings
-- Environment model: recursive descent through the AST with an `env: Map<string, MlirValue>` passed along
-
-### Let Rec (Recursive Functions)
-- The key challenge: the function needs to reference itself before it is fully defined
-- Recommended approach (MinCaml-style known-function optimization):
-  1. Attempt to compile `let rec f x = body` as a top-level `func.func` with direct calls
-  2. If `body` contains no free variables beyond `x` and `f` itself, it qualifies as a "known function" with no closure
-  3. If free variables are present, fall back to closure representation
-- For v1 test programs (factorial, fibonacci), the known-function path should handle all cases
-- Stack-overflow risk: deep recursion without TCO will exhaust the stack. LLVM will perform TCE for self-tail-calls if the `musttail` attribute is set; this is a v1 differentiator worth implementing for `let rec`
-
-### Lambda and Function Application
-- The hardest feature in v1 due to closure representation requirements
-- Closure representation (flat closure, recommended):
-  - `{ fn_ptr: ptr, env_ptr: ptr }` — two-word struct
-  - `fn_ptr` points to a regular LLVM function `(env_ptr, arg) -> result`
-  - `env_ptr` points to a heap-allocated struct containing captured free variables
-  - Free variable analysis: compute `freeVars(body) - {param}` at each lambda
-  - Heap allocation: `llvm.call @malloc(size)` or `llvm.alloca` for short-lived closures
-- Calling a closure (App node):
-  1. Load `fn_ptr` from closure struct
-  2. Load `env_ptr` from closure struct
-  3. Call `fn_ptr(env_ptr, evaluated_arg)`
-- Runtime memory requirement: heap for env structs (malloc/free or arena)
-- Stack vs heap: closure environment is heap-allocated (variable size at compile time for general lambdas). Known functions (no free vars) need no heap.
-
-### Curried Functions (Multi-argument via chained lambda)
-- LangThree functions are single-argument (Lambda has one param)
-- Multi-argument functions are curried: `fun x -> fun y -> x + y`
-- Each application peels one argument: `f a b` = `(f a) b`
-- No special handling needed beyond single-argument lambda; currying falls out naturally
-- Performance concern: each partial application allocates a new closure. In v1, this is acceptable.
-
-### Module-Level Declarations
-- `Decl` = `LetDecl of name * body * Span`
-- Each top-level let generates a `func.func` or a global in MLIR
-- For function-valued top-level lets: generate a named function
-- For non-function top-level lets: can be compiled into `func.func @__init()` or evaluated at global init time
+| Precise/moving GC | Writing a precise GC (root-set enumeration, write barriers, compaction) is a multi-month project orthogonal to type support | Use Boehm GC (conservative, no root declarations needed, single-header integration via `-lgc`) |
+| Reference counting | Introduces cycle leaks for recursive data structures (lists, trees) and requires runtime overhead on every pointer copy | Boehm GC handles cycles transparently |
+| Unboxed tuple specialization | Emitting different LLVM struct types per tuple arity avoids indirection but requires monomorphization infrastructure | Use uniform boxed representation: all fields are `ptr` for simplicity. Defer unboxed optimization to v3. |
+| String interning / deduplication | Reduces memory for repeated string constants but adds a hash table at runtime | In v2, every string allocation is independent. String equality uses `strcmp`, not pointer comparison. |
+| Lazy list (streams / sequences) | OCaml-style `Lazy.t` requires thunk allocation and forcing machinery | LangThree lists are strict (all elements evaluated at construction). No lazy needed. |
+| ADT / discriminated union compilation | LangThree AST already has `Constructor`, `ConstructorPat`, `DataValue` — but these are not in the v2 milestone scope | Keep as `failwith "Constructor not supported"` stub. ADTs are a v3 feature. |
+| Record type compilation | `RecordExpr`, `FieldAccess`, `RecordUpdate` are not in the v2 milestone scope | Stub with `failwith`. Records are a v3+ feature. |
+| Exception runtime (`Raise` / `TryWith`) | Requires `setjmp`/`longjmp` or C++ exception ABI; complex interaction with GC roots | Stub with `failwith`. Exceptions are a v3+ feature. |
+| Printf format string parsing at compile time | The interpreter parses format strings at runtime. Implementing compile-time format parsing is significant work | Use runtime string-based `printf` dispatch via libc for v2. Compile-time formats are a v4+ optimization. |
+| Tail call optimization (TCO) | The v1 design does not guarantee TCO; LLVM may or may not perform it. Explicit `musttail` annotation requires careful ABI matching with the closure calling convention | Accept LLVM's best-effort TCO for known functions. Lists and tuples don't introduce new tail-call sites that didn't exist in v1. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Integer literals
-    └─> Arithmetic ops (+, -, *, /)
-            └─> Comparison ops (<, >, =, etc.)
-                    └─> If-else expression (condition must be boolean)
-                            └─> Let binding (name the result of any expression)
-                                    └─> Variable reference
+GC runtime (Boehm GC_malloc)
+    └─> String heap allocation
+    └─> Tuple heap allocation
+    └─> List cons-cell heap allocation
+            └─> List literal [e1; e2; ...] (desugar to cons)
+            └─> Pattern match on lists ([] / h :: t)
 
-Boolean literals ─────────────────> If-else expression
-                                    Logical ops (&& ||) ─> If-else (for short-circuit)
+Tuple heap allocation
+    └─> Tuple construction expression (Tuple node)
+    └─> Pattern match on tuples (TuplePat)
+    └─> LetPat with tuple pattern
 
-Let binding
-    └─> Let rec (recursive variant; needs closure or known-function mechanism)
-            └─> Lambda (general closures; let rec is a constrained lambda)
-                    └─> Function application (App node; calls via closure or direct)
-                            └─> Currying (falls out from single-arg lambda + App)
+String heap allocation
+    └─> String literal compilation (String node)
+    └─> String equality (= and <>) for ConstPat(StringConst)
+    └─> String + operator (Add on string operands)
+    └─> print / println builtins
+    └─> to_string builtin
+    └─> string_length, string_concat builtins
 
-Lambda ──────────────────────────> Closure representation (flat closure struct)
-    └─> Free variable analysis (prerequisite for closure env layout)
-            └─> Heap allocation (malloc for env struct)
+Pattern matching (Match node)
+    └─> Decision tree evaluation (reuse LangThree MatchCompile.fs structure)
+    └─> ConsPat (requires list cons cells)
+    └─> TuplePat (requires tuple heap layout)
+    └─> ConstPat(StringConst) (requires strcmp)
+    └─> ConstPat(IntConst / BoolConst) (already available from v1)
+    └─> when guards (requires bool elaboration, already available)
+    └─> Wildcard / VarPat (no test needed; bind value)
+    └─> Non-exhaustive match: abort() call
 ```
 
-**Critical path for v1:** Integer literals → Arithmetic → Comparisons → If-else → Let binding → Variable reference → Let rec (known function) → Lambda (closure) → App
+**Critical path for v2.0:**
+1. GC integration (prerequisite for all heap allocation)
+2. String literals + basic string builtins (print/println, string_length, to_string)
+3. Tuple construction + TuplePat destructuring
+4. List cons-cell + EmptyList + ConsPat destructuring
+5. Match expression: full pattern compilation using decision tree
 
-**Unblocking order:**
-1. Integers + Arithmetic + Comparisons: pure SSA, no memory model
-2. Boolean + If-else: adds branching
-3. Let binding + Var: scoping in SSA
-4. Let rec (known function only): adds recursion without closures
-5. Lambda + App (full closure): adds first-class functions
-6. Module-level declarations: top-level plumbing
+**Already available from v1 (no new work needed):**
+- ConstPat(IntConst) and ConstPat(BoolConst): use existing `arith.cmpi eq`
+- VarPat / WildcardPat: bind or discard, no new IR
+- Boolean guards on when clauses: use existing bool elaboration
 
 ---
 
 ## MVP Recommendation
 
-### Phase 1 — Scalar Core (No Functions)
-Build and test: integers, booleans, arithmetic, comparisons, logical ops, if-else, let, var.
+### Phase 1 — GC Runtime Integration
 
-Produces: programs that compute numeric results from pure expressions. No heap allocation. All values are SSA `i64` or `i1`.
+Integrate Boehm GC so that all future heap allocations are GC-managed.
 
-Success criterion: compile and run `let x = (3 + 4) * 2 in if x > 10 then 1 else 0` → correct exit code.
+Work: replace `llvm.call @malloc` with `llvm.call @GC_malloc`; add `GC_INIT()` call at
+program start in `@main`; link with `-lgc`; add `GC_malloc` as an external func declaration
+in the emitted MLIR.
 
-### Phase 2 — Non-Recursive Functions (Known Functions)
-Build and test: lambda, application, let binding of functions. Assume no free variables (known functions only). Compile as top-level `func.func` with direct calls.
+Success criterion: a program that allocates a closure (already done in v1) and calls
+`GC_malloc` instead of `malloc` compiles, links, and runs without crash.
 
-Success criterion: compile and run `let add = fun x -> fun y -> x + y in add 3 4` → `7`.
+### Phase 2 — Strings
 
-### Phase 3 — Recursive Functions (Let Rec, Known)
-Build and test: `let rec` where the function is a known function (no captured free vars beyond the recursion variable).
+Compile string literals to null-terminated GC_malloc'd char arrays. Wire up `print`,
+`println`, and `to_string` as direct libc / stdlib calls.
 
-Success criterion: compile and run `let rec fact n = if n <= 1 then 1 else n * (fact (n - 1)) in fact 10` → `3628800`.
+Success criterion: `print "hello"` compiles and prints `hello`. `to_string 42` compiles
+and produces the string `"42"`.
 
-### Phase 4 — Full Closures (Lambdas with Free Variables)
-Build and test: lambdas that capture variables from enclosing scope. Implement flat closure representation with heap-allocated environment.
+### Phase 3 — Tuples
 
-Success criterion: compile and run a higher-order function like `let add_n n = fun x -> x + n in let add5 = add_n 5 in add5 3` → `8`.
+Compile tuple construction to a GC_malloc'd array of `ptr`-sized words. Compile `TuplePat`
+by GEP-indexing into the array.
 
-### Defer to v2+
-- Strings: heap, null termination, GC
-- Tuples: struct layout, boxing
-- Lists: recursive types, cons cells
-- Pattern matching: depends on tuples/lists
-- ADTs: not in LangThree v1
-- GC: requires runtime
-- Tail call elimination: valuable but can be added incrementally after basic recursion works
+Success criterion: `let (a, b) = (1, 2) in a + b` compiles and exits with 3. A nested
+tuple pattern works.
+
+### Phase 4 — Lists
+
+Compile `EmptyList` as a null pointer, `Cons` as a two-word GC_malloc'd cons cell, and
+`List [...]` as iterated cons construction.
+
+Success criterion: `let rec sum lst = match lst with | [] -> 0 | h :: t -> h + sum t in
+sum [1; 2; 3]` compiles and exits with 6.
+
+### Phase 5 — Pattern Matching
+
+Compile the `Match` AST node to LLVM control flow using the decision-tree structure from
+LangThree's `MatchCompile.fs` as a guide.
+
+Success criterion: a `match` on a list with `[]` and `h :: t` arms, and a `match` on a
+tuple with a `TuplePat` arm, both compile and execute correctly.
+
+### Defer to v3+
+
+- ADTs / discriminated unions
+- Records and field access
+- Exceptions (Raise / TryWith)
+- Char type as a separate compiled type
+- `sprintf` and format-string builtins beyond basic `print`
+- Or-pattern (`OrPat`) compilation (low priority; rare in v2 test programs)
+- `when` guard compilation (medium priority; add if test programs need it)
+
+---
+
+## Feature Detail: GC-Managed Heap Layout
+
+### Uniform value representation
+
+All heap-allocated LangThree values use a uniform pointer-to-struct representation:
+- Every value is either a raw scalar (`i64` / `i1`) passed by value in SSA, or a pointer
+  to a GC-managed struct.
+- This means lists and tuples contain `ptr` elements (all fields boxed).
+- For v2, scalars (int, bool) that appear inside tuples or lists must be boxed: allocate a
+  one-word GC_malloc'd struct holding the `i64` or `i1`.
+
+Alternative: tag the low bit of a pointer to distinguish boxed pointers from immediate
+integers (like OCaml's value representation). This is more efficient but more complex to
+implement. Defer to v3 unless boxing overhead is a measurable problem in v2 tests.
+
+### Tuple layout
+
+```
++-------+-------+-------+
+| arity |  [0]  |  [1]  |  ...
++-------+-------+-------+
+  i64     ptr     ptr
+```
+
+- First word: arity (number of elements) as `i64` — used for safety checks and future
+  pattern matching on tuple size.
+- Remaining words: one `ptr` per element.
+- Total size: `(1 + arity) * sizeof(ptr)` = `(1 + arity) * 8` bytes.
+
+Alternative: omit arity word and rely on static compile-time knowledge of tuple size.
+This saves 8 bytes per tuple. Since LangThree's type system always knows the tuple arity at
+compile time, this is safe and preferred for v2.
+
+### Cons-cell layout
+
+```
++-------+-------+
+|  head |  tail |
++-------+-------+
+   ptr     ptr
+```
+
+- `head`: pointer to the element value.
+- `tail`: pointer to the next cons cell, or null for empty list.
+- Size: 16 bytes (two pointers).
+
+### String layout
+
+- Null-terminated C string stored as `i8*` / `!llvm.ptr`.
+- Allocated with `GC_malloc(strlen + 1)`.
+- Compatible with `printf`, `strcmp`, `strlen` without any marshalling.
 
 ---
 
 ## Sources
 
-- LangThree AST: `/home/shoh/vibe-coding/LangThree/src/LangThree/Ast.fs` (direct inspection — HIGH confidence)
-- LangThree Eval: `/home/shoh/vibe-coding/LangThree/src/LangThree/Eval.fs` (direct inspection — HIGH confidence)
-- LangThree Type: `/home/shoh/vibe-coding/LangThree/src/LangThree/Type.fs` (direct inspection — HIGH confidence)
-- MinCaml compiler paper: known-function optimization, let rec handling (https://esumii.github.io/min-caml/paper.pdf — HIGH confidence)
-- Matt Might: closure conversion strategies (https://matt.might.net/articles/closure-conversion/ — HIGH confidence)
-- MLIR arith dialect: `arith.cmpi`, integer ops (https://mlir.llvm.org/docs/Dialects/ArithOps/ — HIGH confidence)
-- MLIR func dialect: `IsolatedFromAbove`, function definitions (https://mlir.llvm.org/docs/Dialects/Func/ — HIGH confidence)
-- MLIR LLVM dialect: struct types, opaque pointers (https://mlir.llvm.org/docs/Dialects/LLVM/ — HIGH confidence)
-- Xavier Leroy — Compiling Functional Languages (https://xavierleroy.org/talks/compilation-agay.pdf — HIGH confidence)
-- LLVM Tail Recursion Elimination (https://llvm.org/doxygen/TailRecursionElimination_8cpp_source.html — MEDIUM confidence)
+- LangThree AST: `../LangThree/src/LangThree/Ast.fs` — direct inspection, HIGH confidence
+- LangThree Eval: `../LangThree/src/LangThree/Eval.fs` — direct inspection, HIGH confidence
+- LangThree MatchCompile: `../LangThree/src/LangThree/MatchCompile.fs` — direct inspection, HIGH confidence
+- LangBackend v1 FEATURES.md: `.planning/research/FEATURES.md` (v1 scope anchor)
+- LangBackend PROJECT.md: `.planning/PROJECT.md` — v2 milestone definition
+- Boehm GC documentation: https://www.hboehm.info/gc/ — conservative GC API (`GC_INIT`, `GC_malloc`)
+- OCaml value representation: https://v2.ocaml.org/api/compiledfiles/runtime/gc.html — boxed vs unboxed scalars
+- MinCaml — Heap allocation for tuples and closures: https://esumii.github.io/min-caml/paper.pdf
+- LLVM opaque pointers (`!llvm.ptr`): https://mlir.llvm.org/docs/Dialects/LLVM/ — used for all GC-managed values

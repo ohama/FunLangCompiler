@@ -1,581 +1,673 @@
-# Architecture Patterns: LangBackend Compiler
+# Architecture Patterns: LangBackend v2.0
 
-**Domain:** Functional language compiler backend (F# frontend + MLIR/LLVM codegen)
+**Domain:** Functional language compiler backend — MLIR text generation + LLVM pipeline
 **Researched:** 2026-03-26
+**Scope:** v2.0 — GC runtime, heap-allocated strings/tuples/lists, pattern matching
 **Confidence:** HIGH
 
 ---
 
-## Recommended Architecture
+## Actual v1 Architecture (What Was Built)
 
-The pipeline is a straight-line transformation: each stage takes well-defined input, produces
-well-defined output, and owns nothing from the previous stage after conversion. There is no
-shared mutable state between stages.
+The compiler emits MLIR as text strings — NOT via MLIR C API P/Invoke. This is the key
+architectural fact that all v2 decisions must respect.
 
 ```
 Source File (.lt)
        |
        v
-  [ LangThree Frontend ]
-    Lexer + Parser
-    Type Checker (H-M)
+  [ LangThree Frontend ] (project reference, not modified)
+    Lexer + Parser (FsLexYacc)
+    Type Checker (H-M / Bidir)
        |
        v
   Ast.Expr (typed)
        |
        v
-  [ CodegenEnv ]
-    SymbolTable (name -> MlirValue)
-    ClosureCapture analysis
+  [ Elaboration.fs ]
+    elaborateExpr: Expr -> ElabEnv -> (MlirValue * MlirOp list)
+    ElabEnv: {Vars, Counter, LabelCounter, Blocks, KnownFuncs, Funcs, ClosureCounter}
        |
        v
-  [ MLIRGen ]
-    Emit arith, func, cf, llvm dialect ops
-    via MLIR C API P/Invoke
+  MlirModule (F# discriminated union)
+  MlirType | MlirValue | MlirOp | MlirBlock | MlirRegion | FuncOp
        |
        v
-  MlirModule (in-memory MLIR)
+  [ Printer.fs ]
+    printModule: MlirModule -> string
+    Pure serializer, no side effects
        |
        v
-  [ Lowering Pipeline ]
-    convert-arith-to-llvm
-    convert-func-to-llvm
-    convert-cf-to-llvm
-    reconcile-unrealized-casts
+  .mlir text file (temp)
        |
        v
-  MlirModule (llvm dialect only)
+  [ Pipeline.fs ] (shell subprocess)
+    mlir-opt --convert-arith-to-llvm --convert-cf-to-llvm
+             --convert-func-to-llvm --reconcile-unrealized-casts
        |
        v
-  [ LLVM Backend ]
-    mlirTranslateModuleToLLVMIR
-    LLVM Target Machine
-    Emit object file (.o)
+  .mlir (LLVM dialect only, temp)
        |
        v
-  [ Linker ]
-    clang / lld
+    mlir-translate --mlir-to-llvmir
        |
        v
-  Native Binary (ELF x86-64)
+  .ll LLVM IR (temp)
+       |
+       v
+    clang -Wno-override-module
+       |
+       v
+  Native Binary
 ```
+
+### Current Component Inventory
+
+| Component | File | Status | Purpose |
+|-----------|------|--------|---------|
+| `MlirIR.fs` | `MlirType`, `MlirOp` (DU), `MlirBlock`, `FuncOp`, `MlirModule` | v1 complete | Typed internal IR |
+| `Printer.fs` | `printModule: MlirModule -> string` | v1 complete | IR → MLIR text |
+| `Elaboration.fs` | `elaborateExpr`, `ElabEnv` | v1 complete | AST → MlirIR pass |
+| `Pipeline.fs` | `compile: MlirModule -> string -> Result` | v1 complete | Shell pipeline |
+| `Program.fs` | CLI entry point | v1 complete | Orchestrates pipeline |
 
 ---
 
-## Component Boundaries
+## v2 Integration Strategy: What Changes and What Stays
 
-| Component | Responsibility | Input | Output | Communicates With |
-|-----------|---------------|-------|--------|-------------------|
-| LangThree Frontend | Lex, parse, type-check source | `.lt` file | `Ast.Module` | CLI driver |
-| CLI Driver | Orchestrate pipeline, handle errors | File path, flags | Exit code | Frontend, CodegenEnv |
-| CodegenEnv | Manage MLIR context, symbol tables, closure analysis | `Ast.Expr` | Mutable env state | MLIRGen |
-| MLIRGen | Traverse AST, emit MLIR ops via C API | `Ast.Expr` + CodegenEnv | `MlirModule` | MLIR C API bindings |
-| MLIR C API Bindings | F# P/Invoke layer over `libMLIR.so` | F# calls | Opaque MLIR handles | libMLIR.so |
-| Lowering Pipeline | Run built-in conversion passes | `MlirModule` | `MlirModule` (llvm-only) | MLIR C API bindings |
-| LLVM Backend | Translate to LLVM IR, emit object file | `MlirModule` | `.o` file | LLVM Target API |
-| Linker | Link object file into executable | `.o` files | ELF binary | System clang/lld |
+### What stays unchanged
 
-**Key boundary rule:** The F# code never manipulates raw MLIR pointers directly. All interaction
-with MLIR C API goes through the Bindings layer, which wraps each opaque handle in an F# struct
-or discriminated union to preserve lifetime guarantees.
+- `Pipeline.fs` — the lowering passes are unchanged; `llvm` dialect ops lower transparently
+- `Printer.fs` architecture — add new `printOp` match cases, existing cases untouched
+- `ElabEnv` shape — extend with new fields (GcDecls flag); existing fields unchanged
+- `FuncOp` / `MlirBlock` / `MlirRegion` / `MlirModule` — no structural change needed
 
----
+### What extends
 
-## Dialect Selection: What to Use and Why
+| Component | v2 Extension |
+|-----------|-------------|
+| `MlirType` | No new cases needed — `Ptr` covers all heap pointers |
+| `MlirOp` | ~8 new cases: `LlvmCallOp`, `LlvmMallocOp`, `LlvmBitcastOp` (or reuse `LlvmCallOp` with `@GC_malloc`), plus match dispatch ops |
+| `Printer.fs` | New `printOp` match arms for each new op case |
+| `Elaboration.fs` | New `elaborateExpr` match arms for `String`, `Tuple`, `List`, `Cons`, `EmptyList`, `LetPat`, `Match` |
+| `ElabEnv` | Add `NeedsGcDecl: bool ref` flag to trigger runtime declaration emission |
+| `Pipeline.fs` | Add `-lgc` link flag to the clang invocation |
 
-### Recommended dialect set for v1
+### What is new
 
-| Dialect | Used For | Why Not Another |
-|---------|----------|-----------------|
-| `arith` | Integer arithmetic (add, sub, mul, div, cmpi), boolean ops | Standard, well-supported, direct lowering to llvm available |
-| `func` | Top-level function definitions, `func.call` for known calls | Clean representation; required by lowering infrastructure |
-| `cf` | `cf.br`, `cf.cond_br` for if-else and recursion back-edges | Unstructured flow, works cleanly for if-else; `scf` adds overhead |
-| `llvm` | Struct types for closures, `llvm.alloca`, `llvm.getelementptr`, `llvm.store/load`, `llvm.call` for closure invocation | Direct LLVM parity; closures need pointer arithmetic unavailable in higher dialects |
-
-### Why NOT `memref`
-
-`memref` is designed for array/tensor workloads. Its descriptor lowering generates extra struct
-boilerplate in LLVM. For closures and environment structs, use `llvm.alloca` +
-`llvm.getelementptr` directly. This gives full control over field layout with no hidden overhead.
-
-### Why NOT `scf` (structured control flow)
-
-`scf.if` would work for v1 if-else, but it requires a result value semantics that complicates
-tail position handling. `cf.cond_br` is simpler to emit from a recursive AST traversal because
-each branch is a separate basic block — the same model LLVM IR uses.
+| New Component | Purpose | Notes |
+|---------------|---------|-------|
+| GC runtime declarations (inline in emitted MLIR) | Declare `@GC_malloc` as `llvm.func @GC_malloc` | Emitted once at module top by `Printer.fs` |
+| `RuntimeDecls.fs` (optional) | Centralise all extern function declarations | Can be a helper module or inline in Printer |
 
 ---
 
-## Data Flow: Source to Binary
+## Heap Allocation Strategy
 
-### Phase 1 — Frontend (reused, not written here)
+### Boehm GC integration model
 
+The compiler does NOT link against `libgc` via P/Invoke. It emits MLIR text that declares
+`GC_malloc` as an external function, then links the resulting binary against `-lgc`. This
+matches the text-generation approach: everything is textual MLIR + clang linker flags.
+
+**MLIR declaration (emitted once per module):**
 ```
-"let f = fun x -> x + 1"
-       |  (Lexer.fsl + Parser.fsy)
-       v
-Let("f", Lambda("x", Add(Var "x", Number 1)), ...)
-       |  (Infer.fs / TypeCheck.fs)
-       v
-Ast.Expr (type-annotated, spans preserved)
-```
-
-### Phase 2 — CodegenEnv initialization
-
-Before emitting any MLIR, create:
-- `MlirContext` with registered dialects (arith, func, cf, llvm)
-- `MlirModule` (a single compilation unit)
-- `MlirLocation` (file:line:col, from AST spans)
-- `SymbolTable: Map<string, MlirValue>` for SSA variable lookup
-- `ClosureEnvTracker` for closure capture analysis (see below)
-
-### Phase 3 — MLIRGen: AST traversal
-
-Traverse `Ast.Expr` with a single recursive function `emitExpr : Expr -> CodegenEnv -> MlirValue`.
-
-```
-Number(n)     => arith.constant i64 n
-Bool(b)       => arith.constant i1 (0 or 1)
-Add(l, r)     => arith.addi (emit l) (emit r)
-Sub(l, r)     => arith.subi
-Mul(l, r)     => arith.muli
-Div(l, r)     => arith.divsi
-Equal(l, r)   => arith.cmpi "eq"
-LessThan      => arith.cmpi "slt"
-And(l, r)     => arith.andi  (boolean AND on i1)
-Or(l, r)      => arith.ori
-If(c, t, f)   => cf.cond_br (see if-else pattern below)
-Var(name)     => look up SymbolTable
-Let(n, v, b)  => emit v, bind n -> result in SymbolTable, emit b
-LetRec(...)   => emit forward-declared func.func (see recursion pattern below)
-Lambda(p, b)  => closure allocation (see closure pattern below)
-App(fn, arg)  => indirect call through closure struct (see closure pattern below)
+llvm.func private @GC_malloc(i64) -> !llvm.ptr
 ```
 
-### Phase 4 — Lowering
-
-Run the pass pipeline in order:
+**Allocation call for a struct of N words:**
 ```
-mlirRegisterAllPasses()
-pipeline = "convert-arith-to-llvm,convert-func-to-llvm,convert-cf-to-llvm,reconcile-unrealized-casts"
-mlirPassManagerRunOnOp(pm, module)
+%size = arith.constant N : i64           ; bytes = N * 8 for i64-width fields
+%ptr  = llvm.call @GC_malloc(%size) : (i64) -> !llvm.ptr
 ```
 
-All conversion patterns ship with MLIR; no custom lowering passes needed for v1.
+**Pipeline.fs clang flag addition:**
+```fsharp
+let clangArgs = sprintf "-Wno-override-module %s -lgc -o %s" llFile outputPath
+```
 
-### Phase 5 — Object file emission
+### When to use GC_malloc vs alloca
+
+| Allocation Site | Mechanism | Reason |
+|-----------------|-----------|--------|
+| Closure env struct (existing) | `llvm.alloca` | Stack-scoped, v1 decision validated |
+| String literal | `GC_malloc` | Heap-allocated, may outlive stack frame |
+| Tuple value | `GC_malloc` | Returned from functions, must outlive frame |
+| List cons cell | `GC_malloc` | Recursive structure, indefinite lifetime |
+
+### MlirOp extensions for heap allocation
+
+Two approaches; **recommended: add `LlvmCallOp`** (general external call):
 
 ```fsharp
-// Translate MLIR module to LLVM IR (in-memory)
-let llvmModule = mlirTranslateModuleToLLVMIR mlirModule context
+// Recommended: general external call — covers GC_malloc and future runtime calls
+| LlvmCallOp of result: MlirValue * callee: string * args: MlirValue list
 
-// Initialize target machine (x86-64, host CPU)
-mlirTargetMachineEmitToFile tm llvmModule "output.o" MlirCodegenFileType.ObjectFile
+// Printer case:
+| LlvmCallOp(result, callee, args) ->
+    let argStr = args |> List.map (fun v -> sprintf "%s : %s" v.Name (printType v.Type)) |> String.concat ", "
+    sprintf "%s%s = llvm.call @%s(%s) : (%s) -> %s"
+        indent result.Name callee argStr
+        (args |> List.map (fun v -> printType v.Type) |> String.concat ", ")
+        (printType result.Type)
 ```
 
-### Phase 6 — Linking
-
-```bash
-clang output.o -o program
-# Or: lld -flavor gnu output.o -lc -dynamic-linker /lib64/ld-linux-x86-64.so.2 -o program
-```
-
-clang is preferred because it handles the libc startup dance automatically.
+This single op handles `@GC_malloc`, and future calls like `@strcmp`, `@strlen`.
 
 ---
 
-## Closure Representation Strategy
+## String Representation
 
-### The Problem
+### Memory layout
 
-`fun x -> x + captured_var` is a first-class value. It must be passable as a function argument
-and callable without knowing at the call site whether it is a closure or a plain function. MLIR
-has no built-in closure type.
+A string is represented as a GC-managed block with:
+- Field 0 (i64): byte length (not including null terminator)
+- Field 1+ (i8 array): UTF-8 bytes
 
-### Recommended: Flat struct with function pointer (uniform representation)
+In MLIR text: `!llvm.ptr` (opaque pointer — the field layout is implicit, accessed via GEP).
 
-Every lambda — even those with no captures — is represented as an LLVM struct:
+### String literal codegen
+
+For `String("hello", _)` in Elaboration:
 
 ```
-%ClosureEnv_f = type { ptr, i64 }    ; [fn_ptr, capture_0, capture_1, ...]
+; 1. Allocate struct: 8 bytes (length field) + len(s) bytes (chars) + 1 (null)
+%size = arith.constant <total_bytes> : i64
+%ptr  = llvm.call @GC_malloc(%size) : (i64) -> !llvm.ptr
+
+; 2. Store length at field 0
+%len_const = arith.constant <len> : i64
+llvm.store %len_const, %ptr : i64, !llvm.ptr
+
+; 3. Store bytes: use global constant + memcpy, or individual byte stores for small strings
+; For simplicity in v2: llvm.mlir.global for string data + llvm.call @memcpy
 ```
 
-Where:
-- Field 0: `ptr` — points to the implementation function (`fn_ptr`)
-- Fields 1..N: captured variable values (by copy for immutable bindings, by pointer for mutable)
+**Recommended approach for v2:** Use `llvm.mlir.global` for the byte content (static data),
+then at runtime: allocate header struct via `GC_malloc`, copy pointer or inline bytes.
+Alternatively, store a pointer-to-global as the string's data pointer (two-field layout: `{i64 length, ptr data}`).
 
-The implementation function always takes the closure struct pointer as its first argument
-(the "environment parameter"), followed by the actual user arguments:
+Simplest v2 layout — two-field heap struct:
+```
+Field 0: i64 — byte length
+Field 1: ptr — points to global or GC'd byte array
+```
 
-```llvm
-; Implementation function for: fun x -> x + y   (captures y)
-define i64 @closure_impl_0(ptr %env, i64 %x) {
-  %y_ptr = getelementptr %ClosureEnv_0, ptr %env, i32 0, i32 1
-  %y = load i64, ptr %y_ptr
-  %result = add i64 %x, %y
-  ret i64 %result
+Emitted as:
+```
+; global byte array (module top level)
+llvm.mlir.global private constant @str_data_0("\68\65\6c\6c\6f\00") : !llvm.array<6 x i8>
+
+; at use site
+%size = arith.constant 16 : i64          ; 2 fields × 8 bytes
+%hdr  = llvm.call @GC_malloc(%size) : (i64) -> !llvm.ptr
+%len_val = arith.constant 5 : i64
+llvm.store %len_val, %hdr : i64, !llvm.ptr
+%data_slot = llvm.getelementptr %hdr[1] : (!llvm.ptr) -> !llvm.ptr, i64
+%data_ptr = llvm.mlir.addressof @str_data_0 : !llvm.ptr
+llvm.store %data_ptr, %data_slot : !llvm.ptr, !llvm.ptr
+; %hdr is the string value (type Ptr)
+```
+
+### MlirOp additions for strings
+
+```fsharp
+| LlvmGlobalConstantOp of name: string * value: string * numBytes: int
+  // emits: llvm.mlir.global private constant @name("...") : !llvm.array<N x i8>
+  // Printer: top-level op, not inside a function body
+```
+
+`LlvmGlobalConstantOp` is a **module-level op** — it must be added to `MlirModule` as a
+`GlobalDecls: MlirGlobal list` field, or represented as a new variant in a module-level
+declaration type. This is the only structural change to `MlirModule` needed in v2.
+
+---
+
+## Tuple Representation
+
+### Memory layout
+
+A tuple `(v1, v2, ..., vN)` is a GC-managed array of N `i64` words (all values are boxed
+to `i64` or represented as `!llvm.ptr`; Ptr values are stored as pointers in i64 slots).
+
+Simpler: treat all values as `i64`-width (i64 and Ptr fit in 8 bytes on 64-bit).
+
+Layout: `[i64 field0, i64 field1, ..., i64 fieldN-1]`
+
+In MLIR: `!llvm.ptr` pointing to a GC'd array of `i64`.
+
+### Tuple construction codegen
+
+For `Tuple([e1; e2; e3], _)`:
+
+```
+; allocate N*8 bytes
+%size = arith.constant 24 : i64   ; 3 fields * 8 bytes
+%ptr  = llvm.call @GC_malloc(%size) : (i64) -> !llvm.ptr
+
+; store each field
+%v1 = <elaborate e1>
+llvm.store %v1, %ptr : i64, !llvm.ptr
+%slot1 = llvm.getelementptr %ptr[1] : (!llvm.ptr) -> !llvm.ptr, i64
+%v2 = <elaborate e2>
+llvm.store %v2, %slot1 : i64, !llvm.ptr
+...
+; %ptr is the tuple value (type Ptr)
+```
+
+### Tuple element extraction
+
+For pattern `let (x, y) = tup`:
+```
+; load field 0
+%x = llvm.load %ptr : !llvm.ptr -> i64
+; load field 1
+%slot1 = llvm.getelementptr %ptr[1] : (!llvm.ptr) -> !llvm.ptr, i64
+%y = llvm.load %slot1 : !llvm.ptr -> i64
+```
+
+This reuses existing `LlvmGEPLinearOp` and `LlvmLoadOp` — no new MlirOp cases needed for
+field extraction. New cases needed only for construction (`LlvmCallOp` for GC_malloc).
+
+---
+
+## List Representation
+
+### Memory layout
+
+A list is a singly-linked cons cell list:
+- `[]` (EmptyList): represented as null pointer (`i64 0` cast to `!llvm.ptr`)
+- `h :: t` (Cons): GC'd two-field struct `{i64 head, ptr tail}`
+
+Layout of a cons cell:
+```
+Field 0: i64  — head value (or ptr to heap-allocated head)
+Field 1: ptr  — tail (next cons cell, or null for last element)
+```
+
+Size: 16 bytes per cell.
+
+### List codegen
+
+For `EmptyList`:
+```
+%null = arith.constant 0 : i64
+; use %null as the list pointer (i64 0 = null ptr treated as Ptr type)
+```
+
+For `Cons(head, tail, _)`:
+```
+%size = arith.constant 16 : i64
+%cell = llvm.call @GC_malloc(%size) : (i64) -> !llvm.ptr
+%h = <elaborate head>
+llvm.store %h, %cell : i64, !llvm.ptr
+%tail_slot = llvm.getelementptr %cell[1] : (!llvm.ptr) -> !llvm.ptr, i64
+%t = <elaborate tail>
+llvm.store %t, %tail_slot : !llvm.ptr, !llvm.ptr
+; %cell is the list value
+```
+
+For `List([e1; e2; e3])`: desugar to nested Cons with EmptyList at end (in Elaboration,
+not as a separate MlirOp).
+
+### The null-pointer issue
+
+Using `i64 0` as the null/empty list requires a bitcast or `inttoptr` when stored into a
+`ptr` slot. LLVM dialect provides `llvm.inttoptr`:
+
+```fsharp
+| LlvmIntToPtrOp of result: MlirValue * value: MlirValue
+// emits: %result = llvm.inttoptr %value : i64 to !llvm.ptr
+```
+
+Alternatively, use `llvm.mlir.zero` (LLVM 20 null pointer constant):
+```
+%null = llvm.mlir.zero : !llvm.ptr
+```
+
+This is cleaner. Add `LlvmZeroOp of result: MlirValue` to `MlirOp`.
+
+---
+
+## Pattern Matching Codegen
+
+### AST nodes to handle
+
+```
+Match(scrutinee, clauses, _)
+  where each clause: (Pattern * Expr option * Expr)  [pattern, guard, body]
+
+Patterns in scope for v2:
+  VarPat(name)           — always succeeds, binds name
+  WildcardPat            — always succeeds, binds nothing
+  TuplePat([p1; p2])     — match arity, then recurse on fields
+  ConsPat(hPat, tPat)    — check non-null, then recurse on head/tail
+  EmptyListPat           — check null/zero
+  ConstPat(IntConst n)   — compare value == n
+  ConstPat(BoolConst b)  — compare value == 0/1
+
+LetPat(TuplePat([p1;p2]), expr, body) — irrefutable pattern let binding
+```
+
+### Compilation strategy: chain of if-then tests
+
+Each pattern clause becomes a sequence of conditional branches in the basic block graph.
+Pattern matching compiles to:
+
+```
+; for Match(scrut, [clause1; clause2; clause3])
+
+%v = <elaborate scrut>
+
+; Test clause1
+<pattern test ops for clause1>
+cf.cond_br %match1, ^clause1_body, ^try_clause2
+
+^clause1_body:
+  <bind pattern variables>
+  <elaborate body1>
+  cf.br ^match_merge(%result1 : i64)
+
+^try_clause2:
+  <pattern test ops for clause2>
+  cf.cond_br %match2, ^clause2_body, ^try_clause3
+  ...
+
+^match_exhausted:
+  ; runtime error — unreachable in well-typed program
+  llvm.unreachable   ; or call @abort
+
+^match_merge(%result : i64):
+  ; %result is the match expression value
+```
+
+This reuses the existing `CfCondBrOp` / `CfBrOp` mechanism — the same pattern as `If`.
+No new control-flow MlirOp cases are needed.
+
+### Pattern test emission
+
+Each pattern type generates test ops:
+
+| Pattern | Test ops |
+|---------|----------|
+| `VarPat` / `WildcardPat` | None — always succeeds; emit `arith.constant 1 : i1` |
+| `ConstPat(IntConst n)` | `arith.constant n; arith.cmpi eq` → `i1` |
+| `ConstPat(BoolConst b)` | `arith.constant 0/1; arith.cmpi eq` |
+| `EmptyListPat` | `arith.constant 0; arith.cmpi eq` (compare ptr-as-i64 to 0) — needs `ptrtoint` |
+| `ConsPat(hp, tp)` | Check `ptr != 0` (non-null), then load head and tail |
+| `TuplePat([p1;p2])` | Always succeeds at top level (types match); load fields, test sub-patterns |
+
+#### EmptyListPat check — ptrtoint
+
+To compare a list pointer to null, we need `llvm.ptrtoint`:
+```fsharp
+| LlvmPtrToIntOp of result: MlirValue * value: MlirValue
+// emits: %result = llvm.ptrtoint %value : !llvm.ptr to i64
+```
+
+Pattern check for `EmptyListPat`:
+```
+%as_int = llvm.ptrtoint %list_ptr : !llvm.ptr to i64
+%zero   = arith.constant 0 : i64
+%is_nil = arith.cmpi eq, %as_int, %zero : i64
+```
+
+#### Irrefutable pattern let binding
+
+`LetPat(TuplePat([VarPat "x"; VarPat "y"]), expr, body)` compiles exactly like tuple
+field extraction: elaborate expr, GEP+load field 0 into x, GEP+load field 1 into y,
+elaborate body with x and y in env. This is just a special case of `elaborateExpr` with
+no conditional branching — treat it as a degenerate `Match` with one always-succeeding clause.
+
+---
+
+## ElabEnv Extensions
+
+### New fields needed
+
+```fsharp
+type ElabEnv = {
+    // --- existing v1 fields ---
+    Vars:           Map<string, MlirValue>
+    Counter:        int ref
+    LabelCounter:   int ref
+    Blocks:         MlirBlock list ref
+    KnownFuncs:     Map<string, FuncSignature>
+    Funcs:          FuncOp list ref
+    ClosureCounter: int ref
+    // --- new v2 fields ---
+    StringGlobals:  (string * string) list ref  // (globalName, value) pairs, module-level
+    NeedsGcDecl:    bool ref                    // true once any GC_malloc is emitted
 }
 ```
 
-Calling a closure (App node):
-```llvm
-; %closure_ptr is the closure struct pointer
-%fn_ptr_ptr = getelementptr %ClosureType, ptr %closure_ptr, i32 0, i32 0
-%fn_ptr = load ptr, ptr %fn_ptr_ptr
-%result = call i64 %fn_ptr(ptr %closure_ptr, i64 %arg)
-```
+`StringGlobals` accumulates `llvm.mlir.global` entries. `Printer.fs` emits them before
+the first function. `NeedsGcDecl` controls whether `llvm.func private @GC_malloc(i64) -> !llvm.ptr`
+is emitted; set to `true` on first heap allocation.
 
-### Why this approach
+### MlirModule extension
 
-- **Uniform calling convention**: all function values have the same type (`ptr`), making
-  higher-order functions straightforward. No special-casing of closures vs. top-level functions.
-- **Stack allocation by default**: `llvm.alloca` for the closure struct means no GC needed for
-  v1. Closures that escape (returned from function) need heap allocation — defer to v2.
-- **No MLIR closure type needed**: pure LLVM dialect structs, well-supported in lowering.
-- **Matches SpeakEZ/Fidelity pattern**: the F#-to-native compiler using MLIR uses exactly this
-  approach (flat closure, thunk takes `ptr` to its containing struct as first arg).
-
-### Closure allocation in MLIR (before lowering)
-
-```
-; In llvm dialect (before lowering to LLVM IR)
-%env = llvm.alloca i8 * sizeof(ClosureStruct) : !llvm.ptr
-%fn_ptr_field = llvm.getelementptr %env[0, 0] : (!llvm.ptr) -> !llvm.ptr
-llvm.store @closure_impl_0 : !llvm.ptr, %fn_ptr_field
-%capture_field = llvm.getelementptr %env[0, 1] : (!llvm.ptr) -> !llvm.ptr
-llvm.store %captured_val, %capture_field
-; Now %env is the closure value — pass it around as i8*
-```
-
-### Escape analysis for v1
-
-For v1, use a conservative rule: closures returned from functions or passed to other functions
-are heap-allocated via `llvm.call @malloc`. Pure local closures (not escaping) use stack
-`llvm.alloca`. Correct analysis can be improved in v2.
-
----
-
-## If-Else Pattern
-
-The standard approach using `cf` dialect basic blocks:
-
-```
-; MLIR basic blocks for: if cond then t_expr else f_expr
-%cond = arith.cmpi ...         ; i1 value
-cf.cond_br %cond, ^then_bb, ^else_bb
-
-^then_bb:
-  %t_result = ... (emit t_expr)
-  cf.br ^merge_bb(%t_result : i64)
-
-^else_bb:
-  %f_result = ... (emit f_expr)
-  cf.br ^merge_bb(%f_result : i64)
-
-^merge_bb(%result : i64):
-  ; %result is the if-else value
-```
-
-Both branches must produce a value of the same type. The merge block uses a block argument
-(MLIR's equivalent of a phi node) to receive the selected value.
-
----
-
-## Let and LetRec Patterns
-
-### Let binding
-
-`let x = expr in body` is purely an SSA binding — no stack slot needed:
+Add a `GlobalDecls: string list` field to hold pre-function declarations emitted verbatim:
 
 ```fsharp
-let xVal = emitExpr expr env
-let env' = { env with SymbolTable = env.SymbolTable |> Map.add name xVal }
-emitExpr body env'
-```
-
-No MLIR op is emitted for `let` itself; it just extends the symbol table.
-
-### LetRec (recursive function)
-
-`let rec f x = body in inExpr` requires `f` to be callable from within `body`. Strategy:
-
-1. Emit a forward-declared `func.func @f` with the correct signature (including closure ptr arg)
-2. Emit the function body referencing `@f` by symbol name (not SSA value)
-3. Bind `f` in the environment as a closure struct pointing to `@f`
-4. Emit `inExpr` with `f` in scope
-
-In MLIR, `func.func` is a symbol — it can reference itself by name inside its own body without
-SSA capture. This makes `let rec` straightforward: the recursive call is a `func.call @f`
-(not an indirect closure call), which lowers cleanly.
-
-For the external view, `f` is still wrapped in a closure struct so it can be passed as a
-first-class value. The closure's fn_ptr field points to the `func.func @f` symbol.
-
----
-
-## F# P/Invoke Binding Structure
-
-### Layer structure
-
-```
-libMLIR.so (C++ MLIR runtime)
-      ^
-      | DllImport P/Invoke
-      |
-MlirBindings.fs      -- raw extern declarations, opaque handle types
-      ^
-      | thin wrapper, ownership tracking
-      |
-MlirDsl.fs           -- F#-idiomatic builders (computation expressions optional)
-      ^
-      | business logic
-      |
-CodegenEnv.fs        -- symbol table, closure tracking, context lifecycle
-      ^
-      |
-MLIRGen.fs           -- AST traversal, emits MLIR ops
-```
-
-### Opaque handle representation
-
-MLIR C API exposes all objects as opaque `{ ptr }` structs in C. In F#:
-
-```fsharp
-// Raw handle type — wrap in struct to prevent confusion
-[<Struct>] type MlirContext = { Ptr: nativeint }
-[<Struct>] type MlirModule  = { Ptr: nativeint }
-[<Struct>] type MlirValue   = { Ptr: nativeint }
-[<Struct>] type MlirBlock   = { Ptr: nativeint }
-[<Struct>] type MlirType    = { Ptr: nativeint }
-[<Struct>] type MlirLocation = { Ptr: nativeint }
-```
-
-### Ownership rules (from MLIR C API)
-
-- `mlirXCreate*` / `mlirXGet*`: caller owns the result, must call `mlirXDestroy`
-- Operations inserted into a block are owned by that block; do not destroy separately
-- Contexts own types and attributes — destroy context last
-- In F#: use `IDisposable` wrappers or explicit `use` bindings for owned handles
-
-### Key P/Invoke declarations (examples)
-
-```fsharp
-[<DllImport("libMLIR.so")>]
-extern MlirContext mlirContextCreate()
-
-[<DllImport("libMLIR.so")>]
-extern void mlirContextDestroy(MlirContext ctx)
-
-[<DllImport("libMLIR.so")>]
-extern void mlirRegisterAllDialects(MlirContext ctx)
-
-[<DllImport("libMLIR.so")>]
-extern MlirModule mlirModuleCreateEmpty(MlirLocation loc)
-
-[<DllImport("libMLIR.so")>]
-extern MlirOperation mlirOperationCreate(MlirOperationState& state)
-
-[<DllImport("libMLIR.so")>]
-extern MlirPassManager mlirPassManagerCreate(MlirContext ctx)
-
-[<DllImport("libMLIR.so")>]
-extern MlirLogicalResult mlirPassManagerRunOnOp(MlirPassManager pm, MlirOperation op)
-```
-
-String arguments to MLIR C API use `MlirStringRef` (ptr + length), not null-terminated:
-
-```fsharp
-[<Struct>]
-type MlirStringRef = {
-    Data: nativeint   // const char*
-    Length: unativeint
+type MlirModule = {
+    GlobalDecls: string list   // raw MLIR lines emitted before all FuncOps
+    Funcs:       FuncOp list
 }
-// Helper: pin an F# string and pass as MlirStringRef
+```
+
+`Printer.printModule` emits `GlobalDecls` lines first, then functions. This is the minimal
+change needed; avoids new DU cases for global constants.
+
+---
+
+## Component Interaction Map (v2)
+
+```
+Ast.Expr
+   |
+   | new match arms in elaborateExpr
+   v
+Elaboration.fs
+   |--- String  → LlvmGlobalConstantOp (→ ElabEnv.StringGlobals)
+   |             + LlvmCallOp(@GC_malloc) + LlvmGEPLinearOp + LlvmStoreOp
+   |--- Tuple   → LlvmCallOp(@GC_malloc) + LlvmGEPLinearOp + LlvmStoreOp
+   |--- EmptyList → LlvmZeroOp (null ptr)
+   |--- Cons    → LlvmCallOp(@GC_malloc) + LlvmGEPLinearOp + LlvmStoreOp
+   |--- List    → desugared to EmptyList + Cons
+   |--- LetPat  → GEP+load (tuple fields) → no new ops
+   |--- Match   → CfCondBrOp + CfBrOp (existing) + pattern tests (existing arith + new ptrtoint)
+   |
+   v
+MlirModule {GlobalDecls; Funcs}
+   |
+   v
+Printer.fs
+   |--- emit GlobalDecls (GC_malloc decl, llvm.mlir.global entries)
+   |--- emit FuncOps (existing + new op cases)
+   |
+   v
+.mlir text
+   |
+   v
+Pipeline.fs (add -lgc to clang args)
+   |
+   v
+Native binary with Boehm GC
 ```
 
 ---
 
-## Build Order (Phase Dependencies)
+## New MlirOp Cases Summary
 
-The following build order is dictated by hard dependencies — each layer requires the one above
-it to be working before it can be validated:
+Recommended additions to `MlirOp` DU in `MlirIR.fs`:
 
-```
-Phase 1: MLIR C API P/Invoke Bindings
-  - MlirBindings.fs: context, module, location, block, type, op creation
-  - Smoke test: create context, register dialects, destroy context
-  - No AST involvement yet
+```fsharp
+// External function call (covers GC_malloc, memcpy, etc.)
+| LlvmCallOp of result: MlirValue * callee: string * args: MlirValue list
 
-Phase 2: Integer/Arithmetic Codegen
-  - Requires: Phase 1
-  - Emit arith.constant, arith.addi/subi/muli/divsi for Number and arithmetic Expr nodes
-  - Requires lowering pipeline to LLVM and object file emission to be working
-  - E2E test: compile `1 + 2` to binary, run, check exit code 3
+// Null pointer constant
+| LlvmZeroOp of result: MlirValue
+// emits: %result = llvm.mlir.zero : !llvm.ptr
 
-Phase 3: Let Binding and Variables
-  - Requires: Phase 2
-  - Symbol table management in CodegenEnv
-  - Emit for Var, Let nodes (pure SSA, no new MLIR ops)
-  - E2E test: `let x = 5 in x * 2` → 10
+// ptr-to-int conversion (for nil list check)
+| LlvmPtrToIntOp of result: MlirValue * ptr: MlirValue
+// emits: %result = llvm.ptrtoint %ptr : !llvm.ptr to i64
 
-Phase 4: Boolean, Comparisons, If-Else
-  - Requires: Phase 3
-  - arith.constant i1, arith.cmpi, arith.andi/ori
-  - cf.cond_br + basic block structure
-  - E2E test: `if 3 > 2 then 1 else 0` → 1
+// int-to-ptr conversion (when null int needs to become ptr)
+| LlvmIntToPtrOp of result: MlirValue * value: MlirValue
+// emits: %result = llvm.inttoptr %value : i64 to !llvm.ptr
 
-Phase 5: Functions, Lambda, Application
-  - Requires: Phase 4
-  - func.func for top-level functions
-  - Closure struct (llvm dialect) for lambda values
-  - App → indirect call through closure ptr
-  - E2E test: `(fun x -> x + 1) 5` → 6
-
-Phase 6: LetRec (Recursive Functions)
-  - Requires: Phase 5
-  - Forward-declared func.func with self-reference by symbol name
-  - E2E test: `let rec fact n = if n = 0 then 1 else n * fact (n-1) in fact 5` → 120
-
-Phase 7: CLI
-  - Requires: Phase 6
-  - Read .lt file, parse (LangThree), codegen, write .o, invoke clang
-  - E2E test: compile file, execute, check stdout/exit code
+// Unreachable (match exhaustion in well-typed programs never reached)
+| LlvmUnreachableOp
+// emits: llvm.unreachable
 ```
 
-**Critical path**: Phase 1 → Phase 2 → Phase 5 → Phase 6. Everything else hangs off this chain.
-Phase 2 must include a working E2E emission path (lowering + object file + link) before
-anything else is useful to test. Do not defer the linking step to Phase 7.
+Each new case requires one new match arm in `Printer.printOp`. No other Printer changes.
+
+---
+
+## Build Order for v2 Phases
+
+Dependencies flow strictly from left to right. Each phase must have E2E tests passing before
+the next phase starts.
+
+```
+Phase 1: Boehm GC Integration
+  - Add -lgc to Pipeline.fs clang args
+  - Add @GC_malloc declaration to MlirModule.GlobalDecls
+  - Add LlvmCallOp to MlirIR + Printer
+  - Test: hello-world that calls GC_malloc once, returns size
+
+Phase 2: Strings
+  - Requires: Phase 1 (GC_malloc)
+  - Add LlvmGlobalConstantOp (or raw string to GlobalDecls)
+  - Elaborate String literal: global + header alloc + field stores
+  - Test: compile string literal, return its length
+
+Phase 3: Tuples
+  - Requires: Phase 1 (GC_malloc)
+  - Elaborate Tuple: alloc + store fields
+  - Elaborate LetPat(TuplePat): GEP+load fields, bind vars
+  - Test: let (x, y) = (1, 2) in x + y → 3
+
+Phase 4: Lists
+  - Requires: Phase 1 (GC_malloc)
+  - Add LlvmZeroOp (null ptr for nil)
+  - Elaborate EmptyList, Cons
+  - Elaborate List literal (desugar to Cons chain)
+  - Test: let xs = [1; 2; 3] in ...head...
+
+Phase 5: Pattern Matching
+  - Requires: Phases 2, 3, 4 (all heap types)
+  - Add LlvmPtrToIntOp for nil check
+  - Add LlvmUnreachableOp for exhaustion
+  - Elaborate Match with: VarPat, WildcardPat, ConstPat, TuplePat, ConsPat, EmptyListPat
+  - Elaborate LetPat as degenerate match (irrefutable)
+  - Test: match xs with [] -> 0 | h :: _ -> h → head of list
+  - Test: match (1, 2) with (x, y) -> x + y → 3
+```
+
+**Critical path:** Phase 1 (GC) must be working and tested before Phases 2–4 start.
+Phases 2–4 are independent of each other once Phase 1 is solid.
+Phase 5 depends on all of 2–4 because test programs use all types in match expressions.
 
 ---
 
 ## Patterns to Follow
 
-### Pattern 1: Emit-Before-Insert
+### Pattern 1: Extend DU, not restructure
 
-Create an `MlirOperationState`, populate its operands/result types/attributes, then call
-`mlirOperationCreate`, then insert into the current block. Never mutate an operation after
-insertion — MLIR operations are immutable once created.
+Every v1 feature added new `MlirOp` cases without changing `MlirModule`, `FuncOp`, `MlirBlock`,
+or `MlirRegion`. Follow the same rule in v2. When the compiler fails to match a new `MlirOp`
+case in `Printer.printOp`, the F# compiler raises a warning — use this as a check.
 
-### Pattern 2: Block-Centric Emission
+### Pattern 2: GEP + Load for field extraction (existing)
 
-The `CodegenEnv` tracks a "current insertion block". All ops are appended to this block.
-When emitting if-else: create then/else/merge blocks, switch insertion point, emit each branch,
-restore to merge block. This mirrors how LLVM IR builders work.
+Field extraction for tuples and cons cells uses `LlvmGEPLinearOp` + `LlvmLoadOp` — the same
+ops used for closure capture loading. No new op cases are needed for reads.
 
-```fsharp
-type CodegenEnv = {
-    Context: MlirContext
-    Module: MlirModule
-    Builder: MlirOpBuilder       // wraps current insertion point
-    SymbolTable: Map<string, MlirValue>
-    CurrentFunc: MlirBlock option
-}
-```
+### Pattern 3: GlobalDecls as raw strings
 
-### Pattern 3: Type-Directed Emission
+Rather than a typed DU for global declarations, use `string list` in `MlirModule.GlobalDecls`.
+This avoids over-engineering for the few declaration types needed in v2 (GC_malloc decl,
+string byte arrays). If v3 adds more, promote to a typed DU then.
 
-Carry type information from the type checker through codegen. The AST spans contain enough
-information; the Hindley-Milner type checker resolves all types before codegen runs.
-In codegen, `int` → `i64` (not i32 — avoids sign-extension issues on x86-64),
-`bool` → `i1`. No boxing for v1.
+### Pattern 4: Match compiles like nested If-Else
 
-### Pattern 4: Entry Point Convention
+Each match clause is a `cf.cond_br` followed by a body block. The existing `If` elaboration
+pattern (emit condition, create branch blocks, append to env.Blocks) applies directly.
+No new control-flow ops are needed.
 
-The compiled module emits a single `func.func @main() -> i64` (for expressions) or
-`func.func @main(i32, ptr) -> i32` (for a full program). The CLI wraps the user expression
-in a `main` function that returns the computed value. The test harness checks the exit code.
+### Pattern 5: String counter for globals
+
+Add a `StringCounter: int ref` to `ElabEnv`. Each string literal allocates the next name
+`@str_data_N`. The corresponding `llvm.mlir.global` line is appended to `ElabEnv.StringGlobals`
+during elaboration, then collected by `elaborateModule` into `MlirModule.GlobalDecls`.
 
 ---
 
 ## Anti-Patterns to Avoid
 
-### Anti-Pattern 1: Premature Custom Dialect
+### Anti-Pattern 1: Storing type tags at runtime
 
-**What:** Define a custom `funlang` dialect with custom ops (e.g., `funlang.let`, `funlang.app`)
-before validating the pipeline end-to-end.
+**What:** Embed a discriminator word (tag) in every heap object to support dynamic dispatch.
+**Why bad:** LangThree is statically typed — the type checker resolves all types before codegen.
+A tag adds overhead and complexity for no benefit in a monomorphic, type-safe compiler.
+**Instead:** Use structural layout (fixed field offsets) directly. The elaboration pass knows
+the type at compile time and generates the correct GEP index.
 
-**Why bad:** Custom dialect ops require custom lowering passes. Bugs in lowering are hard to
-distinguish from bugs in codegen. For v1 with simple features, using standard dialects
-(arith/func/cf/llvm) directly is sufficient and testable immediately.
+### Anti-Pattern 2: Boxing everything to a uniform value type
 
-**Instead:** Emit standard dialect ops directly from the AST. A custom dialect is a v2+
-optimization concern for source-level transforms.
+**What:** Represent all values as `{i64 tag, i64 payload}` pairs on the heap.
+**Why bad:** Forces double-indirection for integers and booleans, which are perfectly
+representable as unboxed `i64` and `i1`. Massively increases allocation pressure.
+**Instead:** Keep integers and booleans as unboxed SSA values. Only strings, tuples, and
+lists require heap allocation. Match expressions receive the unboxed value directly.
 
-### Anti-Pattern 2: Heap-Only Closures
+### Anti-Pattern 3: Writing a GC from scratch
 
-**What:** Unconditionally malloc every closure, mirroring a GC'd runtime.
+**What:** Emit manual `llvm.call @malloc` + `llvm.call @free` with reference counting.
+**Why bad:** Reference counting with cyclic data structures (lists of tuples) requires
+cycle detection. Manual `free` requires lifetime analysis. Both are v3+ concerns.
+**Instead:** Boehm GC (`-lgc`, `GC_malloc`) handles collection conservatively.
+Zero code changes in the compiler for collection — only allocation matters.
 
-**Why bad:** Introduces malloc/free into v1, requires either a memory leak or a manual free
-discipline. Adds runtime complexity before the basics work.
+### Anti-Pattern 4: Fully-general pattern match compilation
 
-**Instead:** Stack-allocate all closures for v1 (they don't escape in simple call-and-return
-programs). Document the escape limitation; revisit in v2.
+**What:** Implement decision trees, matrix compilation, or exhaustiveness checking in
+the elaboration pass.
+**Why bad:** These are frontend concerns. The type checker + elaboration pass only needs
+to compile patterns it encounters. LangThree's type checker already validates exhaustiveness.
+**Instead:** Compile each clause sequentially (linear chain of `cf.cond_br`). This is
+correct and sufficient. Decision tree optimization is a v3 concern.
 
-### Anti-Pattern 3: Deep P/Invoke Abstraction Too Early
+### Anti-Pattern 5: Changing FuncOp signature for GC init
 
-**What:** Build a full F# DSL (computation expressions, CE builders) over MLIR C API before
-any codegen works.
-
-**Why bad:** The abstraction boundary is unknown until you've emitted a few real IR constructs.
-Over-abstracting early produces leaky wrappers that must be refactored.
-
-**Instead:** Start with thin `extern` declarations and direct calls in MlirGen.fs. Extract
-helpers only when a pattern repeats 3+ times.
-
-### Anti-Pattern 4: String-Based IR Construction
-
-**What:** Build MLIR by printing textual IR into a string and calling `mlirModuleCreateParse`.
-
-**Why bad:** Parsing textual IR is 10-100x slower than building via C API. More importantly,
-it loses source location information and makes incremental IR construction impossible.
-
-**Instead:** Use the C API builder path exclusively for production codegen. Textual IR is
-useful only for debugging (pretty-print the built module to verify it).
-
-### Anti-Pattern 5: Deferring Linking to the End
-
-**What:** Build all codegen stages before proving the object file can be linked and run.
-
-**Why bad:** The MLIR → LLVM → object file → link chain has multiple failure modes
-(missing symbol prefixes, calling convention mismatches, startup routine issues) that are
-unrelated to your IR logic. Discovering these late means debugging two problems at once.
-
-**Instead:** In Phase 2, emit the simplest possible program (`return 42`) and verify the full
-pipeline works before building more IR.
+**What:** Emit a `GC_init()` call at the start of `@main`.
+**Why bad:** Boehm GC does not require explicit initialization when using `GC_malloc`
+(initialization is lazy). Adding a call complicates the entry point for no benefit.
+**Instead:** Link with `-lgc` and call `GC_malloc` directly. No init call needed.
 
 ---
 
 ## Scalability Considerations
 
-This is a compiler tool, not a service. "Scalability" means compile-time performance for
-growing source files, not concurrent users.
-
-| Concern | At 100 LOC | At 10K LOC | At 100K LOC |
-|---------|-----------|-----------|------------|
-| AST size | Negligible | Small | Track allocation |
-| MLIR module size | Negligible | Moderate | May need module splitting |
-| Pass pipeline time | < 100ms | < 1s | Profile pass costs |
-| Closure env size | Stack fine | Stack fine | Escape analysis needed |
-| Symbol table lookup | O(log n) Map fine | Fine | Fine |
-
-For v1 scope (expressions + small programs), none of this matters.
+| Concern | Current state | v2 change | Impact |
+|---------|---------------|-----------|--------|
+| `MlirOp` DU size | 17 cases | +5 cases → 22 | Negligible |
+| `Printer.printOp` | 17 match arms | +5 arms → 22 | Negligible |
+| `ElabEnv` fields | 7 fields | +2 fields | Negligible |
+| Heap allocation count | 0 (all stack) | Per string/tuple/list | GC handles |
+| Pattern match depth | N/A | Linear chain per clause | Fine for typical programs |
+| String globals count | 0 | 1 per distinct literal | Small; deduplicate if needed |
 
 ---
 
 ## Sources
 
-- [MLIR C API official documentation](https://mlir.llvm.org/docs/CAPI/) — handle ownership, naming conventions (HIGH confidence)
-- [MLIR arith Dialect](https://mlir.llvm.org/docs/Dialects/ArithOps/) — integer operations available (HIGH confidence)
-- [MLIR func Dialect](https://mlir.llvm.org/docs/Dialects/Func/) — function definition and call ops (HIGH confidence)
-- [MLIR llvm Dialect](https://mlir.llvm.org/docs/Dialects/LLVM/) — struct types, GEP, alloca (HIGH confidence)
-- [MLIR LLVM IR Target](https://mlir.llvm.org/docs/TargetLLVMIR/) — translation to LLVM IR (HIGH confidence)
-- [MLIR Toy Tutorial Ch. 2 — Emitting MLIR from AST](https://mlir.llvm.org/docs/Tutorials/Toy/Ch-2/) — visitor pattern, direct lowering approach (HIGH confidence)
-- [MLIR Toy Tutorial Ch. 6 — Lowering to LLVM](https://mlir.llvm.org/docs/Tutorials/Toy/Ch-6/) — pass pipeline pattern (HIGH confidence)
-- [MLIR Dialect Conversion](https://mlir.llvm.org/docs/DialectConversion/) — built-in conversion infrastructure (HIGH confidence)
-- [SpeakEZ — Gaining Closure](https://speakez.tech/blog/gaining-closure/) — flat closure representation, F#+MLIR practice (HIGH confidence)
-- [SpeakEZ — Why F# is a Natural Fit for MLIR](https://speakez.tech/blog/why-fsharp-is-a-natural-fit-for-mlir/) — P/Invoke architecture (MEDIUM confidence, no source code visible)
-- [fsharp-mlir-hello proof of concept](https://github.com/speakeztech/fsharp-mlir-hello) — F# + MLIR C API integration example (HIGH confidence)
-- [MLIR discourse — Closure Op in MLIR](https://discourse.llvm.org/t/closure-op-in-mlir/83817) — confirms no native closure op exists (HIGH confidence)
-- [Mapping High-Level Constructs to LLVM IR — Lambda Functions](https://mapping-high-level-constructs-to-llvm-ir.readthedocs.io/en/latest/advanced-constructs/lambda-functions.html) — canonical closure struct + fn pointer pattern (HIGH confidence)
-- [Jeremy Kun — MLIR Lowering through LLVM](https://www.jeremykun.com/2023/11/01/mlir-lowering-through-llvm/) — practical lowering pipeline walkthrough (HIGH confidence)
-- [Intro to Structures in LLVM/MLIR (Medium)](https://medium.com/@60b36t/structures-in-llvm-and-how-to-emit-a-structure-using-mlir-497f5132914e) — llvm.getelementptr usage (MEDIUM confidence)
+- Boehm GC documentation: https://www.hboehm.info/gc/ — `GC_malloc` signature, no init needed (HIGH confidence)
+- MLIR llvm dialect: https://mlir.llvm.org/docs/Dialects/LLVM/ — `llvm.call`, `llvm.mlir.zero`, `llvm.ptrtoint`, `llvm.inttoptr`, `llvm.unreachable`, `llvm.mlir.global` (HIGH confidence)
+- LLVM LangRef: https://llvm.org/docs/LangRef.html — getelementptr semantics for struct field access with opaque pointers (HIGH confidence)
+- Existing v1 source (verified): `MlirIR.fs`, `Printer.fs`, `Elaboration.fs`, `Pipeline.fs` — actual architecture base (HIGH confidence)
+- LangThree `Ast.fs` (verified): `String`, `Tuple`, `EmptyList`, `List`, `Cons`, `Match`, `LetPat`, `Pattern` variants that need compilation (HIGH confidence)
