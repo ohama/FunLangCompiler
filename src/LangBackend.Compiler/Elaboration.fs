@@ -859,6 +859,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let desugared = List.foldBack (fun elem acc -> Cons(elem, acc, span)) elems (EmptyList span)
         elaborateExpr env desugared
 
+    // Phase 15: Range [start..stop] or [start..step..stop]
+    // Compiled to a call to C runtime lang_range(start, stop, step).
+    // Default step is 1 when not specified.
+    | Range(startExpr, stopExpr, stepOpt, _) ->
+        let (startVal, startOps) = elaborateExpr env startExpr
+        let (stopVal,  stopOps)  = elaborateExpr env stopExpr
+        let (stepVal,  stepOps)  =
+            match stepOpt with
+            | Some stepExpr -> elaborateExpr env stepExpr
+            | None ->
+                let v = { Name = freshName env; Type = I64 }
+                (v, [ArithConstantOp(v, 1L)])
+        let result = { Name = freshName env; Type = Ptr }
+        (result, startOps @ stopOps @ stepOps @ [LlvmCallOp(result, "@lang_range", [startVal; stopVal; stepVal])])
+
     // Phase 11 (v2): General Match compiler — Jules Jacobs decision tree algorithm.
     // Compiles pattern matching to a binary decision tree, then emits MLIR from the tree.
     // Handles: VarPat, WildcardPat, ConstPat(Int/Bool/String), EmptyListPat, ConsPat, TuplePat.
