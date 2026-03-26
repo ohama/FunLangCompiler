@@ -106,6 +106,10 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         let patBound = pats |> List.collect extractVarName |> Set.ofList
         let bodyFree = freeVars (Set.union boundVars patBound) bodyExpr
         Set.union bindFree bodyFree
+    | Modulo (l, r, _) ->
+        Set.union (freeVars boundVars l) (freeVars boundVars r)
+    | PipeRight (l, r, _) | ComposeRight (l, r, _) | ComposeLeft (l, r, _) ->
+        Set.union (freeVars boundVars l) (freeVars boundVars r)
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
@@ -235,6 +239,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Number (n, _) ->
         let v = { Name = freshName env; Type = I64 }
         (v, [ArithConstantOp(v, int64 n)])
+    | Char (c, _) ->
+        let v = { Name = freshName env; Type = I64 }
+        (v, [ArithConstantOp(v, int64 (int c))])
     | Add (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
@@ -255,6 +262,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (rv, rops) = elaborateExpr env rhs
         let result = { Name = freshName env; Type = I64 }
         (result, lops @ rops @ [ArithDivSIOp(result, lv, rv)])
+    | Modulo (lhs, rhs, _) ->
+        let (lv, lops) = elaborateExpr env lhs
+        let (rv, rops) = elaborateExpr env rhs
+        let result = { Name = freshName env; Type = I64 }
+        (result, lops @ rops @ [ArithRemSIOp(result, lv, rv)])
     | Negate (inner, _) ->
         let (iv, iops) = elaborateExpr env inner
         let zero = { Name = freshName env; Type = I64 }
@@ -715,6 +727,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     (result, argOps @ [loadOp; callOp])
                 | _ ->
                     failwithf "Elaboration: unsupported App — '%s' is not a known function or closure value" name
+        | Lambda(param, body, _) ->
+            // Inline lambda application: (fun x -> body) arg  ≡  let x = arg in body
+            let (argVal, argOps) = elaborateExpr env argExpr
+            let env' = { env with Vars = Map.add param argVal env.Vars }
+            let (bodyVal, bodyOps) = elaborateExpr env' body
+            (bodyVal, argOps @ bodyOps)
         | _ ->
             failwithf "Elaboration: unsupported App (only named function application supported in Phase 5)"
     // Phase 9: Tuple construction — GC_malloc(n*8) + sequential GEP + store
