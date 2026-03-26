@@ -55,4 +55,8 @@
 
 ## Current
 
-Planning next milestone.
+### v3.0 — Language Completeness
+
+**Goal:** 누락 연산자, 빌트인, 패턴 매칭 확장으로 대부분의 LangThree 프로그램 컴파일 가능
+**Started:** 2026-03-26
+**Status:** Defining requirements
