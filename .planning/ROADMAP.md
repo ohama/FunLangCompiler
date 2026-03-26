@@ -128,9 +128,9 @@ Plans:
 **Milestone Goal:** Extend the compiler with heap-allocated types (string, tuple, list) and pattern matching, backed by Boehm GC runtime. Every heap allocation goes through `GC_malloc`. After this milestone, programs using strings, tuples, lists, and `match` expressions compile and produce correct results.
 
 - [x] **Phase 7: GC Runtime Integration** - Boehm GC linked into emitted binaries; `GC_INIT` emitted in `@main`; v1 closure `llvm.alloca` environments migrated to `GC_malloc`; `print`/`println` builtins wired
-- [ ] **Phase 8: Strings** - String literals compiled to heap-allocated `{i64 length, ptr data}` structs; string equality, `string_length`, `string_concat`, `to_string` builtins working end-to-end
-- [ ] **Phase 9: Tuples** - Tuple construction compiled to `GC_malloc`'d structs; `let (a, b) = ...` tuple destructuring via GEP + load; `TuplePat` in match working
-- [ ] **Phase 10: Lists** - `[]` compiled as null pointer; `h :: t` as GC_malloc'd cons cell; list literal desugaring; list pattern matching via null check + GEP
+- [x] **Phase 8: Strings** - String literals compiled to heap-allocated `{i64 length, ptr data}` structs; string equality, `string_length`, `string_concat`, `to_string` builtins working end-to-end
+- [x] **Phase 9: Tuples** - Tuple construction compiled to `GC_malloc`'d structs; `let (a, b) = ...` tuple destructuring via GEP + load; `TuplePat` in match working
+- [x] **Phase 10: Lists** - `[]` compiled as null pointer; `h :: t` as GC_malloc'd cons cell; list literal desugaring; list pattern matching via null check + GEP
 - [ ] **Phase 11: Pattern Matching** - `match` expression compiled to `cf.cond_br` decision chain for all pattern types; non-exhaustive match runtime fallback emitted
 
 ### Phase 7: GC Runtime Integration
@@ -225,7 +225,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 5. Closures via Elaboration | v1.0 | 2/2 | Complete | 2026-03-26 |
 | 6. CLI | v1.0 | 1/1 | Complete | 2026-03-26 |
 | 7. GC Runtime Integration | v2.0 | 3/3 | Complete | 2026-03-26 |
-| 8. Strings | v2.0 | 0/TBD | Not started | - |
-| 9. Tuples | v2.0 | 0/TBD | Not started | - |
-| 10. Lists | v2.0 | 0/TBD | Not started | - |
+| 8. Strings | v2.0 | 2/2 | Complete | 2026-03-26 |
+| 9. Tuples | v2.0 | 1/1 | Complete | 2026-03-26 |
+| 10. Lists | v2.0 | 1/1 | Complete | 2026-03-26 |
 | 11. Pattern Matching | v2.0 | 0/TBD | Not started | - |
