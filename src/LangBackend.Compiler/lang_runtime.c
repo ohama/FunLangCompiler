@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <gc.h>
 
 /* String struct layout matches MLIR {i64 length, ptr data} at offsets 0 and 8 */
@@ -41,4 +42,9 @@ LangString* lang_to_string_bool(int64_t b) {
     s->length = len;
     s->data = buf;
     return s;
+}
+
+void lang_match_failure(void) {
+    fprintf(stderr, "Fatal: non-exhaustive match\n");
+    exit(1);
 }
