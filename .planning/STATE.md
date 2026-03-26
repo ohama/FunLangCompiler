@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 16 of 20 (Environment Infrastructure)
-Plan: 02 of N in phase (completed)
-Status: In progress
-Last activity: 2026-03-26 — Completed 16-02-PLAN.md (MatchCompiler AdtCtor/RecordCtor dispatch)
+Plan: 01 of 02 (completed — both plans done)
+Status: Phase complete
+Last activity: 2026-03-26 — Completed 16-01-PLAN.md (ElabEnv extension, elaborateProgram, parseModule switch)
 
 Progress: [██░░░░░░░░] ~10% (v4.0, 2 plans complete of ~20 estimated)
 
@@ -45,6 +45,8 @@ Progress: [██░░░░░░░░] ~10% (v4.0, 2 plans complete of ~20 e
 - [v4.0 pending] Pop handler stack before handler body executes, not after (C-16)
 - AdtCtor tag=0 placeholder in MatchCompiler for Phase 16; Phase 17 must supply real integer tag from ADT layout table (16-02)
 - RecordCtor identity = sorted field names list; canonical ordering enforced at desugarPattern site (16-02)
+- parseModule fallback: parseProgram tries parseModule, falls back to parseExpr + synthetic Module for bare-expression inputs (16-01)
+- ElabEnv gains TypeEnv/RecordEnv/ExnTags; elaborateProgram is new entry point; prePassDecls scans Decl list (16-01)
 
 ### Pending Todos
 
@@ -57,6 +59,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T23:21:00Z
-Stopped at: Completed 16-02-PLAN.md — MatchCompiler AdtCtor/RecordCtor dispatch complete
+Last session: 2026-03-26T23:26:18Z
+Stopped at: Completed 16-01-PLAN.md — ElabEnv extension + elaborateProgram + parseModule switch (Phase 16 both plans now complete)
 Resume file: None
