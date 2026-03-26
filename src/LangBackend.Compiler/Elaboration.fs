@@ -125,7 +125,7 @@ let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
 ///   testOps      = ops that compute the condition (run in the test/entry block)
 ///   bodySetupOps = ops that run at the START of the body block (e.g. ConsPat head/tail loads)
 ///   bindEnv      = env with any variable bindings from the pattern added
-let private testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
+let rec private testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
     : MlirValue option * MlirOp list * MlirOp list * ElabEnv =
     match pat with
     | WildcardPat _ ->
@@ -172,8 +172,62 @@ let private testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
             |> (fun e -> match headName with Some n -> { e with Vars = Map.add n headVal e.Vars } | None -> e)
             |> (fun e -> match tailName with Some n -> { e with Vars = Map.add n tailVal e.Vars } | None -> e)
         (Some cond, testOps, setupOps, env')
+    | ConstPat(StringConst s, _) ->
+        // Elaborate the string literal for the pattern constant
+        let (patStrVal, patStrOps) = elaborateStringLiteral env s
+        // Get data ptr for pattern string: GEP field 1
+        let patDataPtrVal   = { Name = freshName env; Type = Ptr }
+        let patDataVal      = { Name = freshName env; Type = Ptr }
+        // Get data ptr for scrutinee string: GEP field 1
+        let scrutDataPtrVal = { Name = freshName env; Type = Ptr }
+        let scrutDataVal    = { Name = freshName env; Type = Ptr }
+        // strcmp result
+        let cmpRes  = { Name = freshName env; Type = I32 }
+        let zero32  = { Name = freshName env; Type = I32 }
+        let cond    = { Name = freshName env; Type = I1 }
+        let ops = patStrOps @ [
+            LlvmGEPStructOp(patDataPtrVal, patStrVal, 1)
+            LlvmLoadOp(patDataVal, patDataPtrVal)
+            LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 1)
+            LlvmLoadOp(scrutDataVal, scrutDataPtrVal)
+            LlvmCallOp(cmpRes, "@strcmp", [scrutDataVal; patDataVal])
+            ArithConstantOp(zero32, 0L)
+            ArithCmpIOp(cond, "eq", cmpRes, zero32)
+        ]
+        (Some cond, ops, [], env)
+
+    | TuplePat(pats, _) ->
+        // Tuple always matches structurally — unconditional.
+        // GEP each field, load with appropriate type, bind sub-patterns.
+        // All ops go into bodySetupOps (no condition needed).
+        let loadTypeOfPat = function
+            | TuplePat _ -> Ptr
+            | _          -> I64
+        let (setupOps, bindEnv) =
+            pats
+            |> List.mapi (fun i subPat -> (i, subPat))
+            |> List.fold (fun (opsAcc, eAcc: ElabEnv) (i, subPat) ->
+                let slotVal  = { Name = freshName env; Type = Ptr }
+                let fieldVal = { Name = freshName env; Type = loadTypeOfPat subPat }
+                let gepOp    = LlvmGEPLinearOp(slotVal, scrutVal, i)
+                let loadOp   = LlvmLoadOp(fieldVal, slotVal)
+                match subPat with
+                | VarPat(vname, _) ->
+                    let eAcc' = { eAcc with Vars = Map.add vname fieldVal eAcc.Vars }
+                    (opsAcc @ [gepOp; loadOp], eAcc')
+                | WildcardPat _ ->
+                    (opsAcc @ [gepOp; loadOp], eAcc)
+                | TuplePat _ ->
+                    // Nested tuple — recurse with fieldVal as the new scrutinee
+                    let (_, innerTestOps, innerSetupOps, innerEnv) = testPattern eAcc fieldVal subPat
+                    (opsAcc @ [gepOp; loadOp] @ innerTestOps @ innerSetupOps, innerEnv)
+                | _ ->
+                    failwithf "testPattern: TuplePat sub-pattern %A not supported" subPat
+            ) ([], env)
+        (None, [], setupOps, bindEnv)
+
     | _ ->
-        failwithf "testPattern: pattern %A not supported in Plan 11-01 (will be added in 11-02)" pat
+        failwithf "testPattern: pattern %A not supported in v2" pat
 
 let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     match expr with
