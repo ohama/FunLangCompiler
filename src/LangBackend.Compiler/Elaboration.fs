@@ -17,6 +17,9 @@ type FuncSignature = {
     ClosureInfo: ClosureInfo option  // None = direct-call func; Some = closure-maker
 }
 
+// Phase 16: TypeInfo for ADT constructor entries in TypeEnv
+type TypeInfo = { Tag: int; Arity: int }
+
 type ElabEnv = {
     Vars:           Map<string, MlirValue>
     Counter:        int ref
@@ -27,12 +30,17 @@ type ElabEnv = {
     ClosureCounter: int ref   // Phase 5: generates unique closure function names
     Globals:        (string * string) list ref   // Phase 7: (name, rawValue) pairs for string constants
     GlobalCounter:  int ref                       // Phase 7: counter for unique global names
+    // Phase 16: Declaration environment — populated by prePassDecls before elaboration
+    TypeEnv:        Map<string, TypeInfo>            // constructor name -> tag + arity
+    RecordEnv:      Map<string, Map<string, int>>    // record type name -> (field name -> index)
+    ExnTags:        Map<string, int>                 // exception ctor name -> tag index
 }
 
 let emptyEnv () : ElabEnv =
     { Vars = Map.empty; Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
       KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0
-      Globals = ref []; GlobalCounter = ref 0 }
+      Globals = ref []; GlobalCounter = ref 0
+      TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty }
 
 let private addStringGlobal (env: ElabEnv) (rawValue: string) : string =
     match env.Globals.Value |> List.tryFind (fun (_, v) -> v = rawValue) with
@@ -324,7 +332,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Funcs = env.Funcs
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
-              GlobalCounter = env.GlobalCounter }
+              GlobalCounter = env.GlobalCounter
+              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -595,7 +604,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Funcs = env.Funcs
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
-              GlobalCounter = env.GlobalCounter }
+              GlobalCounter = env.GlobalCounter
+              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
@@ -1177,7 +1187,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Funcs = env.Funcs
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
-              GlobalCounter = env.GlobalCounter }
+              GlobalCounter = env.GlobalCounter
+              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
@@ -1232,6 +1243,130 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 let elaborateModule (expr: Expr) : MlirModule =
     let env = emptyEnv ()
     let (resultVal, entryOps) = elaborateExpr env expr
+    let sideBlocks = env.Blocks.Value
+    let allBlocks =
+        if sideBlocks.IsEmpty then
+            [ { Label = None; Args = []; Body = entryOps @ [ReturnOp [resultVal]] } ]
+        else
+            let entryBlock = { Label = None; Args = []; Body = entryOps }
+            let lastBlock = List.last sideBlocks
+            let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [resultVal]] }
+            let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
+            entryBlock :: sideBlocksPatched
+    let gcInitOp = LlvmCallVoidOp("@GC_init", [])
+    let allBlocksWithGC =
+        match allBlocks with
+        | [] -> allBlocks
+        | entryBlock :: rest ->
+            { entryBlock with Body = gcInitOp :: entryBlock.Body } :: rest
+    let mainFunc : FuncOp =
+        { Name        = "@main"
+          InputTypes  = []
+          ReturnType  = Some resultVal.Type
+          Body        = { Blocks = allBlocksWithGC }
+          IsLlvmFunc  = false }
+    let globals = env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value))
+    let externalFuncs = [
+        { ExtName = "@GC_init";              ExtParams = [];         ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@GC_malloc";            ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@printf";               ExtParams = [Ptr];      ExtReturn = Some I32; IsVarArg = true  }
+        { ExtName = "@strcmp";               ExtParams = [Ptr; Ptr]; ExtReturn = Some I32; IsVarArg = false }
+        { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false }
+        { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false }
+        { ExtName = "@lang_range";           ExtParams = [I64; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
+    ]
+    { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
+
+// Phase 16: Declaration pre-pass — scans Decl list and populates TypeEnv, RecordEnv, ExnTags.
+// No MLIR IR is emitted in this pass; only F# Map structures are built.
+let private prePassDecls (decls: Ast.Decl list)
+    : Map<string, TypeInfo> * Map<string, Map<string, int>> * Map<string, int> =
+    let mutable typeEnv  = Map.empty<string, TypeInfo>
+    let mutable recordEnv = Map.empty<string, Map<string, int>>
+    let mutable exnTags  = Map.empty<string, int>
+    let exnCounter = ref 0
+    for decl in decls do
+        match decl with
+        | Ast.Decl.TypeDecl (Ast.TypeDecl(_, _, ctors, _)) ->
+            ctors |> List.iteri (fun idx ctor ->
+                match ctor with
+                | Ast.ConstructorDecl(name, dataType, _) ->
+                    let arity = match dataType with None -> 0 | Some _ -> 1
+                    typeEnv <- Map.add name { Tag = idx; Arity = arity } typeEnv
+                | Ast.GadtConstructorDecl(name, argTypes, _, _) ->
+                    let arity = if argTypes.IsEmpty then 0 else 1
+                    typeEnv <- Map.add name { Tag = idx; Arity = arity } typeEnv
+            )
+        | Ast.Decl.RecordTypeDecl (Ast.RecordDecl(typeName, _, fields, _)) ->
+            let fieldMap =
+                fields
+                |> List.mapi (fun idx (Ast.RecordFieldDecl(name, _, _, _)) -> (name, idx))
+                |> Map.ofList
+            recordEnv <- Map.add typeName fieldMap recordEnv
+        | Ast.Decl.ExceptionDecl(name, _, _) ->
+            let tag = exnCounter.Value
+            exnCounter.Value <- tag + 1
+            exnTags <- Map.add name tag exnTags
+        | _ -> ()
+    (typeEnv, recordEnv, exnTags)
+
+// Phase 16: Extract the main expression from a Decl list.
+// LetDecl("_", expr) → use expr as the body; it already contains nested Let bindings.
+// LetDecl(name, body) → wrap in Let(name, body, continuation).
+// Non-expression decls (TypeDecl, RecordTypeDecl, ExceptionDecl) are skipped.
+// LetRecDecl bindings are wrapped in LetRec expressions.
+let private extractMainExpr (decls: Ast.Decl list) : Expr =
+    let s = unknownSpan
+    let exprDecls =
+        decls |> List.filter (fun d ->
+            match d with
+            | Ast.Decl.LetDecl _ | Ast.Decl.LetRecDecl _ -> true
+            | _ -> false)
+    match exprDecls with
+    | [] -> Number(0, s)  // empty module → produce 0 as unit sentinel
+    | _ ->
+        // Fold right: each decl wraps the continuation
+        let rec build (ds: Ast.Decl list) : Expr =
+            match ds with
+            | [] -> Number(0, s)
+            | [Ast.Decl.LetDecl("_", body, _)] -> body
+            | [Ast.Decl.LetDecl(name, body, _)] -> Let(name, body, Var(name, s), s)
+            | [Ast.Decl.LetRecDecl(bindings, _)] ->
+                // Single let rec with no continuation: wrap body in (fun _ -> body) 0 sentinel
+                // Just return 0 as the program's exit value; Phase 17 will need real support
+                match bindings with
+                | (name, param, body, _) :: _ -> LetRec(name, param, body, Number(0, s), s)
+                | [] -> Number(0, s)
+            | Ast.Decl.LetDecl("_", body, _) :: rest ->
+                // let _ = body → evaluate body for side effects, then rest
+                // Represent as Let("_", body, continuation)
+                Let("_", body, build rest, s)
+            | Ast.Decl.LetDecl(name, body, _) :: rest ->
+                Let(name, body, build rest, s)
+            | Ast.Decl.LetRecDecl(bindings, _) :: rest ->
+                match bindings with
+                | (name, param, body, _) :: _ -> LetRec(name, param, body, build rest, s)
+                | [] -> build rest
+            | _ :: rest -> build rest
+        build exprDecls
+
+// Phase 16: elaborateProgram — new entry point accepting Ast.Module.
+// Runs prePassDecls to populate TypeEnv/RecordEnv/ExnTags, then elaborates the program body.
+let elaborateProgram (ast: Ast.Module) : MlirModule =
+    let decls =
+        match ast with
+        | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) | Ast.NamespacedModule(_, decls, _) -> decls
+        | Ast.EmptyModule _ -> []
+    let (typeEnv, recordEnv, exnTags) = prePassDecls decls
+    let mainExpr = extractMainExpr decls
+    let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags }
+    let (resultVal, entryOps) = elaborateExpr env mainExpr
     let sideBlocks = env.Blocks.Value
     let allBlocks =
         if sideBlocks.IsEmpty then
