@@ -70,23 +70,23 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| OP-01 | Phase 12 | Pending |
-| OP-02 | Phase 12 | Pending |
-| OP-03 | Phase 12 | Pending |
-| OP-04 | Phase 12 | Pending |
-| OP-05 | Phase 12 | Pending |
-| PAT-06 | Phase 13 | Pending |
-| PAT-07 | Phase 13 | Pending |
-| PAT-08 | Phase 13 | Pending |
-| BLT-01 | Phase 14 | Pending |
-| BLT-02 | Phase 14 | Pending |
-| BLT-03 | Phase 14 | Pending |
-| BLT-04 | Phase 14 | Pending |
-| BLT-05 | Phase 14 | Pending |
-| BLT-06 | Phase 14 | Pending |
-| BLT-07 | Phase 14 | Pending |
-| RNG-01 | Phase 15 | Pending |
-| RNG-02 | Phase 15 | Pending |
+| OP-01 | Phase 12 | Complete |
+| OP-02 | Phase 12 | Complete |
+| OP-03 | Phase 12 | Complete |
+| OP-04 | Phase 12 | Complete |
+| OP-05 | Phase 12 | Complete |
+| PAT-06 | Phase 13 | Complete |
+| PAT-07 | Phase 13 | Complete |
+| PAT-08 | Phase 13 | Complete |
+| BLT-01 | Phase 14 | Complete |
+| BLT-02 | Phase 14 | Complete |
+| BLT-03 | Phase 14 | Complete |
+| BLT-04 | Phase 14 | Complete |
+| BLT-05 | Phase 14 | Complete |
+| BLT-06 | Phase 14 | Complete |
+| BLT-07 | Phase 14 | Complete |
+| RNG-01 | Phase 15 | Complete |
+| RNG-02 | Phase 15 | Complete |
 
 **Coverage:**
 - v3 requirements: 17 total

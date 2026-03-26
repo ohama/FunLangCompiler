@@ -15,10 +15,10 @@ Pipeline: LangThree AST → Elaboration → MlirIR → Printer → `.mlir` → `
 
 **Milestone Goal:** 누락 연산자, 빌트인, 패턴 매칭 확장으로 대부분의 LangThree 프로그램이 컴파일 가능하도록 한다.
 
-- [ ] **Phase 12: Missing Operators** - Modulo, Char literal, PipeRight, ComposeRight/Left
-- [ ] **Phase 13: Pattern Matching Extensions** - when guards, OrPat, ConstPat(CharConst)
-- [ ] **Phase 14: Builtin Extensions** - failwith, string_sub, string_contains, string_to_int, char_to_int, int_to_char, variable print/println
-- [ ] **Phase 15: Range** - [start..stop] and [start..step..stop] list generation
+- [x] **Phase 12: Missing Operators** - Modulo, Char literal, PipeRight, ComposeRight/Left
+- [x] **Phase 13: Pattern Matching Extensions** - when guards, OrPat, ConstPat(CharConst)
+- [x] **Phase 14: Builtin Extensions** - failwith, string_sub, string_contains, string_to_int, char_to_int, int_to_char, variable print/println
+- [x] **Phase 15: Range** - [start..stop] and [start..step..stop] list generation
 
 ### Phase 12: Missing Operators
 **Goal**: LangThree의 누락 연산자들이 컴파일러에서 지원되어 `%`, `'A'`, `|>`, `>>`, `<<` 연산자를 사용하는 프로그램이 정상 컴파일된다
@@ -71,7 +71,7 @@ Phases 12 → 13 → 14 → 15 (13 and 14 are independent, can run in parallel a
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 12. Missing Operators | v3.0 | 0/TBD | Not started | - |
-| 13. Pattern Matching Extensions | v3.0 | 0/TBD | Not started | - |
-| 14. Builtin Extensions | v3.0 | 0/TBD | Not started | - |
-| 15. Range | v3.0 | 0/TBD | Not started | - |
+| 12. Missing Operators | v3.0 | 2/2 | Complete | 2026-03-26 |
+| 13. Pattern Matching Extensions | v3.0 | 1/1 | Complete | 2026-03-26 |
+| 14. Builtin Extensions | v3.0 | 1/1 | Complete | 2026-03-26 |
+| 15. Range | v3.0 | 1/1 | Complete | 2026-03-26 |
