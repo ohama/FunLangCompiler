@@ -38,11 +38,11 @@ Delivered: Modulo/Char/Pipe/Compose operators, when guards, OrPat, CharConst pat
 
 ---
 
-### 🚧 v4.0 Type System & Error Handling (In Progress)
+### v4.0 Type System & Error Handling (In Progress)
 
-**Milestone Goal:** ADT/GADT(discriminated unions), Records(mutable fields 포함), Exception handling(setjmp/longjmp)을 컴파일하여 LangThree의 타입 시스템 기능 대부분을 네이티브 코드로 지원한다.
+**Milestone Goal:** ADT/GADT(discriminated unions), Records(mutable fields), Exception handling(setjmp/longjmp)을 컴파일하여 LangThree의 타입 시스템 기능 대부분을 네이티브 코드로 지원한다.
 
-- [x] **Phase 16: Environment Infrastructure** — TypeEnv/RecordEnv/ExnTags 구성 + MatchCompiler CtorTag 확장 ✓
+- [x] **Phase 16: Environment Infrastructure** — TypeEnv/RecordEnv/ExnTags 구성 + MatchCompiler CtorTag 확장
 - [ ] **Phase 17: ADT Construction & Pattern Matching** — Constructor elaboration + ConstructorPat round-trip
 - [ ] **Phase 18: Records** — RecordExpr/FieldAccess/RecordUpdate/SetField/RecordPat elaboration
 - [ ] **Phase 19: Exception Handling** — setjmp/longjmp C runtime + Raise/TryWith elaboration
@@ -79,11 +79,11 @@ Plans:
   3. `type Pair = Pair of int * int` — multi-arg `Pair(3, 4)` wraps args as tuple payload; pattern match extracts both fields correctly
   4. GADT constructor compiles identically to regular ADT constructor after frontend type-checking (backend treats as plain ADT)
   5. All 45 existing E2E tests continue to pass (REG-01 gate)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 17-01: Constructor elaboration — nullary/unary/multi-arg ADT value construction (ADT-05, ADT-06, ADT-07)
-- [ ] 17-02: ConstructorPat elaboration — tag comparison + payload GEP + sub-pattern dispatch (ADT-08, ADT-09, ADT-10)
+- [ ] 17-01-PLAN.md — Constructor elaboration: nullary/unary/multi-arg ADT value construction + 3 E2E tests (ADT-05, ADT-06, ADT-07)
+- [ ] 17-02-PLAN.md — ConstructorPat elaboration: tag comparison + payload GEP + sub-pattern dispatch + resolveAccessor Ptr-retype guard + 3 E2E tests (ADT-08, ADT-09, ADT-10)
 
 ---
 
@@ -150,7 +150,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-16 → 17 → 18 → 19 → 20 (17 and 18 are independent after 16; 19 requires both 17 and 18; 20 requires 17 and 19)
+16 -> 17 -> 18 -> 19 -> 20 (17 and 18 are independent after 16; 19 requires both 17 and 18; 20 requires 17 and 19)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -165,4 +165,4 @@ Plans:
 
 ---
 *Created: 2026-03-26 for v4.0 milestone*
-*Last updated: 2026-03-26*
+*Last updated: 2026-03-27*
