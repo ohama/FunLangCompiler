@@ -287,13 +287,53 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Equal (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
-        let result = { Name = freshName env; Type = I1 }
-        (result, lops @ rops @ [ArithCmpIOp(result, "eq", lv, rv)])
+        if lv.Type = Ptr then
+            // String equality via strcmp
+            let lDataPtr   = { Name = freshName env; Type = Ptr }
+            let lData      = { Name = freshName env; Type = Ptr }
+            let rDataPtr   = { Name = freshName env; Type = Ptr }
+            let rData      = { Name = freshName env; Type = Ptr }
+            let cmpResult  = { Name = freshName env; Type = I32 }
+            let zero32     = { Name = freshName env; Type = I32 }
+            let boolResult = { Name = freshName env; Type = I1 }
+            let ops = [
+                LlvmGEPStructOp(lDataPtr, lv, 1)
+                LlvmLoadOp(lData, lDataPtr)
+                LlvmGEPStructOp(rDataPtr, rv, 1)
+                LlvmLoadOp(rData, rDataPtr)
+                LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
+                ArithConstantOp(zero32, 0L)
+                ArithCmpIOp(boolResult, "eq", cmpResult, zero32)
+            ]
+            (boolResult, lops @ rops @ ops)
+        else
+            let result = { Name = freshName env; Type = I1 }
+            (result, lops @ rops @ [ArithCmpIOp(result, "eq", lv, rv)])
     | NotEqual (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
-        let result = { Name = freshName env; Type = I1 }
-        (result, lops @ rops @ [ArithCmpIOp(result, "ne", lv, rv)])
+        if lv.Type = Ptr then
+            // String inequality via strcmp != 0
+            let lDataPtr   = { Name = freshName env; Type = Ptr }
+            let lData      = { Name = freshName env; Type = Ptr }
+            let rDataPtr   = { Name = freshName env; Type = Ptr }
+            let rData      = { Name = freshName env; Type = Ptr }
+            let cmpResult  = { Name = freshName env; Type = I32 }
+            let zero32     = { Name = freshName env; Type = I32 }
+            let boolResult = { Name = freshName env; Type = I1 }
+            let ops = [
+                LlvmGEPStructOp(lDataPtr, lv, 1)
+                LlvmLoadOp(lData, lDataPtr)
+                LlvmGEPStructOp(rDataPtr, rv, 1)
+                LlvmLoadOp(rData, rDataPtr)
+                LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
+                ArithConstantOp(zero32, 0L)
+                ArithCmpIOp(boolResult, "ne", cmpResult, zero32)
+            ]
+            (boolResult, lops @ rops @ ops)
+        else
+            let result = { Name = freshName env; Type = I1 }
+            (result, lops @ rops @ [ArithCmpIOp(result, "ne", lv, rv)])
     | LessThan (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
