@@ -32,12 +32,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. The MlirIR Printer produces a valid `.mlir` text file containing a `func.func @main() -> i64` module that can be opened and read as plain text
   3. `mlir-opt` runs via `System.Diagnostics.Process` with the lowering pipeline and exits 0; `mlir-translate --mlir-to-llvmir` followed by `clang` each exit 0 and produce a runnable ELF binary that exits with code 42
   4. A FsLit `.flt` smoke test file for `return 42` compiles through the full pipeline and verifies the exit code automatically
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: MlirIR DU definition (Region, Block, Op, Value, Type) and LangThree .fsproj project reference
-- [ ] 01-02: MlirIR Printer (MlirIR → `.mlir` text, pure string generation)
-- [ ] 01-03: mlir-opt, mlir-translate, clang shell pipeline and E2E smoke test
+- [ ] 01-01-PLAN.md — MlirIR DU (MlirModule/FuncOp/MlirRegion/MlirBlock/MlirOp/MlirValue/MlirType) and LangBackend.Compiler .fsproj with LangThree project reference
+- [ ] 01-02-PLAN.md — MlirIR Printer (pure string serializer) and shell Pipeline (mlir-opt → mlir-translate → clang via System.Diagnostics.Process)
+- [ ] 01-03-PLAN.md — LangBackend.Cli entry point and FsLit E2E smoke test (`01-return42.flt`)
 
 ### Phase 2: Scalar Codegen via MlirIR
 **Goal**: LangThree integer expressions (literals, arithmetic, let bindings, variable references) are elaborated into MlirIR and compile to native binaries that produce correct results — this phase also introduces the Elaboration pass as the canonical LangThree AST → MlirIR translation layer
