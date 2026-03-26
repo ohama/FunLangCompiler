@@ -60,11 +60,11 @@ Delivered: Modulo/Char/Pipe/Compose operators, when guards, OrPat, CharConst pat
   2. ExceptionDecl constructors are registered in TypeEnv using the same tag-index mechanism as ADT constructors
   3. MatchCompiler.CtorTag includes `AdtCtor` and `RecordCtor` variants; `desugarPattern` dispatches ConstructorPat and RecordPat without hitting `failwith`
   4. All 45 existing E2E tests continue to pass (REG-01 gate)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 16-01: elaborateProgram pre-pass — TypeDecl/RecordDecl/ExceptionDecl tag and index registration (ADT-01, ADT-02, ADT-04, REC-01)
-- [ ] 16-02: MatchCompiler CtorTag extension — AdtCtor/RecordCtor variants + desugarPattern dispatch (ADT-03)
+- [ ] 16-01-PLAN.md — elaborateProgram pre-pass: ElabEnv extension + prePassDecls + Program.fs entry point switch (ADT-01, ADT-02, ADT-04, REC-01)
+- [ ] 16-02-PLAN.md — MatchCompiler CtorTag extension: AdtCtor/RecordCtor variants + desugarPattern dispatch (ADT-03)
 
 ---
 
