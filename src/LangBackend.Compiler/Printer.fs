@@ -82,6 +82,9 @@ let private printOp (indent: string) (op: MlirOp) : string =
     | LlvmGEPLinearOp(result, ptr, index) ->
         sprintf "%s%s = llvm.getelementptr %s[%d] : (!llvm.ptr) -> !llvm.ptr, i64"
             indent result.Name ptr.Name index
+    | LlvmGEPStructOp(result, ptr, fieldIndex) ->
+        sprintf "%s%s = llvm.getelementptr inbounds %s[0, %d] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i64, ptr)>"
+            indent result.Name ptr.Name fieldIndex
     | LlvmReturnOp [] ->
         sprintf "%sllvm.return" indent
     | LlvmReturnOp operands ->

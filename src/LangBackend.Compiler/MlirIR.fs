@@ -49,7 +49,8 @@ type MlirOp =
     | LlvmStoreOp     of value: MlirValue * ptr: MlirValue
     | LlvmLoadOp      of result: MlirValue * ptr: MlirValue
     | LlvmAddressOfOp of result: MlirValue * fnName: string
-    | LlvmGEPLinearOp of result: MlirValue * ptr: MlirValue * index: int
+    | LlvmGEPLinearOp  of result: MlirValue * ptr: MlirValue * index: int
+    | LlvmGEPStructOp  of result: MlirValue * ptr: MlirValue * fieldIndex: int
     | LlvmReturnOp    of operands: MlirValue list
     | IndirectCallOp  of result: MlirValue * fnPtr: MlirValue * envPtr: MlirValue * arg: MlirValue
     // Phase 7: GC/external calls
