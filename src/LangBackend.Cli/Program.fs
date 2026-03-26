@@ -8,6 +8,20 @@ let parseExpr (src: string) (filename: string) : Ast.Expr =
     Lexer.setInitialPos lexbuf filename
     Parser.start Lexer.tokenize lexbuf
 
+// Phase 16: Parse a source file as a module (Ast.Module).
+// Falls back to parseExpr and wraps in a synthetic Module for backward compatibility
+// with bare-expression inputs (e.g. "42", "true") that the module grammar rejects.
+let parseProgram (src: string) (filename: string) : Ast.Module =
+    try
+        let lexbuf = LexBuffer<char>.FromString src
+        Lexer.setInitialPos lexbuf filename
+        Parser.parseModule Lexer.tokenize lexbuf
+    with _ ->
+        // Bare expression input (not a valid top-level declaration): parse as Expr
+        // and wrap in a synthetic Module so elaborateProgram can process it uniformly.
+        let expr = parseExpr src filename
+        Ast.Module([Ast.Decl.LetDecl("_", expr, Ast.unknownSpan)], Ast.unknownSpan)
+
 [<EntryPoint>]
 let main argv =
     let args = argv |> Array.toList
@@ -45,8 +59,8 @@ let main argv =
         // Parse, elaborate, compile — with error handling
         try
             let src = System.IO.File.ReadAllText(inputPath)
-            let expr = parseExpr src inputPath
-            let mlirMod = Elaboration.elaborateModule expr
+            let ast = parseProgram src inputPath
+            let mlirMod = Elaboration.elaborateProgram ast
             match Pipeline.compile mlirMod outputPath with
             | Ok () ->
                 0
