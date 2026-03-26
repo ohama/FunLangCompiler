@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v4.0 Type System & Error Handling — Phase 16: Environment Infrastructure
+**Current focus:** v4.0 Type System & Error Handling — Phase 17: ADT Construction & Pattern Matching
 
 ## Current Position
 
-Phase: 16 of 20 (Environment Infrastructure)
-Plan: 01 of 02 (completed — both plans done)
-Status: Phase complete
-Last activity: 2026-03-26 — Completed 16-01-PLAN.md (ElabEnv extension, elaborateProgram, parseModule switch)
+Phase: 17 of 20 (ADT Construction & Pattern Matching)
+Plan: — (not started)
+Status: Ready to plan
+Last activity: 2026-03-27 — Phase 16 complete and verified (2/2 plans, 4/4 must-haves)
 
-Progress: [██░░░░░░░░] ~10% (v4.0, 2 plans complete of ~20 estimated)
+Progress: [██░░░░░░░░] 20% (v4.0, 1/5 phases complete)
 
 ## Performance Metrics
 
@@ -59,6 +59,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26T23:26:18Z
-Stopped at: Completed 16-01-PLAN.md — ElabEnv extension + elaborateProgram + parseModule switch (Phase 16 both plans now complete)
+Last session: 2026-03-27
+Stopped at: Phase 16 verified — ready to plan Phase 17
 Resume file: None

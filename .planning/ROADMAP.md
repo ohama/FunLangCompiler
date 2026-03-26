@@ -42,7 +42,7 @@ Delivered: Modulo/Char/Pipe/Compose operators, when guards, OrPat, CharConst pat
 
 **Milestone Goal:** ADT/GADT(discriminated unions), Records(mutable fields 포함), Exception handling(setjmp/longjmp)을 컴파일하여 LangThree의 타입 시스템 기능 대부분을 네이티브 코드로 지원한다.
 
-- [ ] **Phase 16: Environment Infrastructure** — TypeEnv/RecordEnv/ExnTags 구성 + MatchCompiler CtorTag 확장
+- [x] **Phase 16: Environment Infrastructure** — TypeEnv/RecordEnv/ExnTags 구성 + MatchCompiler CtorTag 확장 ✓
 - [ ] **Phase 17: ADT Construction & Pattern Matching** — Constructor elaboration + ConstructorPat round-trip
 - [ ] **Phase 18: Records** — RecordExpr/FieldAccess/RecordUpdate/SetField/RecordPat elaboration
 - [ ] **Phase 19: Exception Handling** — setjmp/longjmp C runtime + Raise/TryWith elaboration
@@ -63,8 +63,8 @@ Delivered: Modulo/Char/Pipe/Compose operators, when guards, OrPat, CharConst pat
 **Plans**: 2 plans
 
 Plans:
-- [ ] 16-01-PLAN.md — elaborateProgram pre-pass: ElabEnv extension + prePassDecls + Program.fs entry point switch (ADT-01, ADT-02, ADT-04, REC-01)
-- [ ] 16-02-PLAN.md — MatchCompiler CtorTag extension: AdtCtor/RecordCtor variants + desugarPattern dispatch (ADT-03)
+- [x] 16-01-PLAN.md — elaborateProgram pre-pass: ElabEnv extension + prePassDecls + Program.fs entry point switch (ADT-01, ADT-02, ADT-04, REC-01)
+- [x] 16-02-PLAN.md — MatchCompiler CtorTag extension: AdtCtor/RecordCtor variants + desugarPattern dispatch (ADT-03)
 
 ---
 
@@ -157,7 +157,7 @@ Plans:
 | 1-6. Core Compiler | v1.0 | 11/11 | Complete | 2026-03-26 |
 | 7-11. Data Types & Pattern Matching | v2.0 | 9/9 | Complete | 2026-03-26 |
 | 12-15. Language Completeness | v3.0 | 5/5 | Complete | 2026-03-26 |
-| 16. Environment Infrastructure | v4.0 | 0/2 | Not started | - |
+| 16. Environment Infrastructure | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 17. ADT Construction & Pattern Matching | v4.0 | 0/2 | Not started | - |
 | 18. Records | v4.0 | 0/2 | Not started | - |
 | 19. Exception Handling | v4.0 | 0/3 | Not started | - |

@@ -72,10 +72,10 @@ Deferred to future release. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ADT-01 | Phase 16 | Pending |
-| ADT-02 | Phase 16 | Pending |
-| ADT-03 | Phase 16 | Pending |
-| ADT-04 | Phase 16 | Pending |
+| ADT-01 | Phase 16 | Complete |
+| ADT-02 | Phase 16 | Complete |
+| ADT-03 | Phase 16 | Complete |
+| ADT-04 | Phase 16 | Complete |
 | ADT-05 | Phase 17 | Pending |
 | ADT-06 | Phase 17 | Pending |
 | ADT-07 | Phase 17 | Pending |
@@ -84,7 +84,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | ADT-10 | Phase 17 | Pending |
 | ADT-11 | Phase 20 | Pending |
 | ADT-12 | Phase 20 | Pending |
-| REC-01 | Phase 16 | Pending |
+| REC-01 | Phase 16 | Complete |
 | REC-02 | Phase 18 | Pending |
 | REC-03 | Phase 18 | Pending |
 | REC-04 | Phase 18 | Pending |
