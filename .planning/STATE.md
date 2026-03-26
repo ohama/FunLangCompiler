@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 5 complete — Phase 6 next
+**Current focus:** ALL PHASES COMPLETE — compiler is a fully usable CLI tool
 
 ## Current Position
 
-Phase: 5 of 6 (Closures via Elaboration) — COMPLETE
-Plan: 2 of 2 in phase 05 — Plan 02 complete
-Status: Phase 5 complete — closure E2E pipeline verified, 13/13 FsLit tests green, add_n exits 8
-Last activity: 2026-03-26 — Completed 05-02-PLAN.md (freeVars bug fix, 2 new closure FsLit tests, 13/13 pass)
+Phase: 6 of 6 (CLI Driver) — COMPLETE
+Plan: 1 of 1 in phase 06 — Plan 01 complete
+Status: ALL PHASES DONE — auto-naming CLI, error handling, 15/15 FsLit tests green
+Last activity: 2026-03-26 — Completed 06-01-PLAN.md (auto-naming, file-not-found, parse-error handling, 2 new FsLit tests)
 
-Progress: [████████░░] 75%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 10 (ALL COMPLETE)
 - Average duration: ~2.3 min
-- Total execution time: ~0.37 hours
+- Total execution time: ~0.38 hours
 
 **By Phase:**
 
@@ -32,9 +32,10 @@ Progress: [████████░░] 75%
 | 03-booleans-comparisons-control-flow | 2 | ~4 min | ~2 min |
 | 04-known-functions-via-elaboration | 1 | ~3 min | ~3 min |
 | 05-closures-via-elaboration | 2 | ~9 min | ~4.5 min |
+| 06-cli | 1 | ~2 min | ~2 min |
 
 **Recent Trend:**
-- Last 10 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min), 04-01 (3 min), 05-01 (6 min), 05-02 (3 min)
+- Last 11 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min), 04-01 (3 min), 05-01 (6 min), 05-02 (3 min), 06-01 (2 min)
 - Trend: Stable ~2-3 min/plan; closure plans slightly longer due to MLIR IR complexity
 
 *Updated after each plan completion*
@@ -80,6 +81,10 @@ Recent decisions affecting current work:
 - [05-01]: Captures sorted (List.sort) for deterministic GEP index assignment
 - [05-01]: ClosureCounter shared across module elaboration (same ref in ElabEnv) for globally unique closure function names
 - [05-01]: LlvmReturnOp in llvm.func bodies; ReturnOp in func.func bodies — never mixed (critical anti-pattern)
+- [06-01]: -o flag is optional; Path.GetFileNameWithoutExtension(inputPath) auto-derives output binary name (strips .lt and directory prefix)
+- [06-01]: File.Exists check before File.ReadAllText gives readable "Error: file not found:" instead of FileNotFoundException
+- [06-01]: try/with wraps parse/elaborate/compile pipeline; parse errors surface as "Error: <message>" not stack traces
+- [06-01]: FsLit auto-naming test uses "cd /tmp && cp %input ${OUTNAME}.lt" to exercise extension-stripping; fixed path for error test
 
 ### Pending Todos
 
@@ -94,6 +99,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T03:48:16Z
-Stopped at: Completed 05-02-PLAN.md — freeVars bug fix, 2 closure E2E tests, 13/13 FsLit pass; Phase 5 complete
+Last session: 2026-03-26T04:00:21Z
+Stopped at: Completed 06-01-PLAN.md — CLI auto-naming + error handling, 15/15 FsLit pass; ALL 6 PHASES DONE
 Resume file: None
