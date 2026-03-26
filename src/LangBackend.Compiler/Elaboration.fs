@@ -990,6 +990,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | MatchCompiler.ConsCtor    -> Ptr
             | MatchCompiler.NilCtor     -> Ptr
             | MatchCompiler.TupleCtor _ -> Ptr
+            | MatchCompiler.AdtCtor _   -> failwith "Phase 17: AdtCtor not yet implemented"
+            | MatchCompiler.RecordCtor _ -> failwith "Phase 18: RecordCtor not yet implemented"
 
         // Emit test ops for a constructor match against a scrutinee value.
         // Returns (condValue, testOps).
@@ -1040,6 +1042,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let cond = { Name = freshName env; Type = I1 }
                 let ops = [ ArithConstantOp(cond, 1L) ]
                 (cond, ops)
+            | MatchCompiler.AdtCtor _ ->
+                failwith "Phase 17: AdtCtor not yet implemented"
+            | MatchCompiler.RecordCtor _ ->
+                failwith "Phase 18: RecordCtor not yet implemented"
 
         // Pre-populate accessor cache for ConsCtor sub-fields with correct types.
         // field 0 = head (I64), field 1 = tail (Ptr).

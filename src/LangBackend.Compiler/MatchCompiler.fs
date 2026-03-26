@@ -33,6 +33,10 @@ type CtorTag =
     | ConsCtor            // h :: t  (2 fields: head, tail)
     | NilCtor             // []      (0 fields)
     | TupleCtor of int    // tuple of arity n (n fields)
+    | AdtCtor of name: string * tag: int * arity: int
+                          // ADT constructor: name for equality, tag placeholder (Phase 17), arity
+    | RecordCtor of fields: string list
+                          // Record constructor: sorted field names (canonical identity)
 
 /// A single test: scrutinee must match a constructor with sub-patterns.
 type TestPattern =
@@ -74,6 +78,8 @@ let private ctorArity (tag: CtorTag) : int =
     | NilCtor     -> 0
     | ConsCtor    -> 2
     | TupleCtor n -> n
+    | AdtCtor(_, _, arity) -> arity
+    | RecordCtor fields    -> List.length fields
 
 // ---------------------------------------------------------------------------
 // Pattern desugaring: Ast.Pattern → (Test list * bindings)
