@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="MlirIR.fs" />
     <Compile Include="Printer.fs" />
+    <Compile Include="Pipeline.fs" />
   </ItemGroup>
 
   <ItemGroup>
