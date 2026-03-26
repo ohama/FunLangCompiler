@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 16 of 20 (Environment Infrastructure)
-Plan: — (not started)
-Status: Ready to plan
-Last activity: 2026-03-26 — v4.0 roadmap created; 27 requirements mapped across 5 phases (16-20)
+Plan: 02 of N in phase (completed)
+Status: In progress
+Last activity: 2026-03-26 — Completed 16-02-PLAN.md (MatchCompiler AdtCtor/RecordCtor dispatch)
 
-Progress: [░░░░░░░░░░] 0% (v4.0)
+Progress: [██░░░░░░░░] ~10% (v4.0, 2 plans complete of ~20 estimated)
 
 ## Performance Metrics
 
@@ -43,6 +43,8 @@ Progress: [░░░░░░░░░░] 0% (v4.0)
 - [v4.0 pending] Nullary ctors always allocate real 16-byte block with tag — null encoding reserved for NilCtor (C-12)
 - [v4.0 pending] lang_try_enter must call setjmp via static inline/macro — not out-of-line C function (C-15)
 - [v4.0 pending] Pop handler stack before handler body executes, not after (C-16)
+- AdtCtor tag=0 placeholder in MatchCompiler for Phase 16; Phase 17 must supply real integer tag from ADT layout table (16-02)
+- RecordCtor identity = sorted field names list; canonical ordering enforced at desugarPattern site (16-02)
 
 ### Pending Todos
 
@@ -55,6 +57,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: v4.0 roadmap created — ready to plan Phase 16
+Last session: 2026-03-26T23:21:00Z
+Stopped at: Completed 16-02-PLAN.md — MatchCompiler AdtCtor/RecordCtor dispatch complete
 Resume file: None
