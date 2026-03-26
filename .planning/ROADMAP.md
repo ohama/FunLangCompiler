@@ -142,12 +142,12 @@ Plans:
   2. The v1 closure E2E FsLit tests (15 tests) all continue to pass after migrating closure environment allocation from `llvm.alloca` to `GC_malloc` — no regressions
   3. A program that returns a closure from a function and applies it after the defining stack frame has returned executes correctly (confirms heap closure environments do not become dangling)
   4. `print "hello"` and `println "world"` compile and write the expected strings to stdout in a FsLit E2E test
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 07-01: Add `-lgc` / platform `-L` flag to Pipeline.fs; add `GC_INIT` + `GC_malloc` extern declarations to MlirModule.GlobalDecls; emit `GC_INIT()` call at start of `@main`; add `LlvmCallOp` to MlirIR + Printer
-- [ ] 07-02: Migrate closure environment allocation from `LlvmAllocaOp` to `LlvmCallOp(@GC_malloc)` in Elaboration; verify v1 FsLit tests pass
-- [ ] 07-03: Elaborate `print` / `println` builtins as `llvm.call @printf`; FsLit E2E tests for print output
+- [ ] 07-01-PLAN.md — MlirIR GC infrastructure (MlirGlobal, ExternalFuncDecl, LlvmCallOp, LlvmCallVoidOp), Printer serialization, Pipeline -lgc linking
+- [ ] 07-02-PLAN.md — Elaborate GC_init in @main, migrate closure alloca to GC_malloc, escaped-closure E2E test
+- [ ] 07-03-PLAN.md — Elaborate print/println builtins as llvm.call @printf with string globals, E2E tests
 
 ### Phase 8: Strings
 **Goal**: String literals compile to heap-allocated `{i64 length, ptr data}` two-field structs managed by Boehm GC; the string builtins `print`, `println`, `string_length`, `string_concat`, and `to_string` all work in compiled programs
@@ -224,7 +224,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 4. Known Functions via Elaboration | v1.0 | 1/1 | Complete | 2026-03-26 |
 | 5. Closures via Elaboration | v1.0 | 2/2 | Complete | 2026-03-26 |
 | 6. CLI | v1.0 | 1/1 | Complete | 2026-03-26 |
-| 7. GC Runtime Integration | v2.0 | 0/TBD | Not started | - |
+| 7. GC Runtime Integration | v2.0 | 0/3 | Not started | - |
 | 8. Strings | v2.0 | 0/TBD | Not started | - |
 | 9. Tuples | v2.0 | 0/TBD | Not started | - |
 | 10. Lists | v2.0 | 0/TBD | Not started | - |
