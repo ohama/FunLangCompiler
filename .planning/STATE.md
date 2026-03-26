@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 13-pattern-matching-extensions (1/1 plans complete)
-Plan: 13-01 of 01
+Phase: 14-builtin-extensions (1/1 plans complete)
+Plan: 14-01 of 01
 Status: Phase complete
-Last activity: 2026-03-26 — Completed 13-01-PLAN.md (when-guard, OrPat, CharConst)
+Last activity: 2026-03-26 — Completed 14-01-PLAN.md (failwith, string_sub, string_contains, string_to_int, char_to_int, int_to_char)
 
-Progress: [███░░░░░░░] 30% (3 plans done, v3.0 in progress)
+Progress: [████░░░░░░] 40% (4 plans done, v3.0 in progress)
 
 ## Performance Metrics
 
@@ -38,6 +38,9 @@ Progress: [███░░░░░░░] 30% (3 plans done, v3.0 in progress)
 - Bare Lambda as expression creates inline closure via GC_malloc + llvm.func (12-02)
 - PipeRight/ComposeRight/ComposeLeft are elaboration-time desugar only, no new MLIR ops (12-02)
 - OrPat expanded in Elaboration.fs before MatchCompiler; PAT-08 is IntLit(int c) remap; PAT-06 Guard node in DecisionTree (13-01)
+- char_to_int and int_to_char are identity elaborations — char is already i64 (14-01)
+- string_contains: C returns I64 0/1; ArithCmpIOp(ne, 0) converts to I1 for boolean use (14-01)
+- failwith: LlvmCallVoidOp + dead ArithConstantOp(0L) for unit return type (14-01)
 
 ### Pending Todos
 
@@ -50,5 +53,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 13-01-PLAN.md — phase 13-pattern-matching-extensions complete
+Stopped at: Completed 14-01-PLAN.md — phase 14-builtin-extensions complete
 Resume file: None
