@@ -49,11 +49,11 @@ Plans:
   2. An integer literal `.lt` file compiles end-to-end and the binary exits with the literal value
   3. An arithmetic expression such as `1 + 2 * 3 - 4 / 2` compiles and the binary exits with the correct value (5)
   4. A `let x = 5 in let y = x + 3 in y` program compiles and exits with 8, confirming SSA let binding and variable lookup through the Elaboration pass
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Elaboration pass skeleton, MlirIR scalar op types, integer literal codegen
-- [ ] 02-02: Arithmetic ops elaboration and let/variable SSA binding
+- [ ] 02-01-PLAN.md — Elaboration pass skeleton, MlirIR scalar arith op types + Printer cases, CLI wired to parse .lt files, integer literal FsLit test
+- [ ] 02-02-PLAN.md — FsLit tests for arithmetic expression (1+2*3-4/2=5) and let/variable SSA binding (let x=5 in let y=x+3 in y=8)
 
 ### Phase 3: Booleans, Comparisons, Control Flow
 **Goal**: LangThree programs using boolean literals, comparison operators, logical short-circuit operators, and if-else expressions are elaborated into MlirIR and execute correctly
