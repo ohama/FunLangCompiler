@@ -7,10 +7,10 @@
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: MLIR C API P/Invoke 바인딩 (`MlirContext`, `MlirModule`, `MlirOperation` 등 핸들 타입)
-- [ ] **INFRA-02**: 소유권 추적 래퍼 + `CompilerSession` (destroy 순서 보장)
-- [ ] **INFRA-03**: 4단계 lowering 파이프라인 (`arith→cf→func→llvm→reconcile-unrealized-casts`)
-- [ ] **INFRA-04**: shell pipeline으로 MLIR → object file → 실행 바이너리 생성
+- [ ] **INFRA-01**: MlirIR 정의 — MLIR 개념(Region, Block, Op, Value, Type)을 F# DU로 모델링한 컴파일러 내부 IR
+- [ ] **INFRA-02**: MlirIR → `.mlir` 텍스트 프린터 (P/Invoke 없음, 순수 문자열 생성)
+- [ ] **INFRA-03**: `mlir-opt` 호출로 lowering 파이프라인 (`arith→cf→func→llvm→reconcile-unrealized-casts`)
+- [ ] **INFRA-04**: `mlir-translate --mlir-to-llvmir` + `clang` shell pipeline으로 바이너리 생성
 - [ ] **INFRA-05**: E2E 스모크 테스트 (`return 42` 컴파일 및 실행 검증)
 
 ### Scalar Codegen
@@ -27,12 +27,12 @@
 - [ ] **CTRL-02**: `let` 바인딩 → SSA value 이름 바인딩
 - [ ] **CTRL-03**: 변수 참조 → SSA value 조회
 
-### Functions
+### Elaboration
 
-- [ ] **FUNC-01**: `TypedExpr` 어노테이션 패스 (자유변수 집합, 호출 종류 분석)
-- [ ] **FUNC-02**: `let rec` (캡처 없는 known function) → `func.func` + `func.call`
-- [ ] **FUNC-03**: Lambda (자유변수 있는 경우) → flat closure struct `{fn_ptr, env...}`
-- [ ] **FUNC-04**: 함수 적용 → direct call (known) 또는 indirect call (closure)
+- [ ] **ELAB-01**: LangThree AST → MlirIR 변환 패스 (Elaboration) — 타입 정보, 자유변수 집합, 호출 종류 포함
+- [ ] **ELAB-02**: `let rec` (캡처 없는 known function) elaboration → MlirIR `FuncOp`
+- [ ] **ELAB-03**: Lambda (자유변수 캡처) elaboration → MlirIR closure 표현 (`{fn_ptr, env...}`)
+- [ ] **ELAB-04**: 함수 적용 elaboration → direct call 또는 indirect call 구분
 
 ### CLI
 
@@ -73,6 +73,8 @@
 | string/tuple/list/pattern | GC/boxing 필요, v2로 미룸 |
 | ADT/GADT | LangThree에서도 미구현 |
 | Windows/macOS 지원 | Linux x86-64 (WSL2) 우선 |
+| P/Invoke MLIR C API 바인딩 | MLIR 텍스트 포맷 직접 생성으로 대체, 소유권/ABI 문제 없음 |
+| MlirIR optimization passes | v1에서는 correctness 우선, 최적화는 v2 이후 |
 
 ## Traceability
 
@@ -83,22 +85,22 @@
 | INFRA-03 | Phase 1 | Pending |
 | INFRA-04 | Phase 1 | Pending |
 | INFRA-05 | Phase 1 | Pending |
+| CLI-02 | Phase 1 | Pending |
+| TEST-01 | Phase 1 | Pending |
 | SCALAR-01 | Phase 2 | Pending |
 | SCALAR-02 | Phase 2 | Pending |
+| CTRL-02 | Phase 2 | Pending |
+| CTRL-03 | Phase 2 | Pending |
+| ELAB-01 | Phase 2 | Pending |
 | SCALAR-03 | Phase 3 | Pending |
 | SCALAR-04 | Phase 3 | Pending |
 | SCALAR-05 | Phase 3 | Pending |
 | CTRL-01 | Phase 3 | Pending |
-| CTRL-02 | Phase 2 | Pending |
-| CTRL-03 | Phase 2 | Pending |
-| FUNC-01 | Phase 4 | Pending |
-| FUNC-02 | Phase 4 | Pending |
-| FUNC-03 | Phase 5 | Pending |
-| FUNC-04 | Phase 5 | Pending |
+| ELAB-02 | Phase 4 | Pending |
+| ELAB-03 | Phase 5 | Pending |
+| ELAB-04 | Phase 5 | Pending |
+| TEST-02 | Phase 5 | Pending |
 | CLI-01 | Phase 6 | Pending |
-| CLI-02 | Phase 1 | Pending |
-| TEST-01 | Phase 1 | Pending |
-| TEST-02 | Phase 2 | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
@@ -107,4 +109,4 @@
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 after initial definition*
+*Last updated: 2026-03-26 after MlirIR design revision (Elaboration pass + MlirIR DU as explicit compiler IR)*
