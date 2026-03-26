@@ -620,6 +620,29 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | String (s, _) ->
         elaborateStringLiteral env s
 
+    // Phase 14: string_sub builtin — App(App(App(Var("string_sub"), s), start), len)
+    // Three-arg curried: must be matched before two-arg and one-arg App patterns
+    | App (App (App (Var ("string_sub", _), strExpr, _), startExpr, _), lenExpr, _) ->
+        let (strVal,   strOps)   = elaborateExpr env strExpr
+        let (startVal, startOps) = elaborateExpr env startExpr
+        let (lenVal,   lenOps)   = elaborateExpr env lenExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, strOps @ startOps @ lenOps @ [LlvmCallOp(result, "@lang_string_sub", [strVal; startVal; lenVal])])
+
+    // Phase 14: string_contains builtin — App(App(Var("string_contains"), s), sub)
+    | App (App (Var ("string_contains", _), strExpr, _), subExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let (subVal, subOps) = elaborateExpr env subExpr
+        let rawResult  = { Name = freshName env; Type = I64 }
+        let zeroVal    = { Name = freshName env; Type = I64 }
+        let boolResult = { Name = freshName env; Type = I1 }
+        let ops = [
+            LlvmCallOp(rawResult, "@lang_string_contains", [strVal; subVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+        ]
+        (boolResult, strOps @ subOps @ ops)
+
     // Phase 8: string_concat builtin — App(App(Var("string_concat"), a), b)
     // Must be placed BEFORE general App to avoid being caught by general App dispatch
     | App (App (Var ("string_concat", _), aExpr, _), bExpr, _) ->
@@ -651,6 +674,34 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             LlvmLoadOp(lenVal, lenPtrVal)
         ]
         (lenVal, strOps @ ops)
+
+    // Phase 14: failwith builtin — extract char* from LangString, call lang_failwith (noreturn)
+    | App (Var ("failwith", _), msgExpr, _) ->
+        let (msgVal, msgOps) = elaborateExpr env msgExpr
+        let dataPtrVal  = { Name = freshName env; Type = Ptr }
+        let dataAddrVal = { Name = freshName env; Type = Ptr }
+        let unitVal     = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmGEPStructOp(dataPtrVal, msgVal, 1)
+            LlvmLoadOp(dataAddrVal, dataPtrVal)
+            LlvmCallVoidOp("@lang_failwith", [dataAddrVal])
+            ArithConstantOp(unitVal, 0L)
+        ]
+        (unitVal, msgOps @ ops)
+
+    // Phase 14: string_to_int builtin
+    | App (Var ("string_to_int", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, strOps @ [LlvmCallOp(result, "@lang_string_to_int", [strVal])])
+
+    // Phase 14: char_to_int — identity (char is already i64)
+    | App (Var ("char_to_int", _), charExpr, _) ->
+        elaborateExpr env charExpr
+
+    // Phase 14: int_to_char — identity (int treated as char code point)
+    | App (Var ("int_to_char", _), intExpr, _) ->
+        elaborateExpr env intExpr
 
     // Phase 7: print/println builtins — static literal fast path (keep before general case)
     | App (Var ("print", _), String (s, _), _) ->
@@ -1192,5 +1243,9 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
         { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
         { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false }
+        { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
