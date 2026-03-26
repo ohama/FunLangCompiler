@@ -10,27 +10,27 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 1 of 6 (MlirIR Foundation)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-03-26 — Roadmap revised (MlirIR design: explicit compiler IR + Elaboration pass)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-03-26 — Completed 01-01-PLAN.md (MlirIR DU scaffold)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 5%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: — min
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 2 min
+- Total execution time: ~0.03 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-mlirir-foundation | 1 | 2 min | 2 min |
 
 **Recent Trend:**
-- Last 5 plans: none yet
+- Last 5 plans: 01-01 (2 min)
 - Trend: —
 
 *Updated after each plan completion*
@@ -58,11 +58,11 @@ None yet.
 
 - [Phase 1]: Verify exact `mlir-opt` pass pipeline flag names for the installed MLIR version — run `mlir-opt --help | grep convert-arith` before writing the Process invocation
 - [Phase 1]: Confirm `System.Diagnostics.Process` stdin/stdout piping behavior for large `.mlir` files (pipe buffering deadlock risk if both stdout and stderr are read synchronously)
-- [Phase 1]: Design MlirIR DU to be extensible — each subsequent phase adds new Op union cases without breaking existing ones. Consider `Op` as a wide DU from the start rather than adding cases later.
+- [Phase 1, RESOLVED in 01-01]: MlirIR DU is extensible — MlirOp is a wide DU; new cases are added without changing MlirModule/FuncOp/MlirRegion/MlirBlock shape.
 - [Phase 5]: Closure escape analysis rule for v1: stack-allocate all closures (conservative; correct for programs that do not return closures from functions). Document limitation before Phase 5.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: Roadmap revised — MlirIR design adopted (explicit compiler IR + Elaboration pass), 6 phases, ready to plan Phase 1
+Last session: 2026-03-26T01:21:50Z
+Stopped at: Completed 01-01-PLAN.md — LangBackend.Compiler scaffolded, MlirIR DU defined, return42Module implemented
 Resume file: None
