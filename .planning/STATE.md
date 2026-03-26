@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** ALL PHASES COMPLETE — compiler is a fully usable CLI tool
+**Current focus:** v2.0 — Data Types & Pattern Matching (GC, string, tuple, list, pattern matching)
 
 ## Current Position
 
-Phase: 6 of 6 (CLI Driver) — COMPLETE
-Plan: 1 of 1 in phase 06 — Plan 01 complete
-Status: ALL PHASES DONE — auto-naming CLI, error handling, 15/15 FsLit tests green
-Last activity: 2026-03-26 — Completed 06-01-PLAN.md (auto-naming, file-not-found, parse-error handling, 2 new FsLit tests)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v2.0
+Last activity: 2026-03-26 — v1.0 complete, v2.0 milestone started
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
