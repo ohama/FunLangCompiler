@@ -14,7 +14,7 @@ MlirIR is the project's own IR that grows phase by phase: scalar ops first, then
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: MlirIR Foundation** - MlirIR DU (Region/Block/Op/Value/Type), `.mlir` text printer, mlir-opt/translate/clang shell pipeline, E2E smoke test with hardcoded `return 42`
+- [x] **Phase 1: MlirIR Foundation** - MlirIR DU (Region/Block/Op/Value/Type), `.mlir` text printer, mlir-opt/translate/clang shell pipeline, E2E smoke test with hardcoded `return 42`
 - [ ] **Phase 2: Scalar Codegen via MlirIR** - Elaboration pass introduced for scalar expressions; MlirIR gains scalar arith ops and SSA let/var bindings; integer arithmetic programs compile end-to-end
 - [ ] **Phase 3: Booleans, Comparisons, Control Flow** - MlirIR extended with bool/comparison ops and cond_br; Elaboration handles bool literals, comparison, short-circuit logic, and if-else
 - [ ] **Phase 4: Known Functions via Elaboration** - MlirIR extended with FuncOp and direct call; Elaboration handles let rec (no free variables) as forward-declared func.func calls
@@ -122,7 +122,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. MlirIR Foundation | 0/3 | Not started | - |
+| 1. MlirIR Foundation | 3/3 | Complete | 2026-03-26 |
 | 2. Scalar Codegen via MlirIR | 0/2 | Not started | - |
 | 3. Booleans, Comparisons, Control Flow | 0/2 | Not started | - |
 | 4. Known Functions via Elaboration | 0/1 | Not started | - |

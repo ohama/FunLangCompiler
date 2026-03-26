@@ -5,32 +5,32 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 1 — MlirIR Foundation
+**Current focus:** Phase 2 — Scalar Codegen via MlirIR
 
 ## Current Position
 
-Phase: 1 of 6 (MlirIR Foundation)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-03-26 — Completed 01-02-PLAN.md (Printer + Pipeline)
+Phase: 2 of 6 (Scalar Codegen via MlirIR)
+Plan: 0 of 2 in current phase
+Status: Not started
+Last activity: 2026-03-26 — Phase 1 complete (MlirIR Foundation verified ✓)
 
-Progress: [██░░░░░░░░] 10%
+Progress: [██░░░░░░░░] 17%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: ~1.5 min
-- Total execution time: ~0.05 hours
+- Total plans completed: 3
+- Average duration: ~1.7 min
+- Total execution time: ~0.08 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-mlirir-foundation | 2 | ~3 min | ~1.5 min |
+| 01-mlirir-foundation | 3 | ~5 min | ~1.7 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min), 01-02 (1 min)
+- Last 5 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min)
 - Trend: —
 
 *Updated after each plan completion*
@@ -52,6 +52,7 @@ Recent decisions affecting current work:
 - [01-02]: Printer is pure (no I/O) — pipeline writes string to temp file; enables unit testing without file system
 - [01-02]: stderr read before WaitForExit to prevent pipe deadlock on large mlir-opt output
 - [01-02]: LLVM 20 pass order confirmed: --convert-arith-to-llvm --convert-cf-to-llvm --convert-func-to-llvm --reconcile-unrealized-casts (arith before func per PR #120548)
+- [01-03]: Cross-platform LLVM tool paths via resolveTool helper — checks LLVM_BIN_DIR env var, Homebrew path, Linux path
 
 ### Pending Todos
 
@@ -59,13 +60,13 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1]: Verify exact `mlir-opt` pass pipeline flag names for the installed MLIR version — run `mlir-opt --help | grep convert-arith` before writing the Process invocation
-- [Phase 1]: Confirm `System.Diagnostics.Process` stdin/stdout piping behavior for large `.mlir` files (pipe buffering deadlock risk if both stdout and stderr are read synchronously)
+- [Phase 1, RESOLVED]: mlir-opt pass pipeline flags verified and working
+- [Phase 1, RESOLVED]: Process piping handled with stderr-before-WaitForExit pattern
 - [Phase 1, RESOLVED in 01-01]: MlirIR DU is extensible — MlirOp is a wide DU; new cases are added without changing MlirModule/FuncOp/MlirRegion/MlirBlock shape.
 - [Phase 5]: Closure escape analysis rule for v1: stack-allocate all closures (conservative; correct for programs that do not return closures from functions). Document limitation before Phase 5.
 
 ## Session Continuity
 
-Last session: 2026-03-26T01:24:44Z
-Stopped at: Completed 01-02-PLAN.md — Printer.fs (pure serializer) and Pipeline.fs (mlir-opt → mlir-translate → clang) implemented
+Last session: 2026-03-26
+Stopped at: Phase 1 complete — all 3 plans executed, goal verified (4/4 must-haves passed)
 Resume file: None
