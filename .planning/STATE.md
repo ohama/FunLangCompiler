@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 7 of 11 (GC Runtime Integration)
-Plan: 2 of TBD in current phase
+Plan: 3 of TBD in current phase
 Status: In progress
-Last activity: 2026-03-26 — Completed 07-02-PLAN.md (GC closure migration + GC_init in @main)
+Last activity: 2026-03-26 — Completed 07-03-PLAN.md (print/println builtins via @printf, string globals, LetPat elaboration)
 
 Progress: [██████░░░░░░░░░░░░░░] 6/11 phases complete (v1.0 done, v2.0 in progress)
 
@@ -60,6 +60,9 @@ Recent decisions affecting current work:
 - [07-01]: printModule order: globals -> extern decls -> funcs (required by MLIR 20)
 - [07-02]: Closure env byte count = (numCaptures + 1) * 8 — slot 0 is fn ptr, slots 1..N are captures
 - [07-02]: GC_init and GC_malloc always declared in ExternalFuncs unconditionally
+- [07-03]: print/println special-cased as App(Var("print"|"println"), String(s)) before general App branch
+- [07-03]: LetPat(WildcardPat) added to support "let _ = expr in body" sequencing idiom
+- [07-03]: @printf always declared in ExternalFuncs unconditionally alongside GC_init and GC_malloc
 
 ### Pending Todos
 
@@ -73,5 +76,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 07-02-PLAN.md (GC closure migration — LlvmAllocaOp -> GC_malloc, GC_init in @main, 16 tests passing)
+Stopped at: Completed 07-03-PLAN.md (print/println builtins — string globals, @printf, LetPat, 18 tests passing)
 Resume file: None
