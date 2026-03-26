@@ -48,6 +48,7 @@ type Clause = {
     Tests: Test list
     Bindings: (string * Accessor) list
     BodyIndex: int
+    HasGuard: bool   // true when the arm has a when-guard
 }
 
 /// Decision tree — the output of compilation.
@@ -56,6 +57,9 @@ type DecisionTree =
     | Fail
     | Switch of scrutinee: Accessor * constructor: CtorTag * args: Accessor list
                * ifMatch: DecisionTree * ifNoMatch: DecisionTree
+    | Guard of bindings: (string * Accessor) list * bodyIndex: int * ifFalse: DecisionTree
+    // Guard: resolve bindings, evaluate when-guard for clauses.[bodyIndex];
+    //        if guard true → execute body (Leaf-like); if false → try ifFalse subtree
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -89,8 +93,8 @@ let rec desugarPattern (acc: Accessor) (pat: Pattern) : Test list * (string * Ac
         ([{ Scrutinee = acc; Pattern = CtorTest(BoolLit b, []) }], [])
     | ConstPat (StringConst s, _) ->
         ([{ Scrutinee = acc; Pattern = CtorTest(StringLit s, []) }], [])
-    | ConstPat (CharConst _, _) ->
-        failwith "MatchCompiler: CharConst pattern not supported in backend"
+    | ConstPat (CharConst c, _) ->
+        ([{ Scrutinee = acc; Pattern = CtorTest(IntLit (int c), []) }], [])
     | EmptyListPat _ ->
         ([{ Scrutinee = acc; Pattern = CtorTest(NilCtor, []) }], [])
     | ConsPat (hPat, tPat, _) ->
@@ -194,6 +198,7 @@ let private splitClauses (selected: Test) (clauses: Clause list)
                     Tests = remainingTests @ expandedTests
                     Bindings = clause.Bindings @ expandedBinds
                     BodyIndex = clause.BodyIndex
+                    HasGuard = clause.HasGuard
                 })
             else
                 // Case (b): different constructor → add to noMatch UNCHANGED
@@ -215,7 +220,11 @@ let rec private genMatch (clauses: Clause list) : DecisionTree =
     | first :: _ ->
         if first.Tests.IsEmpty then
             // First clause has no more tests → it matches unconditionally
-            Leaf(first.Bindings, first.BodyIndex)
+            if first.HasGuard then
+                // Guard: evaluate guard; on failure try remaining clauses
+                Guard(first.Bindings, first.BodyIndex, genMatch (List.tail clauses))
+            else
+                Leaf(first.Bindings, first.BodyIndex)
         else
             // Pick the best test via heuristic
             let selected = branchingHeuristic clauses
@@ -233,12 +242,12 @@ let rec private genMatch (clauses: Clause list) : DecisionTree =
 // ---------------------------------------------------------------------------
 
 /// Compile a list of match arms into a decision tree.
-/// Each arm is (Ast.Pattern, bodyIndex) where bodyIndex identifies which
+/// Each arm is (Ast.Pattern, hasGuard, bodyIndex) where bodyIndex identifies which
 /// arm body to execute.  The scrutinee is given as a root Accessor.
-let compile (scrutinee: Accessor) (arms: (Pattern * int) list) : DecisionTree =
+let compile (scrutinee: Accessor) (arms: (Pattern * bool * int) list) : DecisionTree =
     let clauses =
-        arms |> List.map (fun (pat, bodyIdx) ->
+        arms |> List.map (fun (pat, hasGuard, bodyIdx) ->
             let (tests, bindings) = desugarPattern scrutinee pat
-            { Tests = tests; Bindings = bindings; BodyIndex = bodyIdx }
+            { Tests = tests; Bindings = bindings; BodyIndex = bodyIdx; HasGuard = hasGuard }
         )
     genMatch clauses
