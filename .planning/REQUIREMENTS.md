@@ -3,110 +3,127 @@
 **Defined:** 2026-03-26
 **Core Value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
 
-## v1 Requirements
+## v1 Requirements (Complete)
 
 ### Infrastructure
 
-- [ ] **INFRA-01**: MlirIR 정의 — MLIR 개념(Region, Block, Op, Value, Type)을 F# DU로 모델링한 컴파일러 내부 IR
-- [ ] **INFRA-02**: MlirIR → `.mlir` 텍스트 프린터 (P/Invoke 없음, 순수 문자열 생성)
-- [ ] **INFRA-03**: `mlir-opt` 호출로 lowering 파이프라인 (`arith→cf→func→llvm→reconcile-unrealized-casts`)
-- [ ] **INFRA-04**: `mlir-translate --mlir-to-llvmir` + `clang` shell pipeline으로 바이너리 생성
-- [ ] **INFRA-05**: E2E 스모크 테스트 (`return 42` 컴파일 및 실행 검증)
+- [x] **INFRA-01**: MlirIR 정의 — MLIR 개념을 F# DU로 모델링한 컴파일러 내부 IR
+- [x] **INFRA-02**: MlirIR → `.mlir` 텍스트 프린터
+- [x] **INFRA-03**: `mlir-opt` lowering 파이프라인
+- [x] **INFRA-04**: `mlir-translate` + `clang` shell pipeline
+- [x] **INFRA-05**: E2E 스모크 테스트
 
 ### Scalar Codegen
 
-- [ ] **SCALAR-01**: 정수 리터럴 → `arith.constant` (i64)
-- [ ] **SCALAR-02**: 산술 연산 (add/sub/mul/div) → `arith.addi/subi/muli/divsi`
-- [ ] **SCALAR-03**: 비교 연산 (=, <>, <, >, <=, >=) → `arith.cmpi`
-- [ ] **SCALAR-04**: 불리언 리터럴 (true/false) → `arith.constant i1`
-- [ ] **SCALAR-05**: 논리 연산 (&&, ||) → `cf` 분기 (단락 평가 보존)
+- [x] **SCALAR-01**: 정수 리터럴 → `arith.constant` (i64)
+- [x] **SCALAR-02**: 산술 연산 → `arith.addi/subi/muli/divsi`
+- [x] **SCALAR-03**: 비교 연산 → `arith.cmpi`
+- [x] **SCALAR-04**: 불리언 리터럴 → `arith.constant i1`
+- [x] **SCALAR-05**: 논리 연산 (&&, ||) → `cf` 분기
 
 ### Control Flow & Bindings
 
-- [ ] **CTRL-01**: `if-else` → `cf.cond_br` + basic block arguments
-- [ ] **CTRL-02**: `let` 바인딩 → SSA value 이름 바인딩
-- [ ] **CTRL-03**: 변수 참조 → SSA value 조회
+- [x] **CTRL-01**: `if-else` → `cf.cond_br` + basic block arguments
+- [x] **CTRL-02**: `let` 바인딩 → SSA value 이름 바인딩
+- [x] **CTRL-03**: 변수 참조 → SSA value 조회
 
 ### Elaboration
 
-- [ ] **ELAB-01**: LangThree AST → MlirIR 변환 패스 (Elaboration) — 타입 정보, 자유변수 집합, 호출 종류 포함
-- [ ] **ELAB-02**: `let rec` (캡처 없는 known function) elaboration → MlirIR `FuncOp`
-- [ ] **ELAB-03**: Lambda (자유변수 캡처) elaboration → MlirIR closure 표현 (`{fn_ptr, env...}`)
-- [ ] **ELAB-04**: 함수 적용 elaboration → direct call 또는 indirect call 구분
+- [x] **ELAB-01**: LangThree AST → MlirIR 변환 패스
+- [x] **ELAB-02**: `let rec` elaboration → MlirIR `FuncOp`
+- [x] **ELAB-03**: Lambda elaboration → MlirIR closure 표현
+- [x] **ELAB-04**: 함수 적용 → direct/indirect call 구분
 
-### CLI
+### CLI & Testing
 
-- [ ] **CLI-01**: `.lt` 파일을 입력받아 실행 바이너리 출력하는 CLI
-- [ ] **CLI-02**: LangThree `.fsproj` project reference로 frontend 재사용
-
-### Testing
-
-- [ ] **TEST-01**: FsLit 파일 기반 테스트 — `.flt` 파일에 LangThree 소스를 `-- Input:`으로 작성, 컴파일러 → 실행 → 출력 검증 (`--expr` 사용 안 함)
-- [ ] **TEST-02**: 각 기능 카테고리별 `.flt` 테스트 파일 (산술, 비교, if-else, let, let rec, lambda)
+- [x] **CLI-01**: `.lt` 파일 → 네이티브 바이너리 CLI
+- [x] **CLI-02**: LangThree `.fsproj` project reference
+- [x] **TEST-01**: FsLit 파일 기반 테스트
+- [x] **TEST-02**: 각 기능 카테고리별 `.flt` 테스트 파일
 
 ## v2 Requirements
 
-### Extended Types
+### GC Runtime
 
-- **TYPES-01**: string 컴파일 지원
-- **TYPES-02**: 튜플 컴파일 지원
-- **TYPES-03**: 리스트 컴파일 지원 (GC 포함)
+- [ ] **GC-01**: Boehm GC 런타임 통합 — `GC_INIT()` + `GC_malloc` 외부 함수 선언, `-lgc` 링크
+- [ ] **GC-02**: v1 클로저 `llvm.alloca` → `GC_malloc` 마이그레이션 (힙 탈출 안전성)
+- [ ] **GC-03**: `print` / `println` 빌트인 — `printf` libc 호출로 stdout 출력
+
+### String
+
+- [ ] **STR-01**: 문자열 리터럴 → 힙 할당 `{i64 length, ptr data}` 구조체
+- [ ] **STR-02**: 문자열 동등 비교 (`=`, `<>`) → `strcmp` libc 호출
+- [ ] **STR-03**: `string_length` 빌트인
+- [ ] **STR-04**: `string_concat` 빌트인 (+ 연산자 포함)
+- [ ] **STR-05**: `to_string` 빌트인 (int/bool → string)
+
+### Tuple
+
+- [ ] **TUP-01**: 튜플 생성 → GC_malloc'd 구조체 (N개 포인터 필드)
+- [ ] **TUP-02**: `let (a, b) = ...` 튜플 디스트럭처링 → GEP + load
+- [ ] **TUP-03**: 튜플 패턴 매칭 (match에서 TuplePat)
+
+### List
+
+- [ ] **LIST-01**: 빈 리스트 `[]` → null 포인터
+- [ ] **LIST-02**: cons `h :: t` → GC_malloc'd cons cell `{head: ptr, tail: ptr}`
+- [ ] **LIST-03**: 리스트 리터럴 `[e1; e2; ...]` → 중첩 cons로 디슈가
+- [ ] **LIST-04**: 리스트 패턴 매칭 (`[]` / `h :: t`) → null check + GEP
 
 ### Pattern Matching
 
-- **PAT-01**: 패턴 매칭 컴파일 (튜플/리스트 선행 필요)
-- **PAT-02**: ADT/GADT 컴파일
-
-### Runtime
-
-- **RT-01**: 가비지 컬렉터 (Boehm GC 또는 커스텀)
-- **RT-02**: 런타임 에러 메시지 (패턴 매칭 실패 등)
+- [ ] **PAT-01**: `match` 식 → 결정 트리 기반 cf.cond_br 체인 컴파일
+- [ ] **PAT-02**: 상수 패턴 (int, bool) → `arith.cmpi eq` 비교
+- [ ] **PAT-03**: 문자열 상수 패턴 → `strcmp` 비교
+- [ ] **PAT-04**: 와일드카드/변수 패턴 → 무조건 매치 + 바인딩
+- [ ] **PAT-05**: 비소진 매치 런타임 에러 → `@lang_match_failure` 호출
 
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
-| REPL (컴파일 모드) | 인터프리터(LangThree)가 이미 존재함 |
-| `--expr` 모드 CLI | file 기반 컴파일만 지원, REPL은 LangThree 사용 |
-| 커스텀 MLIR dialect | v1에서는 표준 dialects(func/arith/cf/llvm)로 충분 |
-| tail call optimization | LLVM이 자동 처리 기대, v1에서는 명시적 보장 안 함 |
-| string/tuple/list/pattern | GC/boxing 필요, v2로 미룸 |
-| ADT/GADT | LangThree에서도 미구현 |
-| Windows/macOS 지원 | Linux x86-64 (WSL2) 우선 |
-| P/Invoke MLIR C API 바인딩 | MLIR 텍스트 포맷 직접 생성으로 대체, 소유권/ABI 문제 없음 |
-| MlirIR optimization passes | v1에서는 correctness 우선, 최적화는 v2 이후 |
+| Precise/moving GC | Boehm 보수적 GC로 충분, 정밀 GC는 수개월 작업 |
+| 참조 카운팅 | 순환 참조 누수, Boehm이 투명하게 처리 |
+| 언박싱 튜플 최적화 | 균일 박싱 표현으로 v2 단순성 유지, v3로 미룸 |
+| 문자열 인터닝 | v2에서 모든 문자열 독립 할당, strcmp로 비교 |
+| ADT/GADT 컴파일 | v3 범위 |
+| 레코드 타입 | v3 범위 |
+| 예외 처리 (raise/try-with) | setjmp/longjmp 복잡도, v3 범위 |
+| or-패턴 (P1 \| P2) | 결정 트리 분기 공유 복잡도, v2에서 미지원 |
+| when 가드 | 패턴 매칭 후 조건 분기, v2에서 미지원 |
+| char 타입 컴파일 | LangThree에서 사용 빈도 낮음, v3 미룸 |
+| tail call optimization | LLVM 최선-노력 TCO에 의존, 명시적 보장 안 함 |
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 1 | Complete |
-| INFRA-02 | Phase 1 | Complete |
-| INFRA-03 | Phase 1 | Complete |
-| INFRA-04 | Phase 1 | Complete |
-| INFRA-05 | Phase 1 | Complete |
-| CLI-02 | Phase 1 | Complete |
-| TEST-01 | Phase 1 | Complete |
-| SCALAR-01 | Phase 2 | Complete |
-| SCALAR-02 | Phase 2 | Complete |
-| CTRL-02 | Phase 2 | Complete |
-| CTRL-03 | Phase 2 | Complete |
-| ELAB-01 | Phase 2 | Complete |
-| SCALAR-03 | Phase 3 | Complete |
-| SCALAR-04 | Phase 3 | Complete |
-| SCALAR-05 | Phase 3 | Complete |
-| CTRL-01 | Phase 3 | Complete |
-| ELAB-02 | Phase 4 | Complete |
-| ELAB-03 | Phase 5 | Complete |
-| ELAB-04 | Phase 5 | Complete |
-| TEST-02 | Phase 5 | Complete |
-| CLI-01 | Phase 6 | Complete |
+| GC-01 | Phase 7 | Pending |
+| GC-02 | Phase 7 | Pending |
+| GC-03 | Phase 7 | Pending |
+| STR-01 | Phase 8 | Pending |
+| STR-02 | Phase 8 | Pending |
+| STR-03 | Phase 8 | Pending |
+| STR-04 | Phase 8 | Pending |
+| STR-05 | Phase 8 | Pending |
+| TUP-01 | Phase 9 | Pending |
+| TUP-02 | Phase 9 | Pending |
+| TUP-03 | Phase 9 | Pending |
+| LIST-01 | Phase 10 | Pending |
+| LIST-02 | Phase 10 | Pending |
+| LIST-03 | Phase 10 | Pending |
+| LIST-04 | Phase 10 | Pending |
+| PAT-01 | Phase 11 | Pending |
+| PAT-02 | Phase 11 | Pending |
+| PAT-03 | Phase 11 | Pending |
+| PAT-04 | Phase 11 | Pending |
+| PAT-05 | Phase 11 | Pending |
 
 **Coverage:**
-- v1 requirements: 21 total
-- Mapped to phases: 21
+- v2 requirements: 20 total
+- Mapped to phases: 20
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-26*
-*Last updated: 2026-03-26 after MlirIR design revision (Elaboration pass + MlirIR DU as explicit compiler IR)*
+*Last updated: 2026-03-26 after v2.0 milestone definition*
