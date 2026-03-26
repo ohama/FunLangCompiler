@@ -1,6 +1,6 @@
-# Feature Landscape
+# Feature Research
 
-**Domain:** Compiled ML-style functional language — v2.0 Data Types & Pattern Matching
+**Domain:** ML-family functional language compiler backend — v4.0 ADT/GADT, Records, Exception Handling
 **Researched:** 2026-03-26
 **Confidence:** HIGH
 
@@ -8,292 +8,349 @@
 
 ## Scope Anchor
 
-This file addresses the v2.0 milestone: adding GC runtime, strings, tuples, lists, and
-pattern matching to the existing LangBackend compiler. v1 already handles int, bool,
-arithmetic, comparisons, logical ops, if-else, let, let rec, lambda, closures, and the
-CLI. The LangThree AST already defines all target nodes — the work is entirely in the
-compiler backend (Elaboration, MlirIR, Printer).
+This file addresses the v4.0 milestone: adding ADT/GADT (discriminated unions), Records (with
+mutable fields), and Exception handling to LangBackend, which already has int/bool/string/tuple/
+list/pattern-matching/closures/char/range compiled to native code via MLIR→LLVM. The LangThree
+AST already defines all target nodes. The work is entirely in the compiler backend.
+
+**Existing foundation:**
+- GC: Boehm GC (`GC_malloc`), uniform `ptr` representation for all heap values
+- Pattern matching: Jacobs decision tree via `MatchCompiler.fs`, `cf.cond_br` chains
+- Closure: `{fn_ptr, env}` struct; indirect calls via env+arg ABI
+- String: `{i64 length, ptr data}` header struct; `strcmp` for equality
+- Tuple: N-field GC_malloc'd ptr array, GEP by index
+- List: null nil, `{head: ptr, tail: ptr}` cons cell
 
 ---
 
-## What the LangThree AST Defines (Authoritative Source)
+## Feature Landscape
 
-Read from `../LangThree/src/LangThree/Ast.fs` and `Eval.fs` (direct inspection).
+### Table Stakes (Users Expect These)
 
-### Values already in the runtime model
+Features that must work for v4.0 to be complete. Missing any of these means the milestone is
+not done.
 
-| Value | AST Node | Eval representation |
-|-------|----------|---------------------|
-| String | `String of string * Span` | `StringValue of string` |
-| Char | `Char of char * Span` | `CharValue of char` |
-| Tuple | `Tuple of Expr list * Span` | `TupleValue of Value list` |
-| Empty list | `EmptyList of Span` | `ListValue []` |
-| List literal | `List of Expr list * Span` | `ListValue of Value list` |
-| Cons | `Cons of Expr * Expr * Span` | `ListValue (h :: t)` |
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| ADT construction (`Constructor` node) | Discriminated unions are the core abstraction of ML-family languages; every non-trivial LangThree program uses them | MEDIUM | `DataValue(ctor, optArg)` → heap struct `{i64 tag, ptr payload}`; tag is the constructor index in declaration order; nullary constructors store `null` in payload |
+| ADT pattern matching (`ConstructorPat`) | Pattern matching on ADTs is the primary way to inspect their values; without it ADTs are write-only | HIGH | Decision tree already handles `Switch(testVar, ctorName, argVars, ...)` — need to emit: load tag, compare tag against known index, GEP payload; MatchCompile.fs already encodes constructor names as the discriminator |
+| `TypeDecl` elaboration | The compiler must register ADT constructor names and their tag indices at declaration time so that `Constructor(name, optArg)` and `ConstructorPat(name, optArg)` can look up the tag | MEDIUM | Walk `ConstructorDecl list` in declaration order, assign tag 0, 1, 2, … into an `AdtEnv` (Map from constructor name to tag index + arity); thread through `ElabEnv` |
+| Nullary constructors (no payload) | Common in every ADT: `type Color = Red \| Green \| Blue`, `type Bool = True \| False` | LOW | `Constructor(name, None)` → allocate `{tag: i64, payload: ptr}`, store tag, store null payload; `ConstructorPat(name, None)` → test tag only, no payload load |
+| Unary constructors (one payload arg) | Common: `type Option = None \| Some of 'a`, `type List = Nil \| Cons of 'a * List` | MEDIUM | `Constructor(name, Some arg)` → elaborate arg, store into payload field; `ConstructorPat(name, Some pat)` → load payload ptr, apply sub-pattern |
+| Record construction (`RecordExpr`) | Records are the standard named-field product type; fundamental to modeling structured data | MEDIUM | `RecordExpr(_, fields, _)` → allocate `{ptr field_0, ptr field_1, ...}` struct indexed by sorted field order (fields are globally unique per RecordDecl); each field value is an elaborated ptr or i64 |
+| Record field access (`FieldAccess`) | The primary way to read record fields | LOW | Requires field-name-to-index map from `RecordDecl`; emit GEP to field slot + load |
+| Record copy-update (`RecordUpdate`) | Standard ML idiom: `{ r with field = newVal }`; avoids manual field extraction | MEDIUM | Allocate a new record struct, copy all fields from the source ptr via GEP+load+store, then overwrite the named fields with new values |
+| Record patterns (`RecordPat`) | Pattern matching on records is the clean way to destructure them | MEDIUM | `RecordPat(fields)` → for each named field: GEP to field slot by index, load value, bind to pattern variable; unconditional match (no tag test needed) |
+| Mutable field assignment (`SetField`) | `RecordFieldDecl` has `isMutable: bool`; `SetField(expr, fieldName, value)` mutates a field in-place | MEDIUM | GEP to field slot, elaborate new value, store; returns unit (0L as i64); this is the only mutation mechanism in LangThree records |
+| Exception declaration (`ExceptionDecl`) | Exceptions are sugar over constructors with `ResultType = TExn`; declaration must create a named constructor | LOW | `ExceptionDecl(name, dataType, _)` → register as a special constructor in `AdtEnv` with a synthetic tag; the runtime exception object is `DataValue(name, optPayload)` wrapped in a `TExn`-typed pointer |
+| `Raise` expression | The only way to signal an error; without it exceptions are useless | MEDIUM | `Raise(expr)` → elaborate the exception value (a `DataValue` ptr), call `@lang_raise` with that ptr; `@lang_raise` does `longjmp` to the nearest handler frame; elaborated result is an unreachable i64 zero (UB after noreturn call) |
+| `TryWith` expression | The only way to catch an exception; handlers use the same `MatchClause` structure as `Match` | HIGH | `TryWith(body, handlers)` → emit `setjmp` to push a handler frame, evaluate body, on normal exit pop the frame and branch to merge; on exception signal (`longjmp`), receive the exception value from a thread-local slot, run pattern-matching dispatch on handlers using the same `MatchCompiler` decision tree; if no handler matches, re-raise |
+| Exception equality in pattern matching | Handlers like `\| Failure msg -> ...` test the constructor name of the exception DataValue | MEDIUM | `ConstructorPat` on exception values uses the same tag-based matching as ADTs; the pattern dispatches via tag index in the handler switch |
 
-### Patterns already in the runtime model
+### Differentiators (Competitive Advantage)
 
-| Pattern | AST Node |
-|---------|----------|
-| Variable | `VarPat of string * Span` |
-| Wildcard | `WildcardPat of Span` |
-| Tuple destructure | `TuplePat of Pattern list * Span` |
-| List empty | `EmptyListPat of Span` |
-| List cons | `ConsPat of Pattern * Pattern * Span` |
-| Constant | `ConstPat of Constant * Span` (int, bool, string, char) |
-| Or-pattern | `OrPat of Pattern list * Span` |
-
-### Match expression
-
-`Match of scrutinee: Expr * clauses: MatchClause list * Span`
-where `MatchClause = Pattern * Expr option * Expr` (pattern, optional when-guard, body).
-
-LangThree's evaluator compiles pattern matching to a decision tree via `MatchCompile.fs`
-(Jacobs-style algorithm). The compiler can reuse this tree structure directly.
-
-### String builtins already in Eval.initialBuiltinEnv
-
-`string_length`, `string_concat`, `string_sub`, `string_contains`, `to_string`,
-`string_to_int`, `print`, `println`, `printf`, `printfn`, `sprintf`, `failwith`.
-
-These need corresponding compiled implementations — either inlined as LLVM/libc calls or
-as a compiled stdlib. The compiler must emit correct ABI-compatible code that matches what
-the interpreter treats as built-in.
-
----
-
-## Table Stakes
-
-Features users expect. Missing any of these means v2.0 is incomplete for its stated scope.
-
-| Feature | Why Expected | Complexity | Runtime Requirement |
-|---------|--------------|------------|---------------------|
-| GC integration (Boehm GC) | All heap-allocated types (string, tuple, list) require automatic memory management; without GC, every allocation leaks | High | `GC_malloc` replaces `malloc` everywhere; link `-lgc` or `-l:libgc.a`; requires `GC_INIT()` call at program start |
-| String literals | `String` AST node is a fundamental LangThree value; programs cannot do I/O without strings | Medium | Heap-allocated null-terminated C string (GC_malloc'd), represented as `!llvm.ptr` |
-| String equality (= and <>) | Pattern matching on string constants requires structural equality | Medium | `strcmp` from libc; `arith.cmpi eq, i32, i32` on result |
-| String concatenation (+ operator) | Already works in the interpreter; `Add` on `StringValue` dispatches to concat | Medium | Allocate new string, `memcpy` both halves; depends on GC |
-| Tuple construction | `Tuple` AST node; needed for let-pattern and match | Medium | GC_malloc'd struct of N pointers (boxed values); tag first word with arity |
-| Tuple destructure (let pat and match) | `TuplePat` is the primary way to extract tuple components | Medium | GEP into tuple struct by index |
-| List empty `[]` | Required for any list program | Low | Null pointer or singleton sentinel; `!llvm.ptr` null |
-| List cons `h :: t` | `Cons` AST node; fundamental list construction | Medium | GC_malloc'd two-word struct: `{head: ptr, tail: ptr}` (cons cell) |
-| List literal `[e1; e2; ...]` | Sugar for nested cons; already in `List` AST node | Low | Desugar to repeated cons; no new IR nodes needed |
-| Pattern matching on lists ([] and h::t) | The primary way to process lists in ML-style code | High | Decision tree compilation: test head pointer for null (empty) vs non-null (cons) |
-| Pattern matching on tuples | Tuple destructuring via `match` | Medium | GEP by component index after arity check |
-| Pattern matching on constants (int, bool) | `ConstPat` for integers and booleans; already partially handled via comparison ops | Low | `arith.cmpi eq` against constant value |
-| Pattern matching on string constants | `ConstPat (StringConst s, _)` — common in dispatch-style code | Medium | `strcmp` call to test equality |
-| Wildcard and variable patterns | Universal in any real match expression | Low | No test needed; variable patterns just bind the scrutinee value |
-| Non-exhaustive match failure at runtime | The interpreter raises `"Match failure: no pattern matched"`; the compiled program must also fail usefully | Low | Call `abort()` or `exit(1)` with a printed error |
-| `print` / `println` builtins | Required for any program to produce output | Low | `printf("%s", str)` / `printf("%s\n", str)` via libc; already linked via `clang` |
-| `string_length` builtin | Fundamental string operation | Low | `strlen` from libc |
-| `string_concat` builtin | Core string operation; also implied by `+` on strings | Low | Allocate + `memcpy` |
-| `to_string` builtin | Converts int/bool to string; used in nearly every output program | Low | `sprintf` for int; conditional string for bool |
-
----
-
-## Differentiators
-
-Features that go beyond minimum viability for v2.0. Not required for correctness, but
-meaningfully improve the compiler.
+Features beyond table stakes. These improve correctness, ergonomics, or performance — and some
+are effectively required for non-trivial programs even if not labeled "table stakes."
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Tagged value representation (uniform boxing) | Using a uniform `ptr` representation for all heap values enables polymorphic list elements, higher-order functions over mixed types, and future ADT support without changing the calling convention | High | Tag the low bits of a pointer with a type tag (standard in OCaml, GHC). Alternatively, use a `{tag: i64, payload: ptr}` header on every GC-allocated object. The tag approach is more efficient but requires alignment guarantees. |
-| or-pattern compilation (`| P1 \| P2`) | `OrPat` is already in the AST. Compiling it avoids duplicating match arms in the emitted LLVM IR | Medium | Expand `OrPat` into multiple decision-tree branches that share the same leaf body (emit one basic block, branch from multiple test paths). |
-| `when` guard compilation | Guards are already in `MatchClause = Pattern * Expr option * Expr`. Compiling them is needed for programs with conditional matches | Medium | After pattern bindings are set up, evaluate guard expression as `i1`; if false, fall through to next clause. |
-| String pattern matching via trie | For large numbers of string constant patterns, a character-by-character trie is more efficient than sequential `strcmp` calls | High | Not needed for v2; linear `strcmp` chain is correct and sufficient. Defer if string dispatch appears in hot paths. |
-| `string_sub` / `string_contains` builtins | Used in string-processing programs | Low | `strncpy`-based substring; `strstr`-based contains. Mostly libc calls wrapped as builtins. |
-| `sprintf` builtin | Needed for formatted string construction | Medium | Requires `asprintf` or a fixed-size buffer + `snprintf`; GC-managed result buffer. |
-| `char` type and `char_to_int` / `int_to_char` | `CharValue` already exists in the interpreter | Low | A `char` is just `i8` in LLVM; `char_to_int` is a zero-extend, `int_to_char` is a trunc + range check. |
-| GC_malloc with size-of-type calculation | The compiler statically knows the layout of every heap object; using precise sizing prevents wasted GC scan time | Medium | Compute size as `num_fields * sizeof(ptr)` at codegen time; emit `GC_malloc(constant_size)`. This is straightforward since all fields are uniformly boxed pointers or scalars. |
+| `GadtConstructorDecl` support | LangThree's type system already encodes GADTs; compiling them enables programs that use typed index types | MEDIUM | GADT constructors have explicit `argTypes` and `returnType`; at the compiled value level they are identical to normal ADT constructors (`{tag, payload}`); the type system has already checked soundness; no new runtime representation needed |
+| Recursive ADT types (e.g. `type Tree = Leaf \| Node of Tree * int * Tree`) | Recursive structures are the primary use case for ADTs | MEDIUM | Already handled: the `payload` field is a `ptr` to another GC-managed heap object; no layout change needed; the `AdtEnv` must accept forward references within a type block |
+| Polymorphic ADTs (`type 'a Option = None \| Some of 'a`) | The most common use case — `Option`, `Result`, `List` | LOW | At the compiled level, `'a` is a `ptr` (uniform boxing); no monomorphization needed; the constructor tag+payload layout works for any `'a` |
+| Multiple constructors per ADT (> 2) | Realistic ADTs have many constructors: `type Shape = Circle of float \| Rect of float * float \| Triangle of ...` | LOW | The tag is an `i64` index; `ConstructorPat` tests emit `arith.cmpi eq` against the constructor's tag index; `cf.cond_br` chain proceeds through all handler arms (same as existing int/bool patterns) |
+| Nested ADT pattern matching | `match t with \| Node(Node(_, v, _), _, _) -> v \| ...` — nested constructor patterns | HIGH | The decision tree already supports nested sub-patterns via `Switch` recursion and `argVars` expansion; but the implementation of loading the payload from a nested ADT constructor requires recursive GEP+load chains for each level |
+| Exception re-raise on handler miss | If no handler clause matches, the exception propagates upward | MEDIUM | After the handler decision tree reaches `Fail`, call `@lang_raise` again with the original exception value from the thread-local slot; this enables proper exception propagation through nested `TryWith` frames |
+| `setjmp`/`longjmp` stack discipline | The handler frame stack must be a linked list (or array) on the C stack, not a global; each `TryWith` pushes/pops its own frame | MEDIUM | Standard implementation: `struct ExnFrame { jmp_buf buf; ExnFrame* prev; };` allocated via `alloca` (or GC_malloc) in each `TryWith` scope; a global/TLS pointer `__lang_exn_top` tracks the current handler; `@lang_raise` walks the frame linked list via `longjmp` to the nearest frame |
+| Record field ordering stability | Field access by name must produce the same GEP index across all compilation units | LOW | Sort fields alphabetically (or by declaration order) and store the mapping in `RecordEnv`; declaration order is simpler and matches the AST |
+| ADT constructor as first-class value | `let f = Some` — constructor used as a function | MEDIUM | Wrap each unary constructor in a single-argument lambda at elaboration time; nullary constructors elaborate to the DataValue directly; this allows higher-order use of constructors without special AST support |
 
----
+### Anti-Features (Commonly Requested, Often Problematic)
 
-## Anti-Features
+Features to deliberately NOT build in v4.0.
 
-Features to explicitly NOT build in v2.0.
-
-| Anti-Feature | Why Avoid | What to Do Instead |
-|--------------|-----------|-------------------|
-| Precise/moving GC | Writing a precise GC (root-set enumeration, write barriers, compaction) is a multi-month project orthogonal to type support | Use Boehm GC (conservative, no root declarations needed, single-header integration via `-lgc`) |
-| Reference counting | Introduces cycle leaks for recursive data structures (lists, trees) and requires runtime overhead on every pointer copy | Boehm GC handles cycles transparently |
-| Unboxed tuple specialization | Emitting different LLVM struct types per tuple arity avoids indirection but requires monomorphization infrastructure | Use uniform boxed representation: all fields are `ptr` for simplicity. Defer unboxed optimization to v3. |
-| String interning / deduplication | Reduces memory for repeated string constants but adds a hash table at runtime | In v2, every string allocation is independent. String equality uses `strcmp`, not pointer comparison. |
-| Lazy list (streams / sequences) | OCaml-style `Lazy.t` requires thunk allocation and forcing machinery | LangThree lists are strict (all elements evaluated at construction). No lazy needed. |
-| ADT / discriminated union compilation | LangThree AST already has `Constructor`, `ConstructorPat`, `DataValue` — but these are not in the v2 milestone scope | Keep as `failwith "Constructor not supported"` stub. ADTs are a v3 feature. |
-| Record type compilation | `RecordExpr`, `FieldAccess`, `RecordUpdate` are not in the v2 milestone scope | Stub with `failwith`. Records are a v3+ feature. |
-| Exception runtime (`Raise` / `TryWith`) | Requires `setjmp`/`longjmp` or C++ exception ABI; complex interaction with GC roots | Stub with `failwith`. Exceptions are a v3+ feature. |
-| Printf format string parsing at compile time | The interpreter parses format strings at runtime. Implementing compile-time format parsing is significant work | Use runtime string-based `printf` dispatch via libc for v2. Compile-time formats are a v4+ optimization. |
-| Tail call optimization (TCO) | The v1 design does not guarantee TCO; LLVM may or may not perform it. Explicit `musttail` annotation requires careful ABI matching with the closure calling convention | Accept LLVM's best-effort TCO for known functions. Lists and tuples don't introduce new tail-call sites that didn't exist in v1. |
+| Feature | Why Requested | Why Problematic | Alternative |
+|---------|---------------|-----------------|-------------|
+| Unboxed/specialized ADT representation | Avoids the `{tag, payload}` indirection for known-small types like `Option<int>` | Requires monomorphization infrastructure (a multi-phase project); breaks the uniform `ptr` representation that GC and closures rely on | Stay with uniform `{tag: i64, payload: ptr}`; 16 bytes per ADT value is acceptable; defer unboxed optimization to v5+ |
+| C++ exception ABI (`_Unwind_RaiseException`) | Interop with C++ exception-safe libraries | Requires linking `libstdc++` or `libc++`; the unwind ABI is platform-specific and fragile with Boehm GC | Use `setjmp`/`longjmp`; this is what OCaml does and it interoperates with Boehm GC correctly |
+| Exception stack traces / backtraces | Developers want to know where an exception was raised | Requires walking the call stack at `Raise` time (DWARF unwinding or frame pointer chains); significant runtime infrastructure | For v4, store only the exception value (constructor + payload) — no stack trace. Add stack traces in v5+ if needed |
+| Multi-payload constructors (e.g. `Cons of int * int * int`) | Syntactically natural in some languages | LangThree's `ConstructorDecl` only carries one `TypeExpr option` payload; multi-field constructors require tuple wrapping: `Cons of (int * int * int)` | Use a tuple as the payload: `Constructor("Cons", Some (Tuple [a; b; c]))` — this is already expressible and requires no new compiler support |
+| Open/extensible exception types | F#-style extensible discriminated unions via `exception` extending a base type | Requires a global exception registry or a pointer-equality scheme (OCaml's extensible variants); significantly complicates the tag system | All exceptions in LangThree are declared up-front with `ExceptionDecl`; tag assignment at declaration time is sound and closed |
+| Mutable record field through closures (captured `ref`-style) | Simulating ML-style `ref` cells via single-field mutable records | Works already via `SetField` — no special support needed; the anti-feature is implementing a separate `ref` type | Just use `type Ref = { mutable value: int }` and `SetField`; the ADT+Record system covers this |
+| Module-level global mutable state via records | A record at the top level acts like a singleton mutable object | LangThree programs are expressions, not statement sequences; module-level records can be declared but mutation requires threading the record pointer | Use `let r = { mutable x = 0 }` in the top-level expression body — mutation works correctly inside an expression |
+| Printf-style format strings for exceptions | `raise (Failure (sprintf "expected %d got %d" ...))` | `sprintf` is already out of scope for v4 (deferred to v5) | Use `string_concat` or `to_string` for exception message construction |
 
 ---
 
 ## Feature Dependencies
 
 ```
-GC runtime (Boehm GC_malloc)
-    └─> String heap allocation
-    └─> Tuple heap allocation
-    └─> List cons-cell heap allocation
-            └─> List literal [e1; e2; ...] (desugar to cons)
-            └─> Pattern match on lists ([] / h :: t)
+AdtEnv (constructor-name → tag index + arity mapping)
+    └──required by──> Constructor(name, optArg) elaboration
+    └──required by──> ConstructorPat(name, optPat) elaboration
+    └──required by──> TypeDecl declaration processing
 
-Tuple heap allocation
-    └─> Tuple construction expression (Tuple node)
-    └─> Pattern match on tuples (TuplePat)
-    └─> LetPat with tuple pattern
+Constructor(name, optArg) elaboration
+    └──requires──> GC_malloc (already done)
+    └──requires──> LlvmStoreOp, LlvmGEPStructOp (already done)
+    └──produces──> DataValue heap struct {i64 tag, ptr payload}
 
-String heap allocation
-    └─> String literal compilation (String node)
-    └─> String equality (= and <>) for ConstPat(StringConst)
-    └─> String + operator (Add on string operands)
-    └─> print / println builtins
-    └─> to_string builtin
-    └─> string_length, string_concat builtins
+ConstructorPat(name, optPat) elaboration
+    └──requires──> Constructor elaboration (to know what tag values mean)
+    └──requires──> existing cf.cond_br pattern dispatch (already done)
+    └──requires──> existing decision tree (MatchCompile.fs — already handles Switch on ctor names)
 
-Pattern matching (Match node)
-    └─> Decision tree evaluation (reuse LangThree MatchCompile.fs structure)
-    └─> ConsPat (requires list cons cells)
-    └─> TuplePat (requires tuple heap layout)
-    └─> ConstPat(StringConst) (requires strcmp)
-    └─> ConstPat(IntConst / BoolConst) (already available from v1)
-    └─> when guards (requires bool elaboration, already available)
-    └─> Wildcard / VarPat (no test needed; bind value)
-    └─> Non-exhaustive match: abort() call
+RecordEnv (field-name → field index mapping)
+    └──required by──> RecordExpr elaboration
+    └──required by──> FieldAccess elaboration
+    └──required by──> RecordUpdate elaboration
+    └──required by──> SetField elaboration
+    └──required by──> RecordPat elaboration
+
+RecordExpr elaboration
+    └──requires──> GC_malloc (already done)
+    └──requires──> RecordEnv
+
+FieldAccess elaboration
+    └──requires──> RecordEnv
+    └──requires──> LlvmGEPLinearOp + LlvmLoadOp (already done)
+
+RecordUpdate elaboration
+    └──requires──> FieldAccess (copy all fields from source)
+    └──requires──> RecordExpr (allocate new struct)
+
+SetField elaboration
+    └──requires──> RecordEnv (GEP to mutable field slot)
+    └──requires──> LlvmStoreOp (already done)
+
+RecordPat elaboration
+    └──requires──> RecordEnv
+    └──requires──> existing testPattern dispatch (already done for TuplePat)
+    └──enhances──> ADT pattern matching (records appear as constructor payloads)
+
+ExceptionDecl elaboration
+    └──requires──> AdtEnv (exceptions are constructors under TExn type)
+
+Raise elaboration
+    └──requires──> ExceptionDecl (to produce a valid exception DataValue)
+    └──requires──> setjmp/longjmp C runtime support (@lang_raise)
+    └──requires──> Constructor elaboration (exception value is a DataValue)
+
+TryWith elaboration
+    └──requires──> Raise elaboration (@lang_raise mechanism)
+    └──requires──> setjmp/longjmp frame protocol (@lang_push_handler, @lang_pop_handler)
+    └──requires──> ConstructorPat on exception values (handler dispatch)
+    └──requires──> existing decision tree for handler clause matching
+
+Exception handler dispatch (pattern matching on handlers)
+    └──requires──> ConstructorPat elaboration (ADT pattern matching)
+    └──requires──> existing MatchCompiler decision tree
+    └──enhances──> TryWith (handlers are MatchClause list, same as Match)
 ```
 
-**Critical path for v2.0:**
-1. GC integration (prerequisite for all heap allocation)
-2. String literals + basic string builtins (print/println, string_length, to_string)
-3. Tuple construction + TuplePat destructuring
-4. List cons-cell + EmptyList + ConsPat destructuring
-5. Match expression: full pattern compilation using decision tree
+### Dependency Notes
 
-**Already available from v1 (no new work needed):**
-- ConstPat(IntConst) and ConstPat(BoolConst): use existing `arith.cmpi eq`
-- VarPat / WildcardPat: bind or discard, no new IR
-- Boolean guards on when clauses: use existing bool elaboration
+- **ADT before Records:** Records can be implemented independently, but ADT tagging infrastructure
+  (`AdtEnv`) is needed before Exceptions, since exception objects are DataValues.
+- **Raise before TryWith:** `@lang_raise` (longjmp) must be implemented before `TryWith` (setjmp)
+  can be tested, since TryWith without Raise is untestable.
+- **ConstructorPat requires AdtEnv:** The tag index for each constructor must be known at
+  pattern-matching elaboration time. The `AdtEnv` must be populated during `TypeDecl` processing
+  before any expression that uses the constructors.
+- **RecordPat is structurally identical to TuplePat:** Both are unconditional destructures by
+  index. The only difference is that RecordPat looks up index by field name instead of position.
+  This means RecordPat can be implemented by reusing `testPattern`'s TuplePat path with a
+  field-name→index indirection.
+- **SetField does not require new MlirOp:** It uses the existing `LlvmGEPLinearOp` + `LlvmStoreOp`
+  combination. The only new work is resolving the field name to an index.
 
 ---
 
-## MVP Recommendation
+## MVP Definition
 
-### Phase 1 — GC Runtime Integration
+### Launch With — v4.0
 
-Integrate Boehm GC so that all future heap allocations are GC-managed.
+Minimum set for the milestone to be declared complete.
 
-Work: replace `llvm.call @malloc` with `llvm.call @GC_malloc`; add `GC_INIT()` call at
-program start in `@main`; link with `-lgc`; add `GC_malloc` as an external func declaration
-in the emitted MLIR.
+- [ ] `TypeDecl` declaration processing populates `AdtEnv` with constructor→tag index mapping
+- [ ] `Constructor(name, None)` — nullary constructor elaboration to `{tag, null_ptr}` struct
+- [ ] `Constructor(name, Some arg)` — unary constructor elaboration to `{tag, payload_ptr}` struct
+- [ ] `ConstructorPat(name, None)` — nullary pattern: test tag, no payload extraction
+- [ ] `ConstructorPat(name, Some pat)` — unary pattern: test tag, load payload, apply sub-pattern
+- [ ] `RecordDecl` processing populates `RecordEnv` with field→index mapping
+- [ ] `RecordExpr` — record construction to GC_malloc'd field array
+- [ ] `FieldAccess` — field read via GEP + load using `RecordEnv`
+- [ ] `RecordUpdate` — copy-update allocation (new struct + field overwrite)
+- [ ] `SetField` — mutable field in-place store via GEP + store
+- [ ] `RecordPat` — record destructure in pattern matching
+- [ ] `ExceptionDecl` — registers exception constructor in `AdtEnv` under TExn namespace
+- [ ] `Raise` — elaborates exception value + calls `@lang_raise` (longjmp-based)
+- [ ] `TryWith` — emits `setjmp` frame + handler decision tree + merge block
 
-Success criterion: a program that allocates a closure (already done in v1) and calls
-`GC_malloc` instead of `malloc` compiles, links, and runs without crash.
+### Add After Validation — v4.x
 
-### Phase 2 — Strings
+Features to add once the core is working.
 
-Compile string literals to null-terminated GC_malloc'd char arrays. Wire up `print`,
-`println`, and `to_string` as direct libc / stdlib calls.
+- [ ] ADT constructor as first-class value (wrap in lambda) — needed once curried constructors appear in test programs
+- [ ] Exception re-raise on handler miss — needed for `TryWith` in non-exhaustive handler programs
+- [ ] Nested ADT pattern matching (multi-level constructor patterns) — add when test programs require it
 
-Success criterion: `print "hello"` compiles and prints `hello`. `to_string 42` compiles
-and produces the string `"42"`.
+### Future Consideration — v5+
 
-### Phase 3 — Tuples
+Features to defer.
 
-Compile tuple construction to a GC_malloc'd array of `ptr`-sized words. Compile `TuplePat`
-by GEP-indexing into the array.
-
-Success criterion: `let (a, b) = (1, 2) in a + b` compiles and exits with 3. A nested
-tuple pattern works.
-
-### Phase 4 — Lists
-
-Compile `EmptyList` as a null pointer, `Cons` as a two-word GC_malloc'd cons cell, and
-`List [...]` as iterated cons construction.
-
-Success criterion: `let rec sum lst = match lst with | [] -> 0 | h :: t -> h + sum t in
-sum [1; 2; 3]` compiles and exits with 6.
-
-### Phase 5 — Pattern Matching
-
-Compile the `Match` AST node to LLVM control flow using the decision-tree structure from
-LangThree's `MatchCompile.fs` as a guide.
-
-Success criterion: a `match` on a list with `[]` and `h :: t` arms, and a `match` on a
-tuple with a `TuplePat` arm, both compile and execute correctly.
-
-### Defer to v3+
-
-- ADTs / discriminated unions
-- Records and field access
-- Exceptions (Raise / TryWith)
-- Char type as a separate compiled type
-- `sprintf` and format-string builtins beyond basic `print`
-- Or-pattern (`OrPat`) compilation (low priority; rare in v2 test programs)
-- `when` guard compilation (medium priority; add if test programs need it)
+- [ ] GADT refined type checking at compile time — type system already checked by LangThree frontend; compiler just emits the same `{tag, payload}` struct
+- [ ] Stack traces on exceptions — requires DWARF or frame pointer walking
+- [ ] Printf/sprintf for exception messages — `sprintf` is separately deferred
+- [ ] Unboxed ADT specialization — requires monomorphization
 
 ---
 
-## Feature Detail: GC-Managed Heap Layout
+## Feature Prioritization Matrix
 
-### Uniform value representation
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| ADT construction + ConstructorPat | HIGH | MEDIUM | P1 |
+| TypeDecl/AdtEnv registration | HIGH | LOW | P1 |
+| RecordExpr + FieldAccess | HIGH | MEDIUM | P1 |
+| RecordUpdate | HIGH | LOW | P1 (reuses RecordExpr + FieldAccess) |
+| SetField (mutable fields) | MEDIUM | LOW | P1 (GEP+store, no new IR) |
+| RecordPat | MEDIUM | LOW | P1 (reuses TuplePat path) |
+| ExceptionDecl | MEDIUM | LOW | P1 (trivial AdtEnv registration) |
+| Raise | HIGH | MEDIUM | P1 |
+| TryWith | HIGH | HIGH | P1 |
+| Nested ADT patterns | MEDIUM | HIGH | P2 |
+| ADT constructor as first-class value | MEDIUM | MEDIUM | P2 |
+| Exception re-raise propagation | MEDIUM | MEDIUM | P2 |
+| GADT compiled support | LOW | LOW | P3 (already works at value level) |
+| Unboxed ADT | LOW | HIGH | P3 |
 
-All heap-allocated LangThree values use a uniform pointer-to-struct representation:
-- Every value is either a raw scalar (`i64` / `i1`) passed by value in SSA, or a pointer
-  to a GC-managed struct.
-- This means lists and tuples contain `ptr` elements (all fields boxed).
-- For v2, scalars (int, bool) that appear inside tuples or lists must be boxed: allocate a
-  one-word GC_malloc'd struct holding the `i64` or `i1`.
+**Priority key:**
+- P1: Must have for v4.0 launch
+- P2: Should have, add when core is working
+- P3: Nice to have, future milestone
 
-Alternative: tag the low bit of a pointer to distinguish boxed pointers from immediate
-integers (like OCaml's value representation). This is more efficient but more complex to
-implement. Defer to v3 unless boxing overhead is a measurable problem in v2 tests.
+---
 
-### Tuple layout
+## Reference Implementation Notes
 
-```
-+-------+-------+-------+
-| arity |  [0]  |  [1]  |  ...
-+-------+-------+-------+
-  i64     ptr     ptr
-```
+### ADT Heap Layout
 
-- First word: arity (number of elements) as `i64` — used for safety checks and future
-  pattern matching on tuple size.
-- Remaining words: one `ptr` per element.
-- Total size: `(1 + arity) * sizeof(ptr)` = `(1 + arity) * 8` bytes.
-
-Alternative: omit arity word and rely on static compile-time knowledge of tuple size.
-This saves 8 bytes per tuple. Since LangThree's type system always knows the tuple arity at
-compile time, this is safe and preferred for v2.
-
-### Cons-cell layout
+Every ADT value (including exceptions) uses a uniform two-field struct:
 
 ```
-+-------+-------+
-|  head |  tail |
-+-------+-------+
-   ptr     ptr
++--------+---------+
+| tag    | payload |
++--------+---------+
+  i64      ptr
 ```
 
-- `head`: pointer to the element value.
-- `tail`: pointer to the next cons cell, or null for empty list.
-- Size: 16 bytes (two pointers).
+- `tag`: constructor index in declaration order (0-based); stored as `i64` for uniform alignment
+- `payload`: pointer to the argument value (another GC-managed heap object), or `null` for nullary
+- Total size: 16 bytes (2 × 8-byte words)
+- Allocated with `GC_malloc(16)`
 
-### String layout
+This is consistent with the existing uniform `ptr` representation: an ADT value is a `ptr` to
+this 16-byte struct.
 
-- Null-terminated C string stored as `i8*` / `!llvm.ptr`.
-- Allocated with `GC_malloc(strlen + 1)`.
-- Compatible with `printf`, `strcmp`, `strlen` without any marshalling.
+Example for `type Option = None | Some of int`:
+- `None` → `{tag=0, payload=null}`
+- `Some 42` → `{tag=1, payload=ptr_to_boxed_42}` where the boxed int is a separate GC_malloc'd i64
+
+### Record Heap Layout
+
+Records are N-field pointer arrays, structurally identical to tuples but with named access:
+
+```
++----------+----------+----------+
+| field_0  | field_1  | field_2  |
++----------+----------+----------+
+   ptr        ptr        ptr
+```
+
+- Fields are indexed in declaration order (0-based), stored in `RecordEnv`
+- Each field slot holds a `ptr` (uniform boxing: integers are boxed if stored in record fields)
+- Mutable fields: `SetField` GEPs to the field slot and stores a new value in-place
+- Total size: `N * 8` bytes
+
+The existing `LlvmGEPLinearOp` + `LlvmStoreOp`/`LlvmLoadOp` already handles this layout.
+
+### Exception Runtime Protocol
+
+The exception mechanism uses `setjmp`/`longjmp` with a thread-local linked list of handler frames.
+This is the OCaml model and works with Boehm GC (conservative, no stack walk needed).
+
+Relevant C runtime helpers (to be implemented in `runtime.c` alongside existing string/GC helpers):
+
+```c
+// Opaque exception frame — one per TryWith on the call stack
+typedef struct LangExnFrame {
+    jmp_buf buf;
+    struct LangExnFrame *prev;
+} LangExnFrame;
+
+// Thread-local pointer to current innermost handler
+extern __thread LangExnFrame *__lang_exn_top;
+
+// Exception value slot (set before longjmp, read after setjmp returns nonzero)
+extern __thread void *__lang_exn_value;
+
+// Called by Raise: stores exn value, unwinds to nearest handler
+void lang_raise(void *exn_value);  // noreturn
+
+// Called at TryWith entry: push frame
+void lang_push_handler(LangExnFrame *frame);
+
+// Called at TryWith exit (normal): pop frame
+void lang_pop_handler(void);
+```
+
+MLIR elaboration for `TryWith(body, handlers)`:
+
+1. `alloca` a `LangExnFrame` (or `GC_malloc` — alloca is simpler and correct here)
+2. Call `@lang_push_handler` with frame ptr
+3. Emit `setjmp` call: `i32 @setjmp(ptr %frame_buf_ptr)`
+4. `cf.cond_br` on setjmp result: `0 → body_block`, `nonzero → handler_block`
+5. `body_block`: elaborate body; on normal fall-through call `@lang_pop_handler`, branch to merge
+6. `handler_block`: load `__lang_exn_value` (the exception DataValue ptr), run handler decision tree
+7. `merge_block`: phi node for result value from body or handler
+
+This requires a new `LlvmCallOp` variant for `@setjmp` (which returns `i32`, not `ptr`) — the
+existing `LlvmCallOp of result: MlirValue * callee * args` already supports any return type based
+on `result.Type`.
+
+---
+
+## Comparison: ML-Family Exception Implementations
+
+| Approach | Used By | GC Compatible | Stack Cost | Complexity |
+|----------|---------|--------------|------------|------------|
+| `setjmp`/`longjmp` | OCaml (legacy), LangThree v4 | Yes (conservative GC needs no unwind info) | ~200 bytes/frame | LOW |
+| Zero-cost unwind (`_Unwind_RaiseException`) | GHC, modern OCaml 5 | Requires precise GC or root enumeration | ~0 on happy path | VERY HIGH |
+| Result type (`Ok`/`Err`) | Rust, Haskell | N/A (no runtime exceptions) | None | N/A (language design choice) |
+
+**Recommendation for v4.0:** `setjmp`/`longjmp`. It is correct, simple, and matches how OCaml
+handled exceptions before OCaml 5's effects system. The Boehm GC is conservative so there is no
+stack-walking requirement. The implementation is entirely in `runtime.c` — the compiler only needs
+to emit `setjmp` + branch + `lang_push/pop_handler` calls.
 
 ---
 
 ## Sources
 
 - LangThree AST: `../LangThree/src/LangThree/Ast.fs` — direct inspection, HIGH confidence
-- LangThree Eval: `../LangThree/src/LangThree/Eval.fs` — direct inspection, HIGH confidence
-- LangThree MatchCompile: `../LangThree/src/LangThree/MatchCompile.fs` — direct inspection, HIGH confidence
-- LangBackend v1 FEATURES.md: `.planning/research/FEATURES.md` (v1 scope anchor)
-- LangBackend PROJECT.md: `.planning/PROJECT.md` — v2 milestone definition
-- Boehm GC documentation: https://www.hboehm.info/gc/ — conservative GC API (`GC_INIT`, `GC_malloc`)
-- OCaml value representation: https://v2.ocaml.org/api/compiledfiles/runtime/gc.html — boxed vs unboxed scalars
-- MinCaml — Heap allocation for tuples and closures: https://esumii.github.io/min-caml/paper.pdf
-- LLVM opaque pointers (`!llvm.ptr`): https://mlir.llvm.org/docs/Dialects/LLVM/ — used for all GC-managed values
+  (TypeDecl, ConstructorDecl, GadtConstructorDecl, RecordDecl, RecordFieldDecl, all Expr nodes)
+- LangThree MatchCompile: `../LangThree/src/LangThree/MatchCompile.fs` — direct inspection, HIGH
+  confidence (Switch uses ctorName strings; RecordPat already handled in patternToConstructor)
+- LangBackend Elaboration.fs — direct inspection of existing testPattern/elaborateExpr patterns
+- LangBackend MlirIR.fs — direct inspection of existing op set (LlvmGEPStructOp, LlvmStoreOp, etc.)
+- LangBackend PROJECT.md — v4.0 milestone goals and pending decisions
+- OCaml exception implementation: `setjmp`/`longjmp` + `caml_exn_bucket` thread-local model
+  (OCaml runtime source: `ocaml/runtime/sys.c`, `ocaml/runtime/fail.c`)
+- "Tag-based discriminated union layout" — standard across GHC (info tables), OCaml (block tag),
+  MLton (tag word); v4 uses the simplest form: explicit `{i64 tag, ptr payload}`
+- Boehm GC + setjmp interaction: conservative GC scans `jmp_buf` as potential roots automatically;
+  no explicit root registration needed (this is a documented property of Boehm GC)
+
+---
+*Feature research for: LangBackend v4.0 — ADT/GADT, Records, Exception Handling*
+*Researched: 2026-03-26*

@@ -3,9 +3,10 @@
 **Domain:** Functional language compiler (F# host, MLIR text format, LLVM backend)
 **Researched:** 2026-03-26
 **Scope:** v1 pitfalls (MLIR C API, closures, lowering pipeline) + v2 additions (Boehm GC,
-heap-allocated types, pattern matching)
+heap-allocated types, pattern matching) + v3 additions (ADT/GADT, mutable records, setjmp/longjmp exceptions)
 **Confidence:** HIGH for Boehm GC integration and heap representation; HIGH for pattern
-matching compilation; MEDIUM for interaction between existing stack closures and new GC heap
+matching compilation; HIGH for ADT/GADT tag representation; HIGH for setjmp/longjmp pitfalls;
+MEDIUM for interaction between existing stack closures and new GC heap
 
 ---
 
@@ -866,6 +867,468 @@ representations that look identical at the type level (`Ptr`).
 
 ---
 
+---
+
+## Critical Pitfalls — v3: ADT/GADT, Records, Exceptions
+
+Mistakes specific to adding algebraic data types with mutable records and setjmp/longjmp
+exceptions to the existing system.
+
+---
+
+### Pitfall C-11: ADT Tag Stored at Field 0 Conflicts With Existing `LlvmGEPLinearOp(_, ptr, 0)` Loads
+
+**What goes wrong:**
+The existing codebase uses `LlvmGEPLinearOp(slot, ptr, 0)` / `LlvmLoadOp` to load field 0
+of cons cells (the `head`) and tuples (first element). ADTs need a tag word at field 0 and
+payload fields at indices 1..N. If ADT constructors are compiled with the same
+`GEP field 0 = first payload` convention used for tuples and cons cells, the tag check is
+missing and pattern matching reads payload data as a tag, producing garbage.
+
+**Why it happens:**
+The temptation is to reuse the existing tuple representation `{field0, field1, ...}` for
+ADT constructors and simply put the payload at field 0. This works for single-constructor
+types but breaks immediately for multi-constructor types that need tag discrimination.
+The existing `CtorTag` union in `MatchCompiler.fs` already has cases for `ConsCtor` and
+`NilCtor` but no `UserDefinedCtor` case — adding one without establishing the tag-at-0
+invariant is the pitfall.
+
+**Consequences:**
+- Pattern matching on multi-constructor ADTs reads payload pointer as a tag value
+- Null-payload constructors (constant constructors like `None`, `True`) are confused with
+  heap-allocated constructors
+- Silent wrong computation — the match succeeds but dispatches to the wrong arm
+
+**How to avoid:**
+- Establish the invariant: every ADT heap block has the layout
+  `{ i64 tag @offset0, ptr|i64 field1, ptr|i64 field2, ... }`.
+  Constant constructors (arity 0) can be represented as a small integer (the tag itself
+  stored as an unboxed `i64`) rather than a heap pointer, to avoid allocation — but this
+  requires type-directed dispatch at call sites.
+- Add a new `CtorTag` case: `UserCtor of typeName: string * ctorName: string * tag: int`
+- GEP for tag check: `LlvmGEPLinearOp(tagSlot, ptr, 0)` + load as `I64`; GEP for payload:
+  `LlvmGEPLinearOp(fieldSlot, ptr, 1 + fieldIndex)`
+- Never share layout code between ADT blocks and tuples/cons cells — keep them separate
+  codegen paths even if the struct layout looks similar
+
+**Warning signs:**
+- Match on `Some x | None` with `None` case always triggering
+- Tag value printed/logged shows a large number (a heap pointer) rather than 0 or 1
+- ASan reports out-of-bounds read at offset 0 of an ADT block that was allocated too small
+
+**Phase to address:** ADT codegen phase, before any constructor pattern compilation.
+
+---
+
+### Pitfall C-12: Constant Constructor Allocation on Every Evaluation
+
+**What goes wrong:**
+Constant constructors (zero-arity constructors like `None`, `False`, `Nil`) have no payload.
+If the codegen naively allocates a fresh `GC_malloc` block for every evaluation of `None`,
+programs that evaluate `None` in a loop allocate O(N) heap blocks that immediately become
+garbage, causing unnecessary GC pressure and bloating the heap. More critically, if
+`None` is represented as a heap pointer, the null-pointer test used for `NilCtor` in the
+existing cons-cell code will not fire for `None`, breaking existing `LlvmNullOp` / null
+checks if they are reused naively.
+
+**Why it happens:**
+The uniform-boxing instinct: "every value is a pointer to a GC block" is correct for
+payload-bearing constructors but wasteful for constant constructors. The mistake is applying
+the rule universally without distinguishing the two cases.
+
+**Consequences:**
+- O(N) GC allocation for a constant constructor evaluated N times
+- Possible confusion with existing null-pointer encoding for `NilCtor` (list empty)
+- Pattern matching cost becomes O(N) pointer comparisons if constants are not interned
+
+**How to avoid:**
+- Represent zero-arity constructors as small unboxed integers (the tag value as `I64`), not
+  heap pointers. This is the same representation used for `BoolLit` and `IntLit` in the
+  existing `CtorTag`.
+- Use type-directed codegen: when the result type is known to be a zero-arity constructor,
+  emit `ArithConstantOp(result, tagValue)`. When arity > 0, emit `GC_malloc` + fill.
+- Update `MlirType` handling: constant constructors produce `I64` SSA values, not `Ptr`.
+  Pattern matching on them uses `ArithCmpIOp("eq", scrutVal, tagConst)`, not a GEP load.
+- Keep `NilCtor` as the null-pointer encoding for the existing list type; ADT
+  constant constructors use integer encoding on a separate type-directed path.
+
+**Warning signs:**
+- Heap grows linearly with evaluation count even for programs that only construct `None`
+- `GC_PRINT_STATS=1` shows many single-word allocations being collected immediately
+
+**Phase to address:** ADT codegen phase, alongside constructor representation design.
+
+---
+
+### Pitfall C-13: GADT Type Refinement Discarded — Payload Loaded With Wrong MLIR Type
+
+**What goes wrong:**
+In GADTs, the type of a constructor's payload depends on the type index. For example,
+`Expr of 'a`:
+```
+type _ expr =
+  | IntE : int expr
+  | BoolE : bool expr
+  | IfE : bool expr * 'a expr * 'a expr -> 'a expr
+```
+At the match arm `IntE -> ...`, the type refines `'a = int`, so the payload (if any) should
+be loaded as `I64`. At `IfE -> ...`, some payloads are `Ptr` (sub-expressions). If the
+codegen ignores the GADT refinement and always loads payloads as `Ptr` (the safe uniform
+representation), integer-typed fields are misinterpreted as pointers. Conversely, loading
+all fields as `I64` misinterprets pointer fields as integers.
+
+**Why it happens:**
+The existing `testPattern` in `Elaboration.fs` uses a simple heuristic
+(`loadTypeOfPat = function TuplePat -> Ptr | _ -> I64`) that was designed for tuples.
+Reusing this for GADT payloads without threading the GADT type refinement produces wrong
+load types. The F# host compiler erases GADT refinements at compile time; the LangBackend
+codegen must also erase them, but must do so correctly by consulting the type annotation
+at each constructor arm.
+
+**Consequences:**
+- Integer payload loaded as `Ptr`, then used in arithmetic → type error in MLIR verifier or
+  wrong result (pointer value interpreted as integer)
+- `Ptr` payload loaded as `I64` → pointer stored as integer, GC cannot follow it → premature
+  collection of live sub-expression trees
+
+**How to avoid:**
+- Thread explicit type annotations through the match compiler for GADT patterns. Each
+  `ConstructorPat` must carry the resolved payload types (post-refinement) as annotations,
+  not derive them from the pattern shape.
+- For the MLIR text emission phase: each payload field has a declared `MlirType` (`I64` or
+  `Ptr`) that comes from the type annotation, not from a syntactic heuristic.
+- Treat GADTs as requiring a type-annotation pass before codegen. Emit `ConstructorPat`
+  nodes that include the field type list explicitly.
+- If type annotations are not yet available, conservatively box everything as `Ptr` and
+  accept the integer-as-pointer false retention by Boehm GC, but plan to fix it.
+
+**Warning signs:**
+- MLIR verifier fires with "type mismatch: expected i64, got !llvm.ptr" inside a GADT
+  match arm
+- Programs with GADT integer payloads return garbage values or crash on arithmetic
+
+**Phase to address:** GADT codegen phase. Requires type annotation infrastructure to be in
+place before codegen starts.
+
+---
+
+### Pitfall C-14: `longjmp` Over Stack Frames Containing Live GC Roots — Roots Not Cleared
+
+**What goes wrong:**
+When `longjmp` is called from a `raise` site, it unwinds the C stack past one or more stack
+frames that contain pointer-typed SSA values live at the time of the jump. Boehm GC scans
+the stack conservatively — it treats every word on the stack that looks like a heap address
+as a live root. After `longjmp`, those stack frames are logically dead, but the stack memory
+is not zeroed. If the GC runs between the `longjmp` and the next write to those stack
+locations, it will see the old pointer values and treat those objects as live, preventing
+collection.
+
+This is the "floating garbage" form of the bug: objects that should be collected after an
+exception are retained indefinitely. More dangerously, if the stack memory is reused for a
+new frame with a different layout, a previously live GC pointer now aliases an integer slot
+in the new frame — the GC will follow a stale pointer to an object whose identity has
+changed.
+
+**Why it happens:**
+Boehm GC does not know the boundaries of stack frames or which slots contain live pointers.
+It scans every word. `longjmp` does not zero the abandoned stack memory. The GC has no
+way to know that frames below the `setjmp` frame were abandoned.
+
+**Consequences:**
+- Floating garbage: objects kept alive longer than needed (correctness-safe but memory leak)
+- Stale pointer aliasing after stack reuse: reading a GC-managed object through a stale
+  pointer in a reused frame can produce type confusion (accessing field N of object X when
+  the pointer now aliases object Y)
+- Non-deterministic: depends on GC timing and allocation pressure
+
+**How to avoid:**
+- After each `longjmp` return in the handler (`setjmp` returns non-zero), immediately
+  re-initialize all pointer-typed locals that could alias the abandoned frames to null.
+  In practice this means the handler itself should allocate no pointers before the cleanup.
+- Use a C runtime wrapper `lang_setjmp` / `lang_longjmp` that calls `GC_collect_a_little()`
+  after the longjmp returns, to clear the stale roots via a GC cycle.
+- Keep exception handler code as simple as possible: no allocation between `setjmp` and the
+  first handler block.
+- For correctness: document that the implementation has conservative-GC floating-garbage
+  semantics for exceptions. This is acceptable for most programs but must be acknowledged.
+
+**Warning signs:**
+- `GC_PRINT_STATS=1` shows heap growing after every `raise` + handler cycle
+- Programs that raise many exceptions run out of memory despite small working sets
+- Valgrind reports "invalid read" in GC scan of abandoned stack frames (rare)
+
+**Phase to address:** Exception handling phase. Address in the runtime wrapper design before
+any generated `try-with` code is produced.
+
+---
+
+### Pitfall C-15: `setjmp` Without `returns_twice` Attribute Causes LLVM Miscompilation
+
+**What goes wrong:**
+LLVM's optimizer assumes that a function call returns at most once, unless the callee is
+marked with the `returns_twice` attribute. The C standard library `setjmp` is declared with
+this attribute in system headers, but if you call a wrapper function `lang_setjmp` (defined
+in `runtime.c`) that calls `setjmp` internally, the wrapper itself is not marked
+`returns_twice`. LLVM sees `lang_setjmp` as a normal function and optimizes the caller
+assuming it returns once. This means:
+- Variables modified between `lang_setjmp` and the corresponding `longjmp` may be
+  optimized away (dead-store elimination)
+- The result value of `lang_setjmp` may be cached in a register and never re-read after
+  `longjmp` returns
+
+This produces miscompilations that are silent at `-O0` but wrong at `-O2` or higher.
+
+**Why it happens:**
+The `returns_twice` attribute is an LLVM IR calling-convention annotation, not a C
+attribute. A C wrapper around `setjmp` does not inherit the attribute. The MLIR text
+emission for a `call @lang_setjmp(...)` instruction does not automatically annotate the
+callee. Since LangBackend emits MLIR text, there is no mechanism to attach
+`returns_twice` through the normal codegen path without explicit support.
+
+**Consequences:**
+- At `-O2`: `try-with` blocks silently always take the no-exception branch even when an
+  exception is raised, because the `setjmp` return value is cached as `0`
+- Dead-store elimination removes writes to the exception value variable between try body
+  and handler
+- Only visible with optimizations; tests at `-O0` pass, tests at `-O2` fail
+
+**How to avoid:**
+- The `lang_setjmp` wrapper in `runtime.c` must either (a) call `setjmp` directly as a
+  macro (so the C compiler sees the true `setjmp` with its `returns_twice` treatment), or
+  (b) be declared `__attribute__((returns_twice))` explicitly in the C source.
+  Option (a) is strongly preferred: use `#define lang_setjmp(buf) setjmp(buf)` or a static
+  inline wrapper, not an out-of-line function.
+- Never put `setjmp` behind a regular function call boundary where the optimizer cannot see
+  the attribute.
+- Emit MLIR at `-O0` during development; only promote to `-O2` after the
+  `returns_twice` issue is verified resolved.
+- Add a regression test that raises an exception at `-O2` and checks the handler fires.
+
+**Warning signs:**
+- Exception tests pass at `-O0` but fail at `-O1` or `-O2`
+- Handler code is never executed even though `raise` was called
+- `lang_setjmp` return value is always `0` in debugger even after `longjmp`
+
+**Phase to address:** Exception handling phase, runtime.c design. Non-negotiable before
+testing with any optimization level.
+
+---
+
+### Pitfall C-16: Exception Raised Inside Exception Handler — `jmp_buf` Stack Corruption
+
+**What goes wrong:**
+Each `try-with` block requires a `jmp_buf` allocated at the corresponding stack frame and
+pushed onto a runtime exception handler stack. When an exception is raised, `longjmp` jumps
+to the innermost handler. If the handler body itself raises an exception (directly or
+indirectly via a function it calls), the second `longjmp` must find the next enclosing
+handler. If the handler stack is not correctly popped before the handler body executes, the
+second `longjmp` jumps back to the same handler — an infinite loop or stack smash.
+
+Additionally, if the `jmp_buf` was allocated on the stack of the try-frame (which is the
+correct and efficient allocation), and the handler is in the same frame, the `longjmp` does
+not unwind to a different frame — it restores registers within the same frame. This is
+correct. But if the `jmp_buf` is allocated on the GC heap (a common shortcut to avoid
+thinking about lifetimes), the handler stack management must account for the extra
+indirection.
+
+**Why it happens:**
+The natural implementation uses a global or thread-local linked list of `jmp_buf` pointers.
+Each `try-with` pushes at entry; the handler pops at entry before executing the handler body.
+The mistake is popping after the handler body executes, or not popping at all when the
+protected body completes normally (no exception). Both leave the handler stack in a wrong
+state for the next `try-with`.
+
+**Consequences:**
+- Second exception in handler jumps to the same handler → infinite loop
+- Normal completion of protected body leaves a dangling entry on the handler stack →
+  next unrelated `raise` jumps to an already-completed handler frame → crash
+
+**How to avoid:**
+- Use the standard pattern:
+  1. Push `jmp_buf` pointer onto handler stack
+  2. Call `setjmp`
+  3. If `setjmp` returns 0 (normal path): execute protected body, then **pop** handler stack
+  4. If `setjmp` returns non-zero (exception path): do NOT push again; execute handler body
+     (handler stack was already popped in step 3's exception path? No — it wasn't executed)
+  The correct invariant: pop the handler stack immediately when `setjmp` returns non-zero,
+  before executing any handler code.
+- Allocate `jmp_buf` on the C stack (as a local variable in the generated function), not on
+  the GC heap. The GC heap allocation adds false-root noise and complicates lifetime reasoning.
+- In `runtime.c`, expose: `lang_push_handler(jmp_buf*)`, `lang_pop_handler()`,
+  `lang_current_handler() -> jmp_buf*`, `lang_raise(ptr exnValue)`.
+
+**Warning signs:**
+- Program hangs after the second exception raised inside a handler
+- Stack overflow after many exception/handler cycles
+- Handler fires for an unrelated `raise` that should have been caught by a different handler
+
+**Phase to address:** Exception handling phase. Implement and test the handler stack
+management in `runtime.c` before generating any `try-with` codegen.
+
+---
+
+## Moderate Pitfalls — v3: ADT/GADT, Records, Exceptions
+
+---
+
+### Pitfall M-12: Mutable Record Field Aliasing — Two Language Values Share the Same Heap Cell
+
+**What goes wrong:**
+When a mutable record is passed to a function, the generated code passes a `Ptr` to the
+GC-allocated record block. If the function stores that pointer and the caller also retains
+the pointer, both have an alias to the same heap cell. A mutation via one alias is visible
+through the other. This is correct semantics for a by-reference mutable record, but it
+becomes a bug when the programmer (or the compiler) assumes copy semantics.
+
+Specifically: `let r2 = r1` in the generated code emits no copy — both `r2` and `r1` are
+the same `Ptr` SSA value. If the source language intends value semantics for records (as in
+F# default records), every assignment must emit a copy. If the source language intends
+reference semantics (as in OCaml `ref` or F# `[<Struct>]`-free records with mutable fields),
+no copy is needed. Conflating the two produces silent aliasing bugs.
+
+**How to avoid:**
+- Define the semantics of mutable record binding in the source language explicitly before
+  writing any codegen: is `let r2 = r1` a copy or an alias?
+- If copy semantics: add a `lang_record_copy` path that `GC_malloc`s a new block and
+  `memcpy`s all fields. Emit this at every `let r2 = r1` assignment where `r1` is a mutable
+  record type.
+- If reference semantics: document the aliasing and ensure the pattern match compiler
+  never emits a copy (it currently does not for `Ptr` values).
+- Add a test: mutate via `r1`, read via `r2`; check whether the read sees the mutation.
+
+**Warning signs:**
+- Mutation via one record binding is invisible through another binding that should alias it
+  (reference semantics expected but copy emitted)
+- Mutation via one record binding unexpectedly changes a "different" binding (copy semantics
+  expected but alias emitted)
+
+**Phase to address:** Mutable record codegen phase, semantics design step.
+
+---
+
+### Pitfall M-13: Copy-and-Update Expression Shallow-Copies Only — Nested Mutable Records Not Duplicated
+
+**What goes wrong:**
+Copy-and-update syntax `{ r with field = newVal }` allocates a new record block, copies all
+fields from `r`, then overwrites the specified field. If `r` has a field of record type
+(pointer to another GC block), the copy copies the pointer, not the inner record. After the
+copy-and-update, the new record and the old record share the inner mutable record. A mutation
+to the inner record via the old record is visible via the new record.
+
+**Why it happens:**
+The natural implementation is a shallow copy (`GC_malloc` + field-by-field copy of pointer
+values). This is correct for immutable inner records but wrong for mutable inner records if
+the source language intends deep copy semantics on copy-and-update.
+
+**How to avoid:**
+- Decide the copy depth policy: OCaml and F# use shallow copy for record update. Deep copy
+  is expensive and not the convention.
+- Document: copy-and-update is a shallow copy; nested mutable records are aliased.
+- Add a test that demonstrates the aliasing to prevent accidental "fixing" it in a way that
+  breaks the expected semantics.
+- If deep copy is desired, it must be explicit in the language (a `deepcopy` function), not
+  implicit in the copy-and-update syntax.
+
+**Warning signs:**
+- Test case `let r2 = { r1 with x = 5 }; mutate r2.inner; check r1.inner` shows r1.inner
+  was changed unexpectedly
+
+**Phase to address:** Mutable record codegen phase.
+
+---
+
+### Pitfall M-14: `ConstructorPat` Not Added to `CtorTag` — Pattern Compiler Silently Falls Through
+
+**What goes wrong:**
+The existing `MatchCompiler.fs` `CtorTag` DU has cases for `IntLit`, `BoolLit`,
+`StringLit`, `ConsCtor`, `NilCtor`, `TupleCtor`. The `compilePatterns` function and the
+`CtorTag` equality checks implicitly assume all tags are from this set. Adding ADT
+constructors requires adding `UserCtor of ...` to `CtorTag` and updating every pattern
+match on `CtorTag` in `MatchCompiler.fs` and `Elaboration.fs`. Missing even one match case
+causes the F# compiler to warn, but if the codebase uses catch-all `| _` arms (see the
+`failwithf "testPattern: pattern %A not supported in v2"` fallthrough), ADT patterns will
+be silently ignored or raise a confusing internal error.
+
+**How to avoid:**
+- Remove all `| _ -> failwithf` catch-alls in `CtorTag` match expressions after adding
+  `UserCtor`. Replace with explicit cases so the F# compiler reports exhaustiveness warnings.
+- Add `UserCtor` to `ctorArity`, `ctorTag equality`, and `Elaboration.testPattern` in the
+  same commit to avoid intermediate states where one function handles `UserCtor` but another
+  does not.
+- Write a test that uses every constructor of a two-variant ADT in a match expression before
+  marking the phase complete.
+
+**Warning signs:**
+- F# compiler warns about incomplete pattern matches after adding `UserCtor`
+- Pattern match on an ADT raises `System.Exception: testPattern: pattern UserCtor not
+  supported` at compile time
+
+**Phase to address:** ADT pattern matching phase. Update `MatchCompiler.fs` and
+`Elaboration.fs` together in one step.
+
+---
+
+### Pitfall M-15: `volatile` Not Used for Variables Modified Between `setjmp` and `longjmp`
+
+**What goes wrong:**
+The C standard (and LLVM's optimizer) only guarantee that variables modified between the
+`setjmp` call and a `longjmp` are visible in the handler if they are declared `volatile`.
+Any non-volatile automatic variable that is written after `setjmp` and read in the handler
+may have its write optimized away (it may be held in a register that `longjmp` restores to
+the value from `setjmp` time).
+
+For LangBackend: the variable that holds the raised exception value (typically a `void*` or
+`ptr` pointing to the exception object) must be `volatile` if it is written after `setjmp`
+and read after `longjmp` returns.
+
+**How to avoid:**
+- In `runtime.c`, declare the current exception value pointer as
+  `volatile void* lang_current_exception;`
+- Any local variable in a C wrapper that is written between `setjmp` and `longjmp` and then
+  read in the handler path must be `volatile`.
+- Add a comment at each `volatile` declaration explaining which rule requires it.
+- Test at `-O2` explicitly: compile a test that sets `lang_current_exception` then calls
+  `longjmp`; verify the handler reads the correct pointer.
+
+**Warning signs:**
+- Exception handler receives a null or garbage exception value at `-O2`
+- Exception value is correct at `-O0` but wrong at `-O1` or `-O2`
+
+**Phase to address:** Exception handling phase, runtime.c implementation. Apply at the same
+time as the `returns_twice` fix (Pitfall C-15).
+
+---
+
+### Pitfall M-16: Nested `try-with` Allocates `jmp_buf` on GC Heap — False Pointer Retention
+
+**What goes wrong:**
+If `jmp_buf` structs are allocated via `GC_malloc` (to avoid thinking about their lifetime),
+each try-with block allocates a GC-managed buffer that contains register values including
+stack pointers and instruction pointers. Boehm GC will scan this buffer conservatively and
+may find values that look like heap addresses, retaining live objects that should be
+collectible. More importantly, after `longjmp` restores from the buffer, the `jmp_buf` block
+is no longer needed but still holds register-shaped values — more false roots.
+
+**How to avoid:**
+- Allocate `jmp_buf` on the C stack (local variable of the function that calls `setjmp`).
+  This is the correct, standard approach. The `jmp_buf` is valid as long as the function
+  has not returned.
+- If a `try-with` must be compiled in a context where the `jmp_buf` lifetime is ambiguous
+  (e.g., inside a closure that may outlive its defining frame), use a global or thread-local
+  handler stack with stack-allocated nodes — do not put the `jmp_buf` itself on the GC heap.
+- Use `GC_malloc_atomic` if a `jmp_buf` must be heap-allocated for any reason (e.g., in a
+  test harness): atomic allocation prevents GC scanning of the buffer contents.
+
+**Warning signs:**
+- Heap growth proportional to try-with nesting depth
+- `GC_PRINT_STATS=1` shows many 200-byte blocks (typical `jmp_buf` size) accumulating
+
+**Phase to address:** Exception handling phase. Decided at the time of choosing
+`jmp_buf` allocation strategy.
+
+---
+
+
 ## Phase-Specific Warnings
 
 | Phase Topic | Likely Pitfall | Mitigation |
@@ -888,6 +1351,17 @@ representations that look identical at the type level (`Ptr`).
 | Context/Module lifecycle | C-2: context destroyed before module | `CompilerSession` wrapper with enforced destruction order |
 | First MLIR operation emission | C-1: region handle used after ownership transfer | Ownership-tracking wrapper type |
 | AST annotation | C-6: missing free-variable and type annotation | TypedExpr lowering pass before any MLIR emission |
+| ADT constructor representation | C-11: tag at field 0 vs existing GEP conventions | Separate ADT codegen path; tag @offset0, payload @offset1+ |
+| ADT constant constructors | C-12: GC_malloc on every evaluation | Integer encoding for zero-arity ctors; Ptr only for payload-bearing ctors |
+| GADT codegen | C-13: payload loaded with wrong MlirType | Thread type annotations through ConstructorPat before codegen |
+| Exception handling — setjmp wrapper | C-15: returns_twice missing | Use `#define lang_setjmp setjmp` or `__attribute__((returns_twice))`; test at -O2 |
+| Exception handling — handler stack | C-16: double-exception jmp_buf corruption | Pop handler before executing handler body; test nested raises |
+| Exception handling — GC interaction | C-14: stale roots after longjmp | Call GC_collect_a_little after longjmp returns; null out ptrs in handler |
+| Mutable record codegen | M-12: aliasing vs copy semantics | Decide semantics first; add explicit copy if needed |
+| Mutable record copy-and-update | M-13: shallow copy shares inner records | Document and test shallow-copy behavior |
+| Pattern matching — ADT ctors | M-14: CtorTag not extended | Add UserCtor to CtorTag and update all match sites in same commit |
+| Exception volatile variables | M-15: exception value clobbered by optimizer | `volatile` on lang_current_exception; regression test at -O2 |
+| Nested try-with jmp_buf allocation | M-16: GC_malloc'd jmp_buf scanned as roots | Stack-allocate jmp_buf; GC_malloc_atomic if heap allocation required |
 
 ---
 
@@ -913,3 +1387,14 @@ representations that look identical at the type level (`Ptr`).
 - [How to avoid persistent unrealized_conversion_casts — LLVM Discourse](https://discourse.llvm.org/t/how-to-avoid-persistent-unrealized-conversion-cast-s-when-converting-dialects/71721)
 - [LLVM Garbage Collection — Official Docs](https://llvm.org/docs/GarbageCollection.html)
 - [Go closure escape analysis — DEV Community](https://dev.to/imzihad21/go-008-closures-escape-analysis-in-action-3gjb)
+- [OCaml Memory Representation of Values — Real World OCaml](https://dev.realworldocaml.org/runtime-memory-layout.html)
+- [OCaml GADT Tutorial — Official Manual](https://ocaml.org/manual/5.2/gadts-tutorial.html)
+- [setjmp/longjmp and Exception Handling in C — DEV Community](https://dev.to/pauljlucas/setjmp-longjmp-and-exception-handling-in-c-1h7h)
+- [SEI CERT C — MSC22-C: Use setjmp/longjmp facility securely](https://wiki.sei.cmu.edu/confluence/display/c/MSC22-C.+Use+the+setjmp%28%29%2C+longjmp%28%29+facility+securely)
+- [Setjmp/Longjmp Exception Handling — Mapping High Level Constructs to LLVM IR](https://mapping-high-level-constructs-to-llvm-ir.readthedocs.io/en/latest/exception-handling/setjmp+longjmp-exception-handling.html)
+- [LLVM Exception Handling — Official Documentation](https://llvm.org/docs/ExceptionHandling.html)
+- [Avoid LLVM setjmp bug — Julia Discourse](https://discourse.julialang.org/t/avoid-llvm-setjmp-bug/1140)
+- [longjmp — cppreference.com](https://en.cppreference.com/w/c/program/longjmp)
+- [Conservative GC Algorithmic Overview — hboehm.info](https://www.hboehm.info/gc/gcdescr.html)
+- [Boehm GC Porting Directions — stack scanning](https://hboehm.info/gc/porting.html)
+- [Mutable Record Fields — OCaml Programming: Correct + Efficient + Beautiful](https://cs3110.github.io/textbook/chapters/mut/mutable_fields.html)
