@@ -35,6 +35,19 @@ let private gcLinkFlags =
     else
         "-lgc"
 
+// Path to lang_runtime.c — lives alongside Pipeline.fs in the compiler source directory.
+let private runtimeSrc =
+    Path.Combine(__SOURCE_DIRECTORY__, "lang_runtime.c")
+
+// Platform-aware GC include flag for compiling lang_runtime.c.
+// macOS (Homebrew): bdw-gc header is in /opt/homebrew/opt/bdw-gc/include.
+// Linux: GC header is on default include path.
+let private gcIncludeFlag =
+    if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
+        "-I/opt/homebrew/opt/bdw-gc/include"
+    else
+        ""
+
 type CompileError =
     | MlirOptFailed   of exitCode: int * stderr: string
     | TranslateFailed of exitCode: int * stderr: string
@@ -82,8 +95,15 @@ let compile (m: MlirModule) (outputPath: string) : Result<unit, CompileError> =
         | Error (code, err) -> Error (TranslateFailed (code, err))
         | Ok () ->
 
-        // Step 4: Compile to native binary (link Boehm GC with platform-aware path)
-        let clangArgs = sprintf "-Wno-override-module %s %s -o %s" llFile gcLinkFlags outputPath
+        // Step 4: Compile lang_runtime.c to a temp object file
+        let runtimeObj = Path.ChangeExtension(llFile, ".runtime.o")
+        let compileRuntimeArgs = sprintf "-c %s %s -o %s" runtimeSrc gcIncludeFlag runtimeObj
+        match runTool Clang compileRuntimeArgs with
+        | Error (code, err) -> Error (ClangFailed (code, err))
+        | Ok () ->
+
+        // Step 5: Compile to native binary (link Boehm GC and runtime object)
+        let clangArgs = sprintf "-Wno-override-module %s %s %s -o %s" llFile runtimeObj gcLinkFlags outputPath
         match runTool Clang clangArgs with
         | Error (code, err) -> Error (ClangFailed (code, err))
         | Ok () -> Ok ()
