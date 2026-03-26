@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v2.0 — Phase 8: Strings
+**Current focus:** v2.0 — Phase 9: Tuples (next)
 
 ## Current Position
 
-Phase: 8 of 11 (Strings)
-Plan: 1 of TBD in current phase
-Status: In progress
-Last activity: 2026-03-26 — Completed 08-01-PLAN.md (string struct foundation: LlvmGEPStructOp, lang_runtime.c, string_length, 19 tests passing)
+Phase: 8 of 11 (Strings) — COMPLETE
+Plan: 2 of 2 in phase 8
+Status: Phase complete
+Last activity: 2026-03-26 — Completed 08-02-PLAN.md (string builtins: strcmp equality, string_concat, to_string, ArithExtuIOp, 22 tests passing)
 
-Progress: [███████░░░░░░░░░░░░░] 7/11 phases complete (v1.0 done, v2.0 in progress)
+Progress: [████████░░░░░░░░░░░░] 8/11 phases started (Phase 8 Strings complete)
 
 ## Performance Metrics
 
@@ -67,6 +67,10 @@ Recent decisions affecting current work:
 - [08-01]: lang_runtime.c compiled per-invocation to temp .runtime.o — consistent with temp-file pipeline pattern
 - [08-01]: @strcmp, @lang_string_concat, @lang_to_string_int, @lang_to_string_bool always declared in ExternalFuncs unconditionally
 - [08-01]: gcIncludeFlag added to Pipeline for macOS bdw-gc header path when compiling lang_runtime.c
+- [08-02]: ArithExtuIOp (arith.extui) added to promote I1 to I64 before C ABI calls — @lang_to_string_bool takes int64_t, not i1
+- [08-02]: to_string bool path: elaborate arg (I1), ArithExtuIOp to I64, call @lang_to_string_bool with I64
+- [08-02]: FsLit tests must be single-line — LangThree parser does not accept newlines between sub-expressions
+- [08-02]: string_concat nested App matched before general App: App(App(Var("string_concat"),...),...)  ordered before general App dispatch
 
 ### Pending Todos
 
@@ -80,5 +84,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 08-01-PLAN.md (string struct foundation — LlvmGEPStructOp, lang_runtime.c, string_length builtin, 19 tests passing)
+Stopped at: Completed 08-02-PLAN.md (string builtins: strcmp equality, string_concat, to_string, ArithExtuIOp I1→I64, 22 tests passing — Phase 8 complete)
 Resume file: None
