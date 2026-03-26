@@ -101,11 +101,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     | Let (name, Lambda (outerParam, Lambda (innerParam, innerBody, _), _), inExpr, _) ->
-        // Step 1: Compute free variables of the inner lambda body relative to both params being bound.
-        // freeVars {outerParam} (Lambda(innerParam, innerBody)) = freeVars {outerParam, innerParam} innerBody
-        // This finds variables captured from outside the let binding's scope.
+        // Step 1: Compute free variables of the inner lambda body relative to innerParam only.
+        // These are variables that need to come from the closure environment struct.
+        // outerParam IS one such variable — it's passed to the closure-maker and stored at env[1+i].
+        // Using only {innerParam} as bound means outerParam appears free when it's used in innerBody.
         let captures =
-            freeVars (Set.ofList [outerParam; innerParam]) innerBody
+            freeVars (Set.singleton innerParam) innerBody
             |> Set.toList
             |> List.sort
         let numCaptures = List.length captures
