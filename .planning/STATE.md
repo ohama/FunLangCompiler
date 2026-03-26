@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 3 — Booleans, Comparisons, Control Flow
+**Current focus:** Phase 4 — Functions
 
 ## Current Position
 
-Phase: 3 of 6 (Booleans, Comparisons, Control Flow)
-Plan: 1 of 2 in current phase
-Status: In progress
-Last activity: 2026-03-26 — Completed 03-01-PLAN.md (Bool/comparison IR, Printer, Elaboration, dynamic ReturnType)
+Phase: 3 of 6 (Booleans, Comparisons, Control Flow) — COMPLETE
+Plan: 2 of 2 in phase 03 — Phase complete
+Status: Phase 3 complete, ready for Phase 4
+Last activity: 2026-03-26 — Completed 03-02-PLAN.md (multi-block elaboration for If/And/Or, 3 E2E tests, 9/9 FsLit pass)
 
-Progress: [█████░░░░░] 43%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Average duration: ~1.83 min
-- Total execution time: ~0.18 hours
+- Total plans completed: 7
+- Average duration: ~2 min
+- Total execution time: ~0.23 hours
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: [█████░░░░░] 43%
 |-------|-------|-------|----------|
 | 01-mlirir-foundation | 3 | ~5 min | ~1.7 min |
 | 02-scalar-codegen-via-mlirir | 2 | ~4 min | ~2 min |
-| 03-booleans-comparisons-control-flow | 1 | ~2 min | ~2 min |
+| 03-booleans-comparisons-control-flow | 2 | ~4 min | ~2 min |
 
 **Recent Trend:**
-- Last 6 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min)
+- Last 7 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min)
 - Trend: Stable ~2 min/plan
 
 *Updated after each plan completion*
@@ -64,6 +64,10 @@ Recent decisions affecting current work:
 - [03-01]: CfCondBrOp/CfBrOp args format: (%v : type, ...) with parentheses; empty arg lists omit parentheses
 - [03-01]: elaborateModule ReturnType changed from hardcoded I64 to resultVal.Type for dynamic return types
 - [03-01]: F# type inference disambiguated by explicit (args: MlirValue list) annotations when multiple record types share a field name (FuncOp.Name vs MlirValue.Name)
+- [03-02]: env.Blocks ref accumulates side blocks in emission order; elaborateModule appends them after the entry block and patches ReturnOp onto the final merge block
+- [03-02]: MLIR block args serve as phi nodes — mergeArg block argument carries the result value out of if/and/or control flow
+- [03-02]: Short-circuit And: CfCondBrOp(leftVal, evalRightLabel, [], mergeLabel, [leftVal]) — false takes merge branch directly with leftVal
+- [03-02]: Short-circuit Or: CfCondBrOp(leftVal, mergeLabel, [leftVal], evalRightLabel, []) — true takes merge branch directly with leftVal
 
 ### Pending Todos
 
@@ -78,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T02:42:13Z
-Stopped at: Completed 03-01-PLAN.md — Bool/comparison IR, Printer, Elaboration + 2 E2E tests; 6/6 FsLit pass
+Last session: 2026-03-26T02:46:47Z
+Stopped at: Completed 03-02-PLAN.md — multi-block If/And/Or elaboration + 3 E2E tests; 9/9 FsLit pass; Phase 3 complete
 Resume file: None
