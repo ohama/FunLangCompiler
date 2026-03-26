@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 7 of 11 (GC Runtime Integration)
-Plan: 1 of TBD in current phase
+Plan: 2 of TBD in current phase
 Status: In progress
-Last activity: 2026-03-26 — Completed 07-01-PLAN.md (GC IR infrastructure)
+Last activity: 2026-03-26 — Completed 07-02-PLAN.md (GC closure migration + GC_init in @main)
 
 Progress: [██████░░░░░░░░░░░░░░] 6/11 phases complete (v1.0 done, v2.0 in progress)
 
@@ -58,6 +58,8 @@ Recent decisions affecting current work:
 - [07-01]: GC symbol is @GC_init (lowercase i) — GC_INIT is a C macro, not a linkable symbol
 - [07-01]: LlvmCallVoidOp has no result field — void calls must not consume an SSA name counter slot
 - [07-01]: printModule order: globals -> extern decls -> funcs (required by MLIR 20)
+- [07-02]: Closure env byte count = (numCaptures + 1) * 8 — slot 0 is fn ptr, slots 1..N are captures
+- [07-02]: GC_init and GC_malloc always declared in ExternalFuncs unconditionally
 
 ### Pending Todos
 
@@ -65,11 +67,11 @@ None.
 
 ### Blockers/Concerns
 
-- [Phase 7, ACTIVE]: Confirm exact scope of v1 closure alloca in Elaboration.fs before migrating — all LlvmAllocaOp uses must be found and moved to GC_malloc
+- [Phase 7, RESOLVED]: LlvmAllocaOp migration — only one usage site in App dispatch; fully migrated in 07-02
 - [Phase 7, RESOLVED]: macOS -L flag for bdw-gc added in 07-01 via RuntimeInformation.IsOSPlatform
 
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 07-01-PLAN.md (GC IR infrastructure — MlirGlobal, ExternalFuncDecl, LlvmCallOp, LlvmCallVoidOp, -lgc linking)
+Stopped at: Completed 07-02-PLAN.md (GC closure migration — LlvmAllocaOp -> GC_malloc, GC_init in @main, 16 tests passing)
 Resume file: None
