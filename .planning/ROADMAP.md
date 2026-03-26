@@ -81,10 +81,10 @@ Plans:
   2. `let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2) in fib 10` compiles and exits with 55
   3. The emitted `.mlir` text contains a forward-declared `func.func @fact` with a `func.call @fact` recursive call body — Elaboration has annotated the call as `DirectCall` and no closure struct is allocated
   4. FsLit test files for let-rec recursive functions pass
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 04-01: MlirIR FuncOp and DirectCallOp types; Elaboration for let rec known functions
+- [ ] 04-01-PLAN.md — DirectCallOp in MlirIR, LetRec/App elaboration with KnownFuncs, factorial and fibonacci E2E tests
 
 ### Phase 5: Closures via Elaboration
 **Goal**: Lambda expressions that capture free variables are elaborated into MlirIR closure representations (flat struct with `{fn_ptr, env_fields}`) and emitted with indirect call dispatch, enabling higher-order functions to work correctly
