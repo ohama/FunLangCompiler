@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 2 — Scalar Codegen via MlirIR
+**Current focus:** Phase 3 — Booleans, Comparisons, Control Flow
 
 ## Current Position
 

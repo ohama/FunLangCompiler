@@ -80,18 +80,18 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | Phase 1 | Pending |
-| INFRA-02 | Phase 1 | Pending |
-| INFRA-03 | Phase 1 | Pending |
-| INFRA-04 | Phase 1 | Pending |
-| INFRA-05 | Phase 1 | Pending |
-| CLI-02 | Phase 1 | Pending |
-| TEST-01 | Phase 1 | Pending |
-| SCALAR-01 | Phase 2 | Pending |
-| SCALAR-02 | Phase 2 | Pending |
-| CTRL-02 | Phase 2 | Pending |
-| CTRL-03 | Phase 2 | Pending |
-| ELAB-01 | Phase 2 | Pending |
+| INFRA-01 | Phase 1 | Complete |
+| INFRA-02 | Phase 1 | Complete |
+| INFRA-03 | Phase 1 | Complete |
+| INFRA-04 | Phase 1 | Complete |
+| INFRA-05 | Phase 1 | Complete |
+| CLI-02 | Phase 1 | Complete |
+| TEST-01 | Phase 1 | Complete |
+| SCALAR-01 | Phase 2 | Complete |
+| SCALAR-02 | Phase 2 | Complete |
+| CTRL-02 | Phase 2 | Complete |
+| CTRL-03 | Phase 2 | Complete |
+| ELAB-01 | Phase 2 | Complete |
 | SCALAR-03 | Phase 3 | Pending |
 | SCALAR-04 | Phase 3 | Pending |
 | SCALAR-05 | Phase 3 | Pending |
