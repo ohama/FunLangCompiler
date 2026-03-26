@@ -1,0 +1,5 @@
+// --- Command: bash -c 'cd /tmp && OUTNAME=langback_cli_$$_out && cp %input ${OUTNAME}.lt && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- ${OUTNAME}.lt && ./${OUTNAME}; echo $?; rm -f ${OUTNAME} ${OUTNAME}.lt'
+// --- Input:
+let x = 10 in let y = x + 5 in y
+// --- Output:
+15
