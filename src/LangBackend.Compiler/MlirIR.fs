@@ -33,6 +33,7 @@ type ExternalFuncDecl = {
 // Phase 4: func.call (direct)
 // Phase 5: LLVM-level ops for closure mechanics
 // Phase 7: LlvmCallOp + LlvmCallVoidOp for GC and printf
+// Phase 10: LlvmNullOp + LlvmIcmpOp for list null pointer and null checks
 // Future phases add cases here without changing MlirModule/FuncOp/Block/Region shape
 type MlirOp =
     | ArithConstantOp of result: MlirValue * value: int64
@@ -57,6 +58,12 @@ type MlirOp =
     // Phase 7: GC/external calls
     | LlvmCallOp     of result: MlirValue * callee: string * args: MlirValue list
     | LlvmCallVoidOp of callee: string * args: MlirValue list
+    // Phase 10: list null pointer and null checks
+    | LlvmNullOp     of result: MlirValue
+    // result.Type must be Ptr — emits: %result = llvm.mlir.zero : !llvm.ptr
+    | LlvmIcmpOp     of result: MlirValue * predicate: string * lhs: MlirValue * rhs: MlirValue
+    // result.Type must be I1 — emits: %result = llvm.icmp "pred" %lhs, %rhs : !llvm.ptr
+    // predicate: "eq" (null check) or "ne" (non-null check); lhs and rhs must be Ptr typed
     | ReturnOp        of operands: MlirValue list
 
 // A basic block: optional label, block arguments, sequence of ops
