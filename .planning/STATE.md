@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 4 — Functions
+**Current focus:** Phase 5 — Closures via Elaboration
 
 ## Current Position
 
-Phase: 4 of 6 (Known Functions via Elaboration) — In progress
-Plan: 1 of 1 in phase 04 — Phase complete
-Status: Phase 4 complete, ready for Phase 5
-Last activity: 2026-03-26 — Completed 04-01-PLAN.md (DirectCallOp, LetRec/App elaboration, fact+fib E2E tests, 11/11 FsLit pass)
+Phase: 5 of 6 (Closures via Elaboration) — In progress
+Plan: 1 of N in phase 05 — Plan 01 complete
+Status: Phase 5 Plan 01 complete — closure IR types + Printer + Elaboration Lambda handler done
+Last activity: 2026-03-26 — Completed 05-01-PLAN.md (Ptr type, 7 LLVM ops, IsLlvmFunc, freeVars, ClosureInfo, Lambda in Let handler, 11/11 FsLit pass)
 
-Progress: [██████░░░░] 60%
+Progress: [███████░░░] 65%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: ~2 min
-- Total execution time: ~0.27 hours
+- Total plans completed: 9
+- Average duration: ~2.3 min
+- Total execution time: ~0.37 hours
 
 **By Phase:**
 
@@ -31,10 +31,11 @@ Progress: [██████░░░░] 60%
 | 02-scalar-codegen-via-mlirir | 2 | ~4 min | ~2 min |
 | 03-booleans-comparisons-control-flow | 2 | ~4 min | ~2 min |
 | 04-known-functions-via-elaboration | 1 | ~3 min | ~3 min |
+| 05-closures-via-elaboration | 1 | ~6 min | ~6 min |
 
 **Recent Trend:**
-- Last 8 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min), 04-01 (3 min)
-- Trend: Stable ~2 min/plan
+- Last 9 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min), 04-01 (3 min), 05-01 (6 min)
+- Trend: Stable ~2-3 min/plan; 05-01 longer due to complexity of closure machinery
 
 *Updated after each plan completion*
 
@@ -72,6 +73,12 @@ Recent decisions affecting current work:
 - [04-01]: Fresh body env for LetRec: Blocks = ref [] (isolated), Funcs = env.Funcs (shared) — only the module-level accumulator is shared
 - [04-01]: App(Var(name)) checks KnownFuncs; unknown functions fail fast with explicit Phase 4 limitation message
 - [04-01]: elaborateModule: env.Funcs.Value @ [mainFunc] places helper functions before @main (conventional MLIR style)
+- [05-01]: Caller-allocates closure (alloca in caller's frame before calling closure-maker) — callee-allocates causes stack-use-after-return UB
+- [05-01]: Lambda body functions are llvm.func (IsLlvmFunc = true); closure-maker wrappers are func.func (IsLlvmFunc = false)
+- [05-01]: freeVars {outerParam, innerParam} innerBody equivalent to freeVars {outerParam} (Lambda(innerParam, body)) — avoids Span.empty which doesn't exist (only unknownSpan)
+- [05-01]: Captures sorted (List.sort) for deterministic GEP index assignment
+- [05-01]: ClosureCounter shared across module elaboration (same ref in ElabEnv) for globally unique closure function names
+- [05-01]: LlvmReturnOp in llvm.func bodies; ReturnOp in func.func bodies — never mixed (critical anti-pattern)
 
 ### Pending Todos
 
@@ -82,10 +89,10 @@ None yet.
 - [Phase 1, RESOLVED]: mlir-opt pass pipeline flags verified and working
 - [Phase 1, RESOLVED]: Process piping handled with stderr-before-WaitForExit pattern
 - [Phase 1, RESOLVED in 01-01]: MlirIR DU is extensible — MlirOp is a wide DU; new cases are added without changing MlirModule/FuncOp/MlirRegion/MlirBlock shape.
-- [Phase 5]: Closure escape analysis rule for v1: stack-allocate all closures (conservative; correct for programs that do not return closures from functions). Document limitation before Phase 5.
+- [Phase 5, RESOLVED in 05-01]: Closure escape analysis rule for v1: stack-allocate all closures (conservative; correct for programs that do not return closures from functions). Implemented as caller-allocates.
 
 ## Session Continuity
 
-Last session: 2026-03-26T03:09:14Z
-Stopped at: Completed 04-01-PLAN.md — DirectCallOp, LetRec/App elaboration, fact+fib E2E tests; 11/11 FsLit pass; Phase 4 complete
+Last session: 2026-03-26T03:41:43Z
+Stopped at: Completed 05-01-PLAN.md — Ptr type, 7 LLVM MlirOps, IsLlvmFunc, freeVars, ClosureInfo, Lambda in Let handler; 11/11 FsLit pass
 Resume file: None
