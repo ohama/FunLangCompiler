@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 3 of 6 (Booleans, Comparisons, Control Flow) — COMPLETE
-Plan: 2 of 2 in phase 03 — Phase complete
-Status: Phase 3 complete, ready for Phase 4
-Last activity: 2026-03-26 — Completed 03-02-PLAN.md (multi-block elaboration for If/And/Or, 3 E2E tests, 9/9 FsLit pass)
+Phase: 4 of 6 (Known Functions via Elaboration) — In progress
+Plan: 1 of 1 in phase 04 — Phase complete
+Status: Phase 4 complete, ready for Phase 5
+Last activity: 2026-03-26 — Completed 04-01-PLAN.md (DirectCallOp, LetRec/App elaboration, fact+fib E2E tests, 11/11 FsLit pass)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████░░░░] 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
+- Total plans completed: 8
 - Average duration: ~2 min
-- Total execution time: ~0.23 hours
+- Total execution time: ~0.27 hours
 
 **By Phase:**
 
@@ -30,9 +30,10 @@ Progress: [█████░░░░░] 50%
 | 01-mlirir-foundation | 3 | ~5 min | ~1.7 min |
 | 02-scalar-codegen-via-mlirir | 2 | ~4 min | ~2 min |
 | 03-booleans-comparisons-control-flow | 2 | ~4 min | ~2 min |
+| 04-known-functions-via-elaboration | 1 | ~3 min | ~3 min |
 
 **Recent Trend:**
-- Last 7 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min)
+- Last 8 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min), 04-01 (3 min)
 - Trend: Stable ~2 min/plan
 
 *Updated after each plan completion*
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - [03-02]: MLIR block args serve as phi nodes — mergeArg block argument carries the result value out of if/and/or control flow
 - [03-02]: Short-circuit And: CfCondBrOp(leftVal, evalRightLabel, [], mergeLabel, [leftVal]) — false takes merge branch directly with leftVal
 - [03-02]: Short-circuit Or: CfCondBrOp(leftVal, mergeLabel, [leftVal], evalRightLabel, []) — true takes merge branch directly with leftVal
+- [04-01]: Fresh body env for LetRec: Blocks = ref [] (isolated), Funcs = env.Funcs (shared) — only the module-level accumulator is shared
+- [04-01]: App(Var(name)) checks KnownFuncs; unknown functions fail fast with explicit Phase 4 limitation message
+- [04-01]: elaborateModule: env.Funcs.Value @ [mainFunc] places helper functions before @main (conventional MLIR style)
 
 ### Pending Todos
 
@@ -82,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T02:46:47Z
-Stopped at: Completed 03-02-PLAN.md — multi-block If/And/Or elaboration + 3 E2E tests; 9/9 FsLit pass; Phase 3 complete
+Last session: 2026-03-26T03:09:14Z
+Stopped at: Completed 04-01-PLAN.md — DirectCallOp, LetRec/App elaboration, fact+fib E2E tests; 11/11 FsLit pass; Phase 4 complete
 Resume file: None
