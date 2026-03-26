@@ -123,10 +123,16 @@ let rec desugarPattern (acc: Accessor) (pat: Pattern) : Test list * (string * Ac
         let subTests = subResults |> List.collect fst
         let subBinds = subResults |> List.collect snd
         (subTests, subBinds)
-    | ConstructorPat _ ->
-        failwith "MatchCompiler: ConstructorPat not yet supported in backend"
-    | RecordPat _ ->
-        failwith "MatchCompiler: RecordPat not yet supported in backend"
+    | ConstructorPat(name, argPatOpt, _) ->
+        let arity = match argPatOpt with None -> 0 | Some _ -> 1
+        let tag = AdtCtor(name, 0, arity)
+        let subPats = match argPatOpt with None -> [] | Some p -> [p]
+        ([{ Scrutinee = acc; Pattern = CtorTest(tag, subPats) }], [])
+    | RecordPat(fields, _) ->
+        let sorted = fields |> List.sortBy fst
+        let fieldNames = sorted |> List.map fst
+        let subPats = sorted |> List.map snd
+        ([{ Scrutinee = acc; Pattern = CtorTest(RecordCtor fieldNames, subPats) }], [])
     | OrPat _ ->
         failwith "MatchCompiler: OrPat not yet supported in backend"
 
