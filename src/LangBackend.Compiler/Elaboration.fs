@@ -426,6 +426,24 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | String (s, _) ->
         elaborateStringLiteral env s
 
+    // Phase 8: string_concat builtin — App(App(Var("string_concat"), a), b)
+    // Must be placed BEFORE general App to avoid being caught by general App dispatch
+    | App (App (Var ("string_concat", _), aExpr, _), bExpr, _) ->
+        let (aVal, aOps) = elaborateExpr env aExpr
+        let (bVal, bOps) = elaborateExpr env bExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, aOps @ bOps @ [LlvmCallOp(result, "@lang_string_concat", [aVal; bVal])])
+
+    // Phase 8: to_string builtin — dispatch on elaborated arg type
+    | App (Var ("to_string", _), argExpr, _) ->
+        let (argVal, argOps) = elaborateExpr env argExpr
+        let result = { Name = freshName env; Type = Ptr }
+        let callee =
+            match argVal.Type with
+            | I1 -> "@lang_to_string_bool"
+            | _  -> "@lang_to_string_int"   // I64 and any other numeric
+        (result, argOps @ [LlvmCallOp(result, callee, [argVal])])
+
     // Phase 8: string_length builtin — GEP field 0 and load
     | App (Var ("string_length", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
