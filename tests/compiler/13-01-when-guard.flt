@@ -1,0 +1,3 @@
+match 5 with
+| n when n > 0 -> 1
+| _ -> 0
