@@ -118,6 +118,33 @@ let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
             | _ -> false)
     | _ -> false
 
+/// Phase 11: Test a pattern against a scrutinee value.
+/// Returns (condOpt, testOps, bindEnv) where:
+///   condOpt = None  -> unconditional match (WildcardPat / VarPat)
+///   condOpt = Some v -> I1 condition value; test ops must be emitted before the cond_br
+///   bindEnv = env with any variable bindings from the pattern added
+let private testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
+    : MlirValue option * MlirOp list * ElabEnv =
+    match pat with
+    | WildcardPat _ ->
+        (None, [], env)
+    | VarPat(name, _) ->
+        let env' = { env with Vars = Map.add name scrutVal env.Vars }
+        (None, [], env')
+    | ConstPat(IntConst n, _) ->
+        let kVal = { Name = freshName env; Type = I64 }
+        let cond = { Name = freshName env; Type = I1 }
+        let ops  = [ ArithConstantOp(kVal, int64 n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+        (Some cond, ops, env)
+    | ConstPat(BoolConst b, _) ->
+        let kVal = { Name = freshName env; Type = I1 }
+        let cond = { Name = freshName env; Type = I1 }
+        let n    = if b then 1L else 0L
+        let ops  = [ ArithConstantOp(kVal, n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+        (Some cond, ops, env)
+    | _ ->
+        failwithf "testPattern: pattern %A not supported in Plan 11-01 (will be added in 11-02)" pat
+
 let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     match expr with
     | Number (n, _) ->
@@ -659,66 +686,66 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let desugared = List.foldBack (fun elem acc -> Cons(elem, acc, span)) elems (EmptyList span)
         elaborateExpr env desugared
 
-    // Phase 10: Match with EmptyListPat + ConsPat arms — null-check CfCondBrOp chain
+    // Phase 11: General Match compiler — sequential cf.cond_br decision chain
+    // Handles: VarPat, WildcardPat, ConstPat(Int/Bool) in this plan.
+    // EmptyListPat, ConsPat, TuplePat, ConstPat(String) added in Plan 11-02.
     | Match(scrutineeExpr, clauses, _) ->
         let (scrutVal, scrutOps) = elaborateExpr env scrutineeExpr
+        let mergeLabel = freshLabel env "match_merge"
+        let failLabel  = freshLabel env "match_fail"
 
-        // Find EmptyListPat arm and ConsPat arm
-        let emptyArm =
-            clauses |> List.tryFind (fun (pat, guard, _) ->
-                guard.IsNone && match pat with EmptyListPat _ -> true | _ -> false)
-        let consArm =
-            clauses |> List.tryFind (fun (pat, guard, _) ->
-                guard.IsNone && match pat with ConsPat _ -> true | _ -> false)
+        // compileArms: recursively build the decision chain.
+        // armIdx: index used to generate unique labels for this arm.
+        // remainingClauses: clauses not yet compiled.
+        // Returns: (entry ops for current test block, result type for merge block)
+        // Side effect: appends blocks to env.Blocks.Value.
+        let rec compileArms (armIdx: int) (remainingClauses: MatchClause list) : MlirOp list * MlirType =
+            match remainingClauses with
+            | [] ->
+                // No more arms — fall through to failure block
+                ([ CfBrOp(failLabel, []) ], I64)  // dummy type; overridden by first real arm
+            | (pat, _guard, bodyExpr) :: rest ->
+                let bodyLabel = freshLabel env (sprintf "match_arm%d" armIdx)
+                let (condOpt, testOps, bindEnv) = testPattern env scrutVal pat
+                // Elaborate arm body in bindEnv (has variable bindings)
+                let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
+                // Arm body block: body ops + branch to merge with result
+                env.Blocks.Value <- env.Blocks.Value @
+                    [ { Label = Some bodyLabel
+                        Args   = []
+                        Body   = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                match condOpt with
+                | None ->
+                    // Unconditional match (wildcard or variable) — no further arms needed
+                    // Entry ops: just jump to body
+                    (testOps @ [CfBrOp(bodyLabel, [])], bodyVal.Type)
+                | Some cond ->
+                    // Conditional match — if true go to body, if false try next arm
+                    let nextLabel = freshLabel env (sprintf "match_test%d" (armIdx + 1))
+                    // Compile remaining arms into nextLabel block
+                    let (nextEntryOps, resultType) = compileArms (armIdx + 1) rest
+                    env.Blocks.Value <- env.Blocks.Value @
+                        [ { Label = Some nextLabel; Args = []; Body = nextEntryOps } ]
+                    (testOps @ [CfCondBrOp(cond, bodyLabel, [], nextLabel, [])], resultType)
 
-        match emptyArm, consArm with
-        | Some(_, _, emptyExpr), Some(ConsPat(hPat, tPat, _), _, consExpr) ->
-            // Null check: isNull = (scrutVal == null)
-            let nullVal    = { Name = freshName env; Type = Ptr }
-            let isNull     = { Name = freshName env; Type = I1 }
-            let emptyLabel = freshLabel env "list_empty"
-            let consLabel  = freshLabel env "list_cons"
-            let mergeLabel = freshLabel env "list_merge"
+        let (chainEntryOps, resultType) = compileArms 0 clauses
 
-            // Elaborate empty arm
-            let (emptyVal, emptyOps) = elaborateExpr env emptyExpr
+        // Failure block: call @lang_match_failure + llvm.unreachable (NOT a merge predecessor)
+        // Appended BEFORE merge block so elaborateModule's "last side block gets ReturnOp" logic
+        // applies to the merge block, not the failure block.
+        env.Blocks.Value <- env.Blocks.Value @
+            [ { Label = Some failLabel
+                Args   = []
+                Body   = [ LlvmCallVoidOp("@lang_match_failure", [])
+                           LlvmUnreachableOp ] } ]
 
-            // Elaborate cons arm: bind head and tail vars, then elaborate body
-            let headName = match hPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failwithf "Elaboration: ConsPat head pattern must be VarPat or WildcardPat"
-            let tailName = match tPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failwithf "Elaboration: ConsPat tail pattern must be VarPat or WildcardPat"
+        // Merge block: single block argument of result type — appended LAST so elaborateModule
+        // appends ReturnOp [mergeArg] to it (same pattern as if/else merge block).
+        let mergeArg = { Name = freshName env; Type = resultType }
+        env.Blocks.Value <- env.Blocks.Value @
+            [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
 
-            let headVal  = { Name = freshName env; Type = I64 }   // head is i64 for integer lists
-            let tailSlot = { Name = freshName env; Type = Ptr }
-            let tailVal  = { Name = freshName env; Type = Ptr }
-
-            let headLoadOp = LlvmLoadOp(headVal, scrutVal)
-            let tailGepOp  = LlvmGEPLinearOp(tailSlot, scrutVal, 1)
-            let tailLoadOp = LlvmLoadOp(tailVal, tailSlot)
-
-            let consEnv =
-                env
-                |> (fun e -> match headName with Some n -> { e with Vars = Map.add n headVal e.Vars } | None -> e)
-                |> (fun e -> match tailName with Some n -> { e with Vars = Map.add n tailVal e.Vars } | None -> e)
-
-            let (consBodyVal, consBodyOps) = elaborateExpr consEnv consExpr
-            let mergeArg = { Name = freshName env; Type = emptyVal.Type }
-
-            // Build blocks
-            env.Blocks.Value <- env.Blocks.Value @
-                [ { Label = Some emptyLabel; Args = []; Body = emptyOps @ [CfBrOp(mergeLabel, [emptyVal])] } ]
-            env.Blocks.Value <- env.Blocks.Value @
-                [ { Label = Some consLabel; Args = []; Body = [headLoadOp; tailGepOp; tailLoadOp] @ consBodyOps @ [CfBrOp(mergeLabel, [consBodyVal])] } ]
-            env.Blocks.Value <- env.Blocks.Value @
-                [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
-
-            let nullCheckOps = [
-                LlvmNullOp(nullVal)
-                LlvmIcmpOp(isNull, "eq", scrutVal, nullVal)
-            ]
-            (mergeArg, scrutOps @ nullCheckOps @ [CfCondBrOp(isNull, emptyLabel, [], consLabel, [])])
-
-        | _ ->
-            failwithf "Elaboration: Match only supports two-arm EmptyListPat + ConsPat pattern in Phase 10 (found unsupported pattern combination)"
+        (mergeArg, scrutOps @ chainEntryOps)
 
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
@@ -757,5 +784,6 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false }
         { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
         { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
