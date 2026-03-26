@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="MlirIR.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\LangThree\src\LangThree\LangThree.fsproj" />
   </ItemGroup>
 
