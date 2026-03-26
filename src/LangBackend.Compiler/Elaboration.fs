@@ -438,11 +438,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("to_string", _), argExpr, _) ->
         let (argVal, argOps) = elaborateExpr env argExpr
         let result = { Name = freshName env; Type = Ptr }
-        let callee =
-            match argVal.Type with
-            | I1 -> "@lang_to_string_bool"
-            | _  -> "@lang_to_string_int"   // I64 and any other numeric
-        (result, argOps @ [LlvmCallOp(result, callee, [argVal])])
+        match argVal.Type with
+        | I1 ->
+            // Zero-extend I1 to I64 for C ABI compatibility (lang_to_string_bool takes int64_t)
+            let extVal = { Name = freshName env; Type = I64 }
+            (result, argOps @ [ArithExtuIOp(extVal, argVal); LlvmCallOp(result, "@lang_to_string_bool", [extVal])])
+        | _ ->
+            // I64 and other numeric types — call lang_to_string_int directly
+            (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
 
     // Phase 8: string_length builtin — GEP field 0 and load
     | App (Var ("string_length", _), strExpr, _) ->

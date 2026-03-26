@@ -43,6 +43,9 @@ let private printOp (indent: string) (op: MlirOp) : string =
     | ArithCmpIOp(result, predicate, lhs, rhs) ->
         sprintf "%s%s = arith.cmpi %s, %s, %s : %s"
             indent result.Name predicate lhs.Name rhs.Name (printType lhs.Type)
+    | ArithExtuIOp(result, value) ->
+        sprintf "%s%s = arith.extui %s : %s to %s"
+            indent result.Name value.Name (printType value.Type) (printType result.Type)
     | CfCondBrOp(cond, trueLabel, trueArgs, falseLabel, falseArgs) ->
         let fmtArgs (args: MlirValue list) =
             if List.isEmpty args then ""

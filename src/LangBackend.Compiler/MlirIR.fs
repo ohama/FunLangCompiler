@@ -41,6 +41,7 @@ type MlirOp =
     | ArithMulIOp     of result: MlirValue * lhs: MlirValue * rhs: MlirValue
     | ArithDivSIOp    of result: MlirValue * lhs: MlirValue * rhs: MlirValue
     | ArithCmpIOp     of result: MlirValue * predicate: string * lhs: MlirValue * rhs: MlirValue
+    | ArithExtuIOp    of result: MlirValue * value: MlirValue   // zero-extend (e.g. I1 -> I64)
     | CfCondBrOp      of cond: MlirValue * trueLabel: string * trueArgs: MlirValue list * falseLabel: string * falseArgs: MlirValue list
     | CfBrOp          of label: string * args: MlirValue list
     | DirectCallOp    of result: MlirValue * callee: string * args: MlirValue list
