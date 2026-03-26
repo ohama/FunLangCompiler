@@ -2,6 +2,7 @@ module Elaboration
 
 open Ast
 open MlirIR
+open MatchCompiler
 
 // Phase 5: Closure metadata — distinguishes closure-making funcs from direct-call funcs
 type ClosureInfo = {
@@ -770,62 +771,236 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let desugared = List.foldBack (fun elem acc -> Cons(elem, acc, span)) elems (EmptyList span)
         elaborateExpr env desugared
 
-    // Phase 11: General Match compiler — sequential cf.cond_br decision chain
-    // Handles: VarPat, WildcardPat, ConstPat(Int/Bool) in this plan.
-    // EmptyListPat, ConsPat, TuplePat, ConstPat(String) added in Plan 11-02.
+    // Phase 11 (v2): General Match compiler — Jules Jacobs decision tree algorithm.
+    // Compiles pattern matching to a binary decision tree, then emits MLIR from the tree.
+    // Handles: VarPat, WildcardPat, ConstPat(Int/Bool/String), EmptyListPat, ConsPat, TuplePat.
     | Match(scrutineeExpr, clauses, _) ->
         let (scrutVal, scrutOps) = elaborateExpr env scrutineeExpr
         let mergeLabel = freshLabel env "match_merge"
         let failLabel  = freshLabel env "match_fail"
 
-        // compileArms: recursively build the decision chain.
-        // armIdx: index used to generate unique labels for this arm.
-        // remainingClauses: clauses not yet compiled.
-        // Returns: (entry ops for current test block, result type for merge block)
-        // Side effect: appends blocks to env.Blocks.Value.
-        let rec compileArms (armIdx: int) (remainingClauses: MatchClause list) : MlirOp list * MlirType =
-            match remainingClauses with
-            | [] ->
-                // No more arms — fall through to failure block
-                ([ CfBrOp(failLabel, []) ], I64)  // dummy type; overridden by first real arm
-            | (pat, _guard, bodyExpr) :: rest ->
-                let bodyLabel = freshLabel env (sprintf "match_arm%d" armIdx)
-                let (condOpt, testOps, bodySetupOps, bindEnv) = testPattern env scrutVal pat
-                // Elaborate arm body in bindEnv (has variable bindings)
+        // Build arms for MatchCompiler: (Pattern * bodyIndex) list
+        let arms = clauses |> List.mapi (fun i (pat, _guard, _body) -> (pat, i))
+        let rootAcc = MatchCompiler.Root scrutVal.Name
+
+        // Compile to decision tree
+        let tree = MatchCompiler.compile rootAcc arms
+
+        // Map from Accessor to MlirValue, built up as we emit GEP/load ops.
+        // Start with the root accessor mapped to the scrutinee value.
+        let accessorCache = System.Collections.Generic.Dictionary<MatchCompiler.Accessor, MlirValue>()
+        accessorCache.[rootAcc] <- scrutVal
+
+        // Resolve an accessor to an MlirValue, emitting GEP + load ops as needed.
+        // Returns (value, ops).
+        let rec resolveAccessor (acc: MatchCompiler.Accessor) : MlirValue * MlirOp list =
+            match accessorCache.TryGetValue(acc) with
+            | true, v -> (v, [])
+            | false, _ ->
+                match acc with
+                | MatchCompiler.Root _ -> failwith "resolveAccessor: Root not in cache"
+                | MatchCompiler.Field (parent, idx) ->
+                    let (parentVal, parentOps) = resolveAccessor parent
+                    // Determine the type of the loaded field.
+                    // For cons cells: field 0 = head (I64), field 1 = tail (Ptr).
+                    // For tuples: all fields are I64 (or Ptr for nested tuples, but
+                    // we load as I64 by default and the accessor will re-interpret).
+                    // We use Ptr for field 1 of a cons cell (tail pointer), I64 otherwise.
+                    // Actually, we need to know the parent's constructor to decide.
+                    // For simplicity: if the parent is Ptr-typed and we know it's a cons cell,
+                    // field 0 → I64, field 1 → Ptr.  For tuples, all fields are I64.
+                    // But since we can't easily tell from just the accessor, we use a heuristic:
+                    // load as I64 for field 0, and check parentVal.Type for the rest.
+                    //
+                    // Better approach: the field type depends on usage. For now:
+                    // - If parentVal.Type = Ptr, field 1 should be Ptr (tail of list), field 0 = I64 (head)
+                    //   But tuples also use Ptr and all fields could be I64 or Ptr.
+                    // We'll default to I64 and handle Ptr cases as they arise.
+                    // The decision tree will re-resolve with the right type when needed.
+                    //
+                    // Actually the safest approach: we always load as I64 initially.
+                    // When the decision tree needs to test a field as a list (null check etc.),
+                    // the emitDecisionTree will handle the type correctly.
+                    let slotVal  = { Name = freshName env; Type = Ptr }
+                    let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
+                    // For list tails (field 1 of a cons cell), load as Ptr
+                    // For tuple fields that will be further destructured, also Ptr
+                    // We can't know statically here, so we'll handle this in emitDecisionTree
+                    // by loading with the right type based on the constructor being tested.
+                    // Default: I64
+                    let fieldVal = { Name = freshName env; Type = I64 }
+                    let loadOp   = LlvmLoadOp(fieldVal, slotVal)
+                    accessorCache.[acc] <- fieldVal
+                    (fieldVal, parentOps @ [gepOp; loadOp])
+
+        // Resolve an accessor, but load with a specific type override.
+        // This is needed when we know the field should be Ptr (e.g. list tail, nested tuple).
+        let resolveAccessorTyped (acc: MatchCompiler.Accessor) (ty: MlirType) : MlirValue * MlirOp list =
+            match accessorCache.TryGetValue(acc) with
+            | true, v when v.Type = ty -> (v, [])
+            | true, v ->
+                // Cached with wrong type — we need to re-load with correct type.
+                // This happens when a field was first loaded as I64 but actually needs to be Ptr.
+                // Emit a new load from the parent.
+                match acc with
+                | MatchCompiler.Root _ -> (v, [])  // root type is fixed
+                | MatchCompiler.Field (parent, idx) ->
+                    let (parentVal, parentOps) = resolveAccessor parent
+                    let slotVal  = { Name = freshName env; Type = Ptr }
+                    let fieldVal = { Name = freshName env; Type = ty }
+                    let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
+                    let loadOp   = LlvmLoadOp(fieldVal, slotVal)
+                    accessorCache.[acc] <- fieldVal
+                    (fieldVal, parentOps @ [gepOp; loadOp])
+            | false, _ ->
+                match acc with
+                | MatchCompiler.Root _ -> failwith "resolveAccessorTyped: Root not in cache"
+                | MatchCompiler.Field (parent, idx) ->
+                    let (parentVal, parentOps) = resolveAccessor parent
+                    let slotVal  = { Name = freshName env; Type = Ptr }
+                    let fieldVal = { Name = freshName env; Type = ty }
+                    let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
+                    let loadOp   = LlvmLoadOp(fieldVal, slotVal)
+                    accessorCache.[acc] <- fieldVal
+                    (fieldVal, parentOps @ [gepOp; loadOp])
+
+        // Determine what MlirType an accessor should have based on the constructor tag
+        // being tested.  For ConsCtor: scrutinee is Ptr, field 0 = I64, field 1 = Ptr.
+        // For NilCtor: scrutinee is Ptr.
+        // For TupleCtor: scrutinee is Ptr, all fields default to I64 (nested tuples Ptr).
+        // For IntLit/BoolLit: scrutinee is I64/I1 respectively.
+        // For StringLit: scrutinee is Ptr.
+        let scrutineeTypeForTag (tag: MatchCompiler.CtorTag) : MlirType =
+            match tag with
+            | MatchCompiler.IntLit _    -> I64
+            | MatchCompiler.BoolLit _   -> I1
+            | MatchCompiler.StringLit _ -> Ptr
+            | MatchCompiler.ConsCtor    -> Ptr
+            | MatchCompiler.NilCtor     -> Ptr
+            | MatchCompiler.TupleCtor _ -> Ptr
+
+        // Emit test ops for a constructor match against a scrutinee value.
+        // Returns (condValue, testOps).
+        let emitCtorTest (scrutVal: MlirValue) (tag: MatchCompiler.CtorTag) : MlirValue * MlirOp list =
+            match tag with
+            | MatchCompiler.IntLit n ->
+                let kVal = { Name = freshName env; Type = I64 }
+                let cond = { Name = freshName env; Type = I1 }
+                let ops = [ ArithConstantOp(kVal, int64 n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+                (cond, ops)
+            | MatchCompiler.BoolLit b ->
+                let kVal = { Name = freshName env; Type = I1 }
+                let cond = { Name = freshName env; Type = I1 }
+                let n = if b then 1L else 0L
+                let ops = [ ArithConstantOp(kVal, n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+                (cond, ops)
+            | MatchCompiler.StringLit s ->
+                let (patStrVal, patStrOps) = elaborateStringLiteral env s
+                let patDataPtrVal   = { Name = freshName env; Type = Ptr }
+                let patDataVal      = { Name = freshName env; Type = Ptr }
+                let scrutDataPtrVal = { Name = freshName env; Type = Ptr }
+                let scrutDataVal    = { Name = freshName env; Type = Ptr }
+                let cmpRes  = { Name = freshName env; Type = I32 }
+                let zero32  = { Name = freshName env; Type = I32 }
+                let cond    = { Name = freshName env; Type = I1 }
+                let ops = patStrOps @ [
+                    LlvmGEPStructOp(patDataPtrVal, patStrVal, 1)
+                    LlvmLoadOp(patDataVal, patDataPtrVal)
+                    LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 1)
+                    LlvmLoadOp(scrutDataVal, scrutDataPtrVal)
+                    LlvmCallOp(cmpRes, "@strcmp", [scrutDataVal; patDataVal])
+                    ArithConstantOp(zero32, 0L)
+                    ArithCmpIOp(cond, "eq", cmpRes, zero32)
+                ]
+                (cond, ops)
+            | MatchCompiler.NilCtor ->
+                let nullVal = { Name = freshName env; Type = Ptr }
+                let cond    = { Name = freshName env; Type = I1 }
+                let ops = [ LlvmNullOp(nullVal); LlvmIcmpOp(cond, "eq", scrutVal, nullVal) ]
+                (cond, ops)
+            | MatchCompiler.ConsCtor ->
+                let nullVal = { Name = freshName env; Type = Ptr }
+                let cond    = { Name = freshName env; Type = I1 }
+                let ops = [ LlvmNullOp(nullVal); LlvmIcmpOp(cond, "ne", scrutVal, nullVal) ]
+                (cond, ops)
+            | MatchCompiler.TupleCtor _ ->
+                // Tuples always match structurally — emit an unconditional true
+                let cond = { Name = freshName env; Type = I1 }
+                let ops = [ ArithConstantOp(cond, 1L) ]
+                (cond, ops)
+
+        // Pre-populate accessor cache for ConsCtor sub-fields with correct types.
+        // field 0 = head (I64), field 1 = tail (Ptr).
+        let ensureConsFieldTypes (scrutAcc: MatchCompiler.Accessor) (argAccs: MatchCompiler.Accessor list) : MlirOp list =
+            let mutable ops = []
+            if argAccs.Length >= 1 then
+                let (_, headOps) = resolveAccessorTyped argAccs.[0] I64
+                ops <- ops @ headOps
+            if argAccs.Length >= 2 then
+                let (_, tailOps) = resolveAccessorTyped argAccs.[1] Ptr
+                ops <- ops @ tailOps
+            ops
+
+        // Track the result type (determined by first leaf reached)
+        let resultType = ref I64  // default; will be set by first arm body
+
+        // Recursively emit blocks for a DecisionTree node.
+        // Returns the list of ops for the current/entry block.
+        let rec emitDecisionTree (tree: MatchCompiler.DecisionTree) : MlirOp list =
+            match tree with
+            | MatchCompiler.Fail ->
+                [ CfBrOp(failLabel, []) ]
+            | MatchCompiler.Leaf (bindings, bodyIdx) ->
+                // Resolve all bindings: each (varName, accessor) → env binding
+                let mutable bindOps = []
+                let mutable bindEnv = env
+                for (varName, acc) in bindings do
+                    let (v, ops) = resolveAccessor acc
+                    bindOps <- bindOps @ ops
+                    bindEnv <- { bindEnv with Vars = Map.add varName v bindEnv.Vars }
+                // Get the body expression from the original clauses
+                let (_pat, _guard, bodyExpr) = clauses.[bodyIdx]
                 let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
-                // Arm body block: setup ops (e.g. ConsPat loads) + body ops + branch to merge
+                resultType.Value <- bodyVal.Type
+                // Create a body block and branch to merge
+                let bodyLabel = freshLabel env (sprintf "match_body%d" bodyIdx)
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some bodyLabel
-                        Args   = []
-                        Body   = bodySetupOps @ bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
-                match condOpt with
-                | None ->
-                    // Unconditional match (wildcard or variable) — no further arms needed
-                    // Entry ops: just jump to body
-                    (testOps @ [CfBrOp(bodyLabel, [])], bodyVal.Type)
-                | Some cond ->
-                    // Conditional match — if true go to body, if false try next arm
-                    let nextLabel = freshLabel env (sprintf "match_test%d" (armIdx + 1))
-                    // Compile remaining arms into nextLabel block
-                    let (nextEntryOps, resultType) = compileArms (armIdx + 1) rest
-                    env.Blocks.Value <- env.Blocks.Value @
-                        [ { Label = Some nextLabel; Args = []; Body = nextEntryOps } ]
-                    (testOps @ [CfCondBrOp(cond, bodyLabel, [], nextLabel, [])], resultType)
+                        Args  = []
+                        Body  = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                bindOps @ [ CfBrOp(bodyLabel, []) ]
+            | MatchCompiler.Switch (scrutAcc, tag, argAccs, ifMatch, ifNoMatch) ->
+                // Resolve the scrutinee accessor with the correct type for this tag
+                let expectedType = scrutineeTypeForTag tag
+                let (sVal, resolveOps) = resolveAccessorTyped scrutAcc expectedType
+                // Emit the test
+                let (cond, testOps) = emitCtorTest sVal tag
+                // For ConsCtor, pre-load sub-fields with correct types into the cache
+                let preloadOps =
+                    match tag with
+                    | MatchCompiler.ConsCtor -> ensureConsFieldTypes scrutAcc argAccs
+                    | _ -> []
+                // Emit ifMatch and ifNoMatch as separate blocks
+                let matchLabel   = freshLabel env "match_yes"
+                let noMatchLabel = freshLabel env "match_no"
+                let matchOps   = emitDecisionTree ifMatch
+                let noMatchOps = emitDecisionTree ifNoMatch
+                env.Blocks.Value <- env.Blocks.Value @
+                    [ { Label = Some matchLabel; Args = []; Body = preloadOps @ matchOps }
+                      { Label = Some noMatchLabel; Args = []; Body = noMatchOps } ]
+                resolveOps @ testOps @ [ CfCondBrOp(cond, matchLabel, [], noMatchLabel, []) ]
 
-        let (chainEntryOps, resultType) = compileArms 0 clauses
+        let chainEntryOps = emitDecisionTree tree
 
-        // Failure block: call @lang_match_failure + llvm.unreachable (NOT a merge predecessor)
-        // Appended BEFORE merge block so elaborateModule's "last side block gets ReturnOp" logic
-        // applies to the merge block, not the failure block.
+        // Failure block
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some failLabel
                 Args   = []
                 Body   = [ LlvmCallVoidOp("@lang_match_failure", [])
                            LlvmUnreachableOp ] } ]
 
-        // Merge block: single block argument of result type — appended LAST so elaborateModule
-        // appends ReturnOp [mergeArg] to it (same pattern as if/else merge block).
-        let mergeArg = { Name = freshName env; Type = resultType }
+        // Merge block
+        let mergeArg = { Name = freshName env; Type = resultType.Value }
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
 
