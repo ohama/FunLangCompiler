@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 12-missing-operators (2/2 plans complete)
-Plan: 12-02 of 02
+Phase: 13-pattern-matching-extensions (1/1 plans complete)
+Plan: 13-01 of 01
 Status: Phase complete
-Last activity: 2026-03-26 — Completed 12-02-PLAN.md (PipeRight + ComposeRight + ComposeLeft)
+Last activity: 2026-03-26 — Completed 13-01-PLAN.md (when-guard, OrPat, CharConst)
 
-Progress: [██░░░░░░░░] 20% (2 plans done, v3.0 in progress)
+Progress: [███░░░░░░░] 30% (3 plans done, v3.0 in progress)
 
 ## Performance Metrics
 
@@ -37,6 +37,7 @@ Progress: [██░░░░░░░░] 20% (2 plans done, v3.0 in progress)
 - App(Lambda) inlines as env binding, no closure allocation (12-01)
 - Bare Lambda as expression creates inline closure via GC_malloc + llvm.func (12-02)
 - PipeRight/ComposeRight/ComposeLeft are elaboration-time desugar only, no new MLIR ops (12-02)
+- OrPat expanded in Elaboration.fs before MatchCompiler; PAT-08 is IntLit(int c) remap; PAT-06 Guard node in DecisionTree (13-01)
 
 ### Pending Todos
 
@@ -49,5 +50,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 12-02-PLAN.md — phase 12-missing-operators complete
+Stopped at: Completed 13-01-PLAN.md — phase 13-pattern-matching-extensions complete
 Resume file: None
