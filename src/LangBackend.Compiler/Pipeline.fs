@@ -3,6 +3,7 @@ module Pipeline
 open System
 open System.Diagnostics
 open System.IO
+open System.Runtime.InteropServices
 open MlirIR
 
 /// Resolve an LLVM tool binary by name.
@@ -24,6 +25,15 @@ let private resolveTool (name: string) : string =
 let private MlirOpt       = resolveTool "mlir-opt"
 let private MlirTranslate = resolveTool "mlir-translate"
 let private Clang         = resolveTool "clang"
+
+// Platform-aware Boehm GC link flags.
+// macOS (Homebrew): bdw-gc installs to /opt/homebrew/opt/bdw-gc/lib (not on default linker path).
+// Linux: system install at /usr/lib; -lgc alone is sufficient.
+let private gcLinkFlags =
+    if RuntimeInformation.IsOSPlatform(OSPlatform.OSX) then
+        "-L/opt/homebrew/opt/bdw-gc/lib -lgc"
+    else
+        "-lgc"
 
 type CompileError =
     | MlirOptFailed   of exitCode: int * stderr: string
@@ -72,8 +82,8 @@ let compile (m: MlirModule) (outputPath: string) : Result<unit, CompileError> =
         | Error (code, err) -> Error (TranslateFailed (code, err))
         | Ok () ->
 
-        // Step 4: Compile to native binary
-        let clangArgs = sprintf "-Wno-override-module %s -o %s" llFile outputPath
+        // Step 4: Compile to native binary (link Boehm GC with platform-aware path)
+        let clangArgs = sprintf "-Wno-override-module %s %s -o %s" llFile gcLinkFlags outputPath
         match runTool Clang clangArgs with
         | Error (code, err) -> Error (ClangFailed (code, err))
         | Ok () -> Ok ()
