@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v2.0 — Data Types & Pattern Matching (GC, string, tuple, list, pattern matching)
+**Current focus:** v2.0 — Phase 7: GC Runtime Integration
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v2.0
-Last activity: 2026-03-26 — v1.0 complete, v2.0 milestone started
+Phase: 7 of 11 (GC Runtime Integration)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-03-26 — v2.0 roadmap created; Phases 7-11 defined
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██████░░░░░░░░░░░░░░] 6/11 phases complete (v1.0 done, v2.0 starting)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10 (ALL COMPLETE)
+- Total plans completed: 11 (v1.0 ALL COMPLETE)
 - Average duration: ~2.3 min
 - Total execution time: ~0.38 hours
 
@@ -36,7 +36,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Recent Trend:**
 - Last 11 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min), 03-02 (2 min), 04-01 (3 min), 05-01 (6 min), 05-02 (3 min), 06-01 (2 min)
-- Trend: Stable ~2-3 min/plan; closure plans slightly longer due to MLIR IR complexity
+- Trend: Stable ~2-3 min/plan; v2 plans expected slightly longer (GC integration, pattern matching)
 
 *Updated after each plan completion*
 
@@ -47,58 +47,26 @@ Progress: [░░░░░░░░░░] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Init]: Use MLIR text format directly — F# emits `.mlir` text files, then shells out to `mlir-opt` → `mlir-translate` → `clang` via `System.Diagnostics.Process`. No P/Invoke, no ownership issues.
-- [Revised 2026-03-26]: P/Invoke MLIR C API bindings dropped entirely. All 21 v1 requirements map cleanly without any C interop concerns.
-- [Revised 2026-03-26]: MlirIR is the compiler's own IR (F# DU: Region, Block, Op, Value, Type). It is NOT a thin wrapper over MLIR text — it is a typed intermediate representation that the Printer serializes to `.mlir`. This separation enables future MlirIR optimization passes.
-- [Revised 2026-03-26]: Pipeline is LangThree AST → Elaboration pass → MlirIR → Printer → `.mlir` text → mlir-opt → mlir-translate → clang → binary. The old "TypedExpr annotation pass" (Phase 3) is replaced by the Elaboration pass, which is introduced in Phase 2 and extended per phase.
-- [Revised 2026-03-26]: MlirIR evolves incrementally: Phase 1 (skeleton + smoke test), Phase 2 (scalar arith + SSA), Phase 3 (bool/cmp/cond_br), Phase 4 (FuncOp + DirectCallOp), Phase 5 (ClosureAllocOp + IndirectCallOp).
-- [Init]: Flat closure struct `{ fn_ptr, env_fields }` with uniform `(i8* env, arg) -> result` calling convention — must be committed before any lambda codegen (retrofitting is a full rewrite)
-- [Init]: Shell pipeline for Phase 1: `mlir-opt` lowering → `mlir-translate --mlir-to-llvmir` → `clang` linking
-- [01-02]: Printer is pure (no I/O) — pipeline writes string to temp file; enables unit testing without file system
-- [01-02]: stderr read before WaitForExit to prevent pipe deadlock on large mlir-opt output
-- [01-02]: LLVM 20 pass order confirmed: --convert-arith-to-llvm --convert-cf-to-llvm --convert-func-to-llvm --reconcile-unrealized-casts (arith before func per PR #120548)
-- [01-03]: Cross-platform LLVM tool paths via resolveTool helper — checks LLVM_BIN_DIR env var, Homebrew path, Linux path
-- [02-01]: Elaboration.fs placed after Printer.fs in .fsproj (F# compilation order: depends on MlirIR and Ast)
-- [02-01]: freshName generates %t0, %t1, ... SSA names via int ref counter in ElabEnv
-- [02-01]: Negate lowered as: arith.constant 0 then arith.subi zero, inner
-- [02-01]: parseExpr in CLI replicates LangThree.Program.parse 3-line pattern (avoids Eval/Prelude init)
-- [02-02]: FsLit .flt test format with Command/Input/Output sections is the standard pattern for compiler E2E tests
-- [03-01]: arith.cmpi type annotation uses operand type (i64), not result type (i1) — MLIR spec requirement
-- [03-01]: CfCondBrOp/CfBrOp args format: (%v : type, ...) with parentheses; empty arg lists omit parentheses
-- [03-01]: elaborateModule ReturnType changed from hardcoded I64 to resultVal.Type for dynamic return types
-- [03-01]: F# type inference disambiguated by explicit (args: MlirValue list) annotations when multiple record types share a field name (FuncOp.Name vs MlirValue.Name)
-- [03-02]: env.Blocks ref accumulates side blocks in emission order; elaborateModule appends them after the entry block and patches ReturnOp onto the final merge block
-- [03-02]: MLIR block args serve as phi nodes — mergeArg block argument carries the result value out of if/and/or control flow
-- [03-02]: Short-circuit And: CfCondBrOp(leftVal, evalRightLabel, [], mergeLabel, [leftVal]) — false takes merge branch directly with leftVal
-- [03-02]: Short-circuit Or: CfCondBrOp(leftVal, mergeLabel, [leftVal], evalRightLabel, []) — true takes merge branch directly with leftVal
-- [04-01]: Fresh body env for LetRec: Blocks = ref [] (isolated), Funcs = env.Funcs (shared) — only the module-level accumulator is shared
-- [04-01]: App(Var(name)) checks KnownFuncs; unknown functions fail fast with explicit Phase 4 limitation message
-- [04-01]: elaborateModule: env.Funcs.Value @ [mainFunc] places helper functions before @main (conventional MLIR style)
-- [05-01]: Caller-allocates closure (alloca in caller's frame before calling closure-maker) — callee-allocates causes stack-use-after-return UB
-- [05-01]: Lambda body functions are llvm.func (IsLlvmFunc = true); closure-maker wrappers are func.func (IsLlvmFunc = false)
-- [05-01]: freeVars {outerParam, innerParam} innerBody equivalent to freeVars {outerParam} (Lambda(innerParam, body)) — avoids Span.empty which doesn't exist (only unknownSpan)
-- [05-02 CORRECTS 05-01]: Captures computed as freeVars (Set.singleton innerParam) innerBody — NOT {outerParam, innerParam}. Using both params as bound incorrectly excluded outerParam from captures list; fix: only innerParam is bound when computing variables that need to be captured into the closure struct
-- [05-01]: Captures sorted (List.sort) for deterministic GEP index assignment
-- [05-01]: ClosureCounter shared across module elaboration (same ref in ElabEnv) for globally unique closure function names
-- [05-01]: LlvmReturnOp in llvm.func bodies; ReturnOp in func.func bodies — never mixed (critical anti-pattern)
-- [06-01]: -o flag is optional; Path.GetFileNameWithoutExtension(inputPath) auto-derives output binary name (strips .lt and directory prefix)
-- [06-01]: File.Exists check before File.ReadAllText gives readable "Error: file not found:" instead of FileNotFoundException
-- [06-01]: try/with wraps parse/elaborate/compile pipeline; parse errors surface as "Error: <message>" not stack traces
-- [06-01]: FsLit auto-naming test uses "cd /tmp && cp %input ${OUTNAME}.lt" to exercise extension-stripping; fixed path for error test
+- [v2.0 GC]: Use Boehm GC (libgc) — conservative collector, no IR changes, `-lgc` link only
+- [v2.0 GC]: GC_INIT() emitted unconditionally as first op in @main (C-8 prevention)
+- [v2.0 GC]: All heap allocation through GC_malloc without exception (C-9 prevention)
+- [v2.0 GC]: Migrate closure environments from llvm.alloca to GC_malloc in Phase 7 BEFORE any heap type codegen (C-7 prevention)
+- [v2.0 Strings]: String layout is {i64 length, ptr data} two-field heap struct; byte array in llvm.mlir.global (static) + GC_malloc'd header
+- [v2.0 Lists]: EmptyList = llvm.mlir.zero (null ptr); Cons = GC_malloc(16) two-pointer cons cell
+- [v2.0 PatMatch]: Match compiles to sequential cf.cond_br chain (same mechanism as if-else); always emit @lang_match_failure terminal (C-10 prevention)
+- [06-01]: -o flag is optional; Path.GetFileNameWithoutExtension(inputPath) auto-derives output binary name
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-- [Phase 1, RESOLVED]: mlir-opt pass pipeline flags verified and working
-- [Phase 1, RESOLVED]: Process piping handled with stderr-before-WaitForExit pattern
-- [Phase 1, RESOLVED in 01-01]: MlirIR DU is extensible — MlirOp is a wide DU; new cases are added without changing MlirModule/FuncOp/MlirRegion/MlirBlock shape.
-- [Phase 5, RESOLVED in 05-01]: Closure escape analysis rule for v1: stack-allocate all closures (conservative; correct for programs that do not return closures from functions). Implemented as caller-allocates.
+- [Phase 7, ACTIVE]: Confirm exact scope of v1 closure alloca in Elaboration.fs before migrating — all LlvmAllocaOp uses must be found and moved to GC_malloc
+- [Phase 7, ACTIVE]: macOS requires `-L/opt/homebrew/opt/bdw-gc/lib` in clang flags; Linux uses system path — platform detection in Pipeline.fs needed
 
 ## Session Continuity
 
-Last session: 2026-03-26T04:00:21Z
-Stopped at: Completed 06-01-PLAN.md — CLI auto-naming + error handling, 15/15 FsLit pass; ALL 6 PHASES DONE
+Last session: 2026-03-26
+Stopped at: v2.0 roadmap created (Phases 7-11); ready to plan Phase 7
 Resume file: None
