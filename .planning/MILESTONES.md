@@ -53,10 +53,28 @@
 
 ---
 
-## Current
-
-### v3.0 — Language Completeness
+### v3.0 — Language Completeness (2026-03-26)
 
 **Goal:** 누락 연산자, 빌트인, 패턴 매칭 확장으로 대부분의 LangThree 프로그램 컴파일 가능
-**Started:** 2026-03-26
-**Status:** Defining requirements
+
+**Phases:** 12–15 (5 plans, all verified)
+**Requirements:** 17/17 complete
+**Tests:** 45 FsLit E2E tests
+
+**What shipped:**
+- Modulo (%), Char literal ('A'), PipeRight (|>), ComposeRight/Left (>>, <<) operators
+- when guards, OrPat (| P1 | P2), ConstPat(CharConst) pattern matching extensions
+- failwith runtime error, string_sub/string_contains/string_to_int string builtins
+- char_to_int/int_to_char character builtins, variable print/println
+- Range syntax ([start..stop], [start..step..stop]) list generation
+
+**Key decisions validated:**
+- PipeRight/Compose are elaboration-time desugar only, no new MLIR ops ✓
+- OrPat expanded before MatchCompiler; char is already i64 (identity elaboration) ✓
+- Range via C runtime (lang_range) returning Phase-10-compatible cons list ✓
+
+---
+
+## Current
+
+Planning next milestone
