@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 7 of 11 (GC Runtime Integration)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-26 — v2.0 roadmap created; Phases 7-11 defined
+Plan: 1 of TBD in current phase
+Status: In progress
+Last activity: 2026-03-26 — Completed 07-01-PLAN.md (GC IR infrastructure)
 
-Progress: [██████░░░░░░░░░░░░░░] 6/11 phases complete (v1.0 done, v2.0 starting)
+Progress: [██████░░░░░░░░░░░░░░] 6/11 phases complete (v1.0 done, v2.0 in progress)
 
 ## Performance Metrics
 
@@ -55,6 +55,9 @@ Recent decisions affecting current work:
 - [v2.0 Lists]: EmptyList = llvm.mlir.zero (null ptr); Cons = GC_malloc(16) two-pointer cons cell
 - [v2.0 PatMatch]: Match compiles to sequential cf.cond_br chain (same mechanism as if-else); always emit @lang_match_failure terminal (C-10 prevention)
 - [06-01]: -o flag is optional; Path.GetFileNameWithoutExtension(inputPath) auto-derives output binary name
+- [07-01]: GC symbol is @GC_init (lowercase i) — GC_INIT is a C macro, not a linkable symbol
+- [07-01]: LlvmCallVoidOp has no result field — void calls must not consume an SSA name counter slot
+- [07-01]: printModule order: globals -> extern decls -> funcs (required by MLIR 20)
 
 ### Pending Todos
 
@@ -63,10 +66,10 @@ None.
 ### Blockers/Concerns
 
 - [Phase 7, ACTIVE]: Confirm exact scope of v1 closure alloca in Elaboration.fs before migrating — all LlvmAllocaOp uses must be found and moved to GC_malloc
-- [Phase 7, ACTIVE]: macOS requires `-L/opt/homebrew/opt/bdw-gc/lib` in clang flags; Linux uses system path — platform detection in Pipeline.fs needed
+- [Phase 7, RESOLVED]: macOS -L flag for bdw-gc added in 07-01 via RuntimeInformation.IsOSPlatform
 
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: v2.0 roadmap created (Phases 7-11); ready to plan Phase 7
+Stopped at: Completed 07-01-PLAN.md (GC IR infrastructure — MlirGlobal, ExternalFuncDecl, LlvmCallOp, LlvmCallVoidOp, -lgc linking)
 Resume file: None
