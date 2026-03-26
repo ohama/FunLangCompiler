@@ -113,11 +113,11 @@
 | LIST-02 | Phase 10 | Complete |
 | LIST-03 | Phase 10 | Complete |
 | LIST-04 | Phase 10 | Complete |
-| PAT-01 | Phase 11 | Pending |
-| PAT-02 | Phase 11 | Pending |
-| PAT-03 | Phase 11 | Pending |
-| PAT-04 | Phase 11 | Pending |
-| PAT-05 | Phase 11 | Pending |
+| PAT-01 | Phase 11 | Complete |
+| PAT-02 | Phase 11 | Complete |
+| PAT-03 | Phase 11 | Complete |
+| PAT-04 | Phase 11 | Complete |
+| PAT-05 | Phase 11 | Complete |
 
 **Coverage:**
 - v2 requirements: 20 total

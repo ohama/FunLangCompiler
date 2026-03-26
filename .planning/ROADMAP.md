@@ -131,7 +131,7 @@ Plans:
 - [x] **Phase 8: Strings** - String literals compiled to heap-allocated `{i64 length, ptr data}` structs; string equality, `string_length`, `string_concat`, `to_string` builtins working end-to-end
 - [x] **Phase 9: Tuples** - Tuple construction compiled to `GC_malloc`'d structs; `let (a, b) = ...` tuple destructuring via GEP + load; `TuplePat` in match working
 - [x] **Phase 10: Lists** - `[]` compiled as null pointer; `h :: t` as GC_malloc'd cons cell; list literal desugaring; list pattern matching via null check + GEP
-- [ ] **Phase 11: Pattern Matching** - `match` expression compiled to `cf.cond_br` decision chain for all pattern types; non-exhaustive match runtime fallback emitted
+- [x] **Phase 11: Pattern Matching** - `match` expression compiled to `cf.cond_br` decision chain for all pattern types; non-exhaustive match runtime fallback emitted
 
 ### Phase 7: GC Runtime Integration
 **Goal**: Every emitted binary links Boehm GC, calls `GC_INIT()` on startup, and allocates all heap memory through `GC_malloc` — v1 closure environments are migrated off the stack so closures can safely escape into heap containers; `print` and `println` builtins are available for all subsequent test programs
@@ -228,4 +228,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 →
 | 8. Strings | v2.0 | 2/2 | Complete | 2026-03-26 |
 | 9. Tuples | v2.0 | 1/1 | Complete | 2026-03-26 |
 | 10. Lists | v2.0 | 1/1 | Complete | 2026-03-26 |
-| 11. Pattern Matching | v2.0 | 0/TBD | Not started | - |
+| 11. Pattern Matching | v2.0 | 2/2 | Complete | 2026-03-26 |
