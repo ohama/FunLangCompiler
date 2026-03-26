@@ -22,6 +22,9 @@ type MlirOp =
     | ArithSubIOp     of result: MlirValue * lhs: MlirValue * rhs: MlirValue
     | ArithMulIOp     of result: MlirValue * lhs: MlirValue * rhs: MlirValue
     | ArithDivSIOp    of result: MlirValue * lhs: MlirValue * rhs: MlirValue
+    | ArithCmpIOp     of result: MlirValue * predicate: string * lhs: MlirValue * rhs: MlirValue
+    | CfCondBrOp      of cond: MlirValue * trueLabel: string * trueArgs: MlirValue list * falseLabel: string * falseArgs: MlirValue list
+    | CfBrOp          of label: string * args: MlirValue list
     | ReturnOp        of operands: MlirValue list
 
 // A basic block: optional label, block arguments, sequence of ops

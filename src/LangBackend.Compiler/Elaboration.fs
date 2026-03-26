@@ -55,6 +55,40 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let env' = { env with Vars = Map.add name bv env.Vars }
         let (rv, rops) = elaborateExpr env' bodyExpr
         (rv, bops @ rops)
+    | Bool (b, _) ->
+        let v = { Name = freshName env; Type = I1 }
+        let n = if b then 1L else 0L
+        (v, [ArithConstantOp(v, n)])
+    | Equal (lhs, rhs, _) ->
+        let (lv, lops) = elaborateExpr env lhs
+        let (rv, rops) = elaborateExpr env rhs
+        let result = { Name = freshName env; Type = I1 }
+        (result, lops @ rops @ [ArithCmpIOp(result, "eq", lv, rv)])
+    | NotEqual (lhs, rhs, _) ->
+        let (lv, lops) = elaborateExpr env lhs
+        let (rv, rops) = elaborateExpr env rhs
+        let result = { Name = freshName env; Type = I1 }
+        (result, lops @ rops @ [ArithCmpIOp(result, "ne", lv, rv)])
+    | LessThan (lhs, rhs, _) ->
+        let (lv, lops) = elaborateExpr env lhs
+        let (rv, rops) = elaborateExpr env rhs
+        let result = { Name = freshName env; Type = I1 }
+        (result, lops @ rops @ [ArithCmpIOp(result, "slt", lv, rv)])
+    | GreaterThan (lhs, rhs, _) ->
+        let (lv, lops) = elaborateExpr env lhs
+        let (rv, rops) = elaborateExpr env rhs
+        let result = { Name = freshName env; Type = I1 }
+        (result, lops @ rops @ [ArithCmpIOp(result, "sgt", lv, rv)])
+    | LessEqual (lhs, rhs, _) ->
+        let (lv, lops) = elaborateExpr env lhs
+        let (rv, rops) = elaborateExpr env rhs
+        let result = { Name = freshName env; Type = I1 }
+        (result, lops @ rops @ [ArithCmpIOp(result, "sle", lv, rv)])
+    | GreaterEqual (lhs, rhs, _) ->
+        let (lv, lops) = elaborateExpr env lhs
+        let (rv, rops) = elaborateExpr env rhs
+        let result = { Name = freshName env; Type = I1 }
+        (result, lops @ rops @ [ArithCmpIOp(result, "sge", lv, rv)])
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
@@ -66,7 +100,7 @@ let elaborateModule (expr: Expr) : MlirModule =
             {
                 Name       = "@main"
                 InputTypes = []
-                ReturnType = Some I64
+                ReturnType = Some resultVal.Type
                 Body = {
                     Blocks = [
                         {
