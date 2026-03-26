@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v2.0 — Phase 11: Full Pattern Matching (next)
+**Current focus:** v2.0 — Phase 11: Full Pattern Matching (plan 01 complete)
 
 ## Current Position
 
-Phase: 10 of 11 (Lists) — Complete
-Plan: 1 of 1 in phase 10
-Status: Plan 10-01 complete
-Last activity: 2026-03-26 — Completed 10-01-PLAN.md (lists: null-ptr EmptyList, GC_malloc cons cells, foldBack desugaring, null-check match, 27 tests passing)
+Phase: 11 of 11 (Pattern Matching) — In Progress
+Plan: 1 of 1 in phase 11 (plan 01 complete)
+Status: Plan 11-01 complete
+Last activity: 2026-03-26 — Completed 11-01-PLAN.md (general match compiler: cf.cond_br chain, testPattern, @lang_match_failure, 30 tests passing)
 
-Progress: [████████████████████] 10/11 phases started (Phase 10 Lists plan 01 complete)
+Progress: [████████████████████████] 11/11 phases started (Phase 11 pattern matching plan 01 complete)
 
 ## Performance Metrics
 
@@ -79,6 +79,10 @@ Recent decisions affecting current work:
 - [10-01]: isListParamBody: AST pre-scan for LetRec list param detection — Match scrutinee=param with EmptyListPat/ConsPat arms → paramType = Ptr
 - [10-01]: Phase 10 Match limited to two-arm EmptyListPat+ConsPat pattern; other match patterns failwithf until Phase 11
 - [10-01]: Head type hardcoded I64 for integer-list scope; tail type always Ptr; head stored at cellPtr base (no GEP needed for slot 0)
+- [11-01]: Failure block appended BEFORE merge block in env.Blocks.Value — elaborateModule's "last side block gets ReturnOp" targets merge block
+- [11-01]: testPattern returns 4-tuple (condOpt, testOps, bodySetupOps, bindEnv) — bodySetupOps for ConsPat head/tail loads in body block
+- [11-01]: EmptyListPat/ConsPat added to testPattern — general match compiler handles all prior Phase 10 list patterns
+- [11-01]: @lang_match_failure declared unconditionally in ExternalFuncs (same as @GC_init pattern)
 
 ### Pending Todos
 
@@ -92,5 +96,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 10-01-PLAN.md (lists: null-ptr EmptyList, GC_malloc cons cells, null-check match, 27 tests passing)
+Stopped at: Completed 11-01-PLAN.md (general match compiler, LlvmUnreachableOp, lang_match_failure, 30 tests passing)
 Resume file: None
