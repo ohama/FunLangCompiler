@@ -392,4 +392,4 @@ let elaborateModule (expr: Expr) : MlirModule =
           ReturnType  = Some resultVal.Type
           Body        = { Blocks = allBlocks }
           IsLlvmFunc  = false }
-    { Funcs = env.Funcs.Value @ [mainFunc] }
+    { Globals = []; ExternalFuncs = []; Funcs = env.Funcs.Value @ [mainFunc] }
