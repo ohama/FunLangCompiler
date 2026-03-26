@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v2.0 — Phase 9: Tuples (next)
+**Current focus:** v2.0 — Phase 11: Full Pattern Matching (next)
 
 ## Current Position
 
-Phase: 9 of 11 (Tuples) — In progress
-Plan: 1 of 1 in phase 9
-Status: Plan 09-01 complete
-Last activity: 2026-03-26 — Completed 09-01-PLAN.md (tuples: GC_malloc heap structs, GEP+store/load destructuring, 25 tests passing)
+Phase: 10 of 11 (Lists) — Complete
+Plan: 1 of 1 in phase 10
+Status: Plan 10-01 complete
+Last activity: 2026-03-26 — Completed 10-01-PLAN.md (lists: null-ptr EmptyList, GC_malloc cons cells, foldBack desugaring, null-check match, 27 tests passing)
 
-Progress: [█████████░░░░░░░░░░░] 9/11 phases started (Phase 9 Tuples plan 01 complete)
+Progress: [████████████████████] 10/11 phases started (Phase 10 Lists plan 01 complete)
 
 ## Performance Metrics
 
@@ -74,6 +74,11 @@ Recent decisions affecting current work:
 - [09-01]: typeOfPat heuristic for tuple destructuring: TuplePat sub-pattern → load as Ptr; VarPat/WildcardPat → load as I64
 - [09-01]: Sequential let (x,inner) = ... in let (y,z) = inner requires type info to load inner as Ptr; use inline nested TuplePat form instead
 - [09-01]: Match(single TuplePat arm) desugars to LetPat(TuplePat) at elaboration time — no full match compiler needed for TUP-03
+- [10-01]: LlvmNullOp result.Type = Ptr, prints as llvm.mlir.zero : !llvm.ptr (not arith.constant 0 + cast)
+- [10-01]: LlvmIcmpOp result.Type = I1, prints as llvm.icmp "pred" %lhs, %rhs : !llvm.ptr (llvm dialect, not arith.cmpi)
+- [10-01]: isListParamBody: AST pre-scan for LetRec list param detection — Match scrutinee=param with EmptyListPat/ConsPat arms → paramType = Ptr
+- [10-01]: Phase 10 Match limited to two-arm EmptyListPat+ConsPat pattern; other match patterns failwithf until Phase 11
+- [10-01]: Head type hardcoded I64 for integer-list scope; tail type always Ptr; head stored at cellPtr base (no GEP needed for slot 0)
 
 ### Pending Todos
 
@@ -87,5 +92,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 09-01-PLAN.md (tuples: GC_malloc heap structs, GEP+store/load destructuring, typeOfPat heuristic, 25 tests passing)
+Stopped at: Completed 10-01-PLAN.md (lists: null-ptr EmptyList, GC_malloc cons cells, null-check match, 27 tests passing)
 Resume file: None
