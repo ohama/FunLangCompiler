@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Booleans, Comparisons, Control Flow** - MlirIR extended with bool/comparison ops and cond_br; Elaboration handles bool literals, comparison, short-circuit logic, and if-else
 - [x] **Phase 4: Known Functions via Elaboration** - MlirIR extended with FuncOp and direct call; Elaboration handles let rec (no free variables) as forward-declared func.func calls
 - [x] **Phase 5: Closures via Elaboration** - MlirIR extended with closure struct representation and indirect call; Elaboration handles lambda capture, closure allocation, and call dispatch
-- [ ] **Phase 6: CLI** - `.lt` file to native binary CLI driver, module-level declarations
+- [x] **Phase 6: CLI** - `.lt` file to native binary CLI driver, module-level declarations
 
 ## Phase Details
 
@@ -113,7 +113,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 06-01: CLI driver (file input, Elaboration + MlirIR pipeline orchestration, output binary naming)
+- [x] 06-01: CLI driver (file input, Elaboration + MlirIR pipeline orchestration, output binary naming)
 
 ## Progress
 
@@ -127,4 +127,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Booleans, Comparisons, Control Flow | 2/2 | Complete | 2026-03-26 |
 | 4. Known Functions via Elaboration | 1/1 | Complete | 2026-03-26 |
 | 5. Closures via Elaboration | 2/2 | Complete | 2026-03-26 |
-| 6. CLI | 0/1 | Not started | - |
+| 6. CLI | 1/1 | Complete | 2026-03-26 |

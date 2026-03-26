@@ -100,7 +100,7 @@
 | ELAB-03 | Phase 5 | Complete |
 | ELAB-04 | Phase 5 | Complete |
 | TEST-02 | Phase 5 | Complete |
-| CLI-01 | Phase 6 | Pending |
+| CLI-01 | Phase 6 | Complete |
 
 **Coverage:**
 - v1 requirements: 21 total
