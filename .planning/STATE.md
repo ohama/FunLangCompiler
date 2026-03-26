@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v2.0 — Phase 11: Full Pattern Matching (plan 01 complete)
+**Current focus:** v2.0 — Phase 11: Full Pattern Matching (ALL PLANS COMPLETE)
 
 ## Current Position
 
-Phase: 11 of 11 (Pattern Matching) — In Progress
-Plan: 1 of 1 in phase 11 (plan 01 complete)
-Status: Plan 11-01 complete
-Last activity: 2026-03-26 — Completed 11-01-PLAN.md (general match compiler: cf.cond_br chain, testPattern, @lang_match_failure, 30 tests passing)
+Phase: 11 of 11 (Pattern Matching) — COMPLETE
+Plan: 2 of 2 in phase 11 (all plans complete)
+Status: ALL PHASES AND PLANS COMPLETE
+Last activity: 2026-03-26 — Completed 11-02-PLAN.md (testPattern extended: ConstPat(StringConst), TuplePat; 34 FsLit tests passing)
 
-Progress: [████████████████████████] 11/11 phases started (Phase 11 pattern matching plan 01 complete)
+Progress: [████████████████████████] 11/11 phases complete (v2.0 ALL COMPLETE — 34 FsLit tests passing)
 
 ## Performance Metrics
 
@@ -83,6 +83,9 @@ Recent decisions affecting current work:
 - [11-01]: testPattern returns 4-tuple (condOpt, testOps, bodySetupOps, bindEnv) — bodySetupOps for ConsPat head/tail loads in body block
 - [11-01]: EmptyListPat/ConsPat added to testPattern — general match compiler handles all prior Phase 10 list patterns
 - [11-01]: @lang_match_failure declared unconditionally in ExternalFuncs (same as @GC_init pattern)
+- [11-02]: testPattern must be `let rec private` (not `let private rec`) — F# syntax: rec comes before access modifier
+- [11-02]: TuplePat in testPattern: all ops in bodySetupOps (condOpt=None), mirrors Phase 9 bindTuplePat loadTypeOfPat heuristic
+- [11-02]: ConstPat(StringConst): elaborate pattern string literal, GEP field 1 for data ptrs on both sides, @strcmp, arith.cmpi eq
 
 ### Pending Todos
 
@@ -96,5 +99,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 11-01-PLAN.md (general match compiler, LlvmUnreachableOp, lang_match_failure, 30 tests passing)
+Stopped at: Completed 11-02-PLAN.md (testPattern extended, 34 FsLit tests passing — ALL PHASES COMPLETE)
 Resume file: None
