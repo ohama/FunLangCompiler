@@ -34,6 +34,7 @@ type ExternalFuncDecl = {
 // Phase 5: LLVM-level ops for closure mechanics
 // Phase 7: LlvmCallOp + LlvmCallVoidOp for GC and printf
 // Phase 10: LlvmNullOp + LlvmIcmpOp for list null pointer and null checks
+// Phase 11: LlvmUnreachableOp for noreturn terminator after match failure
 // Future phases add cases here without changing MlirModule/FuncOp/Block/Region shape
 type MlirOp =
     | ArithConstantOp of result: MlirValue * value: int64
@@ -64,6 +65,9 @@ type MlirOp =
     | LlvmIcmpOp     of result: MlirValue * predicate: string * lhs: MlirValue * rhs: MlirValue
     // result.Type must be I1 — emits: %result = llvm.icmp "pred" %lhs, %rhs : !llvm.ptr
     // predicate: "eq" (null check) or "ne" (non-null check); lhs and rhs must be Ptr typed
+    // Phase 11: LlvmUnreachableOp for noreturn terminator after match failure
+    | LlvmUnreachableOp
+    // emits: llvm.unreachable — terminator after a noreturn void call (e.g. @lang_match_failure)
     | ReturnOp        of operands: MlirValue list
 
 // A basic block: optional label, block arguments, sequence of ops

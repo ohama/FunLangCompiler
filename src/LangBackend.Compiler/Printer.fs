@@ -122,6 +122,9 @@ let private printOp (indent: string) (op: MlirOp) : string =
     | LlvmIcmpOp(result, predicate, lhs, rhs) ->
         sprintf "%s%s = llvm.icmp \"%s\" %s, %s : !llvm.ptr"
             indent result.Name predicate lhs.Name rhs.Name
+    // Phase 11: noreturn terminator after match failure
+    | LlvmUnreachableOp ->
+        sprintf "%sllvm.unreachable" indent
     | ReturnOp [] ->
         sprintf "%sreturn" indent
     | ReturnOp operands ->
