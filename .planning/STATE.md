@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for v3.0
-Last activity: 2026-03-26 — v3.0 milestone started
+Phase: 12-missing-operators (2/2 plans complete)
+Plan: 12-02 of 02
+Status: Phase complete
+Last activity: 2026-03-26 — Completed 12-02-PLAN.md (PipeRight + ComposeRight + ComposeLeft)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 20% (2 plans done, v3.0 in progress)
 
 ## Performance Metrics
 
@@ -34,6 +34,9 @@ Progress: [░░░░░░░░░░] 0%
 - Uniform boxed representation (all heap types as ptr)
 - Sequential cf.cond_br match compilation (Jacobs decision tree)
 - @lang_match_failure fallback for non-exhaustive match
+- App(Lambda) inlines as env binding, no closure allocation (12-01)
+- Bare Lambda as expression creates inline closure via GC_malloc + llvm.func (12-02)
+- PipeRight/ComposeRight/ComposeLeft are elaboration-time desugar only, no new MLIR ops (12-02)
 
 ### Pending Todos
 
@@ -46,5 +49,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: v2.0 milestone archival complete
+Stopped at: Completed 12-02-PLAN.md — phase 12-missing-operators complete
 Resume file: None
