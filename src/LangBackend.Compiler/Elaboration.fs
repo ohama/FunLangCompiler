@@ -3,24 +3,32 @@ module Elaboration
 open Ast
 open MlirIR
 
+// Phase 5: Closure metadata — distinguishes closure-making funcs from direct-call funcs
+type ClosureInfo = {
+    InnerLambdaFn: string    // MLIR name of the llvm.func body, e.g. "@closure_fn_0"
+    NumCaptures:   int       // number of captured variables
+}
+
 type FuncSignature = {
-    MlirName:   string
-    ParamTypes: MlirType list
-    ReturnType: MlirType
+    MlirName:    string
+    ParamTypes:  MlirType list
+    ReturnType:  MlirType
+    ClosureInfo: ClosureInfo option  // None = direct-call func; Some = closure-maker
 }
 
 type ElabEnv = {
-    Vars:         Map<string, MlirValue>
-    Counter:      int ref
-    LabelCounter: int ref
-    Blocks:       MlirBlock list ref
-    KnownFuncs:   Map<string, FuncSignature>
-    Funcs:        FuncOp list ref
+    Vars:           Map<string, MlirValue>
+    Counter:        int ref
+    LabelCounter:   int ref
+    Blocks:         MlirBlock list ref
+    KnownFuncs:     Map<string, FuncSignature>
+    Funcs:          FuncOp list ref
+    ClosureCounter: int ref   // Phase 5: generates unique closure function names
 }
 
 let emptyEnv () : ElabEnv =
     { Vars = Map.empty; Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
-      KnownFuncs = Map.empty; Funcs = ref [] }
+      KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0 }
 
 let private freshName (env: ElabEnv) : string =
     let n = env.Counter.Value
@@ -31,6 +39,30 @@ let private freshLabel (env: ElabEnv) (prefix: string) : string =
     let n = env.LabelCounter.Value
     env.LabelCounter.Value <- n + 1
     sprintf "%s%d" prefix n
+
+// Phase 5: Free variable analysis — computes free variables in expr relative to boundVars
+let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
+    match expr with
+    | Number _ | Bool _ -> Set.empty
+    | Var (name, _) ->
+        if Set.contains name boundVars then Set.empty else Set.singleton name
+    | Add (l, r, _) | Subtract (l, r, _) | Multiply (l, r, _) | Divide (l, r, _)
+    | Equal (l, r, _) | NotEqual (l, r, _) | LessThan (l, r, _) | GreaterThan (l, r, _)
+    | LessEqual (l, r, _) | GreaterEqual (l, r, _) | And (l, r, _) | Or (l, r, _) ->
+        Set.union (freeVars boundVars l) (freeVars boundVars r)
+    | Negate (e, _) -> freeVars boundVars e
+    | If (c, t, e, _) ->
+        Set.unionMany [ freeVars boundVars c; freeVars boundVars t; freeVars boundVars e ]
+    | Let (name, e1, e2, _) ->
+        Set.union (freeVars boundVars e1) (freeVars (Set.add name boundVars) e2)
+    | Lambda (param, body, _) ->
+        freeVars (Set.add param boundVars) body
+    | App (f, a, _) ->
+        Set.union (freeVars boundVars f) (freeVars boundVars a)
+    | LetRec (name, param, body, inExpr, _) ->
+        let innerBound = Set.add name (Set.add param boundVars)
+        Set.union (freeVars innerBound body) (freeVars (Set.add name boundVars) inExpr)
+    | _ -> Set.empty  // conservative: other exprs (String, Char, etc.) have no free vars
 
 let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     match expr with
@@ -66,6 +98,135 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         match Map.tryFind name env.Vars with
         | Some v -> (v, [])
         | None -> failwithf "Elaboration: unbound variable '%s'" name
+    // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
+    // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
+    | Let (name, Lambda (outerParam, Lambda (innerParam, innerBody, _), _), inExpr, _) ->
+        // Step 1: Compute free variables of the inner lambda body relative to both params being bound.
+        // freeVars {outerParam} (Lambda(innerParam, innerBody)) = freeVars {outerParam, innerParam} innerBody
+        // This finds variables captured from outside the let binding's scope.
+        let captures =
+            freeVars (Set.ofList [outerParam; innerParam]) innerBody
+            |> Set.toList
+            |> List.sort
+        let numCaptures = List.length captures
+
+        // Step 2: Generate fresh closure function name
+        let closureFnIdx = env.ClosureCounter.Value
+        env.ClosureCounter.Value <- closureFnIdx + 1
+        let closureFnName = sprintf "@closure_fn_%d" closureFnIdx
+
+        // Step 3: Compile inner lambda body (llvm.func)
+        // Build the initial vars: %arg0 = env ptr, %arg1 = innerParam
+        let arg0Val = { Name = "%arg0"; Type = Ptr }
+        let arg1Val = { Name = "%arg1"; Type = I64 }
+        let innerEnv : ElabEnv =
+            { Vars = Map.ofList [(innerParam, arg1Val)]
+              Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
+              KnownFuncs = env.KnownFuncs
+              Funcs = env.Funcs
+              ClosureCounter = env.ClosureCounter }
+
+        // For each capture at index i: GEP to slot i+1, then load
+        let captureLoadOps, innerEnvWithCaptures =
+            captures |> List.mapi (fun i capName ->
+                let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
+                let capVal = { Name = sprintf "%%t%d" (i + numCaptures); Type = I64 }
+                (gepVal, capVal, capName, i)
+            )
+            |> List.fold (fun (opsAcc, envAcc: ElabEnv) (gepVal, capVal, capName, i) ->
+                // Advance counter past GEP and load names we pre-allocated
+                let gepOp = LlvmGEPLinearOp(gepVal, arg0Val, i + 1)
+                let loadOp = LlvmLoadOp(capVal, gepVal)
+                let envAcc' = { envAcc with Vars = Map.add capName capVal envAcc.Vars }
+                (opsAcc @ [gepOp; loadOp], envAcc')
+            ) ([], innerEnv)
+
+        // Advance inner env counter past the pre-allocated GEP/load SSA names
+        innerEnvWithCaptures.Counter.Value <- numCaptures * 2
+
+        // Elaborate inner body
+        let (bodyVal, bodyEntryOps) = elaborateExpr innerEnvWithCaptures innerBody
+        let bodySideBlocks = innerEnvWithCaptures.Blocks.Value
+
+        let allBodyBlocks =
+            if bodySideBlocks.IsEmpty then
+                [ { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps @ [LlvmReturnOp [bodyVal]] } ]
+            else
+                let entryBlock = { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps }
+                let lastBlock = List.last bodySideBlocks
+                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [LlvmReturnOp [bodyVal]] }
+                let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
+                entryBlock :: sideBlocksPatched
+
+        let innerFuncOp : FuncOp =
+            { Name        = closureFnName
+              InputTypes  = [Ptr; I64]
+              ReturnType  = Some I64
+              Body        = { Blocks = allBodyBlocks }
+              IsLlvmFunc  = true }
+
+        // Step 4: Compile closure-maker func.func
+        // %arg0 = outerParam (I64), %arg1 = env ptr (Ptr, caller-allocated)
+        let makerArg0 = { Name = "%arg0"; Type = I64 }
+        let makerArg1 = { Name = "%arg1"; Type = Ptr }
+
+        // Use a fresh counter starting after 0 for the closure-maker body ops
+        let makerCounter = ref 0
+        let nextMakerName () =
+            let n = makerCounter.Value
+            makerCounter.Value <- n + 1
+            sprintf "%%t%d" n
+
+        let fnPtrName = nextMakerName ()
+        let fnPtrVal = { Name = fnPtrName; Type = Ptr }
+
+        // addressof + store fn_ptr at env[0]
+        let makerOps =
+            [ LlvmAddressOfOp(fnPtrVal, closureFnName)
+              LlvmStoreOp(fnPtrVal, makerArg1) ]
+
+        // For each capture at index i: GEP to slot i+1, store the captured value
+        let captureStoreOps =
+            captures |> List.mapi (fun i capName ->
+                let slotName = nextMakerName ()
+                let slotVal = { Name = slotName; Type = Ptr }
+                let gepOp = LlvmGEPLinearOp(slotVal, makerArg1, i + 1)
+                // Look up capture value in the OUTER env
+                // If the capture name is the outerParam, it IS %arg0
+                let captureVal =
+                    if capName = outerParam then makerArg0
+                    else
+                        match Map.tryFind capName env.Vars with
+                        | Some v -> v
+                        | None -> failwithf "Elaboration: closure capture '%s' not found in outer scope" capName
+                let storeOp = LlvmStoreOp(captureVal, slotVal)
+                [gepOp; storeOp]
+            ) |> List.concat
+
+        let makerBodyOps = makerOps @ captureStoreOps @ [ReturnOp [makerArg1]]
+
+        let makerFuncOp : FuncOp =
+            { Name        = "@" + name
+              InputTypes  = [I64; Ptr]
+              ReturnType  = Some Ptr
+              Body        = { Blocks = [ { Label = None; Args = []; Body = makerBodyOps } ] }
+              IsLlvmFunc  = false }
+
+        // Step 5: Add both FuncOps to env.Funcs
+        env.Funcs.Value <- env.Funcs.Value @ [innerFuncOp; makerFuncOp]
+
+        // Step 6: Add to KnownFuncs
+        let closureInfo = { InnerLambdaFn = closureFnName; NumCaptures = numCaptures }
+        let sig_ : FuncSignature =
+            { MlirName    = "@" + name
+              ParamTypes  = [I64]
+              ReturnType  = Ptr
+              ClosureInfo = Some closureInfo }
+        let env' = { env with KnownFuncs = Map.add name sig_ env.KnownFuncs }
+
+        // Step 7: Elaborate inExpr with updated env
+        elaborateExpr env' inExpr
+
     | Let (name, bindExpr, bodyExpr, _) ->
         let (bv, bops) = elaborateExpr env bindExpr
         let env' = { env with Vars = Map.add name bv env.Vars }
@@ -143,12 +304,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         (mergeArg, leftOps @ [CfCondBrOp(leftVal, mergeLabel, [leftVal], evalRightLabel, [])])
     | LetRec (name, param, body, inExpr, _) ->
-        let sig_ : FuncSignature = { MlirName = "@" + name; ParamTypes = [I64]; ReturnType = I64 }
+        let sig_ : FuncSignature =
+            { MlirName = "@" + name; ParamTypes = [I64]; ReturnType = I64; ClosureInfo = None }
         let bodyEnv : ElabEnv =
             { Vars = Map.ofList [(param, { Name = "%arg0"; Type = I64 })]
               Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
               KnownFuncs = Map.ofList [(name, sig_)]
-              Funcs = env.Funcs }
+              Funcs = env.Funcs
+              ClosureCounter = env.ClosureCounter }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
@@ -173,14 +336,39 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         match funcExpr with
         | Var (name, _) ->
             match Map.tryFind name env.KnownFuncs with
-            | Some sig_ ->
+            | Some sig_ when sig_.ClosureInfo.IsNone ->
+                // DIRECT CALL (Phase 4 behavior) — known non-closure function
                 let (argVal, argOps) = elaborateExpr env argExpr
                 let result = { Name = freshName env; Type = sig_.ReturnType }
                 (result, argOps @ [DirectCallOp(result, sig_.MlirName, [argVal])])
+            | Some sig_ ->
+                // CLOSURE-MAKING CALL — allocate env in current frame, then call
+                let ci = sig_.ClosureInfo.Value
+                let (argVal, argOps) = elaborateExpr env argExpr
+                let countVal = { Name = freshName env; Type = I64 }
+                let envPtrVal = { Name = freshName env; Type = Ptr }
+                let resultVal = { Name = freshName env; Type = Ptr }
+                let setupOps = [
+                    ArithConstantOp(countVal, 1L)
+                    LlvmAllocaOp(envPtrVal, countVal, ci.NumCaptures)
+                ]
+                let callOp = DirectCallOp(resultVal, sig_.MlirName, [argVal; envPtrVal])
+                (resultVal, argOps @ setupOps @ [callOp])
             | None ->
-                failwithf "Elaboration: unsupported App — '%s' is not a known function in Phase 4" name
+                // Check Vars for closure value (type Ptr)
+                match Map.tryFind name env.Vars with
+                | Some closureVal when closureVal.Type = Ptr ->
+                    // INDIRECT/CLOSURE CALL
+                    let (argVal, argOps) = elaborateExpr env argExpr
+                    let fnPtrVal = { Name = freshName env; Type = Ptr }
+                    let result = { Name = freshName env; Type = I64 }
+                    let loadOp = LlvmLoadOp(fnPtrVal, closureVal)
+                    let callOp = IndirectCallOp(result, fnPtrVal, closureVal, argVal)
+                    (result, argOps @ [loadOp; callOp])
+                | _ ->
+                    failwithf "Elaboration: unsupported App — '%s' is not a known function or closure value" name
         | _ ->
-            failwithf "Elaboration: unsupported App (only direct calls to known functions supported in Phase 4)"
+            failwithf "Elaboration: unsupported App (only named function application supported in Phase 5)"
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
