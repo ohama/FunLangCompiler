@@ -119,29 +119,59 @@ let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
     | _ -> false
 
 /// Phase 11: Test a pattern against a scrutinee value.
-/// Returns (condOpt, testOps, bindEnv) where:
-///   condOpt = None  -> unconditional match (WildcardPat / VarPat)
-///   condOpt = Some v -> I1 condition value; test ops must be emitted before the cond_br
-///   bindEnv = env with any variable bindings from the pattern added
+/// Returns (condOpt, testOps, bodySetupOps, bindEnv) where:
+///   condOpt      = None  -> unconditional match (WildcardPat / VarPat)
+///   condOpt      = Some v -> I1 condition value; test ops must be emitted before the cond_br
+///   testOps      = ops that compute the condition (run in the test/entry block)
+///   bodySetupOps = ops that run at the START of the body block (e.g. ConsPat head/tail loads)
+///   bindEnv      = env with any variable bindings from the pattern added
 let private testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
-    : MlirValue option * MlirOp list * ElabEnv =
+    : MlirValue option * MlirOp list * MlirOp list * ElabEnv =
     match pat with
     | WildcardPat _ ->
-        (None, [], env)
+        (None, [], [], env)
     | VarPat(name, _) ->
         let env' = { env with Vars = Map.add name scrutVal env.Vars }
-        (None, [], env')
+        (None, [], [], env')
     | ConstPat(IntConst n, _) ->
         let kVal = { Name = freshName env; Type = I64 }
         let cond = { Name = freshName env; Type = I1 }
         let ops  = [ ArithConstantOp(kVal, int64 n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
-        (Some cond, ops, env)
+        (Some cond, ops, [], env)
     | ConstPat(BoolConst b, _) ->
         let kVal = { Name = freshName env; Type = I1 }
         let cond = { Name = freshName env; Type = I1 }
         let n    = if b then 1L else 0L
         let ops  = [ ArithConstantOp(kVal, n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
-        (Some cond, ops, env)
+        (Some cond, ops, [], env)
+    | EmptyListPat _ ->
+        // Test: scrutVal == null (is empty list)
+        let nullVal = { Name = freshName env; Type = Ptr }
+        let cond    = { Name = freshName env; Type = I1 }
+        let ops     = [ LlvmNullOp(nullVal); LlvmIcmpOp(cond, "eq", scrutVal, nullVal) ]
+        (Some cond, ops, [], env)
+    | ConsPat(hPat, tPat, _) ->
+        // Test: scrutVal != null (is a cons cell)
+        let nullVal  = { Name = freshName env; Type = Ptr }
+        let cond     = { Name = freshName env; Type = I1 }
+        let testOps  = [ LlvmNullOp(nullVal); LlvmIcmpOp(cond, "ne", scrutVal, nullVal) ]
+        // Body setup: load head and tail from cons cell
+        let headVal  = { Name = freshName env; Type = I64 }
+        let tailSlot = { Name = freshName env; Type = Ptr }
+        let tailVal  = { Name = freshName env; Type = Ptr }
+        let setupOps = [
+            LlvmLoadOp(headVal, scrutVal)
+            LlvmGEPLinearOp(tailSlot, scrutVal, 1)
+            LlvmLoadOp(tailVal, tailSlot)
+        ]
+        // Bind head and tail names
+        let headName = match hPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failwithf "Elaboration: ConsPat head must be VarPat or WildcardPat"
+        let tailName = match tPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failwithf "Elaboration: ConsPat tail must be VarPat or WildcardPat"
+        let env' =
+            env
+            |> (fun e -> match headName with Some n -> { e with Vars = Map.add n headVal e.Vars } | None -> e)
+            |> (fun e -> match tailName with Some n -> { e with Vars = Map.add n tailVal e.Vars } | None -> e)
+        (Some cond, testOps, setupOps, env')
     | _ ->
         failwithf "testPattern: pattern %A not supported in Plan 11-01 (will be added in 11-02)" pat
 
@@ -706,14 +736,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 ([ CfBrOp(failLabel, []) ], I64)  // dummy type; overridden by first real arm
             | (pat, _guard, bodyExpr) :: rest ->
                 let bodyLabel = freshLabel env (sprintf "match_arm%d" armIdx)
-                let (condOpt, testOps, bindEnv) = testPattern env scrutVal pat
+                let (condOpt, testOps, bodySetupOps, bindEnv) = testPattern env scrutVal pat
                 // Elaborate arm body in bindEnv (has variable bindings)
                 let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
-                // Arm body block: body ops + branch to merge with result
+                // Arm body block: setup ops (e.g. ConsPat loads) + body ops + branch to merge
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some bodyLabel
                         Args   = []
-                        Body   = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                        Body   = bodySetupOps @ bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
                 match condOpt with
                 | None ->
                     // Unconditional match (wildcard or variable) — no further arms needed
