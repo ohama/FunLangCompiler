@@ -96,11 +96,11 @@ Plans:
   2. Every lambda with captured variables produces a `ClosureAllocOp` in MlirIR that the Printer serializes to a flat closure struct `{ fn_ptr, env_fields... }` in the `llvm` dialect — inspection of emitted `.mlir` text confirms no bare function pointer calls for closure-applied functions
   3. Function application dispatch is driven by Elaboration annotation: known `let rec` functions emit `DirectCallOp`, closure values emit `IndirectCallOp` with fn_ptr load from the closure struct
   4. FsLit test files for all feature categories (arithmetic, comparison, if-else, let, let-rec, lambda) pass together
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: MlirIR ClosureAllocOp and IndirectCallOp types; Elaboration free-variable capture and closure struct layout
-- [ ] 05-02: Function application dispatch elaboration (DirectCall vs ClosureCall) and full category test suite
+- [ ] 05-01-PLAN.md — MlirIR closure types (Ptr, 7 LLVM ops, IsLlvmFunc), Printer serialization, Elaboration freeVars + ClosureInfo + Lambda compilation
+- [ ] 05-02-PLAN.md — App dispatch (DirectCall vs ClosureCall vs IndirectCall) and FsLit closure E2E tests
 
 ### Phase 6: CLI
 **Goal**: A usable `langbackend <file.lt>` command reads a LangThree source file, runs the full Elaboration → MlirIR → Printer → shell pipeline, and produces a named native executable that the user can run directly
