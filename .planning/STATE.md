@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 2 of 6 (Scalar Codegen via MlirIR)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-03-26 — Completed 02-02-PLAN.md (FsLit E2E tests for arithmetic and let bindings)
+Phase: 3 of 6 (Booleans, Comparisons, Control Flow)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-03-26 — Completed 03-01-PLAN.md (Bool/comparison IR, Printer, Elaboration, dynamic ReturnType)
 
-Progress: [████░░░░░░] 33%
+Progress: [█████░░░░░] 43%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Average duration: ~1.75 min
-- Total execution time: ~0.12 hours
+- Total plans completed: 6
+- Average duration: ~1.83 min
+- Total execution time: ~0.18 hours
 
 **By Phase:**
 
@@ -29,9 +29,10 @@ Progress: [████░░░░░░] 33%
 |-------|-------|-------|----------|
 | 01-mlirir-foundation | 3 | ~5 min | ~1.7 min |
 | 02-scalar-codegen-via-mlirir | 2 | ~4 min | ~2 min |
+| 03-booleans-comparisons-control-flow | 1 | ~2 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min)
+- Last 6 plans: 01-01 (2 min), 01-02 (1 min), 01-03 (2 min), 02-01 (2 min), 02-02 (2 min), 03-01 (2 min)
 - Trend: Stable ~2 min/plan
 
 *Updated after each plan completion*
@@ -59,6 +60,10 @@ Recent decisions affecting current work:
 - [02-01]: Negate lowered as: arith.constant 0 then arith.subi zero, inner
 - [02-01]: parseExpr in CLI replicates LangThree.Program.parse 3-line pattern (avoids Eval/Prelude init)
 - [02-02]: FsLit .flt test format with Command/Input/Output sections is the standard pattern for compiler E2E tests
+- [03-01]: arith.cmpi type annotation uses operand type (i64), not result type (i1) — MLIR spec requirement
+- [03-01]: CfCondBrOp/CfBrOp args format: (%v : type, ...) with parentheses; empty arg lists omit parentheses
+- [03-01]: elaborateModule ReturnType changed from hardcoded I64 to resultVal.Type for dynamic return types
+- [03-01]: F# type inference disambiguated by explicit (args: MlirValue list) annotations when multiple record types share a field name (FuncOp.Name vs MlirValue.Name)
 
 ### Pending Todos
 
@@ -73,6 +78,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T02:15:59Z
-Stopped at: Completed 02-02-PLAN.md — FsLit E2E tests for arithmetic and let bindings; Phase 2 complete
+Last session: 2026-03-26T02:42:13Z
+Stopped at: Completed 03-01-PLAN.md — Bool/comparison IR, Printer, Elaboration + 2 E2E tests; 6/6 FsLit pass
 Resume file: None
