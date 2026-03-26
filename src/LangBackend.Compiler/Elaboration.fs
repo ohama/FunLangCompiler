@@ -53,6 +53,27 @@ let private freshLabel (env: ElabEnv) (prefix: string) : string =
     env.LabelCounter.Value <- n + 1
     sprintf "%s%d" prefix n
 
+// Phase 8: Allocate a heap string struct {i64 length, ptr data} for a compile-time string literal.
+let private elaborateStringLiteral (env: ElabEnv) (s: string) : MlirValue * MlirOp list =
+    let globalName  = addStringGlobal env s
+    let sizeVal     = { Name = freshName env; Type = I64 }
+    let headerVal   = { Name = freshName env; Type = Ptr }
+    let lenPtrVal   = { Name = freshName env; Type = Ptr }
+    let lenVal      = { Name = freshName env; Type = I64 }
+    let dataPtrVal  = { Name = freshName env; Type = Ptr }
+    let dataAddrVal = { Name = freshName env; Type = Ptr }
+    let ops = [
+        ArithConstantOp(sizeVal, 16L)                              // struct size = 16 bytes
+        LlvmCallOp(headerVal, "@GC_malloc", [sizeVal])             // alloc header
+        LlvmGEPStructOp(lenPtrVal, headerVal, 0)                   // &header.length
+        ArithConstantOp(lenVal, int64 s.Length)                    // compile-time length
+        LlvmStoreOp(lenVal, lenPtrVal)                             // header.length = len
+        LlvmGEPStructOp(dataPtrVal, headerVal, 1)                  // &header.data
+        LlvmAddressOfOp(dataAddrVal, globalName)                   // addressof @__str_N
+        LlvmStoreOp(dataAddrVal, dataPtrVal)                       // header.data = &global
+    ]
+    (headerVal, ops)
+
 // Phase 5: Free variable analysis — computes free variables in expr relative to boundVars
 let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
     match expr with
@@ -75,7 +96,8 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
     | LetRec (name, param, body, inExpr, _) ->
         let innerBound = Set.add name (Set.add param boundVars)
         Set.union (freeVars innerBound body) (freeVars (Set.add name boundVars) inExpr)
-    | _ -> Set.empty  // conservative: other exprs (String, Char, etc.) have no free vars
+    | String _ -> Set.empty
+    | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     match expr with
@@ -360,7 +382,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         env.Funcs.Value <- env.Funcs.Value @ [funcOp]
         let env' = { env with KnownFuncs = Map.add name { sig_ with ReturnType = bodyVal.Type } env.KnownFuncs }
         elaborateExpr env' inExpr
-    // Phase 7: print/println builtins — handle BEFORE general App to match first
+    // Phase 8: String literal → GC_malloc'd header struct
+    | String (s, _) ->
+        elaborateStringLiteral env s
+
+    // Phase 8: string_length builtin — GEP field 0 and load
+    | App (Var ("string_length", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let lenPtrVal = { Name = freshName env; Type = Ptr }
+        let lenVal    = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmGEPStructOp(lenPtrVal, strVal, 0)
+            LlvmLoadOp(lenVal, lenPtrVal)
+        ]
+        (lenVal, strOps @ ops)
+
+    // Phase 7: print/println builtins — static literal fast path (keep before general case)
     | App (Var ("print", _), String (s, _), _) ->
         let globalName = addStringGlobal env s
         let ptrVal  = { Name = freshName env; Type = Ptr }
@@ -384,6 +421,40 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             ArithConstantOp(unitVal, 0L)
         ]
         (unitVal, ops)
+
+    // Phase 8: general print/println for string struct variables (Ptr type)
+    | App (Var ("print", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let dataPtrVal  = { Name = freshName env; Type = Ptr }
+        let dataAddrVal = { Name = freshName env; Type = Ptr }
+        let fmtRes      = { Name = freshName env; Type = I32 }
+        let unitVal     = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmGEPStructOp(dataPtrVal, strVal, 1)
+            LlvmLoadOp(dataAddrVal, dataPtrVal)
+            LlvmCallOp(fmtRes, "@printf", [dataAddrVal])
+            ArithConstantOp(unitVal, 0L)
+        ]
+        (unitVal, strOps @ ops)
+
+    | App (Var ("println", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let dataPtrVal  = { Name = freshName env; Type = Ptr }
+        let dataAddrVal = { Name = freshName env; Type = Ptr }
+        let nlGlobal    = addStringGlobal env "\n"
+        let nlPtrVal    = { Name = freshName env; Type = Ptr }
+        let fmtRes1     = { Name = freshName env; Type = I32 }
+        let fmtRes2     = { Name = freshName env; Type = I32 }
+        let unitVal     = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmGEPStructOp(dataPtrVal, strVal, 1)
+            LlvmLoadOp(dataAddrVal, dataPtrVal)
+            LlvmCallOp(fmtRes1, "@printf", [dataAddrVal])
+            LlvmAddressOfOp(nlPtrVal, nlGlobal)
+            LlvmCallOp(fmtRes2, "@printf", [nlPtrVal])
+            ArithConstantOp(unitVal, 0L)
+        ]
+        (unitVal, strOps @ ops)
 
     | App (funcExpr, argExpr, _) ->
         match funcExpr with
@@ -452,8 +523,12 @@ let elaborateModule (expr: Expr) : MlirModule =
           IsLlvmFunc  = false }
     let globals = env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value))
     let externalFuncs = [
-        { ExtName = "@GC_init";   ExtParams = [];    ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@GC_malloc"; ExtParams = [I64]; ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@printf";    ExtParams = [Ptr]; ExtReturn = Some I32; IsVarArg = true  }
+        { ExtName = "@GC_init";              ExtParams = [];         ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@GC_malloc";            ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@printf";               ExtParams = [Ptr];      ExtReturn = Some I32; IsVarArg = true  }
+        { ExtName = "@strcmp";               ExtParams = [Ptr; Ptr]; ExtReturn = Some I32; IsVarArg = false }
+        { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
