@@ -31,4 +31,23 @@ void lang_array_bounds_check(int64_t* arr, int64_t i);
 int64_t* lang_array_of_list(LangCons* list);
 LangCons* lang_array_to_list(int64_t* arr);
 
+typedef struct LangHashEntry {
+    int64_t key;
+    int64_t val;
+    struct LangHashEntry* next;
+} LangHashEntry;
+
+typedef struct {
+    int64_t capacity;
+    int64_t size;
+    LangHashEntry** buckets;
+} LangHashtable;
+
+LangHashtable* lang_hashtable_create(void);
+int64_t lang_hashtable_get(LangHashtable* ht, int64_t key);
+void lang_hashtable_set(LangHashtable* ht, int64_t key, int64_t val);
+int64_t lang_hashtable_containsKey(LangHashtable* ht, int64_t key);
+void lang_hashtable_remove(LangHashtable* ht, int64_t key);
+LangCons* lang_hashtable_keys(LangHashtable* ht);
+
 #endif
