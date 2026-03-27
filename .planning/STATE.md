@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v5.0 Mutable & Collections — Phase 23: Hashtable (in progress, plan 1 of 2 complete)
+**Current focus:** v5.0 Mutable & Collections — Phase 23: Hashtable (COMPLETE), Phase 24: Array HOFs (next)
 
 ## Current Position
 
-Phase: 23 of 24 (Hashtable) — In progress
-Plan: 1 of 2 in phase 23
-Status: In progress
-Last activity: 2026-03-27 — Completed 23-01-PLAN.md (hashtable C runtime structs and 6 functions)
+Phase: 23 of 24 (Hashtable) — COMPLETE
+Plan: 2 of 2 in phase 23
+Status: Phase complete
+Last activity: 2026-03-27 — Completed 23-02-PLAN.md (hashtable elaboration + 8 E2E tests, 88 tests passing)
 
-Progress: [###############░░░░░░░░░░░░░░░] v4.0 complete, v5.0 phases 21+22+23-01 done (80 tests passing)
+Progress: [################░░░░░░░░░░░░░░] v4.0 complete, v5.0 phases 21+22+23 done (88 tests passing)
 
 ## Performance Metrics
 
@@ -23,7 +23,7 @@ Progress: [###############░░░░░░░░░░░░░░░] v4.0 co
 - v2.0: 9 plans, 5 phases — 34 FsLit tests, 1,861 LOC
 - v3.0: 5 plans, 4 phases — 45 FsLit tests
 - v4.0: 12 plans, 5 phases — 67 FsLit tests, 2,861 F# LOC + 184 C LOC
-- v5.0: 5 plans, 2.5/4 phases complete — Phases 21+22 done, 23-01 done (80 E2E tests)
+- v5.0: 6 plans, 3/4 phases complete — Phases 21+22+23 done (88 E2E tests)
 
 **By Phase:**
 
@@ -59,6 +59,10 @@ Recent decisions affecting v5.0:
 - [23-01] lang_throw used for missing-key error (not lang_failwith) — hashtable KeyNotFound is catchable by try/with
 - [23-01] Rehash threshold is size*4 > capacity*3 (load > 0.75), capacity doubles on each rehash
 - [23-01] lang_hashtable_keys returns LangCons* in bucket-iteration order (unspecified, not insertion order)
+- [23-02] hashtable_create discards unit arg by elaborating and ignoring result — keeps parser semantics correct
+- [23-02] coerceToI64 inlined per-arm (not extracted as helper) — consistent with array_create inline pattern
+- [23-02] containsKey returns I1 via ArithCmpIOp("ne", rawI64, 0) — consistent with if/then/else consumption
+- [23-02] summing three let-bound containsKey I64 values (a+b+c) triggered MLIR empty-block error — use keys+len instead
 
 ### Pending Todos
 
@@ -66,10 +70,10 @@ None.
 
 ### Blockers/Concerns
 
-None — C runtime hashtable complete. Phase 23 plan 02 (elaboration) ready to proceed.
+None — Phase 23 complete. Phase 24 (Array HOFs) ready to proceed.
 
 ## Session Continuity
 
-Last session: 2026-03-27T12:08:51Z
-Stopped at: Completed 23-01-PLAN.md — hashtable C runtime structs and 6 functions (80 tests)
+Last session: 2026-03-27T12:24:02Z
+Stopped at: Completed 23-02-PLAN.md — hashtable elaboration + 8 E2E tests (88 tests passing)
 Resume file: None
