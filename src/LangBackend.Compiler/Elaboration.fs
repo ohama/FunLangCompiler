@@ -120,6 +120,16 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         Set.union (freeVars boundVars l) (freeVars boundVars r)
     | Constructor(_, None, _) -> Set.empty
     | Constructor(_, Some argExpr, _) -> freeVars boundVars argExpr
+    | RecordExpr(_, fields, _) ->
+        fields |> List.map (fun (_, e) -> freeVars boundVars e) |> Set.unionMany
+    | FieldAccess(recExpr, _, _) ->
+        freeVars boundVars recExpr
+    | RecordUpdate(sourceExpr, overrides, _) ->
+        let srcFree = freeVars boundVars sourceExpr
+        let overFree = overrides |> List.map (fun (_, e) -> freeVars boundVars e) |> Set.unionMany
+        Set.union srcFree overFree
+    | SetField(recExpr, _, valueExpr, _) ->
+        Set.union (freeVars boundVars recExpr) (freeVars boundVars valueExpr)
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
