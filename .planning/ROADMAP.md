@@ -57,8 +57,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 22-01-PLAN.md — IR extension (LlvmGEPDynamicOp) and C runtime array functions
-- [ ] 22-02-PLAN.md — Array builtin elaboration cases and E2E tests
+- [x] 22-01-PLAN.md — IR extension (LlvmGEPDynamicOp) and C runtime array functions
+- [x] 22-02-PLAN.md — Array builtin elaboration cases and E2E tests
 
 #### Phase 23: Hashtable
 
@@ -99,6 +99,6 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–20. Foundation–Exceptions | v1.0–v4.0 | 37/37 | Complete | 2026-03-27 |
 | 21. Mutable Variables | v5.0 | 2/2 | Complete | 2026-03-27 |
-| 22. Array Core | v5.0 | 0/2 | Not started | - |
+| 22. Array Core | v5.0 | 2/2 | Complete | 2026-03-27 |
 | 23. Hashtable | v5.0 | 0/? | Not started | - |
 | 24. Array HOF Builtins | v5.0 | 0/? | Not started | - |
