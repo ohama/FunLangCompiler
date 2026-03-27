@@ -87,10 +87,11 @@ Plans:
   2. `array_map (fun x -> x * 2) arr` returns a new array with each element doubled
   3. `array_fold (fun acc x -> acc + x) 0 arr` returns the sum of all elements
   4. `array_init 5 (fun i -> i * i)` returns an array [0; 1; 4; 9; 16]
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 24-01: TBD
+- [ ] 24-01-PLAN.md — C runtime HOF functions (LangClosureFn typedef, lang_array_iter/map/fold/init)
+- [ ] 24-02-PLAN.md — HOF elaboration cases, ExternalFuncDecl entries, and 4 E2E tests
 
 ## Progress
 
@@ -102,4 +103,4 @@ Plans:
 | 21. Mutable Variables | v5.0 | 2/2 | Complete | 2026-03-27 |
 | 22. Array Core | v5.0 | 2/2 | Complete | 2026-03-27 |
 | 23. Hashtable | v5.0 | 2/2 | Complete | 2026-03-27 |
-| 24. Array HOF Builtins | v5.0 | 0/? | Not started | - |
+| 24. Array HOF Builtins | v5.0 | 0/2 | Not started | - |
