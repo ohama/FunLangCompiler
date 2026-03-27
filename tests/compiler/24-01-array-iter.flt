@@ -1,0 +1,7 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let arr = array_of_list (1 :: 2 :: 3 :: []) in
+let _ = array_iter (fun x -> print (to_string x)) arr in
+0
+// --- Output:
+1230
