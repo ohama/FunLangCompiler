@@ -131,6 +131,11 @@ let private printOp (indent: string) (op: MlirOp) : string =
     // Phase 11: noreturn terminator after match failure
     | LlvmUnreachableOp ->
         sprintf "%sllvm.unreachable" indent
+    // Phase 20: type coercions between i64 and !llvm.ptr
+    | LlvmIntToPtrOp(result, src) ->
+        sprintf "%s%s = llvm.inttoptr %s : i64 to !llvm.ptr" indent result.Name src.Name
+    | LlvmPtrToIntOp(result, src) ->
+        sprintf "%s%s = llvm.ptrtoint %s : !llvm.ptr to i64" indent result.Name src.Name
     | ReturnOp [] ->
         sprintf "%sreturn" indent
     | ReturnOp operands ->

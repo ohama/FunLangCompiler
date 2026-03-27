@@ -69,6 +69,11 @@ type MlirOp =
     // predicate: "eq" (null check) or "ne" (non-null check); lhs and rhs must be Ptr typed
     // Phase 11: LlvmUnreachableOp for noreturn terminator after match failure
     | LlvmUnreachableOp
+    // Phase 20: type coercions between i64 and !llvm.ptr (for first-class constructor closures)
+    | LlvmIntToPtrOp of result: MlirValue * src: MlirValue
+    // result.Type must be Ptr — emits: %result = llvm.inttoptr %src : i64 to !llvm.ptr
+    | LlvmPtrToIntOp of result: MlirValue * src: MlirValue
+    // result.Type must be I64 — emits: %result = llvm.ptrtoint %src : !llvm.ptr to i64
     // emits: llvm.unreachable — terminator after a noreturn void call (e.g. @lang_match_failure)
     | ReturnOp        of operands: MlirValue list
 

@@ -995,7 +995,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 // This happens when a field was first loaded as I64 but actually needs to be Ptr.
                 // Emit a new load from the parent.
                 match acc with
-                | MatchCompiler.Root _ -> (v, [])  // root type is fixed
+                | MatchCompiler.Root _ ->
+                    // Phase 20: Root accessor type mismatch — emit inttoptr when root is I64 but Ptr needed.
+                    // This occurs when a first-class constructor closure returns ptrtoint(ADT block),
+                    // and the match scrutinee is the i64 result of the indirect call.
+                    if v.Type = I64 && ty = Ptr then
+                        let ptrVal = { Name = freshName env; Type = Ptr }
+                        accessorCache.[acc] <- ptrVal
+                        (ptrVal, [LlvmIntToPtrOp(ptrVal, v)])
+                    else (v, [])
                 | MatchCompiler.Field (parent, idx) ->
                     let (parentVal, parentOps) = resolveAccessor parent
                     let slotVal  = { Name = freshName env; Type = Ptr }
@@ -1293,14 +1301,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             ) ([], innerEnv)
         innerEnvWithCaptures.Counter.Value <- numCaptures * 2
         let (bodyVal, bodyEntryOps) = elaborateExpr innerEnvWithCaptures body
+        // Phase 20: if body returns Ptr (e.g. constructor closure), ptrtoint to I64 for uniform closure return type.
+        // The call site uses inttoptr to recover the pointer when matched against ADT patterns.
+        let (finalRetVal, ptrToIntOps) =
+            if bodyVal.Type = Ptr then
+                let i64Val = { Name = freshName innerEnvWithCaptures; Type = I64 }
+                (i64Val, [LlvmPtrToIntOp(i64Val, bodyVal)])
+            else (bodyVal, [])
         let bodySideBlocks = innerEnvWithCaptures.Blocks.Value
         let allBodyBlocks =
             if bodySideBlocks.IsEmpty then
-                [ { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps @ [LlvmReturnOp [bodyVal]] } ]
+                [ { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps @ ptrToIntOps @ [LlvmReturnOp [finalRetVal]] } ]
             else
                 let entryBlock = { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps }
                 let lastBlock = List.last bodySideBlocks
-                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [LlvmReturnOp [bodyVal]] }
+                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ ptrToIntOps @ [LlvmReturnOp [finalRetVal]] }
                 let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
                 entryBlock :: sideBlocksPatched
         let innerFuncOp : FuncOp =
@@ -1622,7 +1637,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | true, v when v.Type = ty -> (v, [])
             | true, v ->
                 match acc with
-                | MatchCompiler.Root _ -> (v, [])
+                | MatchCompiler.Root _ ->
+                    if v.Type = I64 && ty = Ptr then
+                        let ptrVal = { Name = freshName env; Type = Ptr }
+                        accessorCache2.[acc] <- ptrVal
+                        (ptrVal, [LlvmIntToPtrOp(ptrVal, v)])
+                    else (v, [])
                 | MatchCompiler.Field (parent, idx) ->
                     let (parentVal, parentOps) = resolveAccessor2 parent
                     let slotVal  = { Name = freshName env; Type = Ptr }
