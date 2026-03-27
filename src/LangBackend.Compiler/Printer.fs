@@ -94,6 +94,9 @@ let private printOp (indent: string) (op: MlirOp) : string =
     | LlvmGEPStructOp(result, ptr, fieldIndex) ->
         sprintf "%s%s = llvm.getelementptr inbounds %s[0, %d] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i64, ptr)>"
             indent result.Name ptr.Name fieldIndex
+    | LlvmGEPDynamicOp(result, ptr, index) ->
+        sprintf "%s%s = llvm.getelementptr %s[%s] : (!llvm.ptr, i64) -> !llvm.ptr, i64"
+            indent result.Name ptr.Name index.Name
     | LlvmReturnOp [] ->
         sprintf "%sllvm.return" indent
     | LlvmReturnOp operands ->
