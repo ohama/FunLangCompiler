@@ -121,9 +121,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 19-01-PLAN.md — C runtime extension + Elaboration.fs scaffolding: lang_runtime.h, lang_try_enter/exit/throw, external func decls, prePassDecls fix, freeVars (EXN-01)
-- [ ] 19-02-PLAN.md — Raise elaboration: @lang_throw call + llvm.unreachable + 2 E2E tests (EXN-02, EXN-06 partial)
-- [ ] 19-03-PLAN.md — TryWith elaboration: setjmp branch + handler decision tree + merge block + 4 E2E tests (EXN-03, EXN-04, EXN-05, EXN-06)
+- [x] 19-01-PLAN.md — C runtime extension + Elaboration.fs scaffolding: lang_runtime.h, lang_try_enter/exit/throw, external func decls, prePassDecls fix, freeVars (EXN-01)
+- [x] 19-02-PLAN.md — Raise elaboration: @lang_throw call + llvm.unreachable + 2 E2E tests (EXN-02, EXN-06 partial)
+- [x] 19-03-PLAN.md — TryWith elaboration: setjmp branch + handler decision tree + merge block + 4 E2E tests (EXN-03, EXN-04, EXN-05, EXN-06)
 
 ---
 
@@ -137,13 +137,12 @@ Plans:
   2. `match tree with | Node(Node(Leaf, v, Leaf), root, _) -> root + v | _ -> 0` — nested constructor pattern (multi-level GEP chains) extracts values at depth 2+
   3. Handler miss propagates the exception: when no arm matches, `lang_throw` is called from the `Fail` branch, re-raising to the outer handler or aborting
   4. An exception raised inside a handler body is handled correctly — the inner `try-with` frame does not re-enter the current handler
-  5. All 45 existing E2E tests continue to pass (REG-01 gate)
-**Plans**: TBD
+  5. All 63 existing E2E tests continue to pass (REG-01 gate)
+**Plans**: 2 plans
 
 Plans:
-- [ ] 20-01: First-class constructors — unary ctor lambda wrapping (ADT-11)
-- [ ] 20-02: Nested ADT pattern matching — multi-level GEP chains in MatchCompiler (ADT-12)
-- [ ] 20-03: Exception re-raise + handler-internal exception handling (EXN-07, EXN-08)
+- [ ] 20-01-PLAN.md — First-class constructors: arity-aware Constructor(name, None, _) wraps unary+ as Lambda closure (ADT-11)
+- [ ] 20-02-PLAN.md — Nested ADT pattern Ptr pre-load + raise-in-handler terminator fix (ADT-12, EXN-07 verified, EXN-08)
 
 ---
 
@@ -161,7 +160,7 @@ Plans:
 | 17. ADT Construction & Pattern Matching | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 18. Records | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 19. Exception Handling | v4.0 | 3/3 | Complete | 2026-03-27 |
-| 20. Completeness | v4.0 | 0/3 | Not started | - |
+| 20. Completeness | v4.0 | 0/2 | Not started | - |
 
 ---
 *Created: 2026-03-26 for v4.0 milestone*
