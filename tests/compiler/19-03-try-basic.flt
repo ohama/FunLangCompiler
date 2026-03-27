@@ -1,0 +1,9 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+exception Failure of string
+let _ =
+  try raise (Failure "x")
+  with
+  | Failure msg -> string_length msg
+// --- Output:
+1
