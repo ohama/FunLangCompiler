@@ -5,13 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v5.0 shipped — planning next milestone
+**Current focus:** v6.0 Modules & I/O
 
 ## Current Position
 
-Phase: Between milestones
-Status: v5.0 complete — 92 E2E tests, 26/26 requirements shipped
-Last activity: 2026-03-28 — v5.0 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-28 — Milestone v6.0 started
 
 Progress: v1.0-v5.0 shipped (24 phases, 45 plans total)
 
@@ -41,5 +42,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: v5.0 milestone archived
+Stopped at: v6.0 milestone started — defining requirements
 Resume file: None
