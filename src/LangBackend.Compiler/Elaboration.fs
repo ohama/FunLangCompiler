@@ -799,6 +799,85 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = I64 }
         (result, strOps @ [LlvmCallOp(result, "@lang_string_to_int", [strVal])])
 
+    // Phase 22: array_set — three-arg (must appear before two-arg and one-arg patterns)
+    // array_set arr idx val: bounds check, compute slot idx+1, GEP, store, return unit
+    | App (App (App (Var ("array_set", _), arrExpr, _), idxExpr, _), valExpr, _) ->
+        let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let (idxVal, idxOps) = elaborateExpr env idxExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let oneVal    = { Name = freshName env; Type = I64 }
+        let slotVal   = { Name = freshName env; Type = I64 }
+        let elemPtr   = { Name = freshName env; Type = Ptr }
+        let unitVal   = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmCallVoidOp("@lang_array_bounds_check", [arrVal; idxVal])
+            ArithConstantOp(oneVal, 1L)
+            ArithAddIOp(slotVal, idxVal, oneVal)
+            LlvmGEPDynamicOp(elemPtr, arrVal, slotVal)
+            LlvmStoreOp(valVal, elemPtr)
+            ArithConstantOp(unitVal, 0L)
+        ]
+        (unitVal, arrOps @ idxOps @ valOps @ ops)
+
+    // Phase 22: array_get — two-arg
+    // array_get arr idx: bounds check, compute slot idx+1, GEP, load
+    | App (App (Var ("array_get", _), arrExpr, _), idxExpr, _) ->
+        let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let (idxVal, idxOps) = elaborateExpr env idxExpr
+        let oneVal  = { Name = freshName env; Type = I64 }
+        let slotVal = { Name = freshName env; Type = I64 }
+        let elemPtr = { Name = freshName env; Type = Ptr }
+        let result  = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmCallVoidOp("@lang_array_bounds_check", [arrVal; idxVal])
+            ArithConstantOp(oneVal, 1L)
+            ArithAddIOp(slotVal, idxVal, oneVal)
+            LlvmGEPDynamicOp(elemPtr, arrVal, slotVal)
+            LlvmLoadOp(result, elemPtr)
+        ]
+        (result, arrOps @ idxOps @ ops)
+
+    // Phase 22: array_create — two-arg
+    // array_create n defVal: call lang_array_create(n, defVal)
+    | App (App (Var ("array_create", _), nExpr, _), defExpr, _) ->
+        let (nVal,   nOps)   = elaborateExpr env nExpr
+        let (defVal, defOps) = elaborateExpr env defExpr
+        // Ensure both args are I64 (defVal may be I1 from bool literals)
+        let nI64 =
+            if nVal.Type = I64 then (nVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, nVal)])
+        let defI64 =
+            if defVal.Type = I64 then (defVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, defVal)])
+        let result = { Name = freshName env; Type = Ptr }
+        let (nV, nCoerce)     = nI64
+        let (defV, defCoerce) = defI64
+        (result, nOps @ defOps @ nCoerce @ defCoerce @ [LlvmCallOp(result, "@lang_array_create", [nV; defV])])
+
+    // Phase 22: array_length — one-arg
+    // array_length arr: GEP slot 0 (length slot), load
+    | App (Var ("array_length", _), arrExpr, _) ->
+        let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let lenPtr = { Name = freshName env; Type = Ptr }
+        let result = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmGEPLinearOp(lenPtr, arrVal, 0)
+            LlvmLoadOp(result, lenPtr)
+        ]
+        (result, arrOps @ ops)
+
+    // Phase 22: array_of_list — one-arg
+    | App (Var ("array_of_list", _), lstExpr, _) ->
+        let (lstVal, lstOps) = elaborateExpr env lstExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, lstOps @ [LlvmCallOp(result, "@lang_array_of_list", [lstVal])])
+
+    // Phase 22: array_to_list — one-arg
+    | App (Var ("array_to_list", _), arrExpr, _) ->
+        let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, arrOps @ [LlvmCallOp(result, "@lang_array_to_list", [arrVal])])
+
     // Phase 14: char_to_int — identity (char is already i64)
     | App (Var ("char_to_int", _), charExpr, _) ->
         elaborateExpr env charExpr
@@ -2052,6 +2131,10 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_throw";              ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_current_exception";  ExtParams = [];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@_setjmp";                 ExtParams = [Ptr];  ExtReturn = Some I32; IsVarArg = false; Attrs = ["returns_twice"] }
+        { ExtName = "@lang_array_create";       ExtParams = [I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_bounds_check"; ExtParams = [Ptr; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_of_list";      ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_to_list";      ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -2185,5 +2268,9 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_throw";              ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_current_exception";  ExtParams = [];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@_setjmp";                 ExtParams = [Ptr];  ExtReturn = Some I32; IsVarArg = false; Attrs = ["returns_twice"] }
+        { ExtName = "@lang_array_create";       ExtParams = [I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_bounds_check"; ExtParams = [Ptr; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_of_list";      ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_to_list";      ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
