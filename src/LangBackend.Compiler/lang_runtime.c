@@ -337,3 +337,55 @@ LangCons* lang_hashtable_keys(LangHashtable* ht) {
     }
     return result;
 }
+
+/* Array higher-order function runtime.
+ * Closure ABI: closure ptr points to a struct whose first field is a LangClosureFn.
+ * Call: fn = *(LangClosureFn*)closure; fn(closure, arg) */
+
+void lang_array_iter(void* closure, int64_t* arr) {
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    int64_t n = arr[0];
+    for (int64_t i = 1; i <= n; i++) {
+        fn(closure, arr[i]);
+    }
+}
+
+int64_t* lang_array_map(void* closure, int64_t* arr) {
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    int64_t n = arr[0];
+    int64_t* out = (int64_t*)GC_malloc((size_t)((n + 1) * 8));
+    out[0] = n;
+    for (int64_t i = 1; i <= n; i++) {
+        out[i] = fn(closure, arr[i]);
+    }
+    return out;
+}
+
+int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr) {
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    int64_t n = arr[0];
+    int64_t acc = init;
+    for (int64_t i = 1; i <= n; i++) {
+        /* Curried binary closure: two calls per iteration.
+         * First call: fn(closure, acc) returns partial application (closure ptr as i64).
+         * Second call: fn2(partial_ptr, arr[i]) applies element to partial. */
+        int64_t partial = fn(closure, acc);
+        void* partial_ptr = (void*)partial;
+        LangClosureFn fn2 = *(LangClosureFn*)partial_ptr;
+        acc = fn2(partial_ptr, arr[i]);
+    }
+    return acc;
+}
+
+int64_t* lang_array_init(int64_t n, void* closure) {
+    if (n < 0) {
+        lang_failwith("array_init: negative length");
+    }
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    int64_t* out = (int64_t*)GC_malloc((size_t)((n + 1) * 8));
+    out[0] = n;
+    for (int64_t i = 0; i < n; i++) {
+        out[i + 1] = fn(closure, i);
+    }
+    return out;
+}
