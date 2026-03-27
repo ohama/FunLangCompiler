@@ -130,6 +130,24 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         Set.union srcFree overFree
     | SetField(recExpr, _, valueExpr, _) ->
         Set.union (freeVars boundVars recExpr) (freeVars boundVars valueExpr)
+    | Raise(e, _) -> freeVars boundVars e
+    | TryWith(body, clauses, _) ->
+        let bodyFree = freeVars boundVars body
+        let clauseFree =
+            clauses |> List.map (fun (pat, guardOpt, armBody) ->
+                let rec patBoundVars p =
+                    match p with
+                    | VarPat(n, _) -> Set.singleton n
+                    | TuplePat(ps, _) -> ps |> List.map patBoundVars |> Set.unionMany
+                    | ConsPat(h, t, _) -> Set.union (patBoundVars h) (patBoundVars t)
+                    | ConstructorPat(_, Some inner, _) -> patBoundVars inner
+                    | _ -> Set.empty
+                let patBound = patBoundVars pat
+                let armBound = Set.union boundVars patBound
+                let guardFree = match guardOpt with Some g -> freeVars armBound g | None -> Set.empty
+                Set.union guardFree (freeVars armBound armBody)
+            ) |> Set.unionMany
+        Set.union bodyFree clauseFree
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
@@ -1487,6 +1505,10 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false }
         { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false }
         { ExtName = "@lang_range";           ExtParams = [I64; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_try_enter";          ExtParams = [Ptr];  ExtReturn = Some I64; IsVarArg = false }
+        { ExtName = "@lang_try_exit";           ExtParams = [];     ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@lang_throw";              ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@lang_current_exception";  ExtParams = [];     ExtReturn = Some Ptr; IsVarArg = false }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -1516,10 +1538,12 @@ let private prePassDecls (decls: Ast.Decl list)
                 |> List.mapi (fun idx (Ast.RecordFieldDecl(name, _, _, _)) -> (name, idx))
                 |> Map.ofList
             recordEnv <- Map.add typeName fieldMap recordEnv
-        | Ast.Decl.ExceptionDecl(name, _, _) ->
+        | Ast.Decl.ExceptionDecl(name, dataTypeOpt, _) ->
             let tag = exnCounter.Value
             exnCounter.Value <- tag + 1
             exnTags <- Map.add name tag exnTags
+            let arity = match dataTypeOpt with Some _ -> 1 | None -> 0
+            typeEnv <- Map.add name { Tag = tag; Arity = arity } typeEnv
         | _ -> ()
     (typeEnv, recordEnv, exnTags)
 
@@ -1611,5 +1635,9 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false }
         { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false }
         { ExtName = "@lang_range";           ExtParams = [I64; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@lang_try_enter";          ExtParams = [Ptr];  ExtReturn = Some I64; IsVarArg = false }
+        { ExtName = "@lang_try_exit";           ExtParams = [];     ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@lang_throw";              ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false }
+        { ExtName = "@lang_current_exception";  ExtParams = [];     ExtReturn = Some Ptr; IsVarArg = false }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
