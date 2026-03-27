@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <gc.h>
+#include "lang_runtime.h"
 
 /* String struct layout matches MLIR {i64 length, ptr data} at offsets 0 and 8 */
 typedef struct {
@@ -111,4 +112,34 @@ LangCons* lang_range(int64_t start, int64_t stop, int64_t step) {
         }
     }
     return head;
+}
+
+/* Exception handling runtime */
+LangExnFrame *lang_exn_top = NULL;
+void *lang_current_exception_val = NULL;
+
+__attribute__((returns_twice))
+int lang_try_enter(LangExnFrame *frame) {
+    frame->prev = lang_exn_top;
+    lang_exn_top = frame;
+    return setjmp(frame->buf);
+}
+
+void lang_try_exit(void) {
+    if (lang_exn_top != NULL)
+        lang_exn_top = lang_exn_top->prev;
+}
+
+void lang_throw(void *exn_val) {
+    lang_current_exception_val = exn_val;
+    if (lang_exn_top == NULL) {
+        fprintf(stderr, "Fatal: unhandled exception\n");
+        exit(1);
+    }
+    LangExnFrame *frame = lang_exn_top;
+    longjmp(frame->buf, 1);
+}
+
+void *lang_current_exception(void) {
+    return lang_current_exception_val;
 }
