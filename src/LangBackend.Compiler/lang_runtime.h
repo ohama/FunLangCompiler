@@ -50,4 +50,10 @@ int64_t lang_hashtable_containsKey(LangHashtable* ht, int64_t key);
 void lang_hashtable_remove(LangHashtable* ht, int64_t key);
 LangCons* lang_hashtable_keys(LangHashtable* ht);
 
+typedef int64_t (*LangClosureFn)(void* env, int64_t arg);
+void lang_array_iter(void* closure, int64_t* arr);
+int64_t* lang_array_map(void* closure, int64_t* arr);
+int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr);
+int64_t* lang_array_init(int64_t n, void* closure);
+
 #endif
