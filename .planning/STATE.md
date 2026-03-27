@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v5.0 Mutable & Collections — Phase 22: Array Core (complete), next: Phase 23 Hashtable
+**Current focus:** v5.0 Mutable & Collections — Phase 23: Hashtable (in progress, plan 1 of 2 complete)
 
 ## Current Position
 
-Phase: 22 of 24 (Array Core) — Complete
-Plan: 2 of 2 in phase 22
-Status: Phase complete
-Last activity: 2026-03-27 — Completed 22-02-PLAN.md (array builtin elaboration + 7 E2E tests)
+Phase: 23 of 24 (Hashtable) — In progress
+Plan: 1 of 2 in phase 23
+Status: In progress
+Last activity: 2026-03-27 — Completed 23-01-PLAN.md (hashtable C runtime structs and 6 functions)
 
-Progress: [##############░░░░░░░░░░░░░░░░] v4.0 complete, v5.0 phases 21+22 done (80 tests passing)
+Progress: [###############░░░░░░░░░░░░░░░] v4.0 complete, v5.0 phases 21+22+23-01 done (80 tests passing)
 
 ## Performance Metrics
 
@@ -23,7 +23,7 @@ Progress: [##############░░░░░░░░░░░░░░░░] v4.0 
 - v2.0: 9 plans, 5 phases — 34 FsLit tests, 1,861 LOC
 - v3.0: 5 plans, 4 phases — 45 FsLit tests
 - v4.0: 12 plans, 5 phases — 67 FsLit tests, 2,861 F# LOC + 184 C LOC
-- v5.0: 4 plans, 2/4 phases complete — Phases 21+22 done (80 E2E tests)
+- v5.0: 5 plans, 2.5/4 phases complete — Phases 21+22 done, 23-01 done (80 E2E tests)
 
 **By Phase:**
 
@@ -55,6 +55,10 @@ Recent decisions affecting v5.0:
 - [22-02] Three-arg array_set must appear before two-arg array_get/array_create in elaborateExpr match
 - [22-02] Shell $? truncates exit codes to 8 bits; try/with E2E tests must use return values 0-255
 - [22-02] Both externalFuncs lists in Elaboration.fs (elaborateModule + elaborateProgram) must be kept in sync
+- [23-01] murmurhash3 fmix64 finalizer used for i64 key hashing — fast, no dependencies, good avalanche
+- [23-01] lang_throw used for missing-key error (not lang_failwith) — hashtable KeyNotFound is catchable by try/with
+- [23-01] Rehash threshold is size*4 > capacity*3 (load > 0.75), capacity doubles on each rehash
+- [23-01] lang_hashtable_keys returns LangCons* in bucket-iteration order (unspecified, not insertion order)
 
 ### Pending Todos
 
@@ -62,10 +66,10 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 23 (Hashtable) requires new C runtime file with LangHashtable struct and lang_ht_* functions + value hash function
+None — C runtime hashtable complete. Phase 23 plan 02 (elaboration) ready to proceed.
 
 ## Session Continuity
 
-Last session: 2026-03-27T11:21:37Z
-Stopped at: Completed 22-02-PLAN.md — array builtin elaboration + 7 E2E tests (80 tests)
+Last session: 2026-03-27T12:08:51Z
+Stopped at: Completed 23-01-PLAN.md — hashtable C runtime structs and 6 functions (80 tests)
 Resume file: None
