@@ -85,11 +85,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | ADT-11 | Phase 20 | Pending |
 | ADT-12 | Phase 20 | Pending |
 | REC-01 | Phase 16 | Complete |
-| REC-02 | Phase 18 | Pending |
-| REC-03 | Phase 18 | Pending |
-| REC-04 | Phase 18 | Pending |
-| REC-05 | Phase 18 | Pending |
-| REC-06 | Phase 18 | Pending |
+| REC-02 | Phase 18 | Complete |
+| REC-03 | Phase 18 | Complete |
+| REC-04 | Phase 18 | Complete |
+| REC-05 | Phase 18 | Complete |
+| REC-06 | Phase 18 | Complete |
 | EXN-01 | Phase 19 | Pending |
 | EXN-02 | Phase 19 | Pending |
 | EXN-03 | Phase 19 | Pending |

@@ -44,7 +44,7 @@ Delivered: Modulo/Char/Pipe/Compose operators, when guards, OrPat, CharConst pat
 
 - [x] **Phase 16: Environment Infrastructure** — TypeEnv/RecordEnv/ExnTags 구성 + MatchCompiler CtorTag 확장
 - [x] **Phase 17: ADT Construction & Pattern Matching** — Constructor elaboration + ConstructorPat round-trip ✓
-- [ ] **Phase 18: Records** — RecordExpr/FieldAccess/RecordUpdate/SetField/RecordPat elaboration
+- [x] **Phase 18: Records** — RecordExpr/FieldAccess/RecordUpdate/SetField/RecordPat elaboration ✓
 - [ ] **Phase 19: Exception Handling** — setjmp/longjmp C runtime + Raise/TryWith elaboration
 - [ ] **Phase 20: Completeness** — First-class constructors, nested ADT patterns, exception re-raise/in-handler
 
@@ -101,8 +101,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 18-01-PLAN.md — RecordExpr/FieldAccess/RecordUpdate/SetField elaboration + freeVars + 4 E2E tests (REC-02, REC-03, REC-04, REC-05)
-- [ ] 18-02-PLAN.md — RecordPat elaboration: fill RecordCtor stubs + ensureRecordFieldTypes slot remapping + 2 E2E tests (REC-06)
+- [x] 18-01-PLAN.md — RecordExpr/FieldAccess/RecordUpdate/SetField elaboration + freeVars + 4 E2E tests (REC-02, REC-03, REC-04, REC-05)
+- [x] 18-02-PLAN.md — RecordPat elaboration: fill RecordCtor stubs + ensureRecordFieldTypes slot remapping + 2 E2E tests (REC-06)
 
 ---
 
@@ -159,7 +159,7 @@ Plans:
 | 12-15. Language Completeness | v3.0 | 5/5 | Complete | 2026-03-26 |
 | 16. Environment Infrastructure | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 17. ADT Construction & Pattern Matching | v4.0 | 2/2 | Complete | 2026-03-27 |
-| 18. Records | v4.0 | 0/2 | Not started | - |
+| 18. Records | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 19. Exception Handling | v4.0 | 0/3 | Not started | - |
 | 20. Completeness | v4.0 | 0/3 | Not started | - |
 
