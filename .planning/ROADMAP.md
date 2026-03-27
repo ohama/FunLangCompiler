@@ -5,7 +5,7 @@
 - ✅ **v1.0 Core Compiler** — Phases 1-6 (shipped 2026-03-26)
 - ✅ **v2.0 Data Types & Pattern Matching** — Phases 7-11 (shipped 2026-03-26)
 - ✅ **v3.0 Language Completeness** — Phases 12-15 (shipped 2026-03-26)
-- 🚧 **v4.0 Type System & Error Handling** — Phases 16-20 (in progress)
+- ✅ **v4.0 Type System & Error Handling** — Phases 16-20 (shipped 2026-03-27)
 
 ## Phases
 
@@ -46,7 +46,7 @@ Delivered: Modulo/Char/Pipe/Compose operators, when guards, OrPat, CharConst pat
 - [x] **Phase 17: ADT Construction & Pattern Matching** — Constructor elaboration + ConstructorPat round-trip ✓
 - [x] **Phase 18: Records** — RecordExpr/FieldAccess/RecordUpdate/SetField/RecordPat elaboration ✓
 - [x] **Phase 19: Exception Handling** — setjmp/longjmp C runtime + Raise/TryWith elaboration ✓
-- [ ] **Phase 20: Completeness** — First-class constructors, nested ADT patterns, exception re-raise/in-handler
+- [x] **Phase 20: Completeness** — First-class constructors, nested ADT patterns, exception re-raise/in-handler ✓
 
 ---
 
@@ -138,11 +138,12 @@ Plans:
   3. Handler miss propagates the exception: when no arm matches, `lang_throw` is called from the `Fail` branch, re-raising to the outer handler or aborting
   4. An exception raised inside a handler body is handled correctly — the inner `try-with` frame does not re-enter the current handler
   5. All 63 existing E2E tests continue to pass (REG-01 gate)
-**Plans**: 2 plans
+**Plans**: 3 plans
 
 Plans:
-- [ ] 20-01-PLAN.md — First-class constructors: arity-aware Constructor(name, None, _) wraps unary+ as Lambda closure (ADT-11)
-- [ ] 20-02-PLAN.md — Nested ADT pattern Ptr pre-load + raise-in-handler terminator fix (ADT-12, EXN-07 verified, EXN-08)
+- [x] 20-01-PLAN.md — First-class constructors: arity-aware Constructor(name, None, _) wraps unary+ as Lambda closure (ADT-11)
+- [x] 20-02-PLAN.md — Nested ADT pattern Ptr pre-load + raise-in-handler terminator fix (ADT-12, EXN-07 verified, EXN-08)
+- [x] 20-03-PLAN.md — Gap closure: I64 closure dispatch + general App case for HOF constructor passing (ADT-11 complete)
 
 ---
 
@@ -160,7 +161,7 @@ Plans:
 | 17. ADT Construction & Pattern Matching | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 18. Records | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 19. Exception Handling | v4.0 | 3/3 | Complete | 2026-03-27 |
-| 20. Completeness | v4.0 | 0/2 | Not started | - |
+| 20. Completeness | v4.0 | 3/3 | Complete | 2026-03-27 |
 
 ---
 *Created: 2026-03-26 for v4.0 milestone*
