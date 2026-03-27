@@ -88,14 +88,14 @@ Deferred to future release.
 | ARR-09 | Phase 24 | Pending |
 | ARR-10 | Phase 24 | Pending |
 | ARR-11 | Phase 24 | Pending |
-| HT-01 | Phase 23 | Pending |
-| HT-02 | Phase 23 | Pending |
-| HT-03 | Phase 23 | Pending |
-| HT-04 | Phase 23 | Pending |
-| HT-05 | Phase 23 | Pending |
-| HT-06 | Phase 23 | Pending |
-| HT-07 | Phase 23 | Pending |
-| HT-08 | Phase 23 | Pending |
+| HT-01 | Phase 23 | Complete |
+| HT-02 | Phase 23 | Complete |
+| HT-03 | Phase 23 | Complete |
+| HT-04 | Phase 23 | Complete |
+| HT-05 | Phase 23 | Complete |
+| HT-06 | Phase 23 | Complete |
+| HT-07 | Phase 23 | Complete |
+| HT-08 | Phase 23 | Complete |
 | REG-01 | All phases | Pending |
 
 **Coverage:**
