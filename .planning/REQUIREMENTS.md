@@ -61,33 +61,33 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MOD-01 | TBD | Pending |
-| MOD-02 | TBD | Pending |
-| MOD-03 | TBD | Pending |
-| MOD-04 | TBD | Pending |
-| MOD-05 | TBD | Pending |
-| MOD-06 | TBD | Pending |
-| FIO-01 | TBD | Pending |
-| FIO-02 | TBD | Pending |
-| FIO-03 | TBD | Pending |
-| FIO-04 | TBD | Pending |
-| FIO-05 | TBD | Pending |
-| FIO-06 | TBD | Pending |
-| FIO-07 | TBD | Pending |
-| FIO-08 | TBD | Pending |
-| FIO-09 | TBD | Pending |
-| FIO-10 | TBD | Pending |
-| FIO-11 | TBD | Pending |
-| FIO-12 | TBD | Pending |
-| FIO-13 | TBD | Pending |
-| FIO-14 | TBD | Pending |
-| REG-01 | All | Pending |
+| MOD-01 | Phase 25 | Pending |
+| MOD-02 | Phase 25 | Pending |
+| MOD-03 | Phase 25 | Pending |
+| MOD-04 | Phase 25 | Pending |
+| MOD-05 | Phase 25 | Pending |
+| MOD-06 | Phase 25 | Pending |
+| FIO-01 | Phase 26 | Pending |
+| FIO-02 | Phase 26 | Pending |
+| FIO-03 | Phase 26 | Pending |
+| FIO-04 | Phase 26 | Pending |
+| FIO-05 | Phase 27 | Pending |
+| FIO-06 | Phase 27 | Pending |
+| FIO-07 | Phase 27 | Pending |
+| FIO-08 | Phase 27 | Pending |
+| FIO-09 | Phase 26 | Pending |
+| FIO-10 | Phase 27 | Pending |
+| FIO-11 | Phase 27 | Pending |
+| FIO-12 | Phase 27 | Pending |
+| FIO-13 | Phase 27 | Pending |
+| FIO-14 | Phase 26 | Pending |
+| REG-01 | All phases | Pending |
 
 **Coverage:**
 - v1 requirements: 21 total
-- Mapped to phases: 0 (TBD)
-- Unmapped: 21
+- Mapped to phases: 21/21
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-28*
-*Last updated: 2026-03-28 after initial definition*
+*Last updated: 2026-03-27 — traceability assigned after roadmap creation*
