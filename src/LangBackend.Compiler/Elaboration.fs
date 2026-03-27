@@ -1042,6 +1042,55 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, nOps @ nCoerce @ fOps @ closureOps @ [LlvmCallOp(result, "@lang_array_init", [nV; closurePtrVal])])
 
+    // write_file — two-arg, void return
+    | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
+        let (pathVal,    pathOps)    = elaborateExpr env pathExpr
+        let (contentVal, contentOps) = elaborateExpr env contentExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [LlvmCallVoidOp("@lang_file_write", [pathVal; contentVal]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, pathOps @ contentOps @ ops)
+
+    // append_file — two-arg, void return (identical shape to write_file)
+    | App (App (Var ("append_file", _), pathExpr, _), contentExpr, _) ->
+        let (pathVal,    pathOps)    = elaborateExpr env pathExpr
+        let (contentVal, contentOps) = elaborateExpr env contentExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [LlvmCallVoidOp("@lang_file_append", [pathVal; contentVal]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, pathOps @ contentOps @ ops)
+
+    // read_file — one-arg, returns Ptr (LangString*)
+    | App (Var ("read_file", _), pathExpr, _) ->
+        let (pathVal, pathOps) = elaborateExpr env pathExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, pathOps @ [LlvmCallOp(result, "@lang_file_read", [pathVal])])
+
+    // file_exists — one-arg, returns bool (I1 via I64 comparison)
+    | App (Var ("file_exists", _), pathExpr, _) ->
+        let (pathVal, pathOps) = elaborateExpr env pathExpr
+        let rawVal  = { Name = freshName env; Type = I64 }
+        let zeroVal = { Name = freshName env; Type = I64 }
+        let boolVal = { Name = freshName env; Type = I1  }
+        let ops = [
+            LlvmCallOp(rawVal, "@lang_file_exists", [pathVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolVal, "ne", rawVal, zeroVal)
+        ]
+        (boolVal, pathOps @ ops)
+
+    // eprint — one-arg, void return
+    | App (Var ("eprint", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [LlvmCallVoidOp("@lang_eprint", [strVal]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, strOps @ ops)
+
+    // eprintln — one-arg, void return
+    | App (Var ("eprintln", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [LlvmCallVoidOp("@lang_eprintln", [strVal]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, strOps @ ops)
+
     // Phase 14: char_to_int — identity (char is already i64)
     | App (Var ("char_to_int", _), charExpr, _) ->
         elaborateExpr env charExpr
@@ -2324,6 +2373,12 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_array_map";             ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_fold";            ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_init";            ExtParams = [I64; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_file_read";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_file_write";   ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_file_append";  ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_file_exists";  ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_eprint";       ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_eprintln";     ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -2495,5 +2550,11 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_array_map";             ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_fold";            ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_init";            ExtParams = [I64; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_file_read";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_file_write";   ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_file_append";  ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_file_exists";  ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_eprint";       ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_eprintln";     ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
