@@ -117,13 +117,13 @@ Plans:
   3. Nested `try-with` blocks correctly push/pop the handler stack; the inner handler catches inner exceptions without interfering with the outer handler
   4. `raise (ParseError "bad input")` passes the payload through `lang_throw`/`lang_current_exception`; the handler extracts the string field correctly
   5. An unhandled exception (no matching handler) aborts with a printed message rather than undefined behavior
-  6. All 45 existing E2E tests continue to pass (REG-01 gate)
-**Plans**: TBD
+  6. All 57 existing E2E tests continue to pass (REG-01 gate)
+**Plans**: 3 plans
 
 Plans:
-- [ ] 19-01: C runtime extension — LangExnFrame struct, lang_try_enter (static inline setjmp), lang_try_exit, lang_throw, lang_current_exception (EXN-01)
-- [ ] 19-02: Raise elaboration — DataValue elaboration + @lang_throw call + llvm.unreachable (EXN-02)
-- [ ] 19-03: TryWith elaboration — LangExnFrame alloc + lang_try_enter + setjmp branch + handler decision tree + merge block + nested/payload/unhandled cases (EXN-03, EXN-04, EXN-05, EXN-06)
+- [ ] 19-01-PLAN.md — C runtime extension + Elaboration.fs scaffolding: lang_runtime.h, lang_try_enter/exit/throw, external func decls, prePassDecls fix, freeVars (EXN-01)
+- [ ] 19-02-PLAN.md — Raise elaboration: @lang_throw call + llvm.unreachable + 2 E2E tests (EXN-02, EXN-06 partial)
+- [ ] 19-03-PLAN.md — TryWith elaboration: setjmp branch + handler decision tree + merge block + 4 E2E tests (EXN-03, EXN-04, EXN-05, EXN-06)
 
 ---
 
