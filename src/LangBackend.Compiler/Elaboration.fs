@@ -118,6 +118,8 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         Set.union (freeVars boundVars l) (freeVars boundVars r)
     | PipeRight (l, r, _) | ComposeRight (l, r, _) | ComposeLeft (l, r, _) ->
         Set.union (freeVars boundVars l) (freeVars boundVars r)
+    | Constructor(_, None, _) -> Set.empty
+    | Constructor(_, Some argExpr, _) -> freeVars boundVars argExpr
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
@@ -1000,7 +1002,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | MatchCompiler.ConsCtor    -> Ptr
             | MatchCompiler.NilCtor     -> Ptr
             | MatchCompiler.TupleCtor _ -> Ptr
-            | MatchCompiler.AdtCtor _   -> failwith "Phase 17: AdtCtor not yet implemented"
+            | MatchCompiler.AdtCtor _    -> Ptr
             | MatchCompiler.RecordCtor _ -> failwith "Phase 18: RecordCtor not yet implemented"
 
         // Emit test ops for a constructor match against a scrutinee value.
@@ -1052,8 +1054,20 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let cond = { Name = freshName env; Type = I1 }
                 let ops = [ ArithConstantOp(cond, 1L) ]
                 (cond, ops)
-            | MatchCompiler.AdtCtor _ ->
-                failwith "Phase 17: AdtCtor not yet implemented"
+            | MatchCompiler.AdtCtor(name, _, _) ->
+                // Look up real tag from TypeEnv; load tag slot 0 and compare
+                let info     = Map.find name env.TypeEnv
+                let tagSlot  = { Name = freshName env; Type = Ptr }
+                let tagLoad  = { Name = freshName env; Type = I64 }
+                let tagConst = { Name = freshName env; Type = I64 }
+                let cond     = { Name = freshName env; Type = I1 }
+                let ops = [
+                    LlvmGEPLinearOp(tagSlot, scrutVal, 0)
+                    LlvmLoadOp(tagLoad, tagSlot)
+                    ArithConstantOp(tagConst, int64 info.Tag)
+                    ArithCmpIOp(cond, "eq", tagLoad, tagConst)
+                ]
+                (cond, ops)
             | MatchCompiler.RecordCtor _ ->
                 failwith "Phase 18: RecordCtor not yet implemented"
 
@@ -1067,6 +1081,19 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if argAccs.Length >= 2 then
                 let (_, tailOps) = resolveAccessorTyped argAccs.[1] Ptr
                 ops <- ops @ tailOps
+            ops
+
+        // Pre-populate accessor cache for AdtCtor sub-fields with correct types.
+        // ADT blocks: slot 0 = tag (I64), slot 1 = payload (stored directly — I64 for int, Ptr for tuple/string).
+        // For unary constructors the payload accessor is argAccs.[0] = Field(scrutAcc, 1).
+        // We pre-load it as I64 (the default), which is correct for integer payloads.
+        // For Ptr payloads the resolveAccessorTyped call in emitDecisionTree will re-load with the right type.
+        let ensureAdtFieldTypes (_scrutAcc: MatchCompiler.Accessor) (argAccs: MatchCompiler.Accessor list) : MlirOp list =
+            let mutable ops = []
+            if argAccs.Length >= 1 then
+                // Payload is at slot 1; default load as I64
+                let (_, payOps) = resolveAccessorTyped argAccs.[0] I64
+                ops <- ops @ payOps
             ops
 
         // Track the result type (determined by first leaf reached)
@@ -1103,10 +1130,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let (sVal, resolveOps) = resolveAccessorTyped scrutAcc expectedType
                 // Emit the test
                 let (cond, testOps) = emitCtorTest sVal tag
-                // For ConsCtor, pre-load sub-fields with correct types into the cache
+                // Pre-load sub-fields with correct types into the cache
                 let preloadOps =
                     match tag with
                     | MatchCompiler.ConsCtor -> ensureConsFieldTypes scrutAcc argAccs
+                    | MatchCompiler.AdtCtor(_, _, arity) when arity > 0 -> ensureAdtFieldTypes scrutAcc argAccs
                     | _ -> []
                 // Emit ifMatch and ifNoMatch as separate blocks
                 let matchLabel   = freshLabel env "match_yes"
@@ -1236,6 +1264,51 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                   LlvmStoreOp(capVal, slotVal) ]
             ) |> List.concat
         (envPtrVal, allocOps @ captureStoreOps)
+
+    // Phase 17: ADT constructor — nullary variant (e.g. Red in type Color = Red | Green | Blue)
+    // Allocates a 16-byte block: slot 0 = i64 tag, slot 1 = null ptr.
+    | Constructor(name, None, _) ->
+        let info        = Map.find name env.TypeEnv
+        let sizeVal     = { Name = freshName env; Type = I64 }
+        let blockPtr    = { Name = freshName env; Type = Ptr }
+        let tagSlot     = { Name = freshName env; Type = Ptr }
+        let tagVal      = { Name = freshName env; Type = I64 }
+        let paySlot     = { Name = freshName env; Type = Ptr }
+        let nullPayload = { Name = freshName env; Type = Ptr }
+        let ops = [
+            ArithConstantOp(sizeVal, 16L)
+            LlvmCallOp(blockPtr, "@GC_malloc", [sizeVal])
+            LlvmGEPLinearOp(tagSlot, blockPtr, 0)
+            ArithConstantOp(tagVal, int64 info.Tag)
+            LlvmStoreOp(tagVal, tagSlot)
+            LlvmGEPLinearOp(paySlot, blockPtr, 1)
+            LlvmNullOp(nullPayload)
+            LlvmStoreOp(nullPayload, paySlot)
+        ]
+        (blockPtr, ops)
+
+    // Phase 17: ADT constructor — unary/multi-arg variant (e.g. Some 42, Pair(3,4))
+    // Allocates a 16-byte block: slot 0 = i64 tag, slot 1 = argVal (I64 or Ptr).
+    // Multi-arg constructors: the parser produces Constructor("Pair", Some(Tuple([3;4])), _);
+    // elaborating the Tuple arg already yields a heap-allocated Ptr — stored directly at slot 1.
+    | Constructor(name, Some argExpr, _) ->
+        let info     = Map.find name env.TypeEnv
+        let (argVal, argOps) = elaborateExpr env argExpr
+        let sizeVal  = { Name = freshName env; Type = I64 }
+        let blockPtr = { Name = freshName env; Type = Ptr }
+        let tagSlot  = { Name = freshName env; Type = Ptr }
+        let tagVal   = { Name = freshName env; Type = I64 }
+        let paySlot  = { Name = freshName env; Type = Ptr }
+        let allocOps = [
+            ArithConstantOp(sizeVal, 16L)
+            LlvmCallOp(blockPtr, "@GC_malloc", [sizeVal])
+            LlvmGEPLinearOp(tagSlot, blockPtr, 0)
+            ArithConstantOp(tagVal, int64 info.Tag)
+            LlvmStoreOp(tagVal, tagSlot)
+            LlvmGEPLinearOp(paySlot, blockPtr, 1)
+            LlvmStoreOp(argVal, paySlot)
+        ]
+        (blockPtr, argOps @ allocOps)
 
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
