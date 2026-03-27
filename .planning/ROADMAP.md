@@ -41,10 +41,11 @@ See .planning/MILESTONES.md for full history. 24 phases, 45 plans, 92 E2E tests.
   4. `let pat = expr` declarations inside a module are included in execution (not silently dropped)
   5. All 92 existing E2E tests continue to pass after module system changes
 
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 25-01: TBD
+- [ ] 25-01-PLAN.md — prePassDecls recursion + flattenDecls + LetPatDecl + OpenDecl/NamespaceDecl no-ops (MOD-01/02/03/04/06)
+- [ ] 25-02-PLAN.md — Qualified name desugar in elaborateExpr (MOD-05)
 
 ---
 
@@ -103,7 +104,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–24 | v1.0–v5.0 | 45/45 | Complete | 2026-03-28 |
-| 25. Module System | v6.0 | 0/TBD | Not started | - |
+| 25. Module System | v6.0 | 0/2 | Planning complete | - |
 | 26. File I/O Core | v6.0 | 0/TBD | Not started | - |
 | 27. File I/O Extended | v6.0 | 0/TBD | Not started | - |
 
