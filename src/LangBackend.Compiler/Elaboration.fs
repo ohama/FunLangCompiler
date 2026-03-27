@@ -34,13 +34,16 @@ type ElabEnv = {
     TypeEnv:        Map<string, TypeInfo>            // constructor name -> tag + arity
     RecordEnv:      Map<string, Map<string, int>>    // record type name -> (field name -> index)
     ExnTags:        Map<string, int>                 // exception ctor name -> tag index
+    // Phase 21: Mutable variable tracking — names that live in GC ref cells
+    MutableVars:    Set<string>
 }
 
 let emptyEnv () : ElabEnv =
     { Vars = Map.empty; Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
       KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0
       Globals = ref []; GlobalCounter = ref 0
-      TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty }
+      TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty
+      MutableVars = Set.empty }
 
 let private addStringGlobal (env: ElabEnv) (rawValue: string) : string =
     match env.Globals.Value |> List.tryFind (fun (_, v) -> v = rawValue) with
@@ -148,6 +151,14 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
                 Set.union guardFree (freeVars armBound armBody)
             ) |> Set.unionMany
         Set.union bodyFree clauseFree
+    | LetMut (name, initExpr, bodyExpr, _) ->
+        Set.union (freeVars boundVars initExpr)
+                  (freeVars (Set.add name boundVars) bodyExpr)
+    | Assign (name, valExpr, _) ->
+        let nameFree =
+            if Set.contains name boundVars then Set.empty
+            else Set.singleton name
+        Set.union nameFree (freeVars boundVars valExpr)
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
@@ -363,7 +374,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
-              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags }
+              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
+              MutableVars = Set.empty }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -652,7 +664,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
-              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags }
+              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
+              MutableVars = Set.empty }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
@@ -1336,7 +1349,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
-              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags }
+              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
+              MutableVars = Set.empty }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
