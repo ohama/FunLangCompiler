@@ -1,0 +1,9 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+type Pair = { y: int; x: int }
+let p = { y = 10; x = 20 } in
+match p with
+| { x = xv; y = yv } -> xv
+| _ -> 0
+// --- Output:
+20
