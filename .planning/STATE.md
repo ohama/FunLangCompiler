@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 20 of 20 (Completeness) — In progress
-Plan: 01 of ? complete
-Status: In progress
-Last activity: 2026-03-27 — Completed 20-01-PLAN.md (first-class constructors, 64/64 tests)
+Phase: 20 of 20 (Completeness) — Complete
+Plan: 02 of 2 complete
+Status: Phase complete — all 20 phases done
+Last activity: 2026-03-27 — Completed 20-02-PLAN.md (nested ADT patterns + raise-in-handler, 66/66 tests)
 
-Progress: [█████████░] 85% (v4.0, Phase 20 started)
+Progress: [██████████] 100% (v4.0 complete)
 
 ## Performance Metrics
 
@@ -72,10 +72,13 @@ Progress: [█████████░] 85% (v4.0, Phase 20 started)
 - resolveAccessorTyped Root: emit inttoptr when I64 scrutinee needs Ptr for AdtCtor match GEP (20-01)
 - LlvmIntToPtrOp (llvm.inttoptr i64->ptr) and LlvmPtrToIntOp (llvm.ptrtoint ptr->i64) added to MlirIR (20-01)
 - Higher-order constructor passing (apply f x = f x with f=Some) blocked: lambda params typed I64, can't recognize as closures at call site — ADT-12 scope (20-01)
+- ADT-12 root cause: resolveAccessorTyped false,_ and true,v Field branches used resolveAccessor parent (cached I64) as GEP base; fix is resolveAccessorTyped parent Ptr in all Field branches (20-02)
+- EXN-08 fix 1: emitDecisionTree/2 Leaf+Guard cases now conditionally skip CfBrOp(merge) when body ends with LlvmUnreachableOp (20-02)
+- EXN-08 fix 2: TryWith tryBodyBlock CfBrOp patch checks predecessor existence; emits LlvmUnreachableOp for dead inner merge blocks (all handler arms noreturn) (20-02)
 
 ### Pending Todos
 
-None.
+None. v4.0 is complete.
 
 ### Blockers/Concerns
 
@@ -84,5 +87,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 20-01-PLAN.md — first-class constructors (64/64 tests)
+Stopped at: Completed 20-02-PLAN.md — nested ADT patterns + raise-in-handler (66/66 tests)
 Resume file: None
