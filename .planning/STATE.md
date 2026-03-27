@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v5.0 Mutable & Collections — Phase 23: Hashtable (COMPLETE), Phase 24: Array HOFs (next)
+**Current focus:** v5.0 Mutable & Collections — Phase 24: Array HOFs (in progress, plan 1 of 2 complete)
 
 ## Current Position
 
-Phase: 23 of 24 (Hashtable) — COMPLETE
-Plan: 2 of 2 in phase 23
-Status: Phase complete
-Last activity: 2026-03-27 — Completed 23-02-PLAN.md (hashtable elaboration + 8 E2E tests, 88 tests passing)
+Phase: 24 of 24 (Array HOF Builtins) — In progress
+Plan: 1 of 2 in phase 24
+Status: In progress
+Last activity: 2026-03-27 — Completed 24-01-PLAN.md (C runtime HOF functions: iter/map/fold/init, 88 tests passing)
 
-Progress: [################░░░░░░░░░░░░░░] v4.0 complete, v5.0 phases 21+22+23 done (88 tests passing)
+Progress: [#################░░░░░░░░░░░░░] v4.0 complete, v5.0 phases 21+22+23+24-01 done (88 tests passing)
 
 ## Performance Metrics
 
@@ -63,6 +63,9 @@ Recent decisions affecting v5.0:
 - [23-02] coerceToI64 inlined per-arm (not extracted as helper) — consistent with array_create inline pattern
 - [23-02] containsKey returns I1 via ArithCmpIOp("ne", rawI64, 0) — consistent with if/then/else consumption
 - [23-02] summing three let-bound containsKey I64 values (a+b+c) triggered MLIR empty-block error — use keys+len instead
+- [24-01] lang_array_fold uses two-call curried pattern: partial = fn(closure, acc), then cast i64 result to void* for fn2 call
+- [24-01] All HOF output arrays use GC_malloc (not GC_malloc_atomic) so GC scans interior closure pointers in array elements
+- [24-01] lang_array_init uses zero-based index (i=0..n-1), stores at out[i+1] per one-block layout convention
 
 ### Pending Todos
 
@@ -70,10 +73,10 @@ None.
 
 ### Blockers/Concerns
 
-None — Phase 23 complete. Phase 24 (Array HOFs) ready to proceed.
+None — Phase 24 plan 01 complete. Plan 02 (elaboration layer wiring) ready to proceed.
 
 ## Session Continuity
 
-Last session: 2026-03-27T12:24:02Z
-Stopped at: Completed 23-02-PLAN.md — hashtable elaboration + 8 E2E tests (88 tests passing)
+Last session: 2026-03-27T16:30:28Z
+Stopped at: Completed 24-01-PLAN.md — C runtime HOF functions (iter/map/fold/init), 88 tests passing
 Resume file: None
