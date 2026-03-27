@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v4.0 Type System & Error Handling — Phase 20 in progress
+**Current focus:** v4.0 Type System & Error Handling — Phase 20 DONE
 
 ## Current Position
 
 Phase: 20 of 20 (Completeness) — Complete
-Plan: 02 of 2 complete
-Status: Phase complete — all 20 phases done
-Last activity: 2026-03-27 — Completed 20-02-PLAN.md (nested ADT patterns + raise-in-handler, 66/66 tests)
+Plan: 03 of 3 complete
+Status: Phase complete — all 20 phases done, all gap closures resolved
+Last activity: 2026-03-27 — Completed 20-03-PLAN.md (HO constructor passing, apply Some 42, 67/67 tests)
 
 Progress: [██████████] 100% (v4.0 complete)
 
@@ -71,10 +71,11 @@ Progress: [██████████] 100% (v4.0 complete)
 - Closure ABI always `(ptr, i64) -> i64`; Ptr-returning closure bodies emit ptrtoint before llvm.return (20-01)
 - resolveAccessorTyped Root: emit inttoptr when I64 scrutinee needs Ptr for AdtCtor match GEP (20-01)
 - LlvmIntToPtrOp (llvm.inttoptr i64->ptr) and LlvmPtrToIntOp (llvm.ptrtoint ptr->i64) added to MlirIR (20-01)
-- Higher-order constructor passing (apply f x = f x with f=Some) blocked: lambda params typed I64, can't recognize as closures at call site — ADT-12 scope (20-01)
 - ADT-12 root cause: resolveAccessorTyped false,_ and true,v Field branches used resolveAccessor parent (cached I64) as GEP base; fix is resolveAccessorTyped parent Ptr in all Field branches (20-02)
 - EXN-08 fix 1: emitDecisionTree/2 Leaf+Guard cases now conditionally skip CfBrOp(merge) when body ends with LlvmUnreachableOp (20-02)
 - EXN-08 fix 2: TryWith tryBodyBlock CfBrOp patch checks predecessor existence; emits LlvmUnreachableOp for dead inner merge blocks (all handler arms noreturn) (20-02)
+- Higher-order constructor passing fixed: general App case elaborates funcExpr by type (Ptr/I64), dispatches via indirect call; closure-making calls coerce Ptr args to I64 via LlvmPtrToIntOp (uniform ABI) (20-03)
+- ADT-11 satisfied: apply Some 42 compiles and exits 42; all 67 tests pass (20-03)
 
 ### Pending Todos
 
@@ -87,5 +88,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 20-02-PLAN.md — nested ADT patterns + raise-in-handler (66/66 tests)
+Stopped at: Completed 20-03-PLAN.md — HO constructor passing (apply Some 42, 67/67 tests)
 Resume file: None
