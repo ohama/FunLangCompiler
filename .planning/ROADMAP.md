@@ -44,8 +44,8 @@ See .planning/MILESTONES.md for full history. 24 phases, 45 plans, 92 E2E tests.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 25-01-PLAN.md — prePassDecls recursion + flattenDecls + LetPatDecl + OpenDecl/NamespaceDecl no-ops (MOD-01/02/03/04/06)
-- [ ] 25-02-PLAN.md — Qualified name desugar in elaborateExpr (MOD-05)
+- [x] 25-01-PLAN.md — prePassDecls recursion + flattenDecls + LetPatDecl + OpenDecl/NamespaceDecl no-ops (MOD-01/02/03/04/06)
+- [x] 25-02-PLAN.md — Qualified name desugar in elaborateExpr (MOD-05)
 
 ---
 
@@ -104,7 +104,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–24 | v1.0–v5.0 | 45/45 | Complete | 2026-03-28 |
-| 25. Module System | v6.0 | 0/2 | Planning complete | - |
+| 25. Module System | v6.0 | 2/2 | Complete | 2026-03-28 |
 | 26. File I/O Core | v6.0 | 0/TBD | Not started | - |
 | 27. File I/O Extended | v6.0 | 0/TBD | Not started | - |
 

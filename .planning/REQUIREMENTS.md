@@ -61,12 +61,12 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MOD-01 | Phase 25 | Pending |
-| MOD-02 | Phase 25 | Pending |
-| MOD-03 | Phase 25 | Pending |
-| MOD-04 | Phase 25 | Pending |
-| MOD-05 | Phase 25 | Pending |
-| MOD-06 | Phase 25 | Pending |
+| MOD-01 | Phase 25 | Complete |
+| MOD-02 | Phase 25 | Complete |
+| MOD-03 | Phase 25 | Complete |
+| MOD-04 | Phase 25 | Complete |
+| MOD-05 | Phase 25 | Complete |
+| MOD-06 | Phase 25 | Complete |
 | FIO-01 | Phase 26 | Pending |
 | FIO-02 | Phase 26 | Pending |
 | FIO-03 | Phase 26 | Pending |
