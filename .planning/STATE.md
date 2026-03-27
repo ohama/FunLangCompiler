@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v4.0 Type System & Error Handling — Phase 19 complete, ready for Phase 20
+**Current focus:** v4.0 Type System & Error Handling — Phase 20 in progress
 
 ## Current Position
 
-Phase: 19 of 20 (Exception Handling) — COMPLETE
-Plan: 03 of 3 complete
-Status: Phase complete — ready for Phase 20
-Last activity: 2026-03-27 — Phase 19 verified (6/6 must-haves, 63/63 tests)
+Phase: 20 of 20 (Completeness) — In progress
+Plan: 01 of ? complete
+Status: In progress
+Last activity: 2026-03-27 — Completed 20-01-PLAN.md (first-class constructors, 64/64 tests)
 
-Progress: [████████░░] 80% (v4.0, 4/5 phases complete)
+Progress: [█████████░] 85% (v4.0, Phase 20 started)
 
 ## Performance Metrics
 
@@ -67,6 +67,11 @@ Progress: [████████░░] 80% (v4.0, 4/5 phases complete)
 - RecordCtor structural match: unconditional i1=1 (no tag prefix, unlike ADT) (18-02)
 - ensureRecordFieldTypes: resolve fieldMap via Set superset match in RecordEnv, remap alphabetical argAccs to declaration-order slot indices via Map.find fieldName fieldMap (18-02)
 - RecordPat test syntax: `{ field = var }` explicit form only — grammar does not support shorthand `{ field }` variable binding (18-02)
+- Constructor-as-value: check TypeEnv Arity; arity>=1 re-elaborates as Lambda wrapping constructor (20-01)
+- Closure ABI always `(ptr, i64) -> i64`; Ptr-returning closure bodies emit ptrtoint before llvm.return (20-01)
+- resolveAccessorTyped Root: emit inttoptr when I64 scrutinee needs Ptr for AdtCtor match GEP (20-01)
+- LlvmIntToPtrOp (llvm.inttoptr i64->ptr) and LlvmPtrToIntOp (llvm.ptrtoint ptr->i64) added to MlirIR (20-01)
+- Higher-order constructor passing (apply f x = f x with f=Some) blocked: lambda params typed I64, can't recognize as closures at call site — ADT-12 scope (20-01)
 
 ### Pending Todos
 
@@ -79,5 +84,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 19-03-PLAN.md — TryWith elaboration (63/63 tests)
+Stopped at: Completed 20-01-PLAN.md — first-class constructors (64/64 tests)
 Resume file: None
