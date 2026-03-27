@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v6.0 — Phase 26: File I/O Core
+**Current focus:** v6.0 — Phase 27: File I/O Extended
 
 ## Current Position
 
-Phase: 26 of 27 (File I/O Core)
-Plan: 1 of 1 completed
-Status: Phase complete
-Last activity: 2026-03-27 — Completed 26-01-PLAN.md (file I/O and stderr builtins)
+Phase: 27 of 27 (File I/O Extended)
+Plan: 1 of 2 completed
+Status: In progress
+Last activity: 2026-03-27 — Completed 27-01-PLAN.md (8 C runtime functions for extended file I/O)
 
-Progress: [█████████████░░░░░░░] v5.0 complete, v6.0 phase 26 complete (3/3 v6 plans done)
+Progress: [██████████████░░░░░░] v5.0 complete, v6.0 phase 26 complete, phase 27 plan 1 done (4/4 v6 plans done)
 
 ## Performance Metrics
 
@@ -50,6 +50,9 @@ Recent decisions relevant to v6.0:
 - 26-01: eprint/eprintln E2E tests use single-line `let _ = eprint "..." in println "ok"` + `2>/dev/null`; multiline semicolon format causes IndentFilter NEWLINE to break SeqExpr parsing
 - 26-01: file_exists uses fopen("r") not access() — no extra unistd.h needed
 - 26-01: fwrite+fflush for stderr output avoids IsVarArg complexity of fprintf
+- 27-01: lang_dir_files allows DT_UNKNOWN in addition to DT_REG to handle filesystems that don't populate d_type
+- 27-01: Dynamic buffer growth for stdin functions uses GC_malloc+memcpy (no realloc) — consistent with no-malloc/free rule
+- 27-01: String list return ABI: LangCons* with cell->head = (int64_t)(uintptr_t)LangString* — same pattern as hashtable_keys
 
 ### Pending Todos
 
@@ -62,5 +65,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 26-01-PLAN.md — file I/O core (read/write/append/exists/eprint/eprintln), 108 tests passing
+Stopped at: Completed 27-01-PLAN.md — 8 extended file I/O C functions + header declarations, 108 tests still passing
 Resume file: None
