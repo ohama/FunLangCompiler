@@ -1,0 +1,7 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+type MutRec = { mutable v: int }
+let r = { v = 0 } in
+let _ = r.v <- 42 in r.v
+// --- Output:
+42

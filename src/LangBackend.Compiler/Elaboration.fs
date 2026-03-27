@@ -1303,6 +1303,113 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         ]
         (blockPtr, argOps @ allocOps)
 
+    // Phase 18: RecordExpr construction — allocate n-slot GC_malloc block, store fields in declaration order
+    | RecordExpr(typeNameOpt, fields, _) ->
+        let fieldNames = fields |> List.map fst |> Set.ofList
+        let typeName =
+            match typeNameOpt with
+            | Some n -> n
+            | None ->
+                env.RecordEnv
+                |> Map.tryFindKey (fun _ fmap ->
+                    Set.ofSeq (fmap |> Map.toSeq |> Seq.map fst) = fieldNames)
+                |> Option.defaultWith (fun () ->
+                    failwithf "RecordExpr: cannot resolve record type for fields %A" (Set.toList fieldNames))
+        let fieldMap = Map.find typeName env.RecordEnv
+        let n = Map.count fieldMap
+        let fieldResults = fields |> List.map (fun (_, e) -> elaborateExpr env e)
+        let allFieldOps  = fieldResults |> List.collect snd
+        let fieldVals    = fieldResults |> List.map fst
+        let bytesVal  = { Name = freshName env; Type = I64 }
+        let recPtrVal = { Name = freshName env; Type = Ptr }
+        let allocOps  = [
+            ArithConstantOp(bytesVal, int64 (n * 8))
+            LlvmCallOp(recPtrVal, "@GC_malloc", [bytesVal])
+        ]
+        let storeOps =
+            fields |> List.collect (fun (fieldName, _) ->
+                let slotIdx = Map.find fieldName fieldMap
+                let fieldVal = List.item (fields |> List.findIndex (fun (fn, _) -> fn = fieldName)) fieldVals
+                let slotPtr = { Name = freshName env; Type = Ptr }
+                [ LlvmGEPLinearOp(slotPtr, recPtrVal, slotIdx)
+                  LlvmStoreOp(fieldVal, slotPtr) ]
+            )
+        (recPtrVal, allFieldOps @ allocOps @ storeOps)
+
+    // Phase 18: FieldAccess — GEP into record block at declaration-order slot, load value
+    | FieldAccess(recExpr, fieldName, _) ->
+        let (recVal, recOps) = elaborateExpr env recExpr
+        let slotIdx =
+            env.RecordEnv
+            |> Map.toSeq
+            |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
+            |> Option.defaultWith (fun () ->
+                failwithf "FieldAccess: unknown field '%s'" fieldName)
+        let slotPtr  = { Name = freshName env; Type = Ptr }
+        let fieldVal = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmGEPLinearOp(slotPtr, recVal, slotIdx)
+            LlvmLoadOp(fieldVal, slotPtr)
+        ]
+        (fieldVal, recOps @ ops)
+
+    // Phase 18: RecordUpdate — allocate new block, copy non-overridden fields, write overridden fields
+    | RecordUpdate(sourceExpr, overrides, _) ->
+        let (srcVal, srcOps) = elaborateExpr env sourceExpr
+        let overrideNames = overrides |> List.map fst |> Set.ofList
+        let (typeName, fieldMap) =
+            env.RecordEnv
+            |> Map.tryFindKey (fun _ fmap ->
+                overrideNames |> Set.forall (fun fn -> Map.containsKey fn fmap))
+            |> Option.map (fun tn -> (tn, Map.find tn env.RecordEnv))
+            |> Option.defaultWith (fun () ->
+                failwithf "RecordUpdate: cannot resolve record type for fields %A" (Set.toList overrideNames))
+        let n = Map.count fieldMap
+        let overrideResults = overrides |> List.map (fun (fn, e) -> (fn, elaborateExpr env e))
+        let overrideOps     = overrideResults |> List.collect (fun (_, (_, ops)) -> ops)
+        let overrideVals    = overrideResults |> List.map (fun (fn, (v, _)) -> (fn, v)) |> Map.ofList
+        let bytesVal  = { Name = freshName env; Type = I64 }
+        let newPtrVal = { Name = freshName env; Type = Ptr }
+        let allocOps  = [
+            ArithConstantOp(bytesVal, int64 (n * 8))
+            LlvmCallOp(newPtrVal, "@GC_malloc", [bytesVal])
+        ]
+        let copyOps =
+            fieldMap |> Map.toList |> List.collect (fun (fieldName, slotIdx) ->
+                let dstSlotPtr = { Name = freshName env; Type = Ptr }
+                match Map.tryFind fieldName overrideVals with
+                | Some newVal ->
+                    [ LlvmGEPLinearOp(dstSlotPtr, newPtrVal, slotIdx)
+                      LlvmStoreOp(newVal, dstSlotPtr) ]
+                | None ->
+                    let srcSlotPtr = { Name = freshName env; Type = Ptr }
+                    let srcFieldVal = { Name = freshName env; Type = I64 }
+                    [ LlvmGEPLinearOp(srcSlotPtr, srcVal, slotIdx)
+                      LlvmLoadOp(srcFieldVal, srcSlotPtr)
+                      LlvmGEPLinearOp(dstSlotPtr, newPtrVal, slotIdx)
+                      LlvmStoreOp(srcFieldVal, dstSlotPtr) ]
+            )
+        (newPtrVal, srcOps @ overrideOps @ allocOps @ copyOps)
+
+    // Phase 18: SetField — store in-place at field slot, return unit (i64=0)
+    | SetField(recExpr, fieldName, valueExpr, _) ->
+        let (recVal, recOps)    = elaborateExpr env recExpr
+        let (newVal, newValOps) = elaborateExpr env valueExpr
+        let slotIdx =
+            env.RecordEnv
+            |> Map.toSeq
+            |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
+            |> Option.defaultWith (fun () ->
+                failwithf "SetField: unknown field '%s'" fieldName)
+        let slotPtr = { Name = freshName env; Type = Ptr }
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmGEPLinearOp(slotPtr, recVal, slotIdx)
+            LlvmStoreOp(newVal, slotPtr)
+            ArithConstantOp(unitVal, 0L)
+        ]
+        (unitVal, recOps @ newValOps @ ops)
+
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
