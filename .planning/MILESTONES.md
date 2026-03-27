@@ -99,6 +99,30 @@
 
 ---
 
+### v5.0 — Mutable & Collections (2026-03-28)
+
+**Goal:** Mutable variable bindings, Array, Hashtable을 컴파일하여 LangThree imperative programming 패턴 네이티브 코드 지원
+
+**Phases:** 21–24 (8 plans, all verified)
+**Requirements:** 26/26 complete
+**Tests:** 92 FsLit E2E tests (25 new)
+**LOC:** 3,187 F# + 450 C
+
+**What shipped:**
+- Mutable variables: LetMut/Assign GC ref cell, transparent Var deref, closure capture of shared ref cell
+- Array: one-block layout, dynamic GEP, bounds checking (catchable exception), list conversion
+- Hashtable: C runtime chained buckets, murmurhash3 hashing, 6 builtins
+- Array HOFs: iter/map/fold/init via C runtime closure callbacks (LangClosureFn)
+
+**Key decisions validated:**
+- GC ref cell (8-byte GC_malloc) for mutable variables ✓
+- One-block array layout GC_malloc((n+1)*8) ✓
+- C runtime for hashtable (chained buckets, GC_malloc throughout) ✓
+- Closure callbacks from C runtime via LangClosureFn typedef ✓
+- array_fold two-call curried pattern per iteration ✓
+
+---
+
 ## Current
 
 Planning next milestone
