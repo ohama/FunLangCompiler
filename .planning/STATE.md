@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v6.0 — Phase 25: Module System
+**Current focus:** v6.0 — Phase 25: Module System COMPLETE
 
 ## Current Position
 
 Phase: 25 of 27 (Module System)
-Plan: 1 of 2 completed
-Status: In progress
-Last activity: 2026-03-27 — Completed 25-01-PLAN.md (module flattening foundation)
+Plan: 2 of 2 completed
+Status: Phase complete
+Last activity: 2026-03-27 — Completed 25-02-PLAN.md (qualified name desugar)
 
-Progress: [██████████░░░░░░░░░░] v5.0 complete, v6.0 in progress (1/3 plans started)
+Progress: [████████████░░░░░░░░] v5.0 complete, v6.0 phase 25 complete (2/3 plans done)
 
 ## Performance Metrics
 
@@ -42,6 +42,9 @@ Recent decisions relevant to v6.0:
 - Both externalFuncs lists (Elaboration.fs + Codegen) must be updated for each new builtin
 - 25-01: prePassDecls threads exnCounter as int ref parameter through recursion (not merge via return); flattenDecls placed private before extractMainExpr
 - 25-01: LetPatDecl maps to existing LetPat expression node; OpenDecl is wildcard no-op in build
+- 25-02: Two-arm qualified name desugar required: FieldAccess arm for M.x/M.Ctor (standalone), App arm for M.f arg (functions in KnownFuncs not Vars)
+- 25-02: App desugar guard `not (Map.containsKey memberName env.TypeEnv)` prevents constructor arity bypass
+- 25-02: Match compilation has pre-existing domination bug when two named-ctor arms both extract values; workaround: use one nullary arm
 
 ### Pending Todos
 
@@ -49,10 +52,10 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- Pre-existing MLIR domination bug: match with two named-ctor arms each extracting values fails in mlir-opt (unrelated to module system; observed with `type Shape = Circle of int | Square of int`)
 
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 25-01-PLAN.md — module flattening foundation, 97 tests passing
+Stopped at: Completed 25-02-PLAN.md — qualified name desugar, 100 tests passing
 Resume file: None
