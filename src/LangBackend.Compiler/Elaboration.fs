@@ -968,6 +968,80 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, uOps @ [LlvmCallOp(result, "@lang_hashtable_create", [])])
 
+    // Phase 24: array HOF builtins
+    // array_fold — three-arg (must appear before two-arg patterns)
+    // array_fold closure init arr: coerce closure to Ptr, coerce init to I64, call lang_array_fold → I64
+    | App (App (App (Var ("array_fold", _), closureExpr, _), initExpr, _), arrExpr, _) ->
+        let (fVal,   fOps)   = elaborateExpr env closureExpr
+        let (initVal, initOps) = elaborateExpr env initExpr
+        let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let closurePtrVal =
+            if fVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else fVal
+        let closureOps =
+            if fVal.Type = I64
+            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
+            else []
+        let initI64 =
+            if initVal.Type = I64 then (initVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, initVal)])
+        let (initV, initCoerce) = initI64
+        let result = { Name = freshName env; Type = I64 }
+        (result, fOps @ closureOps @ initOps @ initCoerce @ arrOps @ [LlvmCallOp(result, "@lang_array_fold", [closurePtrVal; initV; arrVal])])
+
+    // array_iter — two-arg
+    // array_iter closure arr: coerce closure to Ptr, call lang_array_iter (void), return unit
+    | App (App (Var ("array_iter", _), closureExpr, _), arrExpr, _) ->
+        let (fVal,   fOps)   = elaborateExpr env closureExpr
+        let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let closurePtrVal =
+            if fVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else fVal
+        let closureOps =
+            if fVal.Type = I64
+            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
+            else []
+        let unitVal = { Name = freshName env; Type = I64 }
+        (unitVal, fOps @ closureOps @ arrOps @ [LlvmCallVoidOp("@lang_array_iter", [closurePtrVal; arrVal]); ArithConstantOp(unitVal, 0L)])
+
+    // array_map — two-arg
+    // array_map closure arr: coerce closure to Ptr, call lang_array_map → Ptr
+    | App (App (Var ("array_map", _), closureExpr, _), arrExpr, _) ->
+        let (fVal,   fOps)   = elaborateExpr env closureExpr
+        let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let closurePtrVal =
+            if fVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else fVal
+        let closureOps =
+            if fVal.Type = I64
+            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
+            else []
+        let result = { Name = freshName env; Type = Ptr }
+        (result, fOps @ closureOps @ arrOps @ [LlvmCallOp(result, "@lang_array_map", [closurePtrVal; arrVal])])
+
+    // array_init — two-arg
+    // array_init n closure: coerce n to I64, coerce closure to Ptr, call lang_array_init → Ptr
+    | App (App (Var ("array_init", _), nExpr, _), closureExpr, _) ->
+        let (nVal,   nOps)   = elaborateExpr env nExpr
+        let (fVal,   fOps)   = elaborateExpr env closureExpr
+        let nI64 =
+            if nVal.Type = I64 then (nVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, nVal)])
+        let (nV, nCoerce) = nI64
+        let closurePtrVal =
+            if fVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else fVal
+        let closureOps =
+            if fVal.Type = I64
+            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
+            else []
+        let result = { Name = freshName env; Type = Ptr }
+        (result, nOps @ nCoerce @ fOps @ closureOps @ [LlvmCallOp(result, "@lang_array_init", [nV; closurePtrVal])])
+
     // Phase 14: char_to_int — identity (char is already i64)
     | App (Var ("char_to_int", _), charExpr, _) ->
         elaborateExpr env charExpr
@@ -2231,6 +2305,10 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_hashtable_containsKey"; ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_keys";        ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_iter";            ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_map";             ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_fold";            ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_init";            ExtParams = [I64; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -2374,5 +2452,9 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_hashtable_containsKey"; ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_keys";        ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_iter";            ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_map";             ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_fold";            ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_init";            ExtParams = [I64; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
