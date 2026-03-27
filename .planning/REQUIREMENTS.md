@@ -71,38 +71,38 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MUT-01 | TBD | Pending |
-| MUT-02 | TBD | Pending |
-| MUT-03 | TBD | Pending |
-| MUT-04 | TBD | Pending |
-| MUT-05 | TBD | Pending |
-| MUT-06 | TBD | Pending |
-| ARR-01 | TBD | Pending |
-| ARR-02 | TBD | Pending |
-| ARR-03 | TBD | Pending |
-| ARR-04 | TBD | Pending |
-| ARR-05 | TBD | Pending |
-| ARR-06 | TBD | Pending |
-| ARR-07 | TBD | Pending |
-| ARR-08 | TBD | Pending |
-| ARR-09 | TBD | Pending |
-| ARR-10 | TBD | Pending |
-| ARR-11 | TBD | Pending |
-| HT-01 | TBD | Pending |
-| HT-02 | TBD | Pending |
-| HT-03 | TBD | Pending |
-| HT-04 | TBD | Pending |
-| HT-05 | TBD | Pending |
-| HT-06 | TBD | Pending |
-| HT-07 | TBD | Pending |
-| HT-08 | TBD | Pending |
-| REG-01 | All | Pending |
+| MUT-01 | Phase 21 | Pending |
+| MUT-02 | Phase 21 | Pending |
+| MUT-03 | Phase 21 | Pending |
+| MUT-04 | Phase 21 | Pending |
+| MUT-05 | Phase 21 | Pending |
+| MUT-06 | Phase 21 | Pending |
+| ARR-01 | Phase 22 | Pending |
+| ARR-02 | Phase 22 | Pending |
+| ARR-03 | Phase 22 | Pending |
+| ARR-04 | Phase 22 | Pending |
+| ARR-05 | Phase 22 | Pending |
+| ARR-06 | Phase 22 | Pending |
+| ARR-07 | Phase 22 | Pending |
+| ARR-08 | Phase 24 | Pending |
+| ARR-09 | Phase 24 | Pending |
+| ARR-10 | Phase 24 | Pending |
+| ARR-11 | Phase 24 | Pending |
+| HT-01 | Phase 23 | Pending |
+| HT-02 | Phase 23 | Pending |
+| HT-03 | Phase 23 | Pending |
+| HT-04 | Phase 23 | Pending |
+| HT-05 | Phase 23 | Pending |
+| HT-06 | Phase 23 | Pending |
+| HT-07 | Phase 23 | Pending |
+| HT-08 | Phase 23 | Pending |
+| REG-01 | All phases | Pending |
 
 **Coverage:**
 - v1 requirements: 26 total
-- Mapped to phases: 0 (TBD — roadmap creation will fill)
-- Unmapped: 26
+- Mapped to phases: 26/26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-27*
-*Last updated: 2026-03-27 after initial definition*
+*Last updated: 2026-03-27 — traceability filled after roadmap creation*
