@@ -342,8 +342,37 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (result, iops @ [ArithConstantOp(zero, 0L); ArithSubIOp(result, zero, iv)])
     | Var (name, _) ->
         match Map.tryFind name env.Vars with
-        | Some v -> (v, [])
+        | Some v ->
+            if Set.contains name env.MutableVars then
+                let loaded = { Name = freshName env; Type = I64 }
+                (loaded, [LlvmLoadOp(loaded, v)])
+            else
+                (v, [])
         | None -> failwithf "Elaboration: unbound variable '%s'" name
+    // Phase 21: Mutable variable allocation
+    | LetMut (name, initExpr, bodyExpr, _) ->
+        let (initVal, initOps) = elaborateExpr env initExpr
+        let sizeVal  = { Name = freshName env; Type = I64 }
+        let cellPtr  = { Name = freshName env; Type = Ptr }
+        let allocOps = [
+            ArithConstantOp(sizeVal, 8L)
+            LlvmCallOp(cellPtr, "@GC_malloc", [sizeVal])
+            LlvmStoreOp(initVal, cellPtr)
+        ]
+        let env' = { env with
+                        Vars        = Map.add name cellPtr env.Vars
+                        MutableVars = Set.add name env.MutableVars }
+        let (bodyVal, bodyOps) = elaborateExpr env' bodyExpr
+        (bodyVal, initOps @ allocOps @ bodyOps)
+    // Phase 21: Mutable variable assignment
+    | Assign (name, valExpr, _) ->
+        let (newVal, valOps) = elaborateExpr env valExpr
+        let cellPtr =
+            match Map.tryFind name env.Vars with
+            | Some v -> v
+            | None -> failwithf "Elaboration: unbound mutable variable '%s' in Assign" name
+        let unitVal = { Name = freshName env; Type = I64 }
+        (unitVal, valOps @ [LlvmStoreOp(newVal, cellPtr); ArithConstantOp(unitVal, 0L)])
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     | Let (name, Lambda (outerParam, Lambda (innerParam, innerBody, _), _), inExpr, _) ->
@@ -2065,7 +2094,7 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
     let exprDecls =
         decls |> List.filter (fun d ->
             match d with
-            | Ast.Decl.LetDecl _ | Ast.Decl.LetRecDecl _ -> true
+            | Ast.Decl.LetDecl _ | Ast.Decl.LetRecDecl _ | Ast.Decl.LetMutDecl _ -> true
             | _ -> false)
     match exprDecls with
     | [] -> Number(0, s)  // empty module → produce 0 as unit sentinel
@@ -2092,6 +2121,8 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
                 match bindings with
                 | (name, param, body, _) :: _ -> LetRec(name, param, body, build rest, s)
                 | [] -> build rest
+            | Ast.Decl.LetMutDecl(name, body, _) :: rest ->
+                LetMut(name, body, build rest, s)
             | _ :: rest -> build rest
         build exprDecls
 
