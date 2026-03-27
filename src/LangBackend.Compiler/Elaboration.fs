@@ -1462,6 +1462,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         ]
         (unitVal, recOps @ newValOps @ ops)
 
+    // Phase 19: Raise — construct exception value, call @lang_throw, terminate block
+    | Raise(exnExpr, _) ->
+        let (exnVal, exnOps) = elaborateExpr env exnExpr
+        // exnVal is a Ptr to an ADT DataValue block (e.g., {tag=0, payload=LangString*} for Failure "msg")
+        // Call @lang_throw(exnVal) — noreturn void call
+        // Emit llvm.unreachable after the call to terminate the block
+        let deadVal = { Name = freshName env; Type = I64 }
+        (deadVal, exnOps @ [ LlvmCallVoidOp("@lang_throw", [exnVal]); LlvmUnreachableOp ])
+
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
