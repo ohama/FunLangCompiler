@@ -71,17 +71,17 @@ Deferred to future release.
 | FIO-02 | Phase 26 | Complete |
 | FIO-03 | Phase 26 | Complete |
 | FIO-04 | Phase 26 | Complete |
-| FIO-05 | Phase 27 | Pending |
-| FIO-06 | Phase 27 | Pending |
-| FIO-07 | Phase 27 | Pending |
-| FIO-08 | Phase 27 | Pending |
+| FIO-05 | Phase 27 | Complete |
+| FIO-06 | Phase 27 | Complete |
+| FIO-07 | Phase 27 | Complete |
+| FIO-08 | Phase 27 | Complete |
 | FIO-09 | Phase 26 | Complete |
-| FIO-10 | Phase 27 | Pending |
-| FIO-11 | Phase 27 | Pending |
-| FIO-12 | Phase 27 | Pending |
-| FIO-13 | Phase 27 | Pending |
+| FIO-10 | Phase 27 | Complete |
+| FIO-11 | Phase 27 | Complete |
+| FIO-12 | Phase 27 | Complete |
+| FIO-13 | Phase 27 | Complete |
 | FIO-14 | Phase 26 | Complete |
-| REG-01 | All phases | Pending |
+| REG-01 | All phases | Complete |
 
 **Coverage:**
 - v1 requirements: 21 total

@@ -93,8 +93,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 27-01-PLAN.md — C runtime functions (8 new functions in lang_runtime.c/h)
-- [ ] 27-02-PLAN.md — Elaboration.fs wiring + E2E tests (FIO-05/06/07/08/10/11/12/13)
+- [x] 27-01-PLAN.md — C runtime functions (8 new functions in lang_runtime.c/h)
+- [x] 27-02-PLAN.md — Elaboration.fs wiring + E2E tests (FIO-05/06/07/08/10/11/12/13)
 
 ---
 
@@ -107,6 +107,6 @@ Plans:
 | 1–24 | v1.0–v5.0 | 45/45 | Complete | 2026-03-28 |
 | 25. Module System | v6.0 | 2/2 | Complete | 2026-03-28 |
 | 26. File I/O Core | v6.0 | 1/1 | Complete | 2026-03-28 |
-| 27. File I/O Extended | v6.0 | 0/2 | Not started | - |
+| 27. File I/O Extended | v6.0 | 2/2 | Complete | 2026-03-28 |
 
 **Regression gate (REG-01):** 92 E2E tests must pass at completion of every phase.
