@@ -1,330 +1,562 @@
-# Architecture Patterns: LangBackend v2.0
+# Architecture Patterns: LangBackend v5.0
 **Domain:** Functional language compiler backend — MLIR text generation + LLVM pipeline
-**Researched:** 2026-03-26
-**Scope:** ADT/GADT + Records (mutable fields) + Exception handling — integration with existing architecture
-**Confidence:** HIGH (based on direct code analysis of all five backend modules + LangThree AST)
+**Researched:** 2026-03-27
+**Scope:** Mutable variables (LetMut/Assign/LetMutDecl) + Array + Hashtable — integration with existing architecture
+**Confidence:** HIGH (based on direct code analysis of all backend modules + LangThree AST/Eval)
 
 ---
 
-## Existing Architecture Snapshot
+## Existing Architecture Snapshot (v4.0 baseline)
 
-The compiler emits MLIR as text strings via F# discriminated unions, then shells out to `mlir-opt → mlir-translate → clang`. This text-generation approach is the unchanging constraint everything below must respect.
+The compiler is a text-generating pipeline: F# DU (`MlirIR`) → `.mlir` string (`Printer`) → native binary (shell via `Pipeline`). Every new feature integrates by adding elaboration cases and optional C runtime helpers. Nothing in the pipeline stages changes.
 
 ```
-Source File (.lt)
-       |
-       v
-  [ LangThree Frontend ]
-    Lexer / Parser / TypeChecker → Ast.Expr / Ast.Decl
-       |
-       v
-  [ Elaboration.fs ]
-    elaborateExpr: Expr → ElabEnv → (MlirValue × MlirOp list)
-    elaborateModule: Expr → MlirModule           ← needs replacing with elaborateProgram
-    ElabEnv { Vars, Counter, LabelCounter, Blocks,
-              KnownFuncs, Funcs, ClosureCounter,
-              Globals, GlobalCounter }
-       |
-       v
-  MlirModule (F# DU)
-  MlirType | MlirOp (DU, ~17 cases) | MlirBlock | FuncOp | MlirModule
-       |
-       v
-  [ Printer.fs ]
-    printModule: MlirModule → string   (pure, no I/O)
-       |
-       v
-  [ Pipeline.fs ]  (shell subprocesses, unchanged)
-    mlir-opt → mlir-translate → clang
-       |
-       v
-  [ lang_runtime.c ]  (compiled as object file by Pipeline.fs/clang)
-    GC_malloc wrapper, string ops, list range, match_failure, failwith
+Source (.lt)
+  |
+  v
+LangThree Frontend (AST, TypeChecker)
+  |
+  v
+Elaboration.fs
+  elaborateProgram: Ast.Module → MlirModule
+  elaborateExpr:    Expr → ElabEnv → (MlirValue × MlirOp list)
+  ElabEnv { Vars, Counter, LabelCounter, Blocks,
+            KnownFuncs, Funcs, ClosureCounter,
+            Globals, GlobalCounter,
+            TypeEnv, RecordEnv, ExnTags }
+  |
+  v
+MlirModule (F# DU: MlirOp ~22 cases, no new cases needed for v5)
+  |
+  v
+Printer.fs  (pure text serializer, no new cases needed)
+  |
+  v
+Pipeline.fs (shell: mlir-opt → mlir-translate → clang)
+  |
+  v
+lang_runtime.c (linked object: GC, strings, lists, range, exceptions)
+  + NEW: array_create, array_get, array_set, array_length,
+         array_of_list, array_to_list,
+         hashtable_create, hashtable_get, hashtable_set,
+         hashtable_containsKey, hashtable_keys, hashtable_remove
 ```
 
 ### Current Component Inventory
 
-| Component | Purpose | Status |
-|-----------|---------|--------|
-| `MlirIR.fs` | F# DU: MlirType, MlirOp, MlirBlock, FuncOp, MlirModule | Complete |
-| `Elaboration.fs` | AST → MlirIR: elaborateExpr, ElabEnv | Complete for int/bool/string/tuple/list/closure/match |
-| `MatchCompiler.fs` | Jacobs decision tree: CtorTag, Accessor, DecisionTree | Complete for Int/Bool/String/Nil/Cons/Tuple; ConstructorPat and RecordPat explicitly fail |
-| `Printer.fs` | MlirIR → MLIR text, pure serializer | Complete |
-| `Pipeline.fs` | Shell pipeline: mlir-opt / mlir-translate / clang | Complete, unchanged for this milestone |
-| `lang_runtime.c` | C runtime: GC_malloc, string ops, lang_range, lang_match_failure | Complete; needs exception additions |
+| Component | Purpose | v5 Status |
+|-----------|---------|-----------|
+| `MlirIR.fs` | F# DU: MlirType, MlirOp (~22 cases), MlirBlock, FuncOp, MlirModule | No change needed |
+| `Elaboration.fs` | AST → MlirIR: elaborateExpr, ElabEnv | Extend with LetMut/Assign/LetMutDecl/Array/Hashtable cases |
+| `MatchCompiler.fs` | Jacobs decision tree | No change needed |
+| `Printer.fs` | MlirIR → MLIR text, pure serializer | No change needed |
+| `Pipeline.fs` | Shell pipeline: mlir-opt / mlir-translate / clang | No change needed |
+| `lang_runtime.c` | C runtime: GC_malloc, string ops, range, exceptions | Add array_* and hashtable_* functions |
+| `lang_runtime.h` | C runtime header | Add array_* and hashtable_* declarations |
+
+**Key insight:** All three new features (LetMut, Array, Hashtable) use the existing `LlvmCallOp` pattern to call C runtime functions. No new `MlirOp` DU cases are needed. No `Printer.fs` changes are needed. Only `Elaboration.fs` and `lang_runtime.c` change.
 
 ---
 
-## v3 Integration Strategy: What Changes and What Stays
+## Feature 1: Mutable Variables (LetMut / Assign / LetMutDecl)
 
-### What stays unchanged
+### Semantics (from LangThree Eval.fs)
 
-- `Pipeline.fs` — lowering passes are unchanged
-- `MlirModule`, `FuncOp`, `MlirBlock`, `MlirRegion` structural shape — additive only
-- `Printer.fs` architecture — add new `printOp` match cases; existing cases untouched
-- Uniform `Ptr` representation for all heap types — no new MlirType variants needed
-- `LlvmGEPLinearOp` / `LlvmStoreOp` / `LlvmLoadOp` reused for record fields (identical to tuple fields)
-- `CfCondBrOp` / `CfBrOp` reused for exception dispatch blocks
+- `LetMut(name, valueExpr, body, _)`: allocates a ref cell, binds `name` to it in the environment, evaluates `body`.
+- `Assign(name, valueExpr, _)`: looks up `name`, expects a `RefValue`, mutates it in place, returns unit (0).
+- `Var(name, _)` when the variable is mutable: transparently dereferences the ref cell to return the stored value.
+- `LetMutDecl`: module-level mutable variable — same semantics as `LetMut`, scoped to the module body.
 
-### What extends
+### Memory Layout: GC_malloc ref cell
 
-| Component | Extension |
-|-----------|-----------|
-| `MlirOp` | Add `LlvmSetjmpOp` and `LlvmLongjmpOp` cases |
-| `Printer.fs` | Add `printOp` arms for the two new cases |
-| `ElabEnv` | Add 5 new fields: `CtorTags`, `CtorArities`, `RecordFields`, `ExnTags`, `JmpBufPtr` |
-| `MatchCompiler.fs` | Add `AdtCtor` and `RecordCtor` to `CtorTag` DU; implement `desugarPattern` for `ConstructorPat` and `RecordPat` |
-| `Elaboration.fs` | New `elaborateExpr` arms for `Constructor`, `RecordExpr`, `FieldAccess`, `RecordUpdate`, `SetField`, `Raise`, `TryWith`; new `elaborateProgram` entry point |
-| `lang_runtime.c` | Add `lang_raise`, `lang_current_exception` and static exception value cell |
+A mutable variable is stored as a GC-managed 8-byte cell: a single `i64` word (or `ptr` for pointer-typed values). The SSA value in `env.Vars` is the `Ptr` to this cell — not the value itself.
 
-### What is new
+```
+GC_malloc(8) → ptr to one i64 word
+  offset 0: current value (i64 or ptr coerced to i64)
+```
 
-| New Item | Purpose |
-|----------|---------|
-| `elaborateProgram` (in `Elaboration.fs`) | Replaces `elaborateModule` for multi-decl programs; processes `TypeDecl`/`RecordTypeDecl`/`ExceptionDecl` before expressions |
-| `@lang_raise` / `@lang_current_exception` (in `lang_runtime.c`) | C runtime exception delivery using `setjmp`/`longjmp` |
+This matches the existing uniform representation: all heap values are `Ptr`; scalars and pointers are stored as `i64` words at fixed GEP offsets.
+
+**Decision: GC_malloc (not alloca)**
+
+Use `GC_malloc(8)` for the ref cell, not `llvm.alloca`. Rationale: closures may capture mutable variables. An `alloca` would become a dangling stack pointer when the allocating function returns but the closure lives longer. `GC_malloc` gives a heap-stable address the closure can safely store. This is the same reason closures already use `GC_malloc` for their env struct.
+
+### LetMut Elaboration
+
+```
+; LetMut(name, valueExpr, body, _)
+; 1. Evaluate initial value
+%init = ... elaborate valueExpr ...    ; type: I64
+
+; 2. Allocate 8-byte ref cell on GC heap
+%size    = arith.constant 8 : i64
+%refptr  = llvm.call @GC_malloc(%size) : (i64) -> !llvm.ptr
+
+; 3. Store initial value into cell
+llvm.store %init, %refptr : i64, !llvm.ptr
+
+; 4. Bind name -> refptr (Ptr) in env.Vars
+; Elaborate body with env' = { env with Vars = Map.add name refptr env.Vars }
+```
+
+**Important:** `name` maps to the `Ptr`-typed `%refptr`, not to the `I64` value. All uses of `name` as a rvalue must emit a fresh `LlvmLoadOp` to dereference.
+
+### Var Dereference for Mutable Variables
+
+The existing `Var` elaboration case returns the SSA value from `env.Vars` directly. For mutable variables, that value is a `Ptr`; consuming code expects an `I64`. Therefore:
+
+```fsharp
+| Var (name, _) ->
+    match Map.tryFind name env.Vars with
+    | Some v when v.Type = Ptr ->
+        // Mutable variable — dereference the ref cell
+        let loaded = { Name = freshName env; Type = I64 }
+        (loaded, [LlvmLoadOp(loaded, v)])
+    | Some v -> (v, [])
+    | None -> failwithf "Elaboration: unbound variable '%s'" name
+```
+
+**Caveat:** This change to `Var` will fire for ALL `Ptr`-typed variables, not just mutable ones. Existing `Ptr`-typed variables — closure pointers, record pointers, list pointers — must NOT be silently dereferenced here.
+
+**Recommended approach:** Add a separate `MutableVars` field to `ElabEnv` (a `Set<string>`) that explicitly tracks which variables are mutable ref cells. Only dereference when `name` is in `MutableVars`. This avoids breaking existing `Ptr`-typed variable bindings.
+
+```fsharp
+type ElabEnv = {
+    // ... existing fields ...
+    MutableVars: Set<string>   // NEW: names bound to GC_malloc'd ref cells
+}
+```
+
+Alternatively, keep `env.Vars` holding the `Ptr` for mutable vars and introduce a separate `MutableVarPtrs: Map<string, MlirValue>` for the cell pointers, so `Vars` continues to hold the plain value (after load). But the `MutableVars` set approach is simpler and has lower risk.
+
+### Assign Elaboration
+
+```
+; Assign(name, valueExpr, _)
+; 1. Evaluate new value
+%newval = ... elaborate valueExpr ...  ; type: I64
+
+; 2. Look up cell ptr — must be in MutableVars
+%refptr = Map.find name env.Vars       ; Ptr
+
+; 3. Store in place
+llvm.store %newval, %refptr : i64, !llvm.ptr
+
+; 4. Return unit
+%unit = arith.constant 0 : i64
+```
+
+### LetMutDecl in prePassDecls / extractMainExpr
+
+`LetMutDecl` appears in `Decl` (module-level). The existing `prePassDecls` ignores it (only handles TypeDecl, RecordTypeDecl, ExceptionDecl). The existing `extractMainExpr` must be extended:
+
+```fsharp
+| Ast.Decl.LetMutDecl(name, body, _) :: rest ->
+    // Treat as LetMut(name, body, build rest, s)
+    LetMut(name, body, build rest, s)
+```
+
+This desugars module-level `let mut x = e` into a nested `LetMut` expression in `@main`, which elaborates as above.
+
+### freeVars Extension
+
+The `freeVars` function must account for `LetMut` and `Assign`:
+
+```fsharp
+| LetMut (name, e1, e2, _) ->
+    Set.union (freeVars boundVars e1) (freeVars (Set.add name boundVars) e2)
+| Assign (name, e, _) ->
+    // name is a reference, not a binding — it must be in scope
+    let nameFree = if Set.contains name boundVars then Set.empty else Set.singleton name
+    Set.union nameFree (freeVars boundVars e)
+```
 
 ---
 
-## ADT/GADT Heap Representation
+## Feature 2: Array
 
-### Memory Layout
+### Semantics (from LangThree Eval.fs)
 
-Every ADT constructor application is a 16-byte GC-managed struct:
+Array operations are all builtins matched as `App(Var("array_*"), ...)` chains. The evaluator uses F# `Value array` internally. The compiler needs:
 
-```
-Field 0 (offset 0, i64):  integer tag — assigned 0, 1, 2, ... in constructor declaration order
-Field 1 (offset 8, i64 or ptr): payload — the constructor argument, or 0 if no argument
-```
+| Builtin | Signature | Notes |
+|---------|-----------|-------|
+| `array_create` | `int -> 'a -> 'a array` | Two-arg curried |
+| `array_get` | `'a array -> int -> 'a` | Two-arg curried; bounds check |
+| `array_set` | `'a array -> int -> 'a -> unit` | Three-arg curried; bounds check |
+| `array_length` | `'a array -> int` | One-arg |
+| `array_of_list` | `'a list -> 'a array` | One-arg |
+| `array_to_list` | `'a array -> 'a list` | One-arg |
+| `array_iter` | `('a -> unit) -> 'a array -> unit` | HOF — defer to later |
+| `array_map` | `('a -> 'b) -> 'a array -> 'b array` | HOF — defer to later |
+| `array_fold` | `('acc -> 'a -> 'acc) -> 'acc -> 'a array -> 'acc` | HOF — defer to later |
+| `array_init` | `int -> (int -> 'a) -> 'a array` | HOF — defer to later |
 
-Zero-argument constructors still allocate 16 bytes; field 1 is stored as 0 (unused).
-One-argument constructors store the argument value (i64 for scalars, ptr for heap values) at field 1.
+**Decision: C runtime functions for all array operations**
 
-This is structurally identical to a two-field tuple and reuses all existing GEP/load infrastructure.
+Do NOT emit inline GEP/load/store for array operations. Use C runtime wrappers for every operation. Rationale:
 
-### Example: `type Option = None | Some of int`
+1. Arrays need bounds checking (the evaluator raises exceptions on OOB). Implementing bounds checking inline would require additional MLIR blocks (if/else). The C runtime can do the check and call `@lang_failwith` or `@lang_throw`.
+2. `array_of_list`, `array_to_list` require traversing a linked list — this cannot be expressed as a single GEP op and would require looping constructs not yet in the elaborator.
+3. HOF variants (`array_iter`, `array_map`, etc.) require calling function values — these can be added in a later phase when the need is demonstrated.
+4. Consistency: the C runtime already handles all `lang_string_*` and `lang_range` operations.
 
-Tags assigned at TypeDecl processing time: `None → 0`, `Some → 1`.
+### Array Memory Layout (in C runtime)
 
-Elaboration of `None`:
-```
-%sz  = arith.constant 16 : i64
-%ptr = llvm.call @GC_malloc(%sz) : (i64) -> !llvm.ptr
-%t   = arith.constant 0 : i64            ; tag for None
-llvm.store %t, %ptr : i64, !llvm.ptr
-%f1  = llvm.getelementptr %ptr[1] : (!llvm.ptr) -> !llvm.ptr, i64
-%z   = arith.constant 0 : i64
-llvm.store %z, %f1 : i64, !llvm.ptr
-; %ptr : !llvm.ptr — the None value
-```
-
-Elaboration of `Some 42`:
-```
-%sz  = arith.constant 16 : i64
-%ptr = llvm.call @GC_malloc(%sz) : (i64) -> !llvm.ptr
-%t   = arith.constant 1 : i64            ; tag for Some
-llvm.store %t, %ptr : i64, !llvm.ptr
-%f1  = llvm.getelementptr %ptr[1] : (!llvm.ptr) -> !llvm.ptr, i64
-%v   = arith.constant 42 : i64
-llvm.store %v, %f1 : i64, !llvm.ptr
-; %ptr : !llvm.ptr — the Some 42 value
-```
-
-### ConstructorPat Matching
-
-Tag comparison: load field 0 from the scrutinee pointer, compare with `ArithCmpIOp "eq"`.
-Payload extraction (for one-argument constructors): `LlvmGEPLinearOp(slotVal, scrutPtr, 1)` + `LlvmLoadOp`.
-
-`MatchCompiler.CtorTag` gains:
-```fsharp
-| AdtCtor of tag: int * arity: int
-  // arity: 0 = no payload, 1 = single payload at field 1
-```
-
-`emitCtorTest` for `AdtCtor(tag, _)`:
-```
-%f0   = llvm.getelementptr %ptr[0] : (!llvm.ptr) -> !llvm.ptr, i64
-%actual_tag = llvm.load %f0 : !llvm.ptr -> i64
-%expected   = arith.constant <tag> : i64
-%cond       = arith.cmpi eq, %actual_tag, %expected : i64
-; %cond : i1 — true if this constructor matches
-```
-
----
-
-## Record Representation
-
-### Memory Layout
-
-Records use the same linear array layout as tuples. Field order matches the `RecordDecl` declaration order.
-
-```
-GC_malloc(n * 8) bytes
-Field 0 (offset 0):   first declared field (i64 or ptr)
-Field 1 (offset 8):   second declared field
-...
-Field n-1 (offset (n-1)*8): last declared field
-```
-
-For `type Point = { mutable x: int; y: int }`: `x` at index 0, `y` at index 1.
-
-### FieldAccess
-
-```fsharp
-// FieldAccess(expr, "x", _) where x is at index 0 in ElabEnv.RecordFields["Point"]
-%slot = llvm.getelementptr %rec_ptr[0] : (!llvm.ptr) -> !llvm.ptr, i64
-%val  = llvm.load %slot : !llvm.ptr -> i64
-; %val : i64
-```
-
-Reuses `LlvmGEPLinearOp` + `LlvmLoadOp` — no new MlirOp cases.
-
-### SetField (Mutable Field Assignment)
-
-```fsharp
-// SetField(expr, "x", value, _) — r.x <- 5
-%slot = llvm.getelementptr %rec_ptr[0] : (!llvm.ptr) -> !llvm.ptr, i64
-%v    = arith.constant 5 : i64
-llvm.store %v, %slot : i64, !llvm.ptr
-%unit = arith.constant 0 : i64            ; unit value
-; %unit : i64
-```
-
-Reuses `LlvmStoreOp` — no new MlirOp cases.
-
-**Mutation semantics note:** After a `SetField`, any previously-elaborated SSA value for that field is stale. The elaborator must re-emit a fresh `LlvmLoadOp` on subsequent `FieldAccess`. This is automatically correct because `elaborateExpr (FieldAccess ...)` always emits a new GEP+load — it does not cache SSA values across expression elaborations.
-
-### RecordPat Matching
-
-Records always match structurally (unconditional, like tuples). `MatchCompiler.CtorTag` gains:
-```fsharp
-| RecordCtor of fields: (string * int) list
-  // unconditional match; each field name maps to a field index
-```
-
-`emitCtorTest` for `RecordCtor(fields)`: emits `arith.constant 1 : i1` (always true). Sub-patterns bind field values via `LlvmGEPLinearOp(slotVal, scrutPtr, fieldIndex)` + `LlvmLoadOp`.
-
----
-
-## Exception Handling: setjmp / longjmp Pattern
-
-### Design Decision: C setjmp rather than LLVM Exceptions
-
-Use C `setjmp`/`longjmp` via `llvm.call` in `LlvmCallOp`/`LlvmCallVoidOp`. This avoids LLVM exception personality, invoke instructions, landing pads, and `scf.if` — none of which exist in the current MLIR emission pipeline. C setjmp integrates cleanly with the existing `LlvmCallOp` pattern.
-
-### New MlirOp Cases
-
-```fsharp
-// In MlirIR.fs:
-| LlvmSetjmpOp  of result: MlirValue * jmpBuf: MlirValue
-  // result.Type = I32; jmpBuf.Type = Ptr
-  // emits: %result = llvm.call @setjmp(%jmpBuf) : (!llvm.ptr) -> i32
-
-| LlvmLongjmpOp of jmpBuf: MlirValue * value: MlirValue
-  // jmpBuf.Type = Ptr; value.Type = I32
-  // emits: llvm.call @longjmp(%jmpBuf, %value) : (!llvm.ptr, i32) -> ()
-  // always followed by LlvmUnreachableOp (longjmp never returns)
-```
-
-### jmp_buf Allocation
-
-The `jmp_buf` must live on the C stack — not GC heap — because setjmp writes the stack frame address into it. The elaborator emits `llvm.alloca` for the buffer.
-
-```fsharp
-// LlvmAllocaOp is already in MlirIR.fs (used for closures):
-// | LlvmAllocaOp of result: MlirValue * count: MlirValue * numCaptures: int
-// For jmp_buf: emit a raw jmp_buf-sized alloca.
-// Simplest approach: declare jmp_buf as an opaque !llvm.ptr via a fixed-size alloca.
-// jmp_buf is platform-specific; use a generous 200-byte alloca (sufficient on all platforms).
-```
-
-Emitted sequence:
-```
-%jbuf_size = arith.constant 200 : i64
-%one       = arith.constant 1 : i64
-%jbuf      = llvm.alloca %one x !llvm.array<200 x i8> : (i64) -> !llvm.ptr
-; %jbuf : !llvm.ptr — points to stack-allocated jmp_buf
-```
-
-### TryWith Elaboration
-
-For `TryWith(body, handlers, _)`:
-
-```
-; 1. Allocate jmp_buf on stack
-%jbuf_sz  = arith.constant 200 : i64
-%one      = arith.constant 1 : i64
-%jbuf     = llvm.alloca %one x !llvm.array<200 x i8> : (i64) -> !llvm.ptr
-
-; 2. Call setjmp — returns 0 on initial entry, 1 after longjmp
-%sjret    = llvm.call @setjmp(%jbuf) : (!llvm.ptr) -> i32
-%zero32   = arith.constant 0 : i32
-%no_exn   = arith.cmpi eq, %sjret, %zero32 : i32    ; i1
-cf.cond_br %no_exn, ^try_body, ^catch_dispatch
-
-^try_body:
-  ; elaborate body with JmpBufPtr = Some %jbuf in ElabEnv
-  ... body ops ...
-  cf.br ^try_merge(%body_val : <T>)
-
-^catch_dispatch:
-  ; load exception value
-  %exn_ptr = llvm.call @lang_current_exception() : () -> !llvm.ptr
-  ; dispatch on exception tag — same Jacobs decision tree as regular Match
-  ... decision tree for handlers ...
-  cf.br ^try_merge(%handler_val : <T>)
-
-^try_merge(%result : <T>):
-  ; %result is the TryWith expression value
-```
-
-The handler dispatch is a nested `Match` on `%exn_ptr` using `ConstructorPat` patterns for exception names — reusing the full ADT pattern matching pipeline.
-
-### Raise Elaboration
-
-For `Raise(expr, _)`:
-
-```
-%exn_val = ... elaborate expr ...   ; type: !llvm.ptr (exception is an ADT value)
-%jbuf    = ElabEnv.JmpBufPtr.Value  ; the current in-scope jmp_buf ptr
-llvm.call @lang_raise(%exn_val, %jbuf) : (!llvm.ptr, !llvm.ptr) -> ()
-llvm.unreachable                    ; lang_raise never returns (it calls longjmp)
-%unit    = arith.constant 0 : i64   ; dummy SSA result to satisfy type system
-; %unit : i64 (never reached)
-```
-
-When `ElabEnv.JmpBufPtr = None` (no enclosing `TryWith`), `Raise` becomes an uncaught exception — call `@lang_failwith` with the exception message and treat it the same as an unhandled error.
-
-### Nested TryWith
-
-Each `TryWith` saves the outer `ElabEnv.JmpBufPtr` and restores it after. The inner elaboration uses the new `%jbuf`. On `Raise`, the most recently pushed `%jbuf` is used, which is the innermost handler — correct LIFO semantics.
-
-### C Runtime Support
+An array is a GC-managed struct:
 
 ```c
-// In lang_runtime.c:
-#include <setjmp.h>
-
-// Global exception value storage (single-threaded)
-static void* __lang_exc_value = NULL;
-
-// Called by Raise: store exception value, then longjmp to handler
-// jmpbuf: pointer to the jmp_buf allocated on the caller's stack frame
-void lang_raise(void* exn, void* jmpbuf) {
-    __lang_exc_value = exn;
-    longjmp(*(jmp_buf*)jmpbuf, 1);
-    // never returns
-}
-
-// Called at start of catch_dispatch to retrieve the thrown exception
-void* lang_current_exception(void) {
-    return __lang_exc_value;
-}
+typedef struct {
+    int64_t length;   // offset 0: number of elements
+    int64_t* data;    // offset 8: pointer to GC_malloc'd element array
+} LangArray;
 ```
+
+- Total size: 16 bytes (matches string struct layout — two-field struct)
+- `data` points to a separate `GC_malloc(length * 8)` allocation — one i64 per element
+- Elements are stored as `i64` (same uniform representation as all other values)
+- Pointer-typed values are stored as `ptrtoint` i64 (consistent with the uniform ABI)
+
+This struct layout is intentionally identical to `LangString` so the same GEP patterns apply if needed. `LlvmGEPStructOp(ptr, 0)` = &length, `LlvmGEPStructOp(ptr, 1)` = &data.
+
+### New C Runtime Functions
+
+```c
+// lang_runtime.c additions:
+
+// array_create : int -> i64 -> LangArray*
+LangArray* lang_array_create(int64_t n, int64_t default_val);
+  // GC_malloc(sizeof(LangArray)) for header
+  // GC_malloc(n * 8) for element data
+  // fill all elements with default_val
+
+// array_get : LangArray* -> int -> i64
+int64_t lang_array_get(LangArray* arr, int64_t i);
+  // bounds check: 0 <= i < arr->length
+  // return arr->data[i]
+
+// array_set : LangArray* -> int -> i64 -> void
+void lang_array_set(LangArray* arr, int64_t i, int64_t val);
+  // bounds check: 0 <= i < arr->length
+  // arr->data[i] = val
+
+// array_length : LangArray* -> int
+int64_t lang_array_length(LangArray* arr);
+  // return arr->length
+
+// array_of_list : LangCons* -> LangArray*
+LangArray* lang_array_of_list(LangCons* list);
+  // count list length, allocate array, fill from list
+
+// array_to_list : LangArray* -> LangCons*
+LangCons* lang_array_to_list(LangArray* arr);
+  // build cons list from arr->data in order
+```
+
+### New ExternalFuncDecl Registrations (Elaboration.fs)
+
+```fsharp
+{ ExtName = "@lang_array_create";   ExtParams = [I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_get";      ExtParams = [Ptr; I64]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_set";      ExtParams = [Ptr; I64; I64]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_length";   ExtParams = [Ptr];      ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_of_list";  ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_to_list";  ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+```
+
+### Array Builtin Elaboration Pattern
+
+Array builtins are matched before the general `App` case, following the same pattern as `string_concat`, `lang_range`, etc.:
+
+```fsharp
+// array_create: App(App(Var("array_create"), nExpr), defExpr)
+| App (App (Var ("array_create", _), nExpr, _), defExpr, _) ->
+    let (nVal, nOps)    = elaborateExpr env nExpr
+    let (defVal, defOps) = elaborateExpr env defExpr
+    let result = { Name = freshName env; Type = Ptr }
+    (result, nOps @ defOps @ [LlvmCallOp(result, "@lang_array_create", [nVal; defVal])])
+
+// array_get: App(App(Var("array_get"), arrExpr), idxExpr)
+| App (App (Var ("array_get", _), arrExpr, _), idxExpr, _) ->
+    let (arrVal, arrOps) = elaborateExpr env arrExpr
+    let (idxVal, idxOps) = elaborateExpr env idxExpr
+    let result = { Name = freshName env; Type = I64 }
+    (result, arrOps @ idxOps @ [LlvmCallOp(result, "@lang_array_get", [arrVal; idxVal])])
+
+// array_set: App(App(App(Var("array_set"), arrExpr), idxExpr), valExpr)
+| App (App (App (Var ("array_set", _), arrExpr, _), idxExpr, _), valExpr, _) ->
+    let (arrVal, arrOps) = elaborateExpr env arrExpr
+    let (idxVal, idxOps) = elaborateExpr env idxExpr
+    let (valArg, valOps) = elaborateExpr env valExpr
+    let unitVal = { Name = freshName env; Type = I64 }
+    (unitVal,
+     arrOps @ idxOps @ valOps @
+     [LlvmCallVoidOp("@lang_array_set", [arrVal; idxVal; valArg])
+      ArithConstantOp(unitVal, 0L)])
+
+// array_length: App(Var("array_length"), arrExpr)
+| App (Var ("array_length", _), arrExpr, _) ->
+    let (arrVal, arrOps) = elaborateExpr env arrExpr
+    let result = { Name = freshName env; Type = I64 }
+    (result, arrOps @ [LlvmCallOp(result, "@lang_array_length", [arrVal])])
+
+// array_of_list: App(Var("array_of_list"), listExpr)
+| App (Var ("array_of_list", _), listExpr, _) ->
+    let (listVal, listOps) = elaborateExpr env listExpr
+    let result = { Name = freshName env; Type = Ptr }
+    (result, listOps @ [LlvmCallOp(result, "@lang_array_of_list", [listVal])])
+
+// array_to_list: App(Var("array_to_list"), arrExpr)
+| App (Var ("array_to_list", _), arrExpr, _) ->
+    let (arrVal, arrOps) = elaborateExpr env arrExpr
+    let result = { Name = freshName env; Type = Ptr }
+    (result, arrOps @ [LlvmCallOp(result, "@lang_array_to_list", [arrVal])])
+```
+
+### freeVars for Array Builtins
+
+Array builtins are `Var`-named references. They are not in `env.Vars` (not user-defined), so `freeVars` will report them as free variables if encountered inside a lambda body. This is the same as `string_concat`, `print`, etc. — no special handling needed. The existing `| _ -> Set.empty` fallback in `freeVars` handles the unrecognized cases.
+
+The existing `freeVars` line 151: `| _ -> Set.empty` must remain as-is. `LetMut` and `Assign` need explicit cases as noted above; array operations are just `App` chains over `Var` which are already handled.
+
+---
+
+## Feature 3: Hashtable
+
+### Semantics (from LangThree Eval.fs)
+
+Hashtable operations are all builtins matched as `App(Var("hashtable_*"), ...)` chains using `System.Collections.Generic.Dictionary<Value, Value>` internally.
+
+| Builtin | Signature | Notes |
+|---------|-----------|-------|
+| `hashtable_create` | `unit -> hashtable<'k,'v>` | Zero-arg (takes `()` as unit) |
+| `hashtable_get` | `hashtable -> 'k -> 'v` | Two-arg curried; raises on missing key |
+| `hashtable_set` | `hashtable -> 'k -> 'v -> unit` | Three-arg curried; mutates in place |
+| `hashtable_containsKey` | `hashtable -> 'k -> bool` | Two-arg curried |
+| `hashtable_keys` | `hashtable -> 'k list` | One-arg; returns cons list |
+| `hashtable_remove` | `hashtable -> 'k -> unit` | Two-arg curried |
+
+**Decision: Must use C runtime (too complex for inline MLIR)**
+
+Hashtable operations cannot be expressed as simple GEP/store sequences. A hash table requires dynamic dispatch for key comparison, hash computation, bucket management, and resizing. The only viable approach is a C runtime wrapper around an opaque C data structure.
+
+### Hashtable Memory Layout (in C runtime)
+
+The hashtable is represented as an opaque pointer to a C struct wrapping a hash table implementation. The MLIR side sees only `!llvm.ptr`.
+
+**Recommended C implementation:** Use a simple chaining hash table with `GC_malloc`-managed nodes. The Boehm GC will trace pointers through the linked chains conservatively. Alternatively, use `uthash` (public domain single-header hash table). The simplest portable approach is a custom linked-list hash table with GC_malloc nodes.
+
+**Key type handling:** Keys are stored as `i64` (uniform representation). For pointer-typed keys (strings, tuples, ADTs), the comparison must dereference and do structural equality. The `hashtable_get`/`containsKey` operations must implement value-level equality consistent with LangThree semantics:
+- Integer keys: i64 comparison
+- String keys: strcmp
+- Boolean keys: i64 comparison (bools are i64 0/1)
+
+**For v5.0 scope:** Support integer and string keys only (the most common use cases). Complex key types (tuples, ADTs) can be added later.
+
+### C Runtime Hashtable Struct
+
+```c
+// In lang_runtime.c / lang_runtime.h
+
+typedef struct LangHtEntry {
+    int64_t key;              // key (i64 for int/bool, or ptr coerced to i64 for string)
+    int64_t key_is_ptr;       // 1 if key is a pointer (string), 0 if plain i64
+    int64_t value;            // value (i64 for scalars, or ptr coerced to i64)
+    struct LangHtEntry* next; // chaining
+} LangHtEntry;
+
+typedef struct {
+    int64_t bucket_count;
+    LangHtEntry** buckets;   // GC_malloc'd array of bucket head pointers
+    int64_t size;             // number of entries
+} LangHashtable;
+```
+
+### New C Runtime Functions
+
+```c
+// hashtable_create : unit -> LangHashtable*
+LangHashtable* lang_hashtable_create(void);
+
+// hashtable_get : LangHashtable* -> i64 -> i64   (raises if key missing)
+int64_t lang_hashtable_get(LangHashtable* ht, int64_t key);
+
+// hashtable_set : LangHashtable* -> i64 -> i64 -> void
+void lang_hashtable_set(LangHashtable* ht, int64_t key, int64_t val);
+
+// hashtable_containsKey : LangHashtable* -> i64 -> i64 (returns 0 or 1)
+int64_t lang_hashtable_containsKey(LangHashtable* ht, int64_t key);
+
+// hashtable_keys : LangHashtable* -> LangCons*
+LangCons* lang_hashtable_keys(LangHashtable* ht);
+
+// hashtable_remove : LangHashtable* -> i64 -> void
+void lang_hashtable_remove(LangHashtable* ht, int64_t key);
+```
+
+### New ExternalFuncDecl Registrations (Elaboration.fs)
+
+```fsharp
+{ ExtName = "@lang_hashtable_create";      ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_get";         ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_set";         ExtParams = [Ptr; I64; I64]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_containsKey"; ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_keys";        ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+```
+
+### Hashtable Builtin Elaboration Pattern
+
+Same App-chain matching as array and string builtins:
+
+```fsharp
+// hashtable_create: App(Var("hashtable_create"), unitExpr)
+// unitExpr is typically Number(0,_) or () — elaborate it but discard result
+| App (Var ("hashtable_create", _), _unitExpr, _) ->
+    let result = { Name = freshName env; Type = Ptr }
+    (result, [LlvmCallOp(result, "@lang_hashtable_create", [])])
+
+// hashtable_get: App(App(Var("hashtable_get"), htExpr), keyExpr)
+| App (App (Var ("hashtable_get", _), htExpr, _), keyExpr, _) ->
+    let (htVal, htOps)   = elaborateExpr env htExpr
+    let (keyVal, keyOps) = elaborateExpr env keyExpr
+    let result = { Name = freshName env; Type = I64 }
+    (result, htOps @ keyOps @ [LlvmCallOp(result, "@lang_hashtable_get", [htVal; keyVal])])
+
+// hashtable_set: App(App(App(Var("hashtable_set"), htExpr), keyExpr), valExpr)
+| App (App (App (Var ("hashtable_set", _), htExpr, _), keyExpr, _), valExpr, _) ->
+    let (htVal,  htOps)  = elaborateExpr env htExpr
+    let (keyVal, keyOps) = elaborateExpr env keyExpr
+    let (valArg, valOps) = elaborateExpr env valExpr
+    let unitVal = { Name = freshName env; Type = I64 }
+    (unitVal,
+     htOps @ keyOps @ valOps @
+     [LlvmCallVoidOp("@lang_hashtable_set", [htVal; keyVal; valArg])
+      ArithConstantOp(unitVal, 0L)])
+
+// hashtable_containsKey: App(App(Var("hashtable_containsKey"), htExpr), keyExpr)
+| App (App (Var ("hashtable_containsKey", _), htExpr, _), keyExpr, _) ->
+    let (htVal,  htOps)  = elaborateExpr env htExpr
+    let (keyVal, keyOps) = elaborateExpr env keyExpr
+    let rawResult  = { Name = freshName env; Type = I64 }
+    let zeroVal    = { Name = freshName env; Type = I64 }
+    let boolResult = { Name = freshName env; Type = I1 }
+    let ops = [
+        LlvmCallOp(rawResult, "@lang_hashtable_containsKey", [htVal; keyVal])
+        ArithConstantOp(zeroVal, 0L)
+        ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+    ]
+    (boolResult, htOps @ keyOps @ ops)
+
+// hashtable_keys: App(Var("hashtable_keys"), htExpr)
+| App (Var ("hashtable_keys", _), htExpr, _) ->
+    let (htVal, htOps) = elaborateExpr env htExpr
+    let result = { Name = freshName env; Type = Ptr }
+    (result, htOps @ [LlvmCallOp(result, "@lang_hashtable_keys", [htVal])])
+
+// hashtable_remove: App(App(Var("hashtable_remove"), htExpr), keyExpr)
+| App (App (Var ("hashtable_remove", _), htExpr, _), keyExpr, _) ->
+    let (htVal,  htOps)  = elaborateExpr env htExpr
+    let (keyVal, keyOps) = elaborateExpr env keyExpr
+    let unitVal = { Name = freshName env; Type = I64 }
+    (unitVal,
+     htOps @ keyOps @
+     [LlvmCallVoidOp("@lang_hashtable_remove", [htVal; keyVal])
+      ArithConstantOp(unitVal, 0L)])
+```
+
+**Note on `hashtable_containsKey` return type:** The C function returns `i64` (0 or 1). The MLIR result must be `I1` for boolean uses. The pattern above extends the C result to `I1` via `arith.cmpi ne`, identical to the `lang_string_contains` pattern in the existing codebase.
+
+---
+
+## Component Interaction Map (v5.0)
+
+```
+Ast.Decl list
+   |
+   | elaborateProgram (existing entry point, minimal extension)
+   |
+   |-- LetMutDecl   → desugar to LetMut in extractMainExpr
+   |
+   | elaborateExpr (extended with new cases)
+   |
+   |-- LetMut       → GC_malloc(8) ref cell + store init + bind Ptr in MutableVars
+   |-- Assign       → load refptr from MutableVars + store new val + return 0
+   |-- Var (mut)    → load from refptr (only when name in MutableVars)
+   |
+   |-- App("array_create", n, def)     → @lang_array_create(n, def) → Ptr
+   |-- App("array_get", arr, idx)      → @lang_array_get(arr, idx) → I64
+   |-- App("array_set", arr, idx, val) → @lang_array_set(arr, idx, val) + unit
+   |-- App("array_length", arr)        → @lang_array_length(arr) → I64
+   |-- App("array_of_list", list)      → @lang_array_of_list(list) → Ptr
+   |-- App("array_to_list", arr)       → @lang_array_to_list(arr) → Ptr
+   |
+   |-- App("hashtable_create", _)           → @lang_hashtable_create() → Ptr
+   |-- App("hashtable_get", ht, key)        → @lang_hashtable_get(ht, key) → I64
+   |-- App("hashtable_set", ht, key, val)   → @lang_hashtable_set(ht, key, val) + unit
+   |-- App("hashtable_containsKey", ht, k)  → @lang_hashtable_containsKey → I1
+   |-- App("hashtable_keys", ht)            → @lang_hashtable_keys(ht) → Ptr
+   |-- App("hashtable_remove", ht, key)     → @lang_hashtable_remove(ht, key) + unit
+   |
+   v
+MlirModule (unchanged structure)
+   |
+   v
+Printer.fs (no changes)
+   |
+   v
+.mlir text → Pipeline.fs → native binary (linked with updated lang_runtime.c)
+```
+
+---
+
+## Build Order
+
+| Step | Files Changed | What It Delivers | Prerequisite | Rationale |
+|------|--------------|-----------------|-------------|-----------|
+| 1 | `lang_runtime.c`, `lang_runtime.h` | `lang_array_*` C functions compile and link | None | Independent; validates C data structure before wiring into MLIR |
+| 2 | `lang_runtime.c`, `lang_runtime.h` | `lang_hashtable_*` C functions compile and link | None (parallel with step 1) | Independent from array; validates hashtable implementation |
+| 3 | `Elaboration.fs` | `MutableVars` field added to `ElabEnv`; `emptyEnv` updated | None (parallel with steps 1-2) | Prerequisite for LetMut/Assign elaboration |
+| 4 | `Elaboration.fs` | `freeVars` extended for `LetMut` and `Assign` cases | Step 3 | Free variable analysis must be correct before closures can capture mutable vars |
+| 5 | `Elaboration.fs` | `extractMainExpr` handles `LetMutDecl` | None | Desugaring must be in place before elaboration tests can run |
+| 6 | `Elaboration.fs` | `LetMut` elaboration: `GC_malloc(8)` ref cell + store + bind in `MutableVars` | Step 3 | Core feature; no external deps |
+| 7 | `Elaboration.fs` | `Assign` elaboration: store to ref cell + return unit | Steps 3, 6 | Requires mutable var ptr to be in env |
+| 8 | `Elaboration.fs` | `Var` dereference for mutable variables | Steps 3, 6 | Reading a mut var requires the ref cell to exist |
+| 9 | `Elaboration.fs` | Array builtin elaboration + `ExternalFuncDecl` registrations | Step 1 | Requires C functions to be available for linking |
+| 10 | `Elaboration.fs` | Hashtable builtin elaboration + `ExternalFuncDecl` registrations | Step 2 | Requires C functions to be available for linking |
+
+**Build order summary:**
+- Steps 1 and 2 are independent (parallel): implement and test C runtime functions in isolation.
+- Step 3 is independent: add `MutableVars` field without changing any behavior.
+- Steps 4-8 are sequential (LetMut phase): freeVars, desugar, then LetMut, then Assign, then Var dereference.
+- Steps 9 and 10 are independent of each other and of steps 3-8 (Array and Hashtable builtins have no interaction with mutable variable machinery).
+
+**Recommended phase structure:**
+- Phase 1: LetMut/Assign (steps 3-8 + partial step 1 for C tests)
+- Phase 2: Array (step 1 + step 9)
+- Phase 3: Hashtable (step 2 + step 10)
+
+This ordering delivers usable features incrementally and isolates failures to a single feature at a time.
+
+---
+
+## Data Layout Summary
+
+| Type | Memory | MLIR SSA type | Allocation |
+|------|--------|--------------|------------|
+| Mutable variable ref cell | `{i64 value}` — 8 bytes | `Ptr` (to ref cell) | `GC_malloc(8)` |
+| Array header | `{i64 length, i64* data}` — 16 bytes | `Ptr` (to header) | `GC_malloc(16)` via C runtime |
+| Array data | `i64[n]` — `n*8` bytes | (internal, via C runtime) | `GC_malloc(n*8)` via C runtime |
+| Hashtable | opaque struct (bucket array + entries) | `Ptr` (to LangHashtable) | `GC_malloc` via C runtime |
+
+All three are GC-managed `Ptr`-typed values at the MLIR level, consistent with the existing uniform representation.
 
 ---
 
 ## ElabEnv Changes
+
+Only one new field is needed:
 
 ```fsharp
 type ElabEnv = {
@@ -338,231 +570,89 @@ type ElabEnv = {
     ClosureCounter: int ref
     Globals:        (string * string) list ref
     GlobalCounter:  int ref
-    // --- new fields ---
-    CtorTags:       Map<string, int>         // constructor name → integer tag (per TypeDecl + ExceptionDecl)
-    CtorArities:    Map<string, int>         // constructor name → arity: 0 or 1
-    RecordFields:   Map<string, (string * int) list>  // record type → [(fieldName, fieldIndex)]
-    ExnTags:        Map<string, int>         // exception name → integer tag (same scheme as ADT)
-    JmpBufPtr:      MlirValue option         // Some ptr = current setjmp buffer in scope; None = no handler
+    TypeEnv:        Map<string, TypeInfo>
+    RecordEnv:      Map<string, Map<string, int>>
+    ExnTags:        Map<string, int>
+    // --- new field ---
+    MutableVars:    Set<string>   // names bound to GC_malloc'd ref cells (for Var dereference)
 }
 ```
 
-`emptyEnv` initialises new fields as `Map.empty` / `None`.
+`emptyEnv ()` sets `MutableVars = Set.empty`.
 
----
-
-## MatchCompiler.fs Changes
-
-### New CtorTag Variants
-
-```fsharp
-type CtorTag =
-    | IntLit of int           // existing
-    | BoolLit of bool         // existing
-    | StringLit of string     // existing
-    | ConsCtor                // existing
-    | NilCtor                 // existing
-    | TupleCtor of int        // existing
-    | AdtCtor of tag: int * arity: int    // NEW: ADT constructor with integer tag
-    | RecordCtor of fields: (string * int) list  // NEW: record (unconditional, field indices)
-```
-
-`ctorArity` for `AdtCtor(_, 0)` = 0; `AdtCtor(_, 1)` = 1; `RecordCtor(fields)` = `List.length fields`.
-
-### desugarPattern for ConstructorPat
-
-```fsharp
-| ConstructorPat(name, argPat, _) ->
-    // Look up tag and arity from ElabEnv (must be threaded to desugarPattern)
-    let tag   = Map.find name ctorTags
-    let arity = Map.find name ctorArities
-    let subPats = match argPat with Some p -> [p] | None -> []
-    ([{ Scrutinee = acc; Pattern = CtorTest(AdtCtor(tag, arity), subPats) }], [])
-```
-
-### desugarPattern for RecordPat
-
-```fsharp
-| RecordPat(fields, _) ->
-    // Look up field indices from ElabEnv
-    // fields: (fieldName * subPattern) list
-    let orderedFields = fields |> List.sortBy (fun (name, _) ->
-        // get index from RecordFields map for the relevant type
-        // (type name must be resolved from context or inferred)
-        fieldIndex name)
-    let subPats = orderedFields |> List.map snd
-    let fieldList = orderedFields |> List.mapi (fun i (name, _) -> (name, i))
-    ([{ Scrutinee = acc; Pattern = CtorTest(RecordCtor(fieldList), subPats) }], [])
-```
-
-**Design note:** `desugarPattern` needs access to `ElabEnv.CtorTags` / `ElabEnv.RecordFields`. The simplest approach is to pass a `desugarCtx` record alongside, or curry the maps as parameters. The existing `compile` function in `MatchCompiler.fs` takes `(scrutinee: Accessor) (arms: (Pattern * bool * int) list)` — extend to `(ctx: DesugarCtx) (scrutinee: Accessor) (arms: ...)`.
-
----
-
-## New ExternalFuncDecl Registrations
-
-`elaborateProgram` must include these in `MlirModule.ExternalFuncs`:
-
-| C function | MLIR declaration |
-|------------|-----------------|
-| `@setjmp` | `llvm.func @setjmp(!llvm.ptr) -> i32` |
-| `@longjmp` | `llvm.func @longjmp(!llvm.ptr, i32) -> ()` (void) |
-| `@lang_raise` | `llvm.func @lang_raise(!llvm.ptr, !llvm.ptr) -> ()` (void) |
-| `@lang_current_exception` | `llvm.func @lang_current_exception() -> !llvm.ptr` |
-
-These are added unconditionally by `elaborateProgram` (the same way `@GC_malloc` and `@printf` are already added).
-
----
-
-## Top-Level Module Elaboration
-
-Currently `elaborateModule` takes a single `Expr`. For programs with multiple declarations:
-
-```fsharp
-let elaborateProgram (decls: Decl list) : MlirModule
-```
-
-Processing order:
-1. Collect all `TypeDecl`, `RecordTypeDecl`, `ExceptionDecl` — assign tags/indices, populate `ElabEnv`; no IR emitted.
-2. Process `LetDecl` / `LetRecDecl` — compile to `FuncOp` (for `LetRec`) or inline into `@main`.
-3. Emit the `@main` function wrapping the top-level expression sequence.
-4. Return `MlirModule` with accumulated `Funcs`, `Globals`, `ExternalFuncs`.
-
----
-
-## Component Interaction Map (v3)
-
-```
-Ast.Decl list
-   |
-   | elaborateProgram (new entry point)
-   |
-   |-- TypeDecl / RecordTypeDecl / ExceptionDecl
-   |      → populate CtorTags, CtorArities, RecordFields, ExnTags in ElabEnv
-   |      (no IR emitted at this stage)
-   |
-   |-- LetDecl / LetRecDecl
-   |
-   | elaborateExpr (extended)
-   |
-   |-- Constructor  → GC_malloc(16) + store tag + store payload
-   |-- RecordExpr   → GC_malloc(n*8) + store each field
-   |-- FieldAccess  → GEP(index) + load
-   |-- RecordUpdate → GC_malloc(n*8) + copy all fields + overwrite updated fields
-   |-- SetField     → GEP(index) + store
-   |-- Raise        → elaborate exn + call @lang_raise + llvm.unreachable
-   |-- TryWith      → alloca jmp_buf + setjmp + try/catch blocks + handler dispatch
-   |
-   | Match (with ConstructorPat / RecordPat)
-   |
-   | MatchCompiler.compile (extended)
-   |-- ConstructorPat → AdtCtor test: load field 0 + cmpi eq tag
-   |-- RecordPat      → RecordCtor test: unconditional + field accessors
-   |
-   v
-MlirModule { Globals, ExternalFuncs, Funcs }
-   |
-   v
-Printer.fs
-   | + printOp for LlvmSetjmpOp, LlvmLongjmpOp
-   v
-.mlir text → Pipeline.fs → native binary
-```
-
----
-
-## Build Order
-
-| Step | Files Changed | What It Delivers | Prerequisite |
-|------|--------------|-----------------|-------------|
-| 1 | `MlirIR.fs`, `Printer.fs` | `LlvmSetjmpOp`, `LlvmLongjmpOp` cases compile and print valid MLIR | None |
-| 2 | `lang_runtime.c` | `lang_raise`, `lang_current_exception` available for linking | None (parallel with step 1) |
-| 3 | `Elaboration.fs` | Add 5 new `ElabEnv` fields; update `emptyEnv` | None |
-| 4 | `Elaboration.fs` | `elaborateProgram` entry point: processes `TypeDecl`/`RecordTypeDecl`/`ExceptionDecl`, populates maps | Step 3 |
-| 5 | `Elaboration.fs` | `Constructor` and `RecordExpr` expression elaboration | Step 4 (tags/field indices must exist) |
-| 6 | `Elaboration.fs` | `FieldAccess`, `RecordUpdate`, `SetField` | Step 5 (record ptr needed) |
-| 7 | `MatchCompiler.fs` | `AdtCtor` and `RecordCtor` CtorTag variants; `desugarPattern` for `ConstructorPat` and `RecordPat` | Step 4 (tag maps must exist) |
-| 8 | `Elaboration.fs` | Wire `emitCtorTest` for `AdtCtor` (load tag + cmpi) and `RecordCtor` (unconditional, expose fields) | Step 7 |
-| 9 | `Elaboration.fs` | `TryWith` elaboration (alloca jmp_buf, setjmp, try/catch blocks, handler match dispatch) | Steps 1, 3, 7, 8 |
-| 10 | `Elaboration.fs` | `Raise` elaboration (call `@lang_raise` + `LlvmUnreachableOp`) | Steps 2, 3, 9 |
-
-**Rationale:**
-- Steps 1 and 2 are independent — validate setjmp/longjmp MLIR emission in isolation before wiring it into the elaborator.
-- Step 3 before Steps 4–10 because all subsequent elaboration uses the new ElabEnv fields.
-- Step 4 (elaborateProgram) before Steps 5–10 because `Constructor`/`Record` elaboration requires pre-populated tag/field maps.
-- Steps 5–6 before Step 8 because pattern matching on records requires knowing the field layout.
-- Step 7 (MatchCompiler) before Step 8 (emitCtorTest integration) — the decision tree must know `AdtCtor`/`RecordCtor` before the elaborator walks it.
-- Steps 9 and 10 are last because they depend on JmpBufPtr (Step 3) and lang_runtime additions (Step 2), but are independent of ADT/record elaboration.
-- Steps 1/2/3 can all proceed in parallel.
+Array and Hashtable builtins do not need env extensions — they are matched by name in `elaborateExpr` and dispatched to C runtime calls directly, just as `lang_string_concat` is matched by name today.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Allocating jmp_buf with GC_malloc
+### Anti-Pattern 1: Storing Mutable Variable as alloca
 
-**What people do:** Call `GC_malloc(sizeof(jmp_buf))` to get the setjmp buffer, for consistency with other heap allocations.
+**What people do:** Use `LlvmAllocaOp` for the ref cell instead of `GC_malloc(8)`.
 
-**Why it is wrong:** `setjmp` writes the stack pointer of the call frame into the buffer. The buffer must remain valid for the duration of the `TryWith` scope — i.e., as long as the enclosing function is on the stack. If the GC moves or collects the buffer (which Boehm GC may do because jmp_buf contents are not GC roots), the stored stack state is invalid. Additionally, `longjmp` jumps to the frame that called `setjmp` — if that frame has already returned, the program crashes.
+**Why it is wrong:** A closure capturing a mutable variable stores the cell's address. If the cell is stack-allocated in function F and the closure outlives F, the stored pointer is dangling. GC_malloc ensures the cell lives on the GC heap for as long as any reference to it exists (conservative scan will find the pointer in the closure's capture slots).
 
-**Do this instead:** Use `llvm.alloca` — the buffer lives on the stack frame of the function containing `TryWith`, which is guaranteed to be live until the function returns or the catch branch executes.
+**Do this instead:** `LlvmCallOp(refptr, "@GC_malloc", [sizeVal8])` where `sizeVal8` is `arith.constant 8 : i64`.
 
-### Anti-Pattern 2: Sharing a Single Global jmp_buf
+### Anti-Pattern 2: Returning the Ptr Directly from Var Lookup for Mutable Variables
 
-**What people do:** Allocate one global `jmp_buf` (or one per program) and reuse it for all `TryWith` expressions.
+**What people do:** When `Var "x"` is looked up and `x` is a mutable variable, return the `Ptr` SSA value (the ref cell pointer) directly as the expression result.
 
-**Why it is wrong:** Nested `TryWith` expressions require a stack of jump buffers. The innermost handler must longjmp to its own buffer; the outer handler must have its buffer preserved. A single global is overwritten by the inner `TryWith` and the outer handler becomes unreachable.
+**Why it is wrong:** Consumer code expects an `I64` value. Arithmetic operations, comparisons, and function calls receive an `!llvm.ptr` where they expect `i64`, causing MLIR type errors.
 
-**Do this instead:** Each `TryWith` allocates its own stack `jmp_buf` via `llvm.alloca`. `ElabEnv.JmpBufPtr` tracks the current innermost buffer; it is saved and restored across nested `TryWith` elaboration.
+**Do this instead:** Emit `LlvmLoadOp(loaded, refptr)` for every `Var` reference to a mutable variable. Use `MutableVars` set to know which variables need this dereference.
 
-### Anti-Pattern 3: Representing Zero-Argument ADT Constructors as Null
+### Anti-Pattern 3: Changing Existing `Var` Logic Without MutableVars Guard
 
-**What people do:** Represent `None`, `False`, or any no-payload constructor as a null pointer to avoid an allocation.
+**What people do:** Modify the `Var` case to dereference ALL `Ptr`-typed env values.
 
-**Why it is wrong:** Pattern matching for `AdtCtor` loads field 0 of the pointer. A null dereference crashes. More critically, when multiple zero-argument constructors exist in the same type (`Red | Green | Blue`), null can represent only one — the others require distinct tag values.
+**Why it is wrong:** Closures, records, lists, strings, and ADT values are all `Ptr`-typed in `env.Vars`. Dereferencing them as ref cells would read the first 8 bytes of those structs as integer values — silently corrupting all non-mutable pointer-typed variables.
 
-**Do this instead:** Always allocate 16 bytes and write the tag. The only exception is the existing list `[]` which is null by design and uses a separate `NilCtor` path that does not dereference.
+**Do this instead:** Check `Set.contains name env.MutableVars` before emitting the load. Only emit the dereference load for confirmed mutable ref cells.
 
-### Anti-Pattern 4: Caching Record Field SSA Values Across SetField
+### Anti-Pattern 4: Implementing Array Operations Inline with GEP
 
-**What people do:** When the match compiler resolves an accessor (GEP + load), it caches the result in `accessorCache`. A subsequent `FieldAccess` reuses the cached value.
+**What people do:** Instead of calling `@lang_array_get`, emit inline GEP/load sequences to access array elements directly.
 
-**Why it is wrong:** `SetField` mutates the heap cell. The cached SSA value reflects the pre-mutation state. Any subsequent read sees the old value, which is incorrect.
+**Why it is wrong:** Inline GEP cannot perform bounds checking without emitting an if/else control flow structure. Skipping bounds checking silently reads/writes memory outside the array, producing undefined behavior rather than the expected LangThree exception. Additionally, `array_of_list` and `array_to_list` require iteration — inline GEP cannot express loops without `LetRec` or a new loop construct.
 
-**Do this instead:** The `accessorCache` in `emitDecisionTree` is scoped to a single `Match` expression evaluation — it is not shared with `elaborateExpr` for `FieldAccess`. `FieldAccess` always emits a fresh GEP + load. This is already the correct behavior in the existing code; the anti-pattern is to change it in the name of "optimization."
+**Do this instead:** Call C runtime functions for all array operations. The bounds check is inside the C runtime and can call `lang_failwith` to terminate cleanly.
 
-### Anti-Pattern 5: Encoding GADT Constraints in the IR Tag
+### Anti-Pattern 5: Using stdlib malloc/free for Hashtable Instead of GC_malloc
 
-**What people do:** For GADTs with parameterized return types, embed the type parameter index in the tag value to enable runtime type inspection.
+**What people do:** Implement the hashtable using `malloc` / `free` directly to avoid GC interaction.
 
-**Why it is wrong:** The type checker handles all GADT constraints statically before elaboration. The elaborator never needs to inspect return type constraints at runtime. Adding type information to the tag conflates type checking with code generation.
+**Why it is wrong:** The Boehm GC is conservative: it scans all heap memory for pointer-shaped values. If the hashtable's internal nodes are allocated with `malloc`, the GC will not see them, but it will still try to scan them if any GC-managed pointer points to a `malloc`-managed block. The GC may also attempt to move or track allocations in ways that conflict with `malloc`. More practically: if a hashtable key or value is a GC-managed pointer and the GC collects it (because only the hashtable's `malloc`-managed storage references it), the hashtable entry becomes a dangling pointer.
 
-**Do this instead:** Tags are dense integers (0..n-1) assigned per constructor in declaration order. GADT type parameters are erased after type checking. The elaborator treats GADT constructors identically to regular ADT constructors.
+**Do this instead:** All hashtable allocations (the header struct, the bucket array, and all entry nodes) use `GC_malloc`. The conservative GC scanner will trace pointers through them correctly.
 
 ---
 
 ## Scalability Considerations
 
-| Concern | Current state | After this milestone | Impact |
-|---------|--------------|---------------------|--------|
-| `MlirOp` DU cases | ~17 cases | +2 → ~19 | Negligible |
-| `Printer.printOp` match arms | ~17 arms | +2 → ~19 | Negligible |
-| `ElabEnv` fields | 9 fields | +5 → 14 | Negligible |
-| `MatchCompiler.CtorTag` cases | 6 cases | +2 → 8 | Negligible |
-| `lang_runtime.c` functions | 8 functions | +2 → 10 | Negligible |
-| jmp_buf stack depth | N/A | 1 alloca per TryWith nesting level | Stack frames; fine for typical programs |
-| Exception value cell | N/A | 1 global pointer | Single-threaded; fine |
+| Concern | After v5.0 | Notes |
+|---------|-----------|-------|
+| `MlirOp` DU cases | 0 new cases | All features use existing `LlvmCallOp` / `LlvmCallVoidOp` |
+| `Printer.fs` match arms | 0 new arms | No new MlirOp cases |
+| `ElabEnv` fields | +1 (`MutableVars`) | 14 total fields |
+| `lang_runtime.c` functions | +12 (6 array + 6 hashtable) | All GC-safe |
+| `elaborateExpr` pattern arms | +12 builtin App patterns | Sequential matching; no perf concern at current scale |
+| Mutable variable ref cells | 1 GC alloc per `LetMut` | Same as any other heap value |
+| Array allocation | 2 GC allocs per `array_create` | Header + data; fixed after creation |
+| Hashtable initial allocation | ~2 GC allocs | Header + initial bucket array; grows on demand |
 
 ---
 
 ## Sources
 
-- Direct code analysis: `MlirIR.fs`, `Elaboration.fs`, `MatchCompiler.fs`, `Printer.fs`, `Pipeline.fs`, `lang_runtime.c` in `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/`
-- Source AST nodes: `Ast.fs`, `MatchCompile.fs`, `Eval.fs` in `/Users/ohama/vibe-coding/LangThree/src/LangThree/`
-- `MatchCompiler.fs` line 121–125: explicit `failwith "MatchCompiler: ConstructorPat not yet supported in backend"` and `RecordPat` — confirms both are unimplemented as of current codebase
-- C standard (C11 §7.13): `setjmp`/`longjmp` behavior; buffer must be in scope at longjmp call
-- Boehm GC: conservative scanner traverses all reachable pointers; stack-allocated jmp_buf is scanned correctly as part of the stack frame
+- Direct code analysis: `Elaboration.fs`, `MlirIR.fs`, `Printer.fs`, `lang_runtime.c`, `lang_runtime.h` in `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/`
+- AST definition: `Ast.fs` in `/Users/ohama/vibe-coding/LangThree/src/LangThree/` — confirmed `LetMut`, `Assign`, `LetMutDecl` nodes at lines 113-114, 330
+- Evaluator semantics: `Eval.fs` in `/Users/ohama/vibe-coding/LangThree/src/LangThree/` — lines 437-571 for array/hashtable builtins, lines 749-763 for LetMut/Assign
+- Existing `string_contains` pattern (Elaboration.fs lines 689-701): reference for the `I64 → I1` conversion pattern used in `hashtable_containsKey`
+- Existing `lang_range` / `lang_string_sub` pattern (Elaboration.fs lines 682-688, 960-970): reference for multi-arg builtin App matching
+- Existing GC_malloc pattern (Elaboration.fs lines 911-924): reference for `GC_malloc(n*8)` allocation sequences
+- Previous ARCHITECTURE.md (v4.0): unchanged constraints on `Ptr` uniform representation, `GC_malloc` allocation, and decision tree pattern matching
 
 ---
-*Architecture research for: LangBackend ADT/GADT + Records (mutable fields) + Exception handling milestone*
-*Researched: 2026-03-26*
+*Architecture research for: LangBackend v5.0 Mutable & Collections milestone*
+*Researched: 2026-03-27*

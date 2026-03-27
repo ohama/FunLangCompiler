@@ -3,7 +3,7 @@
 **Domain:** Functional language compiler (F# host, MLIR text format, LLVM backend)
 **Researched:** 2026-03-26
 **Scope:** v1 pitfalls (MLIR C API, closures, lowering pipeline) + v2 additions (Boehm GC,
-heap-allocated types, pattern matching) + v3 additions (ADT/GADT, mutable records, setjmp/longjmp exceptions)
+heap-allocated types, pattern matching) + v3 additions (ADT/GADT, mutable records, setjmp/longjmp exceptions) + v5 additions (mutable variable bindings, Array, Hashtable)
 **Confidence:** HIGH for Boehm GC integration and heap representation; HIGH for pattern
 matching compilation; HIGH for ADT/GADT tag representation; HIGH for setjmp/longjmp pitfalls;
 MEDIUM for interaction between existing stack closures and new GC heap
@@ -1362,8 +1362,430 @@ is no longer needed but still holds register-shaped values — more false roots.
 | Pattern matching — ADT ctors | M-14: CtorTag not extended | Add UserCtor to CtorTag and update all match sites in same commit |
 | Exception volatile variables | M-15: exception value clobbered by optimizer | `volatile` on lang_current_exception; regression test at -O2 |
 | Nested try-with jmp_buf allocation | M-16: GC_malloc'd jmp_buf scanned as roots | Stack-allocate jmp_buf; GC_malloc_atomic if heap allocation required |
+| LetMut ref cell allocation | C-17: closure captures value snapshot | Track mutable cell pointers in ElabEnv.MutVars (Ptr); capture cell Ptr in closures |
+| freeVars for LetMut/Assign | C-18: free vars silently dropped | Add explicit LetMut/Assign cases to freeVars before any LetMut codegen |
+| Assign codegen | M-19: env.Vars updated instead of cell store | Emit GEP+store to cell pointer; never update env.Vars in Assign codegen |
+| Array bounds check | M-17: silent OOB access | Emit lang_array_bounds_check before every array_get/array_set |
+| Array element allocation | M-18: GC_malloc_atomic for Ptr elements | Use GC_malloc for Ptr-element arrays; GC_malloc_atomic only for pure-I64 buffers |
+| Hashtable C runtime allocation | C-20: malloc'd table invisible to GC | Use GC_malloc for all hashtable struct/bucket/entry allocations |
+| Hashtable key hashing | C-19: Ptr key hashed by address | Implement lang_value_hash with structural hash for strings; address hash for reference types |
+| Hashtable key equality | M-20: pointer comparison for boxed keys | Use lang_value_equal (structural) for key comparison in bucket chain |
 
 ---
+
+---
+
+## Critical Pitfalls — v5: Mutable Variables, Array, Hashtable
+
+Mistakes specific to adding `LetMut`/`Assign` mutable variable bindings, Array, and
+Hashtable to the existing MLIR-targeting compiler backend with Boehm GC.
+
+---
+
+### Pitfall C-17: Closure Captures Mutable Variable Value Instead of Ref Cell Pointer
+
+**What goes wrong:**
+The evaluator (LangThree `Eval.fs`) implements `LetMut` by allocating an F# `ref` cell and
+binding the variable name to `RefValue(refCell)` in the environment. Every subsequent
+`Var(name)` read dereferences the ref cell (`!refCell`), and every `Assign` writes to it
+(`refCell.Value <- newValue`).
+
+The compiler must replicate this exactly: `LetMut(name, initExpr, body)` must allocate a
+GC heap cell (a single-slot `{ptr value}` block via `GC_malloc(8)`), store the initial
+value into it, and bind `name` in `env.Vars` to the **cell pointer** (`Ptr`), not to the
+initial value (`I64`).
+
+The pitfall: when a closure is formed inside `body`, the current `freeVars` function returns
+`Set<string>` with no distinction between mutable and immutable variables. The closure
+capture path (Elaboration.fs line ~1343) loads each captured variable from `env.Vars` as
+`I64` using `LlvmLoadOp`. For a mutable variable, `env.Vars[name]` is a `Ptr` (the cell
+pointer). Loading a `Ptr`-typed value as `I64` — or, worse, treating a cell pointer as the
+value itself — produces wrong capture semantics: the closure captures the current value
+snapshot rather than the live cell, so mutations after closure creation are invisible inside
+the closure.
+
+**Why it happens:**
+The existing closure capture code assumes all captured variables are immutable `I64` values.
+The `capVal = { Name = ...; Type = I64 }` and the `LlvmLoadOp` at capture site both hardcode
+`I64`. There is no type-directed path that handles `Ptr`-typed variables differently.
+
+**Concrete broken pattern:**
+```
+let mut counter = 0
+let increment = fun () -> counter <- counter + 1; counter
+```
+If the closure captures `counter` by value (0), calling `increment` three times returns
+1, 1, 1 instead of 1, 2, 3, because each call reads the snapshot rather than the cell.
+
+**Consequences:**
+- Closures over mutable variables produce stale reads — they see the value at capture time,
+  not the current value
+- Mutations via `Assign` affect only the original frame's SSA binding, not the captured copy
+- Programs that rely on shared mutable state between closures compute wrong results silently
+- No type error or MLIR verifier error: the generated IR is structurally valid but semantically wrong
+
+**Prevention:**
+1. Add a `MutVars: Set<string>` field to `ElabEnv` (or a separate `Map<string, MlirValue>` for
+   mutable cell pointers, distinct from `Vars`)
+2. In `LetMut` codegen: allocate `GC_malloc(8)` → store initial value → bind name in
+   `MutVars` as the cell `Ptr` value
+3. In `Var(name)` codegen: if `name ∈ MutVars`, emit `LlvmLoadOp` from the cell pointer;
+   if `name ∈ Vars`, emit direct use of the SSA value (existing path)
+4. In `Assign(name, valExpr)` codegen: emit `LlvmStoreOp(newVal, cellPtr)` where `cellPtr =
+   MutVars[name]`; do NOT update `env.Vars` (the cell pointer is fixed; the value inside changes)
+5. In closure capture: when a free variable `name ∈ MutVars`, capture the **cell pointer**
+   (`Ptr`) into the closure environment slot — do NOT load the cell value. Inside the closure
+   body, `Var(name)` accesses the captured cell pointer and emits `LlvmLoadOp` from it.
+6. Update `freeVars` to handle `LetMut` and `Assign` nodes (currently the catch-all
+   `| _ -> Set.empty` at line 151 of Elaboration.fs silently drops free variables in
+   `LetMut`/`Assign` expressions)
+
+**Warning signs:**
+- Closures over mutable variables return stale values
+- `increment` / `counter` pattern returns the same value on every call
+- Mutation in one function is invisible to another function that "shares" the variable via closure
+
+**Phase to address:** LetMut/Assign codegen phase, step 1. Must be correct before writing
+any test that combines closures with mutable variables.
+
+---
+
+### Pitfall C-18: `freeVars` Catch-All Drops Free Variables in `LetMut` and `Assign`
+
+**What goes wrong:**
+The existing `freeVars` function in `Elaboration.fs` ends with:
+```fsharp
+| _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
+```
+This catch-all silently returns no free variables for any AST node that has no explicit
+case. `LetMut(name, initExpr, body)` and `Assign(name, valueExpr)` are not yet listed as
+cases. As a result:
+- A closure containing a `LetMut` body does not capture the free variables of `initExpr`
+  or `body` that are defined outside the closure
+- A closure containing an `Assign` does not capture variables appearing in `valueExpr`
+- Any variable that is only referenced inside a `LetMut` or `Assign` inside a lambda body
+  will not be listed as a free variable, so the closure struct will not include a slot for it
+
+This is a silent correctness bug: the variable is not included in the capture list, so at
+runtime the generated code will either read an uninitialized slot or will not compile at all
+because the variable name is absent from `innerEnv.Vars`.
+
+**Why it happens:**
+New AST nodes are added to LangThree without corresponding `freeVars` cases being added to
+the compiler. The catch-all makes the omission silent.
+
+**Consequences:**
+- Closure body that references an outer variable only via `LetMut` or `Assign` does not
+  capture that variable — variable is missing from the closure environment
+- At codegen time: `Map.tryFind name innerEnv.Vars = None` → exception or wrong SSA value
+- In generated MLIR: closure struct has fewer slots than expected; GEP at the missing index
+  reads adjacent memory
+
+**Prevention:**
+- Add explicit `freeVars` cases for all v5 AST nodes:
+  ```fsharp
+  | LetMut(name, initExpr, body, _) ->
+      Set.union (freeVars boundVars initExpr)
+               (freeVars (Set.add name boundVars) body)
+  | Assign(name, valueExpr, _) ->
+      // name itself is a mutation target; it is free if not bound here
+      let nameFree = if Set.contains name boundVars then Set.empty else Set.singleton name
+      Set.union nameFree (freeVars boundVars valueExpr)
+  ```
+- Similarly add cases for any Array or Hashtable AST nodes that contain sub-expressions
+- Remove or guard the catch-all: replace `| _ -> Set.empty` with a specific list of
+  known no-free-var nodes (`| Char _ | IntLit _ | ...`) so the F# compiler warns on
+  any new unhandled case
+- Run the test: a lambda that mutates a captured variable via `Assign` must correctly
+  include that variable in its capture list
+
+**Warning signs:**
+- `System.Collections.Generic.KeyNotFoundException` inside `elaborateExpr` at a `Var` node
+  whose name is bound only in an outer `LetMut`
+- Closure captures list is shorter than expected when inspecting generated MLIR text
+- Adding a `LetMut` inside a lambda body causes unrelated tests to fail (slot index shift)
+
+**Phase to address:** LetMut/Assign codegen phase, step 0 — fix `freeVars` before any
+other LetMut codegen, because all subsequent closure tests depend on it.
+
+---
+
+### Pitfall C-19: Hashtable Key Hashing Uses Pointer Identity for Boxed Values
+
+**What goes wrong:**
+LangThree's `HashtableValue` uses F#'s `Dictionary<Value, Value>`, which calls the custom
+`GetHashCode` defined on the `Value` DU. For `IntValue n`, this is the integer hash. For
+`StringValue s`, this is the string content hash. The compiler must replicate this: when
+compiling `Hashtable.get ht key` and `Hashtable.set ht key value`, the C runtime hash table
+must hash `key` in the same way the evaluator does.
+
+The pitfall: if the C runtime hash table implementation uses `(uintptr_t)key` (pointer
+address) as the hash for boxed values (Ptr), then two string keys with the same content but
+different allocations will hash to different buckets. `Hashtable.set ht "hello" 1; Hashtable.get ht "hello"` will fail to find the key even though the strings are equal by content.
+
+**Why it happens:**
+The uniform boxed representation stores all non-integer values as `Ptr` to GC heap blocks.
+Two string literals `"hello"` that appear in different source locations are different
+allocations (different addresses) with identical content. A hash table keyed by `Ptr` value
+hashes by address, not content.
+
+**Concrete failure:**
+```
+let ht = Hashtable.create ()
+Hashtable.set ht "key" 42
+let v = Hashtable.get ht "key"   (* fails: different string alloc, different hash bucket *)
+```
+
+**Consequences:**
+- `Hashtable.get` fails to find keys that were inserted by `Hashtable.set` with equal content
+- `Hashtable.containsKey` returns false for existing keys
+- No error at compile time; runtime produces `LangThreeException "Hashtable.get: key not found"`
+  which matches the evaluator's exception but fires on a case the evaluator would succeed on
+
+**Prevention:**
+- Implement a C runtime function `lang_value_hash(ptr value, int type_tag) -> uint64` that
+  dispatches on the type tag:
+  - Integer: hash the `i64` value (e.g. mix with a constant)
+  - String: hash the string content (e.g. FNV-1a over the byte array)
+  - Other Ptr types (tuple, ADT, array): hash by address (reference identity), matching
+    the evaluator's `RuntimeHelpers.GetHashCode` behavior for arrays and hashtables
+- The runtime hash table must call `lang_value_hash` for key hashing, not use raw pointer
+  arithmetic
+- Similarly implement `lang_value_equal(ptr a, ptr b, int type_tag) -> bool` for key
+  equality in the hash table bucket chain
+
+**Warning signs:**
+- `Hashtable.get` raises "key not found" for keys that were just inserted
+- Hashtable works correctly for integer keys but fails for string keys
+- Programs that pass a string variable as a key fail when the variable was produced by a
+  function (different allocation site) rather than a literal
+
+**Phase to address:** Hashtable codegen phase, C runtime design step, before any hashtable
+operation is compiled.
+
+---
+
+### Pitfall C-20: Hashtable C Runtime Uses `malloc` — Boehm GC Cannot See Value Pointers
+
+**What goes wrong:**
+The most natural C implementation of a hash table (open addressing or chaining) uses `malloc`
+for bucket arrays and entry nodes. If the hashtable is implemented with `malloc`, all `Ptr`
+values stored as keys or values in the table are invisible to Boehm GC: the GC does not scan
+`malloc`'d memory for roots. This means any object that is only reachable via a value stored
+in a hashtable entry will be collected prematurely.
+
+**Why it happens:**
+Hash table implementations in C tutorials and standard libraries use `malloc`. Integrating
+Boehm GC into a custom C hash table requires changing every allocation to `GC_malloc`, which
+is easy to forget.
+
+**Concrete failure:**
+```
+let ht = Hashtable.create ()
+Hashtable.set ht "key" (make_some_object ())
+GC.collect ()   (* or: run until GC triggers *)
+let v = Hashtable.get ht "key"   (* object was collected; ptr is now dangling *)
+```
+
+**Consequences:**
+- GC collects objects that are only referenced from hashtable entries
+- Dangling pointer read → type confusion, garbage values, or crash
+- Bug is intermittent: depends on GC timing and allocation pressure
+
+**Prevention:**
+- The C runtime hash table must use `GC_malloc` for:
+  - The `LangHashtable` header struct
+  - The bucket pointer array
+  - Each entry node (key, value, next-pointer)
+- Alternatively: use a persistent functional hash map in C that is fully GC-managed
+- Entry nodes that store a key `Ptr` and a value `Ptr` must be allocated with `GC_malloc`
+  (not `GC_malloc_atomic`) so the GC scans both pointer fields
+- Add a GC stress test: insert a value, trigger a GC cycle (by allocating a lot), then
+  verify the stored value is still retrievable
+
+**Warning signs:**
+- Hashtable entries become invalid after allocation-heavy operations
+- `GC_FIND_LEAK=1` does not flag the issue (the entries themselves are GC-managed but may
+  point to collected objects if inner allocations used `malloc`)
+- ASan reports use-after-free inside `lang_hashtable_get` after a GC cycle
+
+**Phase to address:** Hashtable codegen phase, C runtime implementation. Establish the
+`GC_malloc`-only rule for all hashtable memory before writing any test.
+
+---
+
+## Moderate Pitfalls — v5: Mutable Variables, Array, Hashtable
+
+---
+
+### Pitfall M-17: Array Bounds Check Omitted — Silent Out-of-Bounds Access
+
+**What goes wrong:**
+The evaluator (`array_get`, `array_set`) checks bounds explicitly and raises a
+`LangThreeException` on out-of-bounds access. If the compiler omits bounds checks, an
+out-of-bounds index silently reads or writes adjacent heap memory — corrupting other GC
+objects or producing garbage values.
+
+**Why it happens:**
+Bounds checking requires emitting a comparison + conditional branch for every `array_get`
+and `array_set`. The temptation is to skip it for performance, or to defer it. Deferred
+bounds checks often never get added.
+
+**Concrete failure:**
+```
+let arr = array_create 3 0
+array_set arr 5 99   (* evaluator: LangThreeException; compiler: silent OOB write *)
+```
+
+**Consequences:**
+- Out-of-bounds write corrupts adjacent GC heap block headers or object fields
+- Out-of-bounds read returns garbage that looks like a valid value
+- GC may crash or behave incorrectly if its own metadata (stored in the header words of
+  GC_malloc blocks) is overwritten by an OOB array write
+- Tests pass with in-bounds accesses but fail non-deterministically with OOB accesses
+
+**Prevention:**
+- Add a C runtime helper `lang_array_bounds_check(i64 index, i64 length)` that raises
+  a `LangThreeException` on OOB access (consistent with evaluator behavior)
+- Emit a call to `lang_array_bounds_check` before every `array_get` and `array_set`
+  in the generated MLIR
+- Test at exact boundaries: `array_create 3 0; array_get arr 2` (valid) and
+  `array_get arr 3` (should raise); verify the exception fires correctly
+
+**Warning signs:**
+- OOB array access produces garbage output instead of raising an exception
+- Heap corruption detected by `GC_DEBUG=1` or ASan after array operations
+- Adjacent allocated objects have wrong field values after array writes
+
+**Phase to address:** Array codegen phase. Add bounds check before the first array
+operation is compiled; it is much harder to add retroactively.
+
+---
+
+### Pitfall M-18: Array Element Storage Uses Wrong `GC_malloc` Variant
+
+**What goes wrong:**
+An array needs two allocations:
+1. The array **header** struct: `{i64 length, ptr element_data}` — allocated with
+   `GC_malloc` (8+8 = 16 bytes), because `element_data` is a pointer the GC must follow
+2. The array **element buffer**: N slots of either `i64` (unboxed integers) or `ptr`
+   (boxed values)
+
+For a polymorphic array (`'a array`), elements can be either `I64` or `Ptr` depending on
+the element type. If the element type is purely `I64` (e.g. `int array`) and
+`GC_malloc_atomic` is used for the buffer, the GC will not scan the buffer for pointer roots.
+This is correct and reduces false-positive retention (Pitfall M-9).
+
+The pitfall arises if:
+(a) `GC_malloc_atomic` is used for a buffer that stores `Ptr`-typed elements (e.g. `string array`,
+    `(int * int) array`) — the GC cannot follow the pointers and may collect live objects; or
+(b) `GC_malloc` is used for pure-`I64` buffers — functionally correct but causes false retention
+    of integer values that look like heap addresses
+
+**Prevention:**
+- Determine the element `MlirType` from the array's type annotation (`TArray t`):
+  - If element type is `I64` (int, bool, char): allocate buffer with `GC_malloc_atomic`
+  - If element type is `Ptr` (string, tuple, list, ADT, array, hashtable): use `GC_malloc`
+  - For polymorphic/unknown element types: conservatively use `GC_malloc`
+- Never use `GC_malloc_atomic` when the element type is or might be a boxed pointer
+- Add a comment at the allocation site documenting which branch was chosen and why
+
+**Warning signs:**
+- Objects reachable only through array elements are collected prematurely (use `GC_malloc`
+  for everything as a safe baseline; only switch to `GC_malloc_atomic` after correctness is
+  established)
+- `GC_PRINT_STATS=1` shows excessive heap retention for programs with large integer arrays
+  (false retention from `GC_malloc` on pure-integer buffer)
+
+**Phase to address:** Array codegen phase, allocation strategy step.
+
+---
+
+### Pitfall M-19: `Assign` Stores to the Wrong Location After `env.Vars` Update
+
+**What goes wrong:**
+A subtle implementation mistake: when codegen for `Assign(name, valueExpr)` is written, the
+author updates `env.Vars` to map `name` to the new value SSA result. This is wrong for two
+reasons:
+
+1. The mutable cell pointer (the `GC_malloc`'d ref cell) is fixed — it must remain in
+   `env.MutVars` (or however the mutable cell pointer is tracked). Overwriting `env.Vars[name]`
+   with a new SSA value breaks all subsequent reads, which now read the snapshot SSA value
+   instead of loading from the cell.
+
+2. `env.Vars` in the existing system maps variable names to `MlirValue` (SSA values). SSA
+   values are immutable by definition. "Updating" an SSA value binding is not how mutation
+   is represented — it must always go through a memory cell (the ref cell pointer).
+
+**Why it happens:**
+The pattern `env.Vars <- Map.add name newVal env.Vars` (or equivalent functional update
+threading) looks like a natural way to "update a variable." This is how the interpreter
+updates its environment, but the compiled representation is different: the cell pointer
+is stable; only the cell's content changes.
+
+**Consequences:**
+- After an `Assign`, subsequent reads of `name` return the value at the time of the assign
+  (correct), but further assigns have no effect because the cell-store path is bypassed
+- Two closures sharing a mutable variable via a captured cell pointer diverge: one
+  reads from the cell, the other reads the stale SSA value
+
+**Prevention:**
+- Never update `env.Vars` in `Assign` codegen
+- The only effect of `Assign` is: `LlvmStoreOp(newVal, cellPtr)` where
+  `cellPtr = env.MutVars[name]`
+- `env.MutVars` is read-only after `LetMut` binds the name; it never changes
+- Write a unit test: `let mut x = 1; x <- 2; x <- 3; x` should return 3 via three
+  successive cell loads, each reading from the same cell pointer
+
+**Warning signs:**
+- First `Assign` updates the value correctly; second `Assign` has no visible effect
+- After two or more mutations, the value is stuck at the value from the first mutation
+- SSA dominance errors in the MLIR verifier if an updated `env.Vars` binding escapes its block
+
+**Phase to address:** LetMut/Assign codegen phase. Enforce the rule as a comment at the
+`Assign` case: "This case must NOT update env.Vars."
+
+---
+
+### Pitfall M-20: Hashtable Key/Value Equality Uses Pointer Comparison for Boxed Types
+
+**What goes wrong:**
+When searching a hashtable bucket chain for a matching key, the C runtime must check key
+equality. If the runtime uses `key_ptr == stored_key_ptr` (pointer identity), two strings
+with the same content but different allocations will not match — `Hashtable.get` will not
+find keys inserted by `Hashtable.set` when the key is a string, tuple, or other boxed type.
+
+This is distinct from Pitfall C-19 (hashing): even if the hash is correct and both keys
+land in the same bucket, the bucket chain comparison must also use structural equality.
+
+**Why it happens:**
+Pointer comparison is the default `==` for C pointers. It is correct for reference-identity
+types (arrays, hashtables themselves) but wrong for value-equality types (strings, integers,
+tuples).
+
+**Prevention:**
+- Implement a C runtime function `lang_value_equal(ptr a, ptr b) -> bool` that dispatches
+  on the runtime type tag of `a`:
+  - Integer: compare `i64` values
+  - String: compare byte content (`strcmp` on the `data` field)
+  - Tuple: recursively compare field by field
+  - ADT: compare tag, then payload fields recursively
+  - Array, Hashtable: pointer identity (matching evaluator's `ReferenceEquals` behavior)
+- Use `lang_value_equal` in every hash table lookup, not `==`
+- For the MVP, it is acceptable to restrict hashtable keys to integer and string types
+  (the most common cases) and document the restriction
+
+**Warning signs:**
+- `Hashtable.get` fails for string keys produced by a function call (different allocation
+  from the literal used as key at `set` time)
+- Hashtable works for integer keys (`I64` values, compared by value automatically) but
+  fails for any boxed key
+
+**Phase to address:** Hashtable codegen phase, C runtime key-comparison implementation.
+Must be correct before any hashtable test with string or tuple keys.
+
+---
+
 
 ## Sources
 
@@ -1398,3 +1820,7 @@ is no longer needed but still holds register-shaped values — more false roots.
 - [Conservative GC Algorithmic Overview — hboehm.info](https://www.hboehm.info/gc/gcdescr.html)
 - [Boehm GC Porting Directions — stack scanning](https://hboehm.info/gc/porting.html)
 - [Mutable Record Fields — OCaml Programming: Correct + Efficient + Beautiful](https://cs3110.github.io/textbook/chapters/mut/mutable_fields.html)
+- [Boehm GC — GC_malloc_atomic for pointer-free regions](https://www.hboehm.info/gc/gcinterface.html)
+- [FNV Hash — Fowler/Noll/Vo hash algorithm for C strings](http://www.isthe.com/chongo/tech/comp/fnv/)
+- [OCaml ref cells — how mutable variables are compiled](https://v2.ocaml.org/api/compiledfiles/lambda.html)
+- [LangThree Eval.fs — LetMut uses F# ref cells, Assign dereferences them](../LangThree/src/LangThree/Eval.fs)

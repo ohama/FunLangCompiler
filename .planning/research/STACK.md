@@ -1,761 +1,684 @@
-# Technology Stack: LangBackend v4.0 — ADT/GADT, Records, Exceptions
+# Technology Stack: LangBackend v5.0 — Mutable Variables, Array, Hashtable
 
 **Project:** LangBackend — LangThree MLIR → LLVM → native binary compiler
-**Milestone:** v4.0 ADT/GADT, Records (mutable fields), Exception handling
-**Researched:** 2026-03-26
-**Confidence:** HIGH for ADT tagged-union layout and MatchCompiler extension; HIGH for record struct layout and mutable field mutation via GEP+store; MEDIUM for setjmp/longjmp exception strategy (implementation straightforward; interaction with Boehm GC requires one explicit safeguard)
+**Milestone:** v5.0 — LetMut/Assign (mutable variables), Array, Hashtable
+**Researched:** 2026-03-27
+**Confidence:** HIGH for all three features — patterns are direct extensions of existing SetField
+(mutable record fields) and the Range/lang_range (C runtime builtins) already established.
 
 ---
 
 ## Scope of This Document
 
-This document covers ONLY stack additions and changes required for v4.0. The existing v3.0 stack
+This document covers ONLY stack additions and changes required for v5.0. The existing v4.0 stack
 (F# / .NET 10, LLVM 20 / MLIR 20, func/arith/cf/llvm dialects, Boehm GC 8.2.12, lang_runtime.c,
-45 passing E2E tests) remains unchanged. Each section states precisely what changes and why.
+67 passing E2E tests) remains unchanged. Each section states precisely what changes and why.
 
 ---
 
-## What v4.0 Adds to the Stack
+## What v5.0 Adds to the Stack
 
 ### Summary Table
 
 | Category | What Changes | Why |
 |----------|-------------|-----|
-| Runtime library (`lang_runtime.c`) | Add `lang_try_push`, `lang_try_pop`, `lang_throw`, `lang_current_exception`; add `LangExnFrame` struct and global frame stack | setjmp/longjmp exception runtime — cannot be emitted from MLIR alone |
-| MlirIR.fs — `MlirType` | No new variants needed | ADT tags are `i64`; record/ADT payloads are `!llvm.ptr` (existing types cover everything) |
-| MlirIR.fs — `MlirOp` | Add `LlvmTruncIOp`; no other new ops needed | Truncate i64 tag to i1 for booleans if needed; everything else reuses existing ops |
-| MatchCompiler.fs — `CtorTag` | Add `AdtCtor of name: string * arity: int` variant | The decision-tree algorithm needs to tell ADT constructors from cons cells and tuples |
-| Elaboration.fs | Add match arms for `Constructor`, `ConstructorPat`, `RecordExpr`, `FieldAccess`, `SetField`, `RecordUpdate`, `RecordPat`, `Raise`, `TryWith`; add `TypeEnv`/`RecordEnv` to `ElabEnv` | New AST nodes need codegen |
-| Elaboration.fs — `ElabEnv` | Add `TypeEnv: Map<string, AdtInfo>` and `RecordEnv: Map<string, RecordInfo>` | Constructor-to-tag index lookup; record field-to-index lookup at codegen time |
+| Runtime library (`lang_runtime.c`) | Add `lang_array_create`, `lang_array_get`, `lang_array_set`, `lang_array_length`; add `lang_hashtable_create`, `lang_hashtable_get`, `lang_hashtable_set`, `lang_hashtable_contains_key`, `lang_hashtable_remove`, `lang_hashtable_keys` | Array and Hashtable are heap objects managed by C runtime; cannot be emitted purely from MLIR ops |
+| Runtime library header (`lang_runtime.h`) | Add typedefs for `LangArray` and forward declarations for all new runtime functions | Needed by C compiler when compiling lang_runtime.c itself |
+| MlirIR.fs — `MlirOp` | No new variants needed | LetMut uses `LlvmCallOp` + `LlvmGEPLinearOp` + `LlvmStoreOp` + `LlvmLoadOp` (all existing); Array and Hashtable operations route through `LlvmCallOp` and `LlvmCallVoidOp` to C runtime functions |
+| MlirIR.fs — `MlirType` | No new variants needed | Ref cells, arrays, and hashtables are all `Ptr` (opaque heap pointers) in the uniform boxed representation |
+| Elaboration.fs | Add arms for `LetMut`, `Assign`, `LetMutDecl`; add builtin dispatch arms for `array_create`, `array_get`, `array_set`, `array_length`, `array_of_list`, `array_to_list`, `array_iter`, `array_map`, `array_fold`, `array_init`, `hashtable_create`, `hashtable_get`, `hashtable_set`, `hashtable_contains_key`, `hashtable_remove`, `hashtable_keys` | New AST nodes and new builtin function names need codegen dispatch |
+| Elaboration.fs — `freeVars` | No changes needed | `LetMut` and `Assign` already present in the `_ -> Set.empty` fallthrough; `LetMutDecl` is a module-level declaration handled in `elaborateProgram` not `freeVars` |
 | Pipeline.fs | No changes | lang_runtime.c already compiled and linked; new C functions go into the same file |
-| Test infrastructure | No new framework; extend E2E tests | 45 existing tests continue to pass; new `.lt` files added |
+| Test infrastructure | No new framework; extend E2E tests | 67 existing tests continue to pass; new `.flt` files added |
 
 ---
 
-## 1. ADT / GADT: Tagged Union Representation
+## 1. LetMut / Assign: Mutable Variable Ref Cells
 
-### 1.1 Runtime Layout
+### 1.1 Semantic Model and Runtime Representation
 
-Every ADT value is a GC_malloc'd heap block with this layout:
+The LangThree evaluator represents `LetMut` by allocating an F# `ref` cell and storing a `RefValue`
+in the environment. When a `Var` lookup finds a `RefValue`, it transparently dereferences it.
+`Assign` writes through the ref cell and returns unit.
+
+**Compiled representation:** Every mutable variable is a GC-managed ref cell — a 1-word heap block
+containing the current value:
 
 ```
-offset  0 : i64   — constructor tag (0, 1, 2, ... in declaration order)
-offset  8 : ptr   — payload pointer (null if constructor has no argument)
-total size: 16 bytes (two i64-sized words, both 8 bytes on 64-bit)
+GC_malloc(8) → ptr to one 8-byte word
 ```
 
-This is a two-field struct: `!llvm.struct<(i64, !llvm.ptr)>`.
+Why 8 bytes (one word), not a typed struct: the uniform boxed representation stores all values as
+either `i64` (scalars) or `ptr` (heap objects). A ref cell is a 1-slot array of words. Reading the
+variable is a `LlvmLoadOp` from the cell pointer; writing is a `LlvmStoreOp` to the cell pointer.
 
-Why this layout:
-- Uniform size (always 16 bytes regardless of constructor). Every ADT value at the use site
-  is an opaque `!llvm.ptr` — no type parameterisation at the MLIR level.
-- The tag field is `i64` (not `i8` or `i32`). Reasons: (a) all existing integer operations in the
-  codegen use `i64`; (b) alignment — an i64 at offset 0 avoids padding before the payload pointer;
-  (c) no savings from smaller types because the next field (ptr) is 8-byte aligned anyway.
-- The payload pointer is null for constructors with no argument (e.g., `None`, `True`-style nullary
-  ctors). Pattern matching checks the tag first; a null payload is never dereferenced.
-- GADT constructors with multiple fields: wrap multiple arguments into a GC_malloc'd tuple, store
-  the tuple pointer as the single payload field. This keeps the ADT struct layout constant at 16
-  bytes regardless of constructor arity.
+### 1.2 LetMut Codegen
 
-### 1.2 Constructor Expression Codegen
-
-`Constructor("Some", Some argExpr, span)` compiles to:
+`LetMut("x", initExpr, bodyExpr, span)` compiles to:
 
 ```mlir
-%arg = ...                          ; elaborate argExpr
-%sz = arith.constant 16 : i64
-%adt = llvm.call @GC_malloc(%sz) : (i64) -> !llvm.ptr
-%tagSlot = llvm.getelementptr inbounds %adt[0, 0] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i64, !llvm.ptr)>
-%tagVal = arith.constant 1 : i64   ; tag for "Some" = 1 (0-based ctor index)
-llvm.store %tagVal, %tagSlot : i64, !llvm.ptr
-%paySlot = llvm.getelementptr inbounds %adt[0, 1] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i64, !llvm.ptr)>
-llvm.store %arg, %paySlot : !llvm.ptr, !llvm.ptr
+; elaborate initExpr → %init : i64 (or !llvm.ptr for heap-typed inits)
+%cellSz = arith.constant 8 : i64
+%cell   = llvm.call @GC_malloc(%cellSz) : (i64) -> !llvm.ptr
+llvm.store %init, %cell : i64, !llvm.ptr   ; (or !llvm.ptr, !llvm.ptr)
+; bind "x" → %cell in env (Ptr type — the cell pointer, NOT the contained value)
+; elaborate bodyExpr in env' where Vars["x"] = { Name = %cell; Type = Ptr }
 ```
 
-For nullary constructors (`None`, `Red`, etc.) the payload store is omitted; the payload slot
-remains uninitialized (Boehm GC conservative scan may see it but `null` is safer — initialize to
-`llvm.mlir.zero` to make null-checks safe and to suppress false pointer retentions):
+Variable reads (`Var("x")`) in `bodyExpr` must dereference the cell:
 
 ```mlir
-%null = llvm.mlir.zero : !llvm.ptr
-llvm.store %null, %paySlot : !llvm.ptr, !llvm.ptr
+%x_val = llvm.load %cell : !llvm.ptr -> i64   ; (or !llvm.ptr for heap-typed vars)
 ```
 
-### 1.3 ConstructorPat Pattern Matching (MatchCompiler.fs extension)
+**Key distinction from immutable Let:** In an immutable `Let`, `Vars["x"]` holds the value itself
+(e.g., `{ Name = "%t3"; Type = I64 }`). In `LetMut`, `Vars["x"]` holds the cell pointer
+(`{ Name = "%cell"; Type = Ptr }`), and every `Var("x")` lookup must emit a `LlvmLoadOp`.
 
-The existing `CtorTag` DU in `MatchCompiler.fs` currently covers `IntLit`, `BoolLit`, `StringLit`,
-`ConsCtor`, `NilCtor`, `TupleCtor`. Add one case:
-
-```fsharp
-type CtorTag =
-    | IntLit of int
-    | BoolLit of bool
-    | StringLit of string
-    | ConsCtor
-    | NilCtor
-    | TupleCtor of int
-    | AdtCtor of name: string * tag: int   // NEW: named ADT constructor with its integer tag
-```
-
-`ctorArity` returns 1 for `AdtCtor` with a payload, 0 for nullary. The decision tree algorithm
-(Jacobs) works unchanged — the new `AdtCtor` integrates identically to `TupleCtor`.
-
-In `desugarPattern`, the `ConstructorPat` branch (currently `failwith`) becomes:
+**How to distinguish in elaborateExpr `Var` arm:** The existing `Var(name, _)` arm looks up
+`env.Vars` and returns the stored value directly. With ref cells, a Ptr-typed entry whose name
+came from a LetMut cell would be emitted with an extra load. **The cleanest approach is to track
+mutable variable names in a new `MutVars: Set<string>` field in `ElabEnv`**, and emit the load
+only for names in `MutVars`. This is analogous to how `ExnTags` tracks exception constructor names.
 
 ```fsharp
-| ConstructorPat(name, argPatOpt, _) ->
-    let tag = lookupCtorTag env name   // from ElabEnv.TypeEnv
-    let subPats = match argPatOpt with Some p -> [p] | None -> []
-    ([{ Scrutinee = acc; Pattern = CtorTest(AdtCtor(name, tag), subPats) }], [])
-```
-
-In `Elaboration.fs`, when the decision tree emits a `Switch` node for `AdtCtor(_, tag)`:
-
-1. Load the tag field: `LlvmGEPStructOp` at field index 0 + `LlvmLoadOp` → `i64` value.
-2. Compare: `ArithCmpIOp("eq", loadedTag, ArithConstantOp(tag))` → `i1`.
-3. Branch: `CfCondBrOp` on the `i1` to match block / no-match block.
-4. In the match block, load the payload pointer: `LlvmGEPStructOp` at field index 1 + `LlvmLoadOp`.
-   The payload pointer becomes the accessor for the sub-pattern.
-
-This reuses all existing ops. No new `MlirOp` cases are needed for ADT pattern matching.
-
-### 1.4 ElabEnv Addition: TypeEnv
-
-```fsharp
-type CtorInfo = {
-    Tag:     int       // 0-based index within the type declaration
-    HasArg:  bool      // true if constructor takes an argument
-}
-
-type AdtInfo = {
-    TypeName:     string
-    Constructors: Map<string, CtorInfo>   // ctor name → tag + arity
-}
-
 type ElabEnv = {
     // ... existing fields ...
-    TypeEnv:   Map<string, AdtInfo>    // NEW: ctor name → AdtInfo (keyed by ctor name for fast lookup)
-    RecordEnv: Map<string, RecordInfo> // NEW: record type name → field-name-to-index map
+    MutVars: Set<string>   // NEW: names bound by LetMut/LetMutDecl (need deref on Var lookup)
 }
 ```
 
-`TypeEnv` is populated when the elaborator processes a `TypeDecl` (top-level declaration). The
-mapping is keyed by **constructor name** (not type name) so `lookupCtorTag "Some"` works directly.
+When elaborating `Var(name, _)`:
 
-### 1.5 GADT Constructors
+```fsharp
+| Var(name, _) ->
+    match Map.tryFind name env.Vars with
+    | Some cellPtr when Set.contains name env.MutVars ->
+        // Mutable variable: deref the cell
+        let valType = I64  // default; use Ptr if context requires (see §1.5)
+        let result = { Name = freshName env; Type = valType }
+        (result, [LlvmLoadOp(result, cellPtr)])
+    | Some v -> (v, [])
+    | None -> failwithf "Undefined variable: %s" name
+```
 
-`GadtConstructorDecl` has multiple `argTypes`. Codegen strategy: wrap all arguments into a GC_malloc'd
-flat struct (same as tuple), store the tuple pointer as the ADT payload. From the MLIR side this
-is identical to a regular ADT with a tuple argument. The arity is the number of argTypes.
+### 1.3 Assign Codegen
 
-No new MlirOp variants are needed; GADT constructors compile as `AdtCtor` with a tuple payload.
+`Assign("x", newValExpr, span)` compiles to:
+
+```mlir
+; elaborate newValExpr → %newVal : i64 (or !llvm.ptr)
+; look up Vars["x"] → %cell : !llvm.ptr  (must be in MutVars)
+llvm.store %newVal, %cell : i64, !llvm.ptr
+; result = unit value → arith.constant 0 : i64
+```
+
+```fsharp
+| Assign(name, valueExpr, _) ->
+    let (newVal, valOps) = elaborateExpr env valueExpr
+    let cellPtr =
+        match Map.tryFind name env.Vars with
+        | Some v when Set.contains name env.MutVars -> v
+        | _ -> failwithf "Assign: '%s' is not a mutable variable" name
+    let unitVal = { Name = freshName env; Type = I64 }
+    let ops = valOps @ [
+        LlvmStoreOp(newVal, cellPtr)
+        ArithConstantOp(unitVal, 0L)
+    ]
+    (unitVal, ops)
+```
+
+### 1.4 LetMutDecl Codegen (Module Level)
+
+`LetMutDecl(name, initExpr, span)` is the module-level form. The evaluator handles it in
+`elaborateProgram`'s declaration fold. Codegen is identical to `LetMut` for the init allocation,
+but the cell pointer is added to the module-level environment rather than a local block environment.
+
+The existing `elaborateProgram` accumulates a `Map<string, MlirValue>` of top-level bindings for
+use in `main`. Add `MutVars` tracking in that same fold:
+
+```fsharp
+| LetMutDecl(name, body, _) ->
+    let (initVal, initOps) = elaborateExpr env body
+    let cellSz   = { Name = freshName env; Type = I64 }
+    let cellPtr  = { Name = freshName env; Type = Ptr }
+    let storeOp  = LlvmStoreOp(initVal, cellPtr)
+    let allOps   = initOps @ [
+        ArithConstantOp(cellSz, 8L)
+        LlvmCallOp(cellPtr, "@GC_malloc", [cellSz])
+        storeOp
+    ]
+    // Emit allOps into current block
+    let env' = { env with
+                   Vars    = Map.add name cellPtr env.Vars
+                   MutVars = Set.add name env.MutVars }
+    (env', allOps)
+```
+
+### 1.5 Type of Mutable Variables
+
+All mutable variables in LangThree are dynamically typed (the interpreter stores `Value ref`).
+In the compiled backend, the type of the stored word in the cell is `i64` for integer/bool/unit
+values and `!llvm.ptr` for heap-allocated values (strings, tuples, lists, arrays, hashtables, ADTs,
+records). At codegen time the type is determined from the initial value expression's type.
+
+**Recommendation:** Use the elaborated type of the init expression to decide whether to store/load
+as `I64` or `Ptr`. This mirrors how record fields work in `SetField` and `FieldAccess`.
+
+### 1.6 GC Implications
+
+A ref cell is a 1-word `GC_malloc` block. Boehm GC's conservative scan will find the cell
+pointer in the local frame (it is a `!llvm.ptr` on the stack or in a register). If the cell
+contains a pointer to another heap object, the GC will trace through the cell correctly since
+Boehm is conservative — it treats any pointer-shaped word as a live reference. No special
+GC registration or write barriers are needed.
+
+**One risk:** if a mutable variable holding a `Ptr` is stored as `i64` (mistyped), the GC will
+miss the pointer and may collect the object. Ensure mutable variables holding heap-typed values
+always use `Ptr` as the stored type.
 
 ---
 
-## 2. Records: Named Field Structs with Mutable Fields
+## 2. Array: Fixed-Size Mutable Heap Array
 
 ### 2.1 Runtime Layout
 
-A record is a GC_malloc'd heap block with one field per record field declaration, in declaration order:
+Every array is a GC-managed heap block with this layout:
 
 ```
-offset 0     : first field value (i64 or ptr, 8 bytes)
-offset 8     : second field value
+offset  0 : i64          — element count (length)
+offset  8 : ptr          — pointer to element data block (GC_malloc'd array of words)
+total     : 16 bytes (array header)
+
+Element data block:
+offset  0 : word[0]      — first element (i64 or ptr, 8 bytes)
+offset  8 : word[1]
 ...
-offset n*8   : nth field value
-total size   : numFields * 8 bytes
+offset n*8: word[n-1]
+total     : length * 8 bytes
 ```
 
-This is the same layout as a tuple. Every record value at the use site is an opaque `!llvm.ptr`.
+This matches the `LangString` header layout (`{i64 length, ptr data}`) which already exists in
+`lang_runtime.c`. The element data is a separate GC_malloc'd block so that the header can be
+updated if arrays were ever resized (they are not in this design, but consistency with strings is
+valuable for code reuse).
 
-Why the same layout as tuples:
-- The existing `LlvmGEPLinearOp` (GEP with linear integer index) is the correct op for a flat
-  array-of-words layout. Record fields are accessed by name, but the elaborator resolves names to
-  integer indices at compile time using `RecordEnv`.
-- No discriminant tag is needed — records are not sum types.
-- Mutable fields are no different from immutable fields in the layout. Mutability only affects
-  whether a `SetField` expression is valid (enforced by the type checker). At the MLIR level,
-  a `SetField` simply emits a `LlvmStoreOp` through the field's pointer.
+**Alternative considered — flat layout `{length, elem0, elem1, ...}`:** This avoids one extra
+allocation and one indirection per element access. However, it requires knowing the element count
+at the malloc site, complicates GEP arithmetic (field 0 = length, field i+1 = element i), and
+cannot be expressed cleanly with `LlvmGEPLinearOp` which uses a single linear index. The two-word
+header layout is recommended because it keeps element-access arithmetic uniform: the element data
+pointer is at a fixed offset (field 1 of the header), and element `i` is at `dataPtr[i]`.
 
-### 2.2 RecordExpr Codegen
+### 2.2 C Runtime Functions for Array
 
-`RecordExpr(typeName, [("x", e1); ("y", e2)], span)` compiles to:
-
-```mlir
-; elaborate e1, e2
-%sz = arith.constant 16 : i64         ; 2 fields * 8 bytes
-%rec = llvm.call @GC_malloc(%sz) : (i64) -> !llvm.ptr
-%slot0 = llvm.getelementptr %rec[0] : (!llvm.ptr) -> !llvm.ptr, i64
-llvm.store %v1, %slot0 : i64, !llvm.ptr    ; or !llvm.ptr for pointer fields
-%slot1 = llvm.getelementptr %rec[1] : (!llvm.ptr) -> !llvm.ptr, i64
-llvm.store %v2, %slot1 : i64, !llvm.ptr
-; result = %rec (the !llvm.ptr to the record block)
-```
-
-The field-to-index mapping comes from `RecordEnv`.
-
-### 2.3 FieldAccess Codegen
-
-`FieldAccess(recExpr, "x", span)` compiles to:
-
-```mlir
-; elaborate recExpr → %rec : !llvm.ptr
-%fieldIdx = 0    ; resolved at compile time from RecordEnv
-%slot = llvm.getelementptr %rec[0] : (!llvm.ptr) -> !llvm.ptr, i64
-%val = llvm.load %slot : !llvm.ptr -> i64    ; or !llvm.ptr for pointer fields
-```
-
-The load type (I64 vs Ptr) is determined from the field's declared type in `RecordEnv`.
-
-### 2.4 SetField Codegen (Mutable Field Mutation)
-
-`SetField(recExpr, "x", newValExpr, span)` compiles to:
-
-```mlir
-; elaborate recExpr → %rec : !llvm.ptr
-; elaborate newValExpr → %newVal : i64 (or !llvm.ptr)
-%slot = llvm.getelementptr %rec[0] : (!llvm.ptr) -> !llvm.ptr, i64
-llvm.store %newVal, %slot : i64, !llvm.ptr
-; result = () → represent as arith.constant 0 : i64 (unit value)
-```
-
-`SetField` is a void-valued expression. It returns the unit value (i64 = 0), consistent with how
-void operations are handled elsewhere in the existing codegen.
-
-### 2.5 RecordUpdate Codegen
-
-`RecordUpdate(sourceExpr, [("x", e1)], span)` — structural copy with field override:
-
-1. Elaborate `sourceExpr` → `%src`.
-2. `GC_malloc(numFields * 8)` → `%copy`.
-3. For each field in declaration order: `GEP + load` from `%src`, then `GEP + store` to `%copy`.
-4. For each overridden field: elaborate the new expression and store it into `%copy` (overwrites
-   the copy from step 3). OR alternatively: copy all non-overridden fields, store new values for
-   overridden fields directly without loading the old values first.
-
-Strategy 2 is more efficient (avoids loading the old value for overridden fields). Use strategy 2.
-
-No new ops needed; this is `LlvmGEPLinearOp` + `LlvmLoadOp` + `LlvmStoreOp` sequences.
-
-### 2.6 RecordPat Pattern Matching
-
-`RecordPat([("x", xPat); ("y", yPat)], span)` — always structurally matches (no discriminant test).
-
-In `desugarPattern`:
-
-```fsharp
-| RecordPat(fields, _) ->
-    // RecordPat is an always-matching irrefutable pattern like TuplePat
-    // Resolve field names to indices, desugar sub-patterns
-    let subResults =
-        fields |> List.map (fun (fieldName, subPat) ->
-            let idx = lookupFieldIndex env fieldName
-            desugarPattern (Field(acc, idx)) subPat
-        )
-    (subResults |> List.collect fst, subResults |> List.collect snd)
-```
-
-Emits no condition (unconditional match). Field access in the codegen side uses `LlvmGEPLinearOp`.
-
-### 2.7 ElabEnv Addition: RecordEnv
-
-```fsharp
-type FieldInfo = {
-    Index:     int       // 0-based position in the record struct
-    IsMutable: bool      // from RecordFieldDecl.isMutable
-    FieldType: MlirType  // I64 for int/bool/char; Ptr for string/list/tuple/ADT/record
-}
-
-type RecordInfo = {
-    TypeName: string
-    Fields:   Map<string, FieldInfo>   // field name → index + mutability + type
-    NumFields: int
-}
-```
-
-`RecordEnv` is keyed by record type name. Populated when the elaborator processes a `RecordTypeDecl`.
-
-The type-name-to-record lookup happens via the `typeName: string option` field of `RecordExpr`. When
-`typeName = None` (type inferred by type checker), the elaborator must use the field name set to
-disambiguate. Since the LangThree type checker has already run and the AST is typed, the type name
-can be recovered from the type annotation carried on the expression. Simpler approach for v4.0:
-require `typeName = Some _` at MLIR codegen time (the type checker should have resolved this).
-
----
-
-## 3. Exception Handling: setjmp/longjmp via C Runtime
-
-### 3.1 Strategy: C Runtime Wrapper (Recommended)
-
-The recommended strategy is a C runtime wrapper (`lang_runtime.c` extension) that encapsulates
-all `setjmp`/`longjmp` calls. The MLIR/LLVM layer never calls `setjmp` or `longjmp` directly.
-
-**Why not `llvm.intr.eh.sjlj.setjmp` / `llvm.eh.sjlj.longjmp`:**
-These are LLVM's structured-exception-handling intrinsics, designed for use with the DWARF
-EH personality function and landing pads. Using them requires `llvm.invoke` instead of `llvm.call`,
-landing pad blocks (`llvm.landingpad`), and an EH personality registration. This is the full C++
-exception mechanism — a significant undertaking. For a language where exceptions are recoverable
-but do not need destructors, setjmp/longjmp through C wrappers is simpler and correct.
-
-**Why not calling `setjmp` directly from MLIR:**
-`setjmp` is special in the C standard and in LLVM: its return address must be in the same stack
-frame as the `if (setjmp(...))` check. If the call were wrapped in an MLIR function that calls
-a C wrapper that calls `setjmp`, and the wrapper returns, the jmp_buf is stale. `setjmp` must be
-called directly in the frame that contains the handler code. The C wrapper approach exploits the
-fact that `lang_try_push` calls `setjmp` in the same frame as the TryWith body.
-
-Specifically, `lang_try_push` is implemented as a macro/inline that expands in the caller's frame,
-OR — more practically — as a non-inline C function that uses `setjmp` in its own frame and returns
-a `longjmp` indicator. The codegen calls `lang_try_push` and checks its return value to branch
-into the try body or exception handler body:
+Add to `lang_runtime.c`:
 
 ```c
-// lang_runtime.c additions
+typedef struct {
+    int64_t  length;
+    int64_t* data;    /* treated as word array; element may be i64 or ptr */
+} LangArray;
 
-typedef struct LangExnFrame {
-    jmp_buf             env;
-    struct LangExnFrame *parent;
-    void*               exn_value;   // GC_malloc'd exception payload (or NULL)
-    char*               exn_name;    // constructor name of the raised exception (or NULL)
-} LangExnFrame;
+/* lang_array_create(n, defVal) : allocate length-n array, fill with defVal.
+   n must be >= 0. Returns !llvm.ptr to LangArray header. */
+LangArray* lang_array_create(int64_t n, int64_t def_val);
 
-// Global (or thread-local) exception frame stack
-static LangExnFrame* lang_exn_top = NULL;
+/* lang_array_get(arr, i) : bounds-check, return arr->data[i].
+   Raises (via lang_throw) on out-of-bounds. Returns i64 (element value). */
+int64_t lang_array_get(LangArray* arr, int64_t i);
 
-// Push a new frame, call setjmp, return 0 on first entry, non-zero after longjmp.
-// The caller MUST treat this as an expanded-inline setjmp idiom:
-// the frame struct is allocated in the caller's stack frame, not here.
-// Implementation: caller allocates LangExnFrame on the heap (GC_malloc),
-// fills env via lang_setjmp_helper, pushes frame, checks return.
-int lang_try_enter(LangExnFrame* frame) {
-    frame->parent    = lang_exn_top;
-    frame->exn_value = NULL;
-    frame->exn_name  = NULL;
-    lang_exn_top     = frame;
-    return setjmp(frame->env);   // returns 0 normally; non-zero after longjmp
-}
+/* lang_array_set(arr, i, val) : bounds-check, arr->data[i] = val.
+   Raises on out-of-bounds. Returns void (unit). */
+void lang_array_set(LangArray* arr, int64_t i, int64_t val);
 
-void lang_try_exit(void) {
-    if (lang_exn_top != NULL)
-        lang_exn_top = lang_exn_top->parent;
-}
-
-// Throw: set exception data and longjmp to nearest handler.
-// exn_name: the name of the exception constructor (e.g., "MyError")
-// exn_value: the payload (may be NULL for nullary exceptions)
-_Noreturn void lang_throw(const char* exn_name, void* exn_value) {
-    if (lang_exn_top == NULL) {
-        fprintf(stderr, "Fatal: unhandled exception: %s\n", exn_name);
-        exit(1);
-    }
-    lang_exn_top->exn_name  = (char*)exn_name;
-    lang_exn_top->exn_value = exn_value;
-    LangExnFrame* frame = lang_exn_top;
-    lang_exn_top = frame->parent;
-    longjmp(frame->env, 1);   // always jumps with value 1
-}
-
-// Query current exception (called inside handler blocks)
-const char* lang_exn_name(void)  { return lang_exn_top == NULL ? NULL : lang_exn_top->exn_name; }
-void*       lang_exn_value(void) { return lang_exn_top == NULL ? NULL : lang_exn_top->exn_value; }
+/* lang_array_length(arr) : return arr->length */
+int64_t lang_array_length(LangArray* arr);
 ```
 
-The critical architectural point: `LangExnFrame` is **GC_malloc'd** by the MLIR-generated code
-before calling `lang_try_enter`. This ensures Boehm GC can scan the `exn_value` pointer inside the
-frame even during a collection triggered mid-exception. If `LangExnFrame` were stack-allocated and
-`longjmp` unwinds past that frame, the frame would be gone before `lang_exn_top` is updated.
-GC_malloc-allocating the frame eliminates this hazard.
+**Why C runtime for array operations, not inline MLIR ops:**
+- Bounds checking requires conditional branches, error strings, and a call to `lang_throw`. This
+  is complex to emit inline and would bloat Elaboration.fs significantly.
+- Reuses the existing `lang_throw` exception propagation mechanism for out-of-bounds errors —
+  consistent with how LangThree raises on OOB access.
+- `lang_array_create` needs to zero-initialize or fill with a default value, which is a loop
+  better expressed in C than as unrolled MLIR.
 
-### 3.2 TryWith Codegen
+**C runtime function signatures (MLIR-side view):**
 
-`TryWith(bodyExpr, handlers, span)` compiles to:
+| Function | MLIR Param Types | MLIR Return Type |
+|----------|-----------------|-----------------|
+| `@lang_array_create` | `(i64, i64)` | `!llvm.ptr` |
+| `@lang_array_get` | `(!llvm.ptr, i64)` | `i64` |
+| `@lang_array_set` | `(!llvm.ptr, i64, i64)` | void |
+| `@lang_array_length` | `(!llvm.ptr)` | `i64` |
 
-```mlir
-; 1. Allocate an LangExnFrame on the GC heap
-%frameSz = arith.constant 40 : i64     ; sizeof(LangExnFrame) = 4 ptrs + jmp_buf (~36-40 bytes on x86-64)
-%frame = llvm.call @GC_malloc(%frameSz) : (i64) -> !llvm.ptr
+Note: element values are passed as `i64` at the ABI boundary (the uniform boxed representation).
+Pointer-typed elements (strings, tuples, etc.) are passed via `ptrtoint` at the call site, and
+`inttoptr` after `lang_array_get`. This is the same coercion already used in closure/ADT codegen.
 
-; 2. Call lang_try_enter — returns 0 on first entry, 1 after longjmp
-%rc = llvm.call @lang_try_enter(%frame) : (!llvm.ptr) -> i32
-%zero32 = arith.constant 0 : i32
-%isExn = arith.cmpi "ne", %rc, %zero32 : i32
-cf.cond_br %isExn, ^handler_dispatch, ^try_body
+### 2.3 Builtin Dispatch in Elaboration.fs
 
-^try_body:
-  ; elaborate bodyExpr here
-  %bodyVal = ...
-  llvm.call @lang_try_exit() : () -> ()   ; pop frame on normal exit
-  cf.br ^try_join(%bodyVal : <type>)
+The LangThree evaluator exposes these builtins: `array_create`, `array_get`, `array_set`,
+`array_length`, `array_of_list`, `array_to_list`, `array_iter`, `array_map`, `array_fold`,
+`array_init`. The compiler maps each curried F# builtin application to a C runtime call.
 
-^handler_dispatch:
-  ; check exception name against each handler pattern
-  %ename = llvm.call @lang_exn_name() : () -> !llvm.ptr
-  ; for each | ExnPat(...) -> handlerExpr: string-compare %ename against pattern name
-  ...
-  cf.br ^try_join(%handlerResult : <type>)
-
-^try_join(%result : <type>):
-  ; continue with %result
-```
-
-The `setjmp` ABI constraint is satisfied: `lang_try_enter` calls `setjmp` and returns in the same
-C call frame where `longjmp` will restore execution (jumping to the `rc = llvm.call @lang_try_enter`
-instruction and returning with value 1). This is the canonical way to wrap `setjmp` in a function.
-
-### 3.3 Raise Codegen
-
-`Raise(Constructor("MyError", Some payloadExpr, span), span)` compiles to:
-
-```mlir
-; elaborate Constructor("MyError", Some payloadExpr) → %exnVal : !llvm.ptr
-; (this is just a normal ADT constructor allocation — tag + payload)
-%namePtr = llvm.mlir.addressof @__str_myerror : !llvm.ptr   ; global string constant "MyError"
-llvm.call @lang_throw(%namePtr, %exnVal) : (!llvm.ptr, !llvm.ptr) -> ()
-llvm.unreachable   ; lang_throw is _Noreturn
-```
-
-`lang_throw` receives two arguments: the exception name string (for handler dispatch by name) and
-the ADT-valued exception payload pointer (which carries the constructor tag + value, same layout as
-any other ADT value). The handler reads the value back via `lang_exn_value()`.
-
-For nullary exceptions (`Raise(Constructor("Exn", None, span), span)`):
-- The exception payload is a null pointer (`llvm.mlir.zero`).
-- `lang_throw` is called with null as the value argument.
-
-### 3.4 Exception Handler Pattern Matching
-
-The `handlers` clauses in `TryWith` are `MatchClause list`. Each clause has a pattern.
-Exception patterns in LangThree are `ConstructorPat` patterns (the exception name is the constructor
-name from `ExceptionDecl`). The handler dispatch block:
-
-1. Calls `lang_exn_name()` → `!llvm.ptr` (C string pointer to exception name).
-2. For each handler clause: emit a `strcmp` call against the exception's constructor name.
-3. If `strcmp` returns 0: enter handler body; bind the payload value if the pattern has an argument
-   (call `lang_exn_value()`, cast/use as the appropriate type).
-4. If no handler matches: re-throw by calling `lang_throw` again with the same name and value
-   (or calling `lang_match_failure` — unhandled exceptions should abort with a diagnostic).
-
-This reuses the existing `strcmp` + `ArithCmpIOp` pattern already used for string literal pattern
-matching in `ConstPat(StringConst ...)`.
-
-### 3.5 ExceptionDecl Codegen
-
-`ExceptionDecl("MyError", Some TEString, span)` declares an exception constructor.
-
-Compilation: emit a global string constant for the exception name (e.g., `@__exn_MyError`), and
-register the constructor in `TypeEnv` as if it were a single-ctor ADT with `tag = 0` and
-`hasArg = (dataType <> None)`. At construction time (`Constructor("MyError", Some ..., span)`),
-the tag field is always 0 (exceptions have exactly one constructor); the payload is the value.
-
-No dedicated IR structure for exceptions beyond what ADTs already provide. Exception name lookup
-at handler dispatch uses the string constant, not the tag.
-
-### 3.6 Boehm GC + setjmp/longjmp Interaction
-
-**The key constraint:** Boehm GC internally uses `setjmp` to flush CPU registers to the stack before
-scanning the stack for roots. This is independent of the application's use of `setjmp`/`longjmp`.
-
-**Concern:** if a `longjmp` from `lang_throw` skips stack frames that hold pointers to
-GC-managed objects, those pointers are lost before the next GC cycle can scan the dead frames.
-Boehm GC is a conservative collector: it scans the **live** stack. After `longjmp`, the unwound
-frames are gone, so any pointers they held are no longer on the stack. If those were the only roots
-for some live objects, those objects could be collected.
-
-**Mitigation:** GC_malloc all exception-related values **before** the `longjmp`. In this design:
-- The `LangExnFrame` itself is GC_malloc'd — so the GC can find `exn_value` through `lang_exn_top`.
-- The exception payload (`%exnVal`) is the result of a normal ADT constructor allocation (GC_malloc'd)
-  and stored in `frame->exn_value` by `lang_throw` before calling `longjmp`. The global
-  `lang_exn_top` pointer chain keeps the payload alive across the `longjmp`.
-- The handler code calls `lang_exn_value()` to recover the payload immediately and stores it in
-  a local SSA value — Boehm GC scans the new live stack and finds it there.
-
-This is the standard technique used by Chicken Scheme and similar systems. The critical invariant:
-**the exception payload pointer must be reachable through the global `lang_exn_top` chain between
-`lang_throw` and the handler's call to `lang_exn_value()`.**
-
-**Do NOT** stack-allocate `LangExnFrame`. If the frame is on the stack and `longjmp` unwinds past
-that frame, the frame pointer becomes dangling before `lang_exn_top` is updated, and the GC can no
-longer find `exn_value`. GC_malloc allocation of the frame prevents this.
-
----
-
-## 4. New MlirOp Cases
-
-Exactly one new `MlirOp` case is needed for v4.0 (all other codegen reuses existing ops):
+**Pattern:** Each builtin is matched as a fully-applied `App` expression before the general `App`
+arm, exactly as `string_concat`, `string_sub`, `lang_range` are matched today.
 
 ```fsharp
-// MlirIR.fs — v4.0 addition
-type MlirOp =
-    // ... all existing cases unchanged ...
+// array_create : int -> 'a -> 'a array
+| App(App(Var("array_create", _), nExpr, _), defExpr, _) ->
+    let (nVal, nOps)    = elaborateExpr env nExpr
+    let (defVal, dOps)  = elaborateExpr env defExpr
+    // Coerce defVal to i64 if it is Ptr (uniform ABI)
+    let (i64Def, coerceOps) = coerceToI64 env defVal
+    let result = { Name = freshName env; Type = Ptr }
+    (result, nOps @ dOps @ coerceOps @ [LlvmCallOp(result, "@lang_array_create", [nVal; i64Def])])
 
-    // v4.0: Truncate a wider integer to a narrower one (e.g. i32 → i1 for try-enter return value)
-    | LlvmTruncIOp of result: MlirValue * value: MlirValue
-    // emits: %result = llvm.trunci %value : <srcType> to <dstType>
-    // Used to convert i32 (lang_try_enter return) to i1 for cf.cond_br
+// array_get : 'a array -> int -> 'a
+| App(App(Var("array_get", _), arrExpr, _), idxExpr, _) ->
+    let (arrVal, aOps) = elaborateExpr env arrExpr
+    let (idxVal, iOps) = elaborateExpr env idxExpr
+    let result = { Name = freshName env; Type = I64 }
+    (result, aOps @ iOps @ [LlvmCallOp(result, "@lang_array_get", [arrVal; idxVal])])
+
+// array_set : 'a array -> int -> 'a -> unit
+| App(App(App(Var("array_set", _), arrExpr, _), idxExpr, _), valExpr, _) ->
+    let (arrVal, aOps) = elaborateExpr env arrExpr
+    let (idxVal, iOps) = elaborateExpr env idxExpr
+    let (newVal, vOps) = elaborateExpr env valExpr
+    let (i64New, coerceOps) = coerceToI64 env newVal
+    let unitVal = { Name = freshName env; Type = I64 }
+    (unitVal, aOps @ iOps @ vOps @ coerceOps @
+              [LlvmCallVoidOp("@lang_array_set", [arrVal; idxVal; i64New])
+               ArithConstantOp(unitVal, 0L)])
+
+// array_length : 'a array -> int
+| App(Var("array_length", _), arrExpr, _) ->
+    let (arrVal, aOps) = elaborateExpr env arrExpr
+    let result = { Name = freshName env; Type = I64 }
+    (result, aOps @ [LlvmCallOp(result, "@lang_array_length", [arrVal])])
 ```
 
-Why `LlvmTruncIOp` and not `ArithTruncIOp`:
-`arith.trunci` is valid for integer scalar types in the arith dialect, but `lang_try_enter` returns
-`i32` (C `int`), which is an llvm dialect type at the IR level. To convert `i32` to `i1` for
-`cf.cond_br`, `llvm.trunci` is more consistent with the rest of the llvm-dialect ops used in v4.0.
-In practice, `arith.trunci` also works — either is acceptable. Use `ArithCmpIOp("ne", rc, zero32)`
-with an `i32` zero constant instead, which avoids the need for `LlvmTruncIOp` entirely.
+**Higher-order array builtins (`array_iter`, `array_map`, `array_fold`, `array_init`):**
+These require looping over array elements and calling a user closure for each element. This cannot
+be expressed as a single C runtime call (because the callback is a compiled closure, not a C
+function pointer). These are deferred to a later phase or expressed as loop constructs in MLIR.
 
-**Revised conclusion: zero new MlirOp cases needed.** Compare `i32 rc` against `i32 0` using
-the existing `ArithCmpIOp` (arith.cmpi works on i32 as well as i64). Add `I32` as an existing
-`MlirType` variant — it is already present in the DU. No new ops.
+See §2.5 for the recommended strategy.
 
----
+### 2.4 array_of_list and array_to_list
 
-## 5. New ExternalFuncDecl Entries
-
-Add to the static `externalFuncs` list in `Elaboration.fs`:
-
-```fsharp
-{ ExtName = "@lang_try_enter"; ExtParams = [Ptr]; ExtReturn = Some I32; IsVarArg = false }
-{ ExtName = "@lang_try_exit";  ExtParams = [];    ExtReturn = None;     IsVarArg = false }
-{ ExtName = "@lang_throw";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false }
-{ ExtName = "@lang_exn_name";  ExtParams = [];    ExtReturn = Some Ptr; IsVarArg = false }
-{ ExtName = "@lang_exn_value"; ExtParams = [];    ExtReturn = Some Ptr; IsVarArg = false }
-```
-
-The `lang_throw` entry has `ExtReturn = None` (void) and the codegen follows it with
-`LlvmUnreachableOp` (already exists in `MlirOp`) to satisfy MLIR block terminator requirements.
-
----
-
-## 6. lang_runtime.c Changes
-
-Add the following new functions to `lang_runtime.c`. No existing functions change.
+These two builtins bridge between List (cons-cell linked list) and Array.
 
 ```c
-// New types and globals (add at the top of lang_runtime.c after existing typedefs)
-#include <setjmp.h>
+/* lang_array_of_list: traverse cons list, allocate array */
+LangArray* lang_array_of_list(void* cons_list);   /* cons_list is ptr or null */
 
-typedef struct LangExnFrame {
-    jmp_buf             env;           // platform-specific save area
-    struct LangExnFrame *parent;       // previous frame in the exception stack
-    void*               exn_value;    // GC_malloc'd exception value pointer
-    char*               exn_name;     // exception constructor name (points to static string)
-} LangExnFrame;
-
-static LangExnFrame* lang_exn_top = NULL;
-
-int lang_try_enter(LangExnFrame* frame) {
-    frame->parent    = lang_exn_top;
-    frame->exn_value = NULL;
-    frame->exn_name  = NULL;
-    lang_exn_top     = frame;
-    return setjmp(frame->env);
-}
-
-void lang_try_exit(void) {
-    if (lang_exn_top != NULL)
-        lang_exn_top = lang_exn_top->parent;
-}
-
-_Noreturn void lang_throw(const char* exn_name, void* exn_value) {
-    if (lang_exn_top == NULL) {
-        fprintf(stderr, "Fatal: unhandled exception: %s\n",
-                exn_name != NULL ? exn_name : "<unknown>");
-        exit(1);
-    }
-    lang_exn_top->exn_name  = (char*)exn_name;
-    lang_exn_top->exn_value = exn_value;
-    LangExnFrame* frame = lang_exn_top;
-    lang_exn_top = frame->parent;
-    longjmp(frame->env, 1);
-}
-
-const char* lang_exn_name(void)  {
-    return lang_exn_top != NULL ? lang_exn_top->exn_name : NULL;
-}
-
-void* lang_exn_value(void) {
-    return lang_exn_top != NULL ? lang_exn_top->exn_value : NULL;
-}
+/* lang_array_to_list: traverse array, build cons list */
+void* lang_array_to_list(LangArray* arr);          /* returns ptr (head cons cell) or null */
 ```
 
-**sizeof(LangExnFrame) note:** `jmp_buf` size varies by platform. On x86-64 Linux, it is 200 bytes.
-On macOS arm64, it is 392 bytes. To allocate the frame in the MLIR code with the correct size,
-emit a call to a helper that returns the actual size, OR — simpler — emit a large fixed constant
-(512 bytes) and let GC_malloc overallocate harmlessly. Alternatively, expose a `lang_exn_frame_size`
-C function or a compile-time constant. **Recommended for v4.0:** add a
-`lang_exn_frame_size()` function to `lang_runtime.c` that returns `(int64_t)sizeof(LangExnFrame)`
-and call it once at the start of each `TryWith` elaboration to get the actual frame size.
+Both are C runtime functions. `lang_array_of_list` must traverse the cons list to count elements
+first (or use a growable buffer), then allocate. Both traverse structures the C runtime already
+understands (cons cells use the existing 2-word layout).
+
+### 2.5 Higher-Order Array Builtins (array_iter, array_map, array_fold, array_init)
+
+These require invoking user-defined closures per element. Two options:
+
+**Option A (recommended for v5.0):** Implement as C runtime functions that accept a closure
+pointer and call it via the existing indirect-call ABI. This requires the C runtime to understand
+the closure calling convention (`fn_ptr(arg, env_ptr)` → `i64`). This is a significant coupling
+between the C runtime and the MLIR closure ABI.
+
+**Option B (deferred):** Implement as loop constructs in MLIR directly — emit a loop with a
+counter, load each element, emit an indirect call, store the result. This keeps all calling
+convention knowledge in Elaboration.fs, not the C runtime. However it requires either a loop
+construct in the IR (which `cf.br`/`cf.cond_br` can express) or inline unrolling.
+
+**Recommendation: Defer `array_iter`, `array_map`, `array_fold`, `array_init` to a follow-on
+phase.** The core array primitives (`array_create`, `array_get`, `array_set`, `array_length`,
+`array_of_list`, `array_to_list`) are sufficient for the most common array usage patterns. Higher-
+order functions can be expressed by callers using explicit recursion in the language. Add them to
+MLIR loop emission later.
+
+### 2.6 GC Implications for Arrays
+
+- The `LangArray` header (16 bytes) is `GC_malloc`'d. Boehm scans it and finds `data` as a pointer.
+- The element data block is also `GC_malloc`'d. Boehm finds it via the `data` pointer in the header.
+- Elements that are pointers (strings, tuples, etc.) are stored as `int64_t` words at the C level
+  but contain pointer bit patterns. **Boehm's conservative scan will treat any word that looks like
+  a heap address as a live reference**, so these are traced correctly without special annotation.
+- No explicit GC registration needed. The existing `GC_malloc` calls in `lang_array_create` are
+  sufficient.
+
+---
+
+## 3. Hashtable: Mutable Key-Value Store
+
+### 3.1 Runtime Representation
+
+The LangThree evaluator uses `.NET Dictionary<Value, Value>`. In the compiled backend, implement
+the hashtable as a C-level open-addressing or chained hash table, fully managed by `lang_runtime.c`
+and allocated via `GC_malloc`.
+
+**Recommended layout — chained bucket array:**
 
 ```c
-int64_t lang_exn_frame_size(void) { return (int64_t)sizeof(LangExnFrame); }
+typedef struct LangHashEntry {
+    int64_t              key;    /* key value (i64 or ptr-as-i64) */
+    int64_t              val;    /* value (i64 or ptr-as-i64) */
+    struct LangHashEntry* next;  /* next entry in chain (NULL = end) */
+} LangHashEntry;
+
+typedef struct {
+    int64_t       capacity;    /* number of buckets */
+    int64_t       size;        /* number of key-value pairs */
+    LangHashEntry** buckets;   /* GC_malloc'd array of bucket pointers */
+} LangHashtable;
 ```
 
-Add to `externalFuncs` in `Elaboration.fs`:
+All allocations via `GC_malloc`. No `free` calls — Boehm GC handles reclamation.
+
+**Why chained buckets over open addressing:**
+- Open addressing requires tombstones for deletion (`hashtable_remove`) which complicates
+  the implementation. Chaining handles deletion cleanly by relinking.
+- Boehm GC conservatively traces through all `LangHashEntry*` chains because they are heap pointers.
+  With open addressing, deleted slots holding stale pointer-shaped values could cause false retention;
+  chaining avoids this by nulling the pointer on removal.
+
+**Why not reuse a C standard library hash table (e.g., `hsearch`, POSIX):**
+- These do not use `GC_malloc` and cannot be reclaimed by Boehm GC automatically.
+- No standard portable chaining hash table exists in libc.
+
+### 3.2 C Runtime Functions for Hashtable
+
+Add to `lang_runtime.c`:
+
+```c
+/* lang_hashtable_create() : allocate empty hashtable. Returns !llvm.ptr. */
+LangHashtable* lang_hashtable_create(void);
+
+/* lang_hashtable_get(ht, key) : look up key; lang_throw on miss. Returns i64 value. */
+int64_t lang_hashtable_get(LangHashtable* ht, int64_t key);
+
+/* lang_hashtable_set(ht, key, val) : insert or update. Returns void. */
+void lang_hashtable_set(LangHashtable* ht, int64_t key, int64_t val);
+
+/* lang_hashtable_contains_key(ht, key) : returns 1 if found, 0 if not. */
+int64_t lang_hashtable_contains_key(LangHashtable* ht, int64_t key);
+
+/* lang_hashtable_remove(ht, key) : remove key if present (no error if absent). Returns void. */
+void lang_hashtable_remove(LangHashtable* ht, int64_t key);
+
+/* lang_hashtable_keys(ht) : return cons list of all keys. Returns !llvm.ptr (cons list head). */
+void* lang_hashtable_keys(LangHashtable* ht);
+```
+
+**C runtime function signatures (MLIR-side view):**
+
+| Function | MLIR Param Types | MLIR Return Type |
+|----------|-----------------|-----------------|
+| `@lang_hashtable_create` | `()` | `!llvm.ptr` |
+| `@lang_hashtable_get` | `(!llvm.ptr, i64)` | `i64` |
+| `@lang_hashtable_set` | `(!llvm.ptr, i64, i64)` | void |
+| `@lang_hashtable_contains_key` | `(!llvm.ptr, i64)` | `i64` (0 or 1) |
+| `@lang_hashtable_remove` | `(!llvm.ptr, i64)` | void |
+| `@lang_hashtable_keys` | `(!llvm.ptr)` | `!llvm.ptr` (cons list) |
+
+Keys and values are `i64` at the ABI boundary (same coercion pattern as array elements).
+`lang_hashtable_contains_key` returns `i64` (0/1) rather than `i1` to avoid I1/I64 extend
+complications; the caller compares to 0 with `ArithCmpIOp("ne", ...)` to get `I1` for branches.
+
+### 3.3 Builtin Dispatch in Elaboration.fs
+
 ```fsharp
-{ ExtName = "@lang_exn_frame_size"; ExtParams = []; ExtReturn = Some I64; IsVarArg = false }
+// hashtable_create : unit -> hashtable
+| App(Var("hashtable_create", _), _, _) ->   // argument is unit (ignored)
+    let result = { Name = freshName env; Type = Ptr }
+    (result, [LlvmCallOp(result, "@lang_hashtable_create", [])])
+
+// hashtable_get : hashtable -> key -> value
+| App(App(Var("hashtable_get", _), htExpr, _), keyExpr, _) ->
+    let (htVal,  hOps) = elaborateExpr env htExpr
+    let (keyVal, kOps) = elaborateExpr env keyExpr
+    let (i64Key, coerceOps) = coerceToI64 env keyVal
+    let result = { Name = freshName env; Type = I64 }
+    (result, hOps @ kOps @ coerceOps @ [LlvmCallOp(result, "@lang_hashtable_get", [htVal; i64Key])])
+
+// hashtable_set : hashtable -> key -> value -> unit
+| App(App(App(Var("hashtable_set", _), htExpr, _), keyExpr, _), valExpr, _) ->
+    let (htVal,  hOps) = elaborateExpr env htExpr
+    let (keyVal, kOps) = elaborateExpr env keyExpr
+    let (newVal, vOps) = elaborateExpr env valExpr
+    let (i64Key, kcOps) = coerceToI64 env keyVal
+    let (i64Val, vcOps) = coerceToI64 env newVal
+    let unitVal = { Name = freshName env; Type = I64 }
+    (unitVal, hOps @ kOps @ vOps @ kcOps @ vcOps @
+              [LlvmCallVoidOp("@lang_hashtable_set", [htVal; i64Key; i64Val])
+               ArithConstantOp(unitVal, 0L)])
+
+// hashtable_contains_key : hashtable -> key -> bool
+| App(App(Var("hashtable_contains_key", _), htExpr, _), keyExpr, _) ->
+    let (htVal,  hOps) = elaborateExpr env htExpr
+    let (keyVal, kOps) = elaborateExpr env keyExpr
+    let (i64Key, coerceOps) = coerceToI64 env keyVal
+    let rawResult  = { Name = freshName env; Type = I64 }
+    let zeroVal    = { Name = freshName env; Type = I64 }
+    let boolResult = { Name = freshName env; Type = I1 }
+    let ops = [
+        LlvmCallOp(rawResult, "@lang_hashtable_contains_key", [htVal; i64Key])
+        ArithConstantOp(zeroVal, 0L)
+        ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+    ]
+    (boolResult, hOps @ kOps @ coerceOps @ ops)
+
+// hashtable_remove : hashtable -> key -> unit
+| App(App(Var("hashtable_remove", _), htExpr, _), keyExpr, _) ->
+    let (htVal,  hOps) = elaborateExpr env htExpr
+    let (keyVal, kOps) = elaborateExpr env keyExpr
+    let (i64Key, coerceOps) = coerceToI64 env keyVal
+    let unitVal = { Name = freshName env; Type = I64 }
+    (unitVal, hOps @ kOps @ coerceOps @
+              [LlvmCallVoidOp("@lang_hashtable_remove", [htVal; i64Key])
+               ArithConstantOp(unitVal, 0L)])
+
+// hashtable_keys : hashtable -> key list
+| App(Var("hashtable_keys", _), htExpr, _) ->
+    let (htVal, hOps) = elaborateExpr env htExpr
+    let result = { Name = freshName env; Type = Ptr }
+    (result, hOps @ [LlvmCallOp(result, "@lang_hashtable_keys", [htVal])])
 ```
+
+### 3.4 Hashing Strategy in C Runtime
+
+LangThree hashtable keys can be any `Value`: `IntValue`, `BoolValue`, `StringValue`, `TupleValue`,
+etc. In the compiled backend, keys are passed as `i64` (the uniform representation). The C runtime
+must implement a hash function over `int64_t` key words.
+
+For the common cases (integer keys, boolean keys, pointer-as-int keys for string/tuple keys):
+use a 64-bit integer hash (e.g., the FNV-1a mix or a simple multiply-shift hash). The hash
+table's equality check must be `int64_t` equality — two keys are equal iff their `i64`
+representations are equal. This is correct for integer and boolean keys, and for pointer keys
+when the same object is used as the key (identity equality). **String equality by content is
+NOT supported with this approach** — two distinct string objects with the same content will hash
+to different buckets if they are different pointers. This is acceptable for v5.0 and matches
+common usage patterns. Document clearly in source.
+
+### 3.5 GC Implications for Hashtable
+
+- All `LangHashtable` and `LangHashEntry` allocations use `GC_malloc`. Boehm GC traces them
+  conservatively through bucket array and entry chain pointers.
+- Keys and values stored as `int64_t` that are actually heap pointers: Boehm's conservative
+  scan treats pointer-sized integers as potential live references, so GC-managed objects used
+  as keys/values will not be collected prematurely.
+- **Resize / rehash:** when the load factor exceeds a threshold, `lang_hashtable_set` should
+  rehash. During rehash, the old `buckets` array is still alive (referenced by `ht->buckets`).
+  The new `buckets` array is allocated with `GC_malloc` before the old one is replaced. Since
+  no `free` is called, both coexist during the rehash — the old array is collected on the next
+  GC cycle after the pointer in `ht->buckets` is updated. No write barriers needed.
 
 ---
 
-## 7. Elaboration.fs Changes Summary
+## 4. Shared Infrastructure: coerceToI64 Helper
 
-### 7.1 ElabEnv additions
+Array and Hashtable operations both need to pass values as `i64` to C runtime functions, even when
+the value is a heap-typed `Ptr`. This is the same coercion already done in the closure-making call
+path (`LlvmPtrToIntOp`). Extract it as a helper function in `Elaboration.fs`:
 
 ```fsharp
-type ElabEnv = {
-    Vars:           Map<string, MlirValue>
-    Counter:        int ref
-    LabelCounter:   int ref
-    Blocks:         MlirBlock list ref
-    KnownFuncs:     Map<string, FuncSignature>
-    Funcs:          FuncOp list ref
-    ClosureCounter: int ref
-    Globals:        (string * string) list ref
-    GlobalCounter:  int ref
-    // v4.0 additions:
-    TypeEnv:        Map<string, AdtInfo>    // keyed by constructor name
-    RecordEnv:      Map<string, RecordInfo> // keyed by record type name
-}
+/// Coerce an MlirValue to I64 for C ABI boundary.
+/// If the value is already I64: no-op.
+/// If the value is Ptr: emit LlvmPtrToIntOp.
+/// If the value is I1: emit ArithExtuIOp (zero-extend to I64).
+let private coerceToI64 (env: ElabEnv) (v: MlirValue) : MlirValue * MlirOp list =
+    match v.Type with
+    | I64 -> (v, [])
+    | Ptr ->
+        let r = { Name = freshName env; Type = I64 }
+        (r, [LlvmPtrToIntOp(r, v)])
+    | I1 ->
+        let r = { Name = freshName env; Type = I64 }
+        (r, [ArithExtuIOp(r, v)])
+    | I32 ->
+        let r = { Name = freshName env; Type = I64 }
+        (r, [ArithExtuIOp(r, v)])   // treat as unsigned extend for return values
 ```
 
-`emptyEnv` initialises both new fields to `Map.empty`.
+This helper replaces the ad-hoc coercion code already in the closure-making path and `to_string`
+dispatch. Consolidating it reduces duplication.
 
-### 7.2 New elaborateExpr match arms (outline)
+---
+
+## 5. MlirIR.fs — No Changes Required
+
+All new operations use existing `MlirOp` cases:
+
+| Operation | MlirOp Used |
+|-----------|------------|
+| Allocate ref cell | `LlvmCallOp` (`@GC_malloc`) |
+| Read mutable variable | `LlvmLoadOp` |
+| Write mutable variable | `LlvmStoreOp` |
+| Array create | `LlvmCallOp` (`@lang_array_create`) |
+| Array get | `LlvmCallOp` (`@lang_array_get`) |
+| Array set | `LlvmCallVoidOp` (`@lang_array_set`) |
+| Array length | `LlvmCallOp` (`@lang_array_length`) |
+| Hashtable create | `LlvmCallOp` (`@lang_hashtable_create`) |
+| Hashtable get | `LlvmCallOp` (`@lang_hashtable_get`) |
+| Hashtable set | `LlvmCallVoidOp` (`@lang_hashtable_set`) |
+| Hashtable contains key | `LlvmCallOp` + `ArithCmpIOp` |
+| Hashtable remove | `LlvmCallVoidOp` (`@lang_hashtable_remove`) |
+| Hashtable keys | `LlvmCallOp` (`@lang_hashtable_keys`) |
+| Unit result | `ArithConstantOp(v, 0L)` |
+| Ptr-to-I64 coercion | `LlvmPtrToIntOp` |
+
+**Confidence: HIGH.** The existing op set is expressive enough. No new dialect ops are needed.
+
+---
+
+## 6. ExternalFuncDecl Registrations
+
+All new C runtime functions must be declared as `ExternalFuncDecl` in the emitted MLIR module.
+The existing `elaborateProgram` function builds the `ExternalFuncs` list. Add these entries:
 
 ```fsharp
-| Constructor(name, argOpt, _)  → allocate 16-byte ADT block, store tag + payload
-| RecordExpr(_, fields, _)      → GC_malloc(numFields*8), store each field
-| FieldAccess(expr, name, _)    → elaborate expr, GEP field index, load
-| SetField(expr, name, val, _)  → elaborate expr + val, GEP field index, store; return unit (0L)
-| RecordUpdate(src, fields, _)  → GC_malloc copy, copy all fields, overwrite changed fields
-| Raise(Constructor(...))       → elaborate Constructor, call lang_throw, llvm.unreachable
-| TryWith(body, handlers, _)    → allocate LangExnFrame, lang_try_enter, cond_br, elaborate body/handlers
+// Array runtime
+{ ExtName = "@lang_array_create";          ExtParams = [I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_get";             ExtParams = [Ptr; I64]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_set";             ExtParams = [Ptr; I64; I64]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_length";          ExtParams = [Ptr]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_of_list";         ExtParams = [Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_array_to_list";         ExtParams = [Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+// Hashtable runtime
+{ ExtName = "@lang_hashtable_create";      ExtParams = []; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_get";         ExtParams = [Ptr; I64]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_set";         ExtParams = [Ptr; I64; I64]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_contains_key";ExtParams = [Ptr; I64]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+{ ExtName = "@lang_hashtable_keys";        ExtParams = [Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
 ```
 
-### 7.3 MatchCompiler.fs: ConstructorPat and RecordPat
-
-Both currently `failwith`. Replace with real implementations as described in sections 1.3 and 2.6.
-`desugarPattern` needs `TypeEnv` / `RecordEnv` from `ElabEnv` passed as a parameter, OR the
-`lookupCtorTag` / `lookupFieldIndex` lookups happen in the Elaboration layer that calls
-`MatchCompiler.compile`, not inside the MatchCompiler itself (preferred — keeps MatchCompiler
-pure / free of environment references).
-
-Preferred approach: MatchCompiler receives the already-desugared test lists from Elaboration, which
-pre-resolves constructor names to integer tags before calling `compile`. `ConstructorPat` desugaring
-happens in the `testPattern` function in `Elaboration.fs` (alongside `TuplePat`), not in
-`MatchCompiler.desugarPattern`. This requires no change to `MatchCompiler.desugarPattern` at all —
-the pattern is already expanded when it reaches the tree algorithm.
+**Note:** Only emit these `ExternalFuncDecl` entries when the corresponding builtins are actually
+referenced in the program. The existing pattern (add all externals unconditionally in
+`elaborateProgram`) is simpler and already works — unnecessary declarations do not affect correctness.
 
 ---
 
-## 8. No New MLIR Passes
+## 7. freeVars and Closure Analysis
 
-The lowering pipeline does not change:
+`LetMut` and `Assign` need to be handled in `freeVars` for correct closure capture analysis.
 
+Current state: the `freeVars` function has a `| _ -> Set.empty` catch-all fallthrough. This means
+`LetMut` and `Assign` are currently treated as having no free variables — **incorrect** if lambdas
+capture mutable variables.
+
+**Required change to `freeVars`:**
+
+```fsharp
+| LetMut(name, initExpr, bodyExpr, _) ->
+    Set.union (freeVars boundVars initExpr)
+              (freeVars (Set.add name boundVars) bodyExpr)
+| Assign(name, valueExpr, _) ->
+    let valFree = freeVars boundVars valueExpr
+    // "name" being assigned: if it's a free variable (not in boundVars), it IS free
+    // (the assignment reads the cell pointer, which lives in the enclosing scope)
+    let nameFree = if Set.contains name boundVars then Set.empty else Set.singleton name
+    Set.union valFree nameFree
 ```
---convert-arith-to-llvm --convert-cf-to-llvm --convert-func-to-llvm --reconcile-unrealized-casts
-```
 
-All new ops (GEP, load, store, call, cond_br) are already in the llvm or cf dialect and pass
-through the pipeline unchanged. `lang_try_enter` calls `setjmp` internally; no LLVM intrinsic
-for setjmp is emitted by the MLIR code generator. This is the entire design advantage of the
-C wrapper strategy.
+This ensures closures that capture a mutable variable (read OR write) correctly capture the cell
+pointer, not just the initial value. Without this fix, a lambda that assigns to a captured mutable
+variable would not capture the cell, leading to a runtime failure or silent data corruption.
 
 ---
 
-## 9. No New F# / .NET Dependencies
+## 8. What NOT to Add
 
-All v4.0 features are implemented in the four compiler source files and `lang_runtime.c`. No new
-NuGet packages are needed.
-
----
-
-## 10. Alternatives Considered
-
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| ADT tag width | `i64` | `i8` / `i32` | `i64` matches all other integer values in the codegen; no padding before the payload ptr; alignment is consistent; not worth saving 4 bytes per constructor |
-| ADT payload for nullary ctors | Null ptr (llvm.mlir.zero) stored at field 1 | Leave field 1 uninitialised | Conservative GC may scan uninitialised bytes and interpret garbage bits as pointers, keeping dead objects alive. Explicit null prevents this |
-| Multi-arg GADT ctors | Tuple payload (wrap in GC_malloc'd tuple) | Variadic struct with N payload fields | Variadic layout requires per-type struct allocation sizes; uniform 16-byte ADT block is simpler and already proven (same as cons cell) |
-| Exception runtime | C wrapper `lang_try_enter` / `lang_throw` | LLVM SJLJ intrinsics (`llvm.eh.sjlj.setjmp`) | LLVM SJLJ intrinsics require `llvm.invoke` (not `llvm.call`), landing pads, and an EH personality function — essentially the full C++ EH ABI. C wrapper avoids all of this. |
-| Exception runtime | C wrapper `lang_try_enter` / `lang_throw` | LLVM invoke + landingpad | Requires `--convert-func-to-llvm` to understand `llvm.invoke` semantics; adds `landingpad` block to every TryWith; handler dispatch requires `llvm.extractvalue` on the landingpad result. Significantly more IR complexity for no benefit over C wrapper. |
-| LangExnFrame allocation | GC_malloc | Stack alloca | Stack alloca: if `longjmp` unwinds the frame before `lang_exn_top` is updated, the pointer to the frame in `lang_exn_top` becomes dangling, causing undefined behaviour or GC corruption. GC_malloc is unconditionally safe. |
-| Exception frame size | `lang_exn_frame_size()` C function | Hardcoded constant | `jmp_buf` size varies by platform (200 bytes on x86-64 Linux, 392 on macOS arm64). Hardcoding 512 bytes works but is wasteful and fragile. `lang_exn_frame_size()` makes it portable at the cost of one extra call per TryWith. |
-| Record mutable fields | GEP + LlvmStoreOp directly | ref cells (extra indirection) | The interpreter uses `Value ref` for mutable fields (F# ref cells). At the MLIR level, the record block is already on the heap; GEP + store is sufficient and avoids a double-indirection. |
-| Record field type at codegen | I64 for scalars, Ptr for heap types | Always Ptr (uniform boxing) | Scalars stored as I64 avoid extra GC_malloc per field for int/bool values. The type is known from `RecordFieldDecl.fieldType` — no runtime type dispatch needed. |
-| Handler dispatch | `strcmp` against constructor name string | Integer tag comparison | Exception constructor tags are not stable across compilation units (they depend on `ExceptionDecl` order). String name comparison is the only reliable discriminant when exceptions can cross module boundaries. |
+| Idea | Why Not |
+|------|---------|
+| New `MlirType` variants for `ArrayType` or `HashtableType` | Uniform boxed representation — all heap types are `Ptr`. Adding typed heap pointers would require propagating type information through all existing match arms. Not worth the complexity for a conservative GC. |
+| New `MlirOp` for array element GEP + load inline | Bounds checking requires a branch + error path, which requires `cf.cond_br`. Doing this inline would require emitting 5-8 ops per array access in Elaboration.fs. Routing through C runtime is cleaner and already validated by the Range pattern. |
+| Open-addressing hash table | Deletion (hashtable_remove) requires tombstones and complicates GC scanning. Chaining is simpler and correct. |
+| Resizable arrays | LangThree does not have array resize. Do not add `array_push`, `array_pop`, or `array_resize`. Array is fixed-size from creation. |
+| Stack-allocated ref cells (alloca) | `LlvmAllocaOp` exists and could allocate ref cells on the stack. However, stack cells cannot escape into closures. Since mutable variables can be captured by closures, all ref cells must be GC-heap-allocated. Using alloca would be incorrect for the capturing case. |
+| Write barriers | Boehm GC is a stop-the-world conservative collector with no generational structure. Write barriers are not needed and would add overhead with no benefit. |
+| `MutVars` in MatchCompiler | Pattern matching never needs to distinguish mutable vs immutable bindings. `MutVars` tracking only belongs in `ElabEnv` and `freeVars`. |
 
 ---
 
-## 11. Version Compatibility
+## 9. Pipeline.fs — No Changes Required
 
-No version changes from v3.0. All new features use:
-
-| Component | Version | Notes |
-|-----------|---------|-------|
-| Boehm GC (libgc) | 8.2.12 | `lang_exn_top` global is not thread-safe; single-threaded programs only. Thread-safe version requires `pthread_key_t` for `lang_exn_top`. |
-| LLVM / MLIR | 20 | `llvm.getelementptr`, `llvm.call`, `llvm.store`, `cf.cond_br` — all present in MLIR 20. No version bump needed. |
-| F# / .NET | 10 | No NuGet additions. |
-| clang (compile step) | whatever version links with LLVM 20 | `lang_runtime.c` uses standard C99 + POSIX setjmp.h. No platform-specific extensions. |
+The build pipeline (`mlir-opt` → `mlir-translate` → `clang` → link with `lang_runtime.c` + Boehm
+GC) remains unchanged. The new C runtime functions are added to the existing `lang_runtime.c` file
+compiled in Step 4. No new compilation steps, no new link flags.
 
 ---
 
-## 12. Confidence Assessment
+## 10. Confidence Assessment
 
-| Area | Confidence | Notes |
+| Area | Confidence | Basis |
 |------|------------|-------|
-| ADT tagged union layout (16-byte, i64 tag + ptr payload) | HIGH | Standard technique; uniform size is the correct trade-off for a GC language; GEP field 0/1 reuses existing `LlvmGEPStructOp` pattern |
-| ADT pattern matching via decision tree extension | HIGH | `CtorTag` extension is additive; Jacobs algorithm unchanged; reuses existing `ArithCmpIOp` + `CfCondBrOp` machinery |
-| Record layout = tuple layout (GEP linear) | HIGH | Already proven for tuple codegen; field-name-to-index resolution is straightforward given `RecordEnv` |
-| Mutable field SetField via GEP + store | HIGH | Semantically correct; GC_malloc heap block is already mutable; LlvmStoreOp already exists |
-| Exception C wrapper strategy | HIGH (design); MEDIUM (sizeof(LangExnFrame)) | Design is standard; jmp_buf portability is the main concern. Mitigated by `lang_exn_frame_size()`. |
-| GC interaction with longjmp | MEDIUM | Conservative GC + GC_malloc'd frame is the standard mitigation; confirmed by Chicken Scheme / bdwgc documentation. No known issues with this pattern but requires careful frame pointer management. |
-| MatchCompiler.fs: RecordPat / ConstructorPat | HIGH | Both are structurally equivalent to existing TuplePat/ConsPat; field-name-to-index lookup is the only new logic |
+| LetMut/Assign ref cell approach | HIGH | Direct analogy to SetField mutable record fields (already working in 18-04-setfield test). Same GEP+store pattern, different object size. |
+| MutVars in ElabEnv | HIGH | Mirrors ExnTags pattern already in ElabEnv. Clean, non-intrusive. freeVars fix is straightforward. |
+| Array C runtime layout | HIGH | Mirrors existing LangString layout exactly. lang_array_get/set raise via lang_throw (already working). |
+| Array builtin dispatch | HIGH | Same App-matching pattern as string_sub (3-arg) and string_concat (2-arg). |
+| Hashtable C runtime | MEDIUM-HIGH | Chained hash table is standard. Key hashing by i64 value is a simplification but correct for the primary use cases. String-key equality by pointer (not content) is a known limitation. |
+| Higher-order array builtins (array_iter, etc.) | MEDIUM | Requires closure indirect call from C runtime OR loop emission in MLIR. Defer to follow-on phase. |
+| coerceToI64 helper | HIGH | The Ptr→I64 coercion already exists in the closure-making path (LlvmPtrToIntOp). Extracting it is purely mechanical refactoring. |
+| freeVars correctness for LetMut | HIGH | The fix is straightforward. Failure to fix it is a correctness bug for closures capturing mutable variables. |
 
 ---
 
-## 13. Sources
+## Sources
 
-- LangThree `Ast.fs` (direct inspection, 2026-03-26) — authoritative source for `Constructor`, `ConstructorPat`, `RecordExpr`, `FieldAccess`, `SetField`, `RecordUpdate`, `RecordPat`, `Raise`, `TryWith`, `ExceptionDecl` AST definitions
-- LangBackend `MlirIR.fs`, `Elaboration.fs`, `Printer.fs`, `Pipeline.fs`, `lang_runtime.c` (direct inspection, 2026-03-26) — confirmed existing op set, `LlvmGEPStructOp` syntax, cons cell layout (16 bytes = two ptrs), `LlvmUnreachableOp` existence, external function declaration pattern
-- LangBackend `MatchCompiler.fs` (direct inspection, 2026-03-26) — confirmed `CtorTag` DU, `desugarPattern` structure, `ConstructorPat` and `RecordPat` currently `failwith` stubs
-- [MLIR llvm Dialect documentation](https://mlir.llvm.org/docs/Dialects/LLVM/) — confirmed `llvm.getelementptr` struct syntax `[0, fieldIdx]`, `llvm.invoke` + `llvm.landingpad` (rejected for v4.0), `llvm.call`, `llvm.store`, `llvm.load` ops in MLIR 20
-- [Mapping High-Level Constructs to LLVM IR — Exception Handling](https://mapping-high-level-constructs-to-llvm-ir.readthedocs.io/en/latest/exception-handling/setjmp+longjmp-exception-handling.html) — setjmp/longjmp pattern for exceptions; C wrapper technique
-- [Dev.to: setjmp/longjmp and Exception Handling in C](https://dev.to/pauljlucas/setjmp-longjmp-and-exception-handling-in-c-1h7h) — `LangExnFrame` design derived from the linked-list frame stack pattern
-- [LLVM Exception Handling documentation](https://llvm.org/docs/ExceptionHandling.html) — confirmed SJLJ intrinsics require landing pad ABI (rejected)
-- [bdwgc Conservative GC Overview](https://www.hboehm.info/gc/gcdescr.html) — confirmed GC uses setjmp internally for stack scanning; longjmp interaction is safe when live pointers remain reachable through the global frame stack
-- [Zig tagged union layout discussion](https://github.com/ziglang/zig/issues/2166) — confirmed 16-byte tag+payload is a common trade-off in compiled language implementations
-- [Tagged union — Wikipedia](https://en.wikipedia.org/wiki/Tagged_union) — confirmed standard industry representation for discriminated unions
-
----
-
-## Appendix: Minimal Diff to MlirIR.fs
-
-No new `MlirType` or `MlirOp` variants are required. The only change is in `Elaboration.fs` (new
-match arms and `ElabEnv` fields), `MatchCompiler.fs` (new `CtorTag.AdtCtor` variant and stub
-replacements), `Printer.fs` (no changes needed — all ops already print correctly), and
-`lang_runtime.c` (new functions).
-
-The additive-only change to `MatchCompiler.fs`:
-
-```fsharp
-// MatchCompiler.fs — v4.0 addition to CtorTag
-type CtorTag =
-    | IntLit of int
-    | BoolLit of bool
-    | StringLit of string
-    | ConsCtor
-    | NilCtor
-    | TupleCtor of int
-    | AdtCtor of name: string * tag: int   // NEW
-
-// CtorArity: AdtCtor arity is passed from Elaboration (0 for nullary, 1 for payload)
-// For simplicity, use AdtCtor(name, tag) only for constructors WITH a payload;
-// nullary ADT ctors produce tag-only tests (arity 0).
-// Or: AdtCtor always arity 1, but the payload accessor is discarded for nullary ctors.
-// Recommended: carry arity in the DU:
-| AdtCtor of name: string * tag: int * arity: int   // arity: 0 (nullary) or 1 (has payload)
-```
-
----
-*Stack research for: LangBackend v4.0 — ADT/GADT, Records (mutable fields), Exception handling*
-*Researched: 2026-03-26*
+- Existing `lang_runtime.c` and `lang_runtime.h` — SetField (mutable record), TryWith (lang_throw)
+  patterns directly applicable
+- Existing `Elaboration.fs` — App matching for string_concat, string_sub, Range (lang_range) as
+  direct patterns for Array/Hashtable builtin dispatch
+- LangThree `Ast.fs` — confirms LetMut/Assign/LetMutDecl AST shapes and RefValue semantics
+- LangThree `Eval.fs` — confirms array_create/get/set/length signatures and hashtable_* signatures
+- Existing `MlirIR.fs` — confirms LlvmPtrToIntOp, LlvmCallOp, LlvmCallVoidOp, LlvmLoadOp,
+  LlvmStoreOp cover all needed operations without new variants
+- `Pipeline.fs` — confirms lang_runtime.c compilation and linking unchanged
