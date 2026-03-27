@@ -66,4 +66,13 @@ int64_t     lang_file_exists(LangString* path);
 void        lang_eprint(LangString* s);
 void        lang_eprintln(LangString* s);
 
+LangCons*   lang_read_lines(LangString* path);
+void        lang_write_lines(LangString* path, LangCons* lines);
+LangString* lang_stdin_read_line(void);
+LangString* lang_stdin_read_all(void);
+LangString* lang_get_env(LangString* varName);
+LangString* lang_get_cwd(void);
+LangString* lang_path_combine(LangString* dir, LangString* file);
+LangCons*   lang_dir_files(LangString* path);
+
 #endif
