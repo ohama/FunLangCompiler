@@ -111,6 +111,10 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
     | String _ -> Set.empty
     | Tuple (exprs, _) ->
         exprs |> List.map (freeVars boundVars) |> Set.unionMany
+    | LetPat (WildcardPat _, bindExpr, bodyExpr, _) ->
+        Set.union (freeVars boundVars bindExpr) (freeVars boundVars bodyExpr)
+    | LetPat (VarPat (name, _), bindExpr, bodyExpr, _) ->
+        Set.union (freeVars boundVars bindExpr) (freeVars (Set.add name boundVars) bodyExpr)
     | LetPat (TuplePat (pats, _), bindExpr, bodyExpr, _) ->
         let bindFree = freeVars boundVars bindExpr
         let extractVarName p = match p with | VarPat (name, _) -> [name] | _ -> []
@@ -404,13 +408,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = Set.empty }
+              MutableVars = env.MutableVars }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
-                let capVal = { Name = sprintf "%%t%d" (i + numCaptures); Type = I64 }
+                let capType = if Set.contains capName env.MutableVars then Ptr else I64
+                let capVal = { Name = sprintf "%%t%d" (i + numCaptures); Type = capType }
                 (gepVal, capVal, capName, i)
             )
             |> List.fold (fun (opsAcc, envAcc: ElabEnv) (gepVal, capVal, capName, i) ->
@@ -1379,11 +1384,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = Set.empty }
+              MutableVars = env.MutableVars }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
-                let capVal = { Name = sprintf "%%t%d" (i + numCaptures); Type = I64 }
+                let capType = if Set.contains capName env.MutableVars then Ptr else I64
+                let capVal = { Name = sprintf "%%t%d" (i + numCaptures); Type = capType }
                 (gepVal, capVal, capName, i)
             )
             |> List.fold (fun (opsAcc, envAcc: ElabEnv) (gepVal, capVal, capName, i) ->
