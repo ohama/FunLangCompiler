@@ -1773,6 +1773,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             )
         (recPtrVal, allFieldOps @ allocOps @ storeOps)
 
+    // Phase 25: Qualified name desugar — M.x → Var(x), M.Ctor → Constructor(Ctor)
+    // Must come BEFORE the record FieldAccess arm.
+    | FieldAccess(Constructor(_, None, _), memberName, span) ->
+        if Map.containsKey memberName env.TypeEnv then
+            elaborateExpr env (Constructor(memberName, None, span))
+        else
+            elaborateExpr env (Var(memberName, span))
+
     // Phase 18: FieldAccess — GEP into record block at declaration-order slot, load value
     | FieldAccess(recExpr, fieldName, _) ->
         let (recVal, recOps) = elaborateExpr env recExpr
