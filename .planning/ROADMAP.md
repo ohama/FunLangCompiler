@@ -98,11 +98,11 @@ Plans:
   3. `let r = { mutable v = 0 }` + `r.v <- 42` sets the field in-place; subsequent read exits with 42; `r.v <- ...` returns unit
   4. `match p with | { x = 3; y } -> y | _ -> 0` exits with 4 (RecordPat field extraction)
   5. All 45 existing E2E tests continue to pass (REG-01 gate)
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 18-01: RecordExpr/FieldAccess/RecordUpdate/SetField elaboration (REC-02, REC-03, REC-04, REC-05)
-- [ ] 18-02: RecordPat elaboration (REC-06)
+- [ ] 18-01-PLAN.md — RecordExpr/FieldAccess/RecordUpdate/SetField elaboration + freeVars + 4 E2E tests (REC-02, REC-03, REC-04, REC-05)
+- [ ] 18-02-PLAN.md — RecordPat elaboration: fill RecordCtor stubs + ensureRecordFieldTypes slot remapping + 2 E2E tests (REC-06)
 
 ---
 
