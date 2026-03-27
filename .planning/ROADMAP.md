@@ -45,7 +45,7 @@ Delivered: Modulo/Char/Pipe/Compose operators, when guards, OrPat, CharConst pat
 - [x] **Phase 16: Environment Infrastructure** — TypeEnv/RecordEnv/ExnTags 구성 + MatchCompiler CtorTag 확장
 - [x] **Phase 17: ADT Construction & Pattern Matching** — Constructor elaboration + ConstructorPat round-trip ✓
 - [x] **Phase 18: Records** — RecordExpr/FieldAccess/RecordUpdate/SetField/RecordPat elaboration ✓
-- [ ] **Phase 19: Exception Handling** — setjmp/longjmp C runtime + Raise/TryWith elaboration
+- [x] **Phase 19: Exception Handling** — setjmp/longjmp C runtime + Raise/TryWith elaboration ✓
 - [ ] **Phase 20: Completeness** — First-class constructors, nested ADT patterns, exception re-raise/in-handler
 
 ---
@@ -160,7 +160,7 @@ Plans:
 | 16. Environment Infrastructure | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 17. ADT Construction & Pattern Matching | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 18. Records | v4.0 | 2/2 | Complete | 2026-03-27 |
-| 19. Exception Handling | v4.0 | 0/3 | Not started | - |
+| 19. Exception Handling | v4.0 | 3/3 | Complete | 2026-03-27 |
 | 20. Completeness | v4.0 | 0/3 | Not started | - |
 
 ---

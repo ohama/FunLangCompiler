@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v4.0 Type System & Error Handling — Phase 19: Exception Handling
+**Current focus:** v4.0 Type System & Error Handling — Phase 19 complete, ready for Phase 20
 
 ## Current Position
 
-Phase: 19 of 20 (Exception Handling) — In progress
+Phase: 19 of 20 (Exception Handling) — COMPLETE
 Plan: 03 of 3 complete
-Status: Plan 19-03 complete — TryWith elaboration done (63/63 tests)
-Last activity: 2026-03-27 — Completed 19-03-PLAN.md (TryWith elaboration + 4 E2E tests, 63/63 tests)
+Status: Phase complete — ready for Phase 20
+Last activity: 2026-03-27 — Phase 19 verified (6/6 must-haves, 63/63 tests)
 
-Progress: [███████░░░] 70% (v4.0, phase 19 plan 03 done)
+Progress: [████████░░] 80% (v4.0, 4/5 phases complete)
 
 ## Performance Metrics
 
