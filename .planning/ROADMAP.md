@@ -54,10 +54,11 @@ Plans:
   3. `array_set arr 2 99` stores 99 at index 2 and subsequent `array_get arr 2` returns 99
   4. `array_length arr` returns the number of elements (not counting the internal length slot)
   5. `array_of_list lst` and `array_to_list arr` round-trip: converting a list to an array and back yields an equal list
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 22-01: TBD
+- [ ] 22-01-PLAN.md — IR extension (LlvmGEPDynamicOp) and C runtime array functions
+- [ ] 22-02-PLAN.md — Array builtin elaboration cases and E2E tests
 
 #### Phase 23: Hashtable
 
@@ -98,6 +99,6 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–20. Foundation–Exceptions | v1.0–v4.0 | 37/37 | Complete | 2026-03-27 |
 | 21. Mutable Variables | v5.0 | 2/2 | Complete | 2026-03-27 |
-| 22. Array Core | v5.0 | 0/? | Not started | - |
+| 22. Array Core | v5.0 | 0/2 | Not started | - |
 | 23. Hashtable | v5.0 | 0/? | Not started | - |
 | 24. Array HOF Builtins | v5.0 | 0/? | Not started | - |
