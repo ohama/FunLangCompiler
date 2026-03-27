@@ -924,42 +924,25 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 match acc with
                 | MatchCompiler.Root _ -> failwith "resolveAccessor: Root not in cache"
                 | MatchCompiler.Field (parent, idx) ->
-                    let (parentVal, parentOps) = resolveAccessor parent
-                    // Determine the type of the loaded field.
-                    // For cons cells: field 0 = head (I64), field 1 = tail (Ptr).
-                    // For tuples: all fields are I64 (or Ptr for nested tuples, but
-                    // we load as I64 by default and the accessor will re-interpret).
-                    // We use Ptr for field 1 of a cons cell (tail pointer), I64 otherwise.
-                    // Actually, we need to know the parent's constructor to decide.
-                    // For simplicity: if the parent is Ptr-typed and we know it's a cons cell,
-                    // field 0 → I64, field 1 → Ptr.  For tuples, all fields are I64.
-                    // But since we can't easily tell from just the accessor, we use a heuristic:
-                    // load as I64 for field 0, and check parentVal.Type for the rest.
-                    //
-                    // Better approach: the field type depends on usage. For now:
-                    // - If parentVal.Type = Ptr, field 1 should be Ptr (tail of list), field 0 = I64 (head)
-                    //   But tuples also use Ptr and all fields could be I64 or Ptr.
-                    // We'll default to I64 and handle Ptr cases as they arise.
-                    // The decision tree will re-resolve with the right type when needed.
-                    //
-                    // Actually the safest approach: we always load as I64 initially.
-                    // When the decision tree needs to test a field as a list (null check etc.),
-                    // the emitDecisionTree will handle the type correctly.
+                    let (rawParentVal, parentOps) = resolveAccessor parent
+                    // Guard: GEP requires a Ptr parent. If the parent was cached as I64
+                    // (e.g., ADT slot 1 loaded as I64 but holding a tuple Ptr), re-resolve
+                    // the parent as Ptr so we can GEP into the pointed-to block.
+                    let (parentVal, retypeOps) =
+                        if rawParentVal.Type = Ptr then (rawParentVal, [])
+                        else resolveAccessorTyped parent Ptr
                     let slotVal  = { Name = freshName env; Type = Ptr }
                     let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
-                    // For list tails (field 1 of a cons cell), load as Ptr
-                    // For tuple fields that will be further destructured, also Ptr
-                    // We can't know statically here, so we'll handle this in emitDecisionTree
-                    // by loading with the right type based on the constructor being tested.
-                    // Default: I64
+                    // Default: load field as I64. resolveAccessorTyped handles re-loads
+                    // when a specific type is needed (e.g., Ptr for list tail, tuple payload).
                     let fieldVal = { Name = freshName env; Type = I64 }
                     let loadOp   = LlvmLoadOp(fieldVal, slotVal)
                     accessorCache.[acc] <- fieldVal
-                    (fieldVal, parentOps @ [gepOp; loadOp])
+                    (fieldVal, parentOps @ retypeOps @ [gepOp; loadOp])
 
         // Resolve an accessor, but load with a specific type override.
         // This is needed when we know the field should be Ptr (e.g. list tail, nested tuple).
-        let resolveAccessorTyped (acc: MatchCompiler.Accessor) (ty: MlirType) : MlirValue * MlirOp list =
+        and resolveAccessorTyped (acc: MatchCompiler.Accessor) (ty: MlirType) : MlirValue * MlirOp list =
             match accessorCache.TryGetValue(acc) with
             | true, v when v.Type = ty -> (v, [])
             | true, v ->
