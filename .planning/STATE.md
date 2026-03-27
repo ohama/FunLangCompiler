@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 18 of 20 (Records)
-Plan: — (not started)
-Status: Ready to plan
-Last activity: 2026-03-27 — Phase 17 complete and verified (2/2 plans, 5/5 must-haves, 51 tests)
+Plan: 01 of 2 complete
+Status: In progress
+Last activity: 2026-03-27 — Completed 18-01-PLAN.md (RecordExpr/FieldAccess/RecordUpdate/SetField, 55/55 tests)
 
-Progress: [████░░░░░░] 40% (v4.0, 2/5 phases complete)
+Progress: [████░░░░░░] 40% (v4.0, 2/5 phases complete; Phase 18 plan 1/2 done)
 
 ## Performance Metrics
 
@@ -51,6 +51,11 @@ Progress: [████░░░░░░] 40% (v4.0, 2/5 phases complete)
 - RecordCtor identity = sorted field names list; canonical ordering enforced at desugarPattern site (16-02)
 - parseModule fallback: parseProgram tries parseModule, falls back to parseExpr + synthetic Module for bare-expression inputs (16-01)
 - ElabEnv gains TypeEnv/RecordEnv/ExnTags; elaborateProgram is new entry point; prePassDecls scans Decl list (16-01)
+- Record flat layout: GC_malloc(n*8), field at slot RecordEnv[typeName][fieldName], no tag prefix (18-01)
+- RecordExpr typeName=None resolved by field-set equality match in RecordEnv; field names must be unique across types (18-01)
+- SetField returns unit (i64=0) via fresh ArithConstantOp — not the stored value (18-01)
+- FieldAccess/SetField search all RecordEnv entries for fieldName slot (field-name uniqueness assumed) (18-01)
+- RecordUpdate op order: srcOps → overrideOps → allocOps → copyOps (prevents SSA use-before-def) (18-01)
 
 ### Pending Todos
 
@@ -59,10 +64,10 @@ None.
 ### Blockers/Concerns
 
 - Phase 19 (Exception Handling): validate `static inline setjmp` + clang `-O2` interaction with MLIR-emitted LLVM IR before full TryWith codegen. Write standalone proof-of-concept first.
-- Phase 18 (Records): verify that `RecordExpr` with `typeName = None` is handled (recommend requiring `Some _` for v4.0).
+- Phase 18-02 (RecordPat): `argAccessors.[i]` from MatchCompiler uses alphabetical sort order; RecordEnv uses declaration order — `ensureRecordFieldTypes` helper must remap via declaration-order slot lookup (RESEARCH.md Approach A).
 
 ## Session Continuity
 
-Last session: 2026-03-27
-Stopped at: Phase 17 verified — ready to plan Phase 18
+Last session: 2026-03-27T04:15:14Z
+Stopped at: Completed 18-01-PLAN.md — Phase 18 plan 1/2 done
 Resume file: None
