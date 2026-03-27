@@ -209,3 +209,131 @@ LangCons* lang_array_to_list(int64_t* arr) {
     }
     return head;
 }
+
+/* Hashtable runtime functions.
+ * Chained-bucket hashtable; all allocations via GC_malloc.
+ * Missing-key errors use lang_throw (catchable by try/with). */
+
+/* Murmurhash3 finalizer for i64 keys — fast, good avalanche */
+static uint64_t lang_ht_hash(int64_t key) {
+    uint64_t h = (uint64_t)key;
+    h ^= h >> 33;
+    h *= UINT64_C(0xff51afd7ed558ccd);
+    h ^= h >> 33;
+    h *= UINT64_C(0xc4ceb9fe1a85ec53);
+    h ^= h >> 33;
+    return h;
+}
+
+/* Find entry for key; returns NULL if not present */
+static LangHashEntry* lang_ht_find(LangHashtable* ht, int64_t key) {
+    uint64_t bucket = lang_ht_hash(key) % (uint64_t)ht->capacity;
+    LangHashEntry* e = ht->buckets[bucket];
+    while (e != NULL) {
+        if (e->key == key) return e;
+        e = e->next;
+    }
+    return NULL;
+}
+
+LangHashtable* lang_hashtable_create(void) {
+    LangHashtable* ht = (LangHashtable*)GC_malloc(sizeof(LangHashtable));
+    ht->capacity = 16;
+    ht->size = 0;
+    ht->buckets = (LangHashEntry**)GC_malloc((size_t)(ht->capacity * (int64_t)sizeof(LangHashEntry*)));
+    for (int64_t i = 0; i < ht->capacity; i++) {
+        ht->buckets[i] = NULL;
+    }
+    return ht;
+}
+
+int64_t lang_hashtable_get(LangHashtable* ht, int64_t key) {
+    LangHashEntry* e = lang_ht_find(ht, key);
+    if (e != NULL) return e->val;
+    /* Key not found: throw a LangString* error (catchable by try/with) */
+    const char* msg_str = "hashtable key not found";
+    int64_t msg_len = (int64_t)strlen(msg_str);
+    char* buf = (char*)GC_malloc((size_t)(msg_len + 1));
+    memcpy(buf, msg_str, (size_t)(msg_len + 1));
+    LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+    msg->length = msg_len;
+    msg->data = buf;
+    lang_throw((void*)msg);
+    return 0; /* unreachable */
+}
+
+/* Rehash into a table of new_cap buckets */
+static void lang_ht_rehash(LangHashtable* ht, int64_t new_cap) {
+    LangHashEntry** new_buckets = (LangHashEntry**)GC_malloc((size_t)(new_cap * (int64_t)sizeof(LangHashEntry*)));
+    for (int64_t i = 0; i < new_cap; i++) new_buckets[i] = NULL;
+    for (int64_t i = 0; i < ht->capacity; i++) {
+        LangHashEntry* e = ht->buckets[i];
+        while (e != NULL) {
+            LangHashEntry* next = e->next;
+            uint64_t b = lang_ht_hash(e->key) % (uint64_t)new_cap;
+            e->next = new_buckets[b];
+            new_buckets[b] = e;
+            e = next;
+        }
+    }
+    ht->buckets = new_buckets;
+    ht->capacity = new_cap;
+}
+
+void lang_hashtable_set(LangHashtable* ht, int64_t key, int64_t val) {
+    /* Rehash when load factor exceeds 3/4: size > capacity * 3 / 4 */
+    if (ht->size * 4 > ht->capacity * 3) {
+        lang_ht_rehash(ht, ht->capacity * 2);
+    }
+    LangHashEntry* e = lang_ht_find(ht, key);
+    if (e != NULL) {
+        e->val = val;
+        return;
+    }
+    /* Insert new entry at head of bucket chain */
+    uint64_t bucket = lang_ht_hash(key) % (uint64_t)ht->capacity;
+    LangHashEntry* entry = (LangHashEntry*)GC_malloc(sizeof(LangHashEntry));
+    entry->key = key;
+    entry->val = val;
+    entry->next = ht->buckets[bucket];
+    ht->buckets[bucket] = entry;
+    ht->size++;
+}
+
+int64_t lang_hashtable_containsKey(LangHashtable* ht, int64_t key) {
+    return lang_ht_find(ht, key) != NULL ? 1 : 0;
+}
+
+void lang_hashtable_remove(LangHashtable* ht, int64_t key) {
+    uint64_t bucket = lang_ht_hash(key) % (uint64_t)ht->capacity;
+    LangHashEntry* prev = NULL;
+    LangHashEntry* e = ht->buckets[bucket];
+    while (e != NULL) {
+        if (e->key == key) {
+            if (prev == NULL) {
+                ht->buckets[bucket] = e->next;
+            } else {
+                prev->next = e->next;
+            }
+            ht->size--;
+            return;
+        }
+        prev = e;
+        e = e->next;
+    }
+}
+
+LangCons* lang_hashtable_keys(LangHashtable* ht) {
+    LangCons* result = NULL;
+    for (int64_t i = 0; i < ht->capacity; i++) {
+        LangHashEntry* e = ht->buckets[i];
+        while (e != NULL) {
+            LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+            cell->head = e->key;
+            cell->tail = result;
+            result = cell;
+            e = e->next;
+        }
+    }
+    return result;
+}
