@@ -1468,11 +1468,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // exnVal is a Ptr to an ADT DataValue block (e.g., {tag=0, payload=LangString*} for Failure "msg")
         // Call @lang_throw(exnVal) — noreturn void call
         // Emit llvm.unreachable after the call to terminate the block
+        // deadVal must be defined by ArithConstantOp to satisfy MLIR SSA validity,
+        // even though it is never used after llvm.unreachable
         let deadVal = { Name = freshName env; Type = I64 }
-        (deadVal, exnOps @ [ LlvmCallVoidOp("@lang_throw", [exnVal]); LlvmUnreachableOp ])
+        (deadVal, exnOps @ [ ArithConstantOp(deadVal, 0L); LlvmCallVoidOp("@lang_throw", [exnVal]); LlvmUnreachableOp ])
 
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
+
+/// Append ReturnOp to a block body only if the block does not already end with
+/// a terminator (llvm.unreachable).  This allows Raise at the end of a function
+/// without generating a dead `return` after `llvm.unreachable`.
+let private appendReturnIfNeeded (ops: MlirOp list) (retVal: MlirValue) : MlirOp list =
+    match List.tryLast ops with
+    | Some LlvmUnreachableOp -> ops
+    | _ -> ops @ [ReturnOp [retVal]]
 
 let elaborateModule (expr: Expr) : MlirModule =
     let env = emptyEnv ()
@@ -1480,11 +1490,11 @@ let elaborateModule (expr: Expr) : MlirModule =
     let sideBlocks = env.Blocks.Value
     let allBlocks =
         if sideBlocks.IsEmpty then
-            [ { Label = None; Args = []; Body = entryOps @ [ReturnOp [resultVal]] } ]
+            [ { Label = None; Args = []; Body = appendReturnIfNeeded entryOps resultVal } ]
         else
             let entryBlock = { Label = None; Args = []; Body = entryOps }
             let lastBlock = List.last sideBlocks
-            let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [resultVal]] }
+            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded lastBlock.Body resultVal }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
     let gcInitOp = LlvmCallVoidOp("@GC_init", [])
@@ -1610,11 +1620,11 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
     let sideBlocks = env.Blocks.Value
     let allBlocks =
         if sideBlocks.IsEmpty then
-            [ { Label = None; Args = []; Body = entryOps @ [ReturnOp [resultVal]] } ]
+            [ { Label = None; Args = []; Body = appendReturnIfNeeded entryOps resultVal } ]
         else
             let entryBlock = { Label = None; Args = []; Body = entryOps }
             let lastBlock = List.last sideBlocks
-            let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [resultVal]] }
+            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded lastBlock.Body resultVal }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
     let gcInitOp = LlvmCallVoidOp("@GC_init", [])
