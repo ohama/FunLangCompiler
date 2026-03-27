@@ -852,6 +852,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let loadOp = LlvmLoadOp(fnPtrVal, closureVal)
                     let callOp = IndirectCallOp(result, fnPtrVal, closureVal, argVal)
                     (result, argOps @ [loadOp; callOp])
+                | Some closureVal when closureVal.Type = I64 ->
+                    // I64 value may be a closure passed through uniform ABI — cast to Ptr and attempt indirect call
+                    let (argVal, argOps) = elaborateExpr env argExpr
+                    let closurePtrVal = { Name = freshName env; Type = Ptr }
+                    let fnPtrVal = { Name = freshName env; Type = Ptr }
+                    let result = { Name = freshName env; Type = I64 }
+                    let castOp = LlvmIntToPtrOp(closurePtrVal, closureVal)
+                    let loadOp = LlvmLoadOp(fnPtrVal, closurePtrVal)
+                    let callOp = IndirectCallOp(result, fnPtrVal, closurePtrVal, argVal)
+                    (result, argOps @ [castOp; loadOp; callOp])
                 | _ ->
                     failwithf "Elaboration: unsupported App — '%s' is not a known function or closure value" name
         | Lambda(param, body, _) ->
