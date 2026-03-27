@@ -37,10 +37,11 @@ Phases 16–20: ADTs, records, exceptions, first-class constructors
   3. Module-level `let mut x = e` declarations compile via extractMainExpr desugaring
   4. `Var(name)` for a mutable name emits a load through the ref cell pointer (not a direct SSA value)
   5. freeVars correctly identifies mutable variables so closures capture the ref cell, not the value
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 21-01: TBD
+- [ ] 21-01-PLAN.md — Core mutable variable support (freeVars, ElabEnv, LetMut/Assign/Var/LetMutDecl)
+- [ ] 21-02-PLAN.md — Closure capture of mutable ref cells
 
 #### Phase 22: Array Core
 
@@ -96,7 +97,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–20. Foundation–Exceptions | v1.0–v4.0 | 37/37 | Complete | 2026-03-27 |
-| 21. Mutable Variables | v5.0 | 0/? | Not started | - |
+| 21. Mutable Variables | v5.0 | 0/2 | In progress | - |
 | 22. Array Core | v5.0 | 0/? | Not started | - |
 | 23. Hashtable | v5.0 | 0/? | Not started | - |
 | 24. Array HOF Builtins | v5.0 | 0/? | Not started | - |
