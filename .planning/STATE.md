@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 ## Current Position
 
 Phase: 25 of 27 (Module System)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-27 — v6.0 roadmap created; phases 25-27 defined
+Plan: 1 of 2 completed
+Status: In progress
+Last activity: 2026-03-27 — Completed 25-01-PLAN.md (module flattening foundation)
 
-Progress: [██████████░░░░░░░░░░] v5.0 complete, v6.0 starting (0/3 phases)
+Progress: [██████████░░░░░░░░░░] v5.0 complete, v6.0 in progress (1/3 plans started)
 
 ## Performance Metrics
 
@@ -40,6 +40,8 @@ Recent decisions relevant to v6.0:
 - Qualified names: FieldAccess(Constructor(M), x) pattern, desugar in Elaboration.fs
 - File I/O: 14 C runtime functions in lang_runtime.c/h; zero changes to MlirIR/Printer/Pipeline
 - Both externalFuncs lists (Elaboration.fs + Codegen) must be updated for each new builtin
+- 25-01: prePassDecls threads exnCounter as int ref parameter through recursion (not merge via return); flattenDecls placed private before extractMainExpr
+- 25-01: LetPatDecl maps to existing LetPat expression node; OpenDecl is wildcard no-op in build
 
 ### Pending Todos
 
@@ -52,5 +54,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Roadmap created — Phase 25 ready to plan
+Stopped at: Completed 25-01-PLAN.md — module flattening foundation, 97 tests passing
 Resume file: None
