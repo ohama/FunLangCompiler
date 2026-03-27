@@ -839,8 +839,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     ArithConstantOp(bytesVal, int64 ((ci.NumCaptures + 1) * 8))
                     LlvmCallOp(envPtrVal, "@GC_malloc", [bytesVal])
                 ]
-                let callOp = DirectCallOp(resultVal, sig_.MlirName, [argVal; envPtrVal])
-                (resultVal, argOps @ setupOps @ [callOp])
+                // Closure-maker always expects I64 as first arg (uniform ABI).
+                // If argVal is Ptr (e.g., a constructor closure), emit ptrtoint first.
+                let (i64ArgVal, coerceOps) =
+                    if argVal.Type = Ptr then
+                        let coerced = { Name = freshName env; Type = I64 }
+                        (coerced, [LlvmPtrToIntOp(coerced, argVal)])
+                    else
+                        (argVal, [])
+                let callOp = DirectCallOp(resultVal, sig_.MlirName, [i64ArgVal; envPtrVal])
+                (resultVal, argOps @ setupOps @ coerceOps @ [callOp])
             | None ->
                 // Check Vars for closure value (type Ptr)
                 match Map.tryFind name env.Vars with
@@ -871,7 +879,27 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let (bodyVal, bodyOps) = elaborateExpr env' body
             (bodyVal, argOps @ bodyOps)
         | _ ->
-            failwithf "Elaboration: unsupported App (only named function application supported in Phase 5)"
+            // General case: evaluate funcExpr to get a closure value, then dispatch
+            let (funcVal, funcOps) = elaborateExpr env funcExpr
+            let (argVal, argOps) = elaborateExpr env argExpr
+            if funcVal.Type = Ptr then
+                // Ptr-typed closure: load fn_ptr from slot 0, call indirect
+                let fnPtrVal = { Name = freshName env; Type = Ptr }
+                let result = { Name = freshName env; Type = I64 }
+                let loadOp = LlvmLoadOp(fnPtrVal, funcVal)
+                let callOp = IndirectCallOp(result, fnPtrVal, funcVal, argVal)
+                (result, funcOps @ argOps @ [loadOp; callOp])
+            elif funcVal.Type = I64 then
+                // I64-typed closure (passed through uniform ABI): inttoptr then indirect call
+                let closurePtrVal = { Name = freshName env; Type = Ptr }
+                let fnPtrVal = { Name = freshName env; Type = Ptr }
+                let result = { Name = freshName env; Type = I64 }
+                let castOp = LlvmIntToPtrOp(closurePtrVal, funcVal)
+                let loadOp = LlvmLoadOp(fnPtrVal, closurePtrVal)
+                let callOp = IndirectCallOp(result, fnPtrVal, closurePtrVal, argVal)
+                (result, funcOps @ argOps @ [castOp; loadOp; callOp])
+            else
+                failwithf "Elaboration: unsupported App — function expression elaborated to unsupported type %A" funcVal.Type
     // Phase 9: Tuple construction — GC_malloc(n*8) + sequential GEP + store
     | Tuple (exprs, _) ->
         let n = List.length exprs
