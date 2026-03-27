@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v6.0 — Phase 25: Module System COMPLETE
+**Current focus:** v6.0 — Phase 26: File I/O Core
 
 ## Current Position
 
-Phase: 25 of 27 (Module System)
-Plan: 2 of 2 completed
+Phase: 26 of 27 (File I/O Core)
+Plan: 1 of 1 completed
 Status: Phase complete
-Last activity: 2026-03-27 — Completed 25-02-PLAN.md (qualified name desugar)
+Last activity: 2026-03-27 — Completed 26-01-PLAN.md (file I/O and stderr builtins)
 
-Progress: [████████████░░░░░░░░] v5.0 complete, v6.0 phase 25 complete (2/3 plans done)
+Progress: [█████████████░░░░░░░] v5.0 complete, v6.0 phase 26 complete (3/3 v6 plans done)
 
 ## Performance Metrics
 
@@ -45,6 +45,11 @@ Recent decisions relevant to v6.0:
 - 25-02: Two-arm qualified name desugar required: FieldAccess arm for M.x/M.Ctor (standalone), App arm for M.f arg (functions in KnownFuncs not Vars)
 - 25-02: App desugar guard `not (Map.containsKey memberName env.TypeEnv)` prevents constructor arity bypass
 - 25-02: Match compilation has pre-existing domination bug when two named-ctor arms both extract values; workaround: use one nullary arm
+- 26-01: lang_file_read uses lang_throw (catchable) not lang_failwith (exits) for missing file error
+- 26-01: LangString struct renamed to LangString_s (named struct) to allow forward declaration in .h without clang typedef redefinition error
+- 26-01: eprint/eprintln E2E tests use single-line `let _ = eprint "..." in println "ok"` + `2>/dev/null`; multiline semicolon format causes IndentFilter NEWLINE to break SeqExpr parsing
+- 26-01: file_exists uses fopen("r") not access() — no extra unistd.h needed
+- 26-01: fwrite+fflush for stderr output avoids IsVarArg complexity of fprintf
 
 ### Pending Todos
 
@@ -57,5 +62,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 25-02-PLAN.md — qualified name desugar, 100 tests passing
+Stopped at: Completed 26-01-PLAN.md — file I/O core (read/write/append/exists/eprint/eprintln), 108 tests passing
 Resume file: None
