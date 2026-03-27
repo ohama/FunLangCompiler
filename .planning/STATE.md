@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v4.0 Type System & Error Handling — Phase 18: Records
+**Current focus:** v4.0 Type System & Error Handling — Phase 19: Exception Handling
 
 ## Current Position
 
-Phase: 18 of 20 (Records)
-Plan: 01 of 2 complete
-Status: In progress
-Last activity: 2026-03-27 — Completed 18-01-PLAN.md (RecordExpr/FieldAccess/RecordUpdate/SetField, 55/55 tests)
+Phase: 18 of 20 (Records) — COMPLETE
+Plan: 02 of 2 complete
+Status: Phase complete — ready for Phase 19
+Last activity: 2026-03-27 — Completed 18-02-PLAN.md (RecordPat pattern matching, 57/57 tests)
 
-Progress: [████░░░░░░] 40% (v4.0, 2/5 phases complete; Phase 18 plan 1/2 done)
+Progress: [█████░░░░░] 50% (v4.0, 3/5 phases complete; Phase 18 done)
 
 ## Performance Metrics
 
@@ -56,6 +56,9 @@ Progress: [████░░░░░░] 40% (v4.0, 2/5 phases complete; Phase
 - SetField returns unit (i64=0) via fresh ArithConstantOp — not the stored value (18-01)
 - FieldAccess/SetField search all RecordEnv entries for fieldName slot (field-name uniqueness assumed) (18-01)
 - RecordUpdate op order: srcOps → overrideOps → allocOps → copyOps (prevents SSA use-before-def) (18-01)
+- RecordCtor structural match: unconditional i1=1 (no tag prefix, unlike ADT) (18-02)
+- ensureRecordFieldTypes: resolve fieldMap via Set superset match in RecordEnv, remap alphabetical argAccs to declaration-order slot indices via Map.find fieldName fieldMap (18-02)
+- RecordPat test syntax: `{ field = var }` explicit form only — grammar does not support shorthand `{ field }` variable binding (18-02)
 
 ### Pending Todos
 
@@ -64,10 +67,9 @@ None.
 ### Blockers/Concerns
 
 - Phase 19 (Exception Handling): validate `static inline setjmp` + clang `-O2` interaction with MLIR-emitted LLVM IR before full TryWith codegen. Write standalone proof-of-concept first.
-- Phase 18-02 (RecordPat): `argAccessors.[i]` from MatchCompiler uses alphabetical sort order; RecordEnv uses declaration order — `ensureRecordFieldTypes` helper must remap via declaration-order slot lookup (RESEARCH.md Approach A).
 
 ## Session Continuity
 
-Last session: 2026-03-27T04:15:14Z
-Stopped at: Completed 18-01-PLAN.md — Phase 18 plan 1/2 done
+Last session: 2026-03-27T04:22:22Z
+Stopped at: Completed 18-02-PLAN.md — Phase 18 complete (2/2 plans done)
 Resume file: None
