@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 19 of 20 (Exception Handling) — In progress
-Plan: 01 of 2 complete
-Status: In progress — 19-01 done, 19-02 pending
-Last activity: 2026-03-27 — Completed 19-01-PLAN.md (C runtime exception infra + Elaboration.fs scaffolding, 57/57 tests)
+Phase: 19 of 20 (Exception Handling) — Complete
+Plan: 02 of 2 complete
+Status: Phase 19 complete — all plans done (19-01, 19-02)
+Last activity: 2026-03-27 — Completed 19-02-PLAN.md (Raise elaboration + 2 E2E tests, 59/59 tests)
 
-Progress: [██████░░░░] 62% (v4.0, plan 19-01 done)
+Progress: [███████░░░] 67% (v4.0, phase 19 done)
 
 ## Performance Metrics
 
@@ -49,6 +49,8 @@ Progress: [██████░░░░] 62% (v4.0, plan 19-01 done)
 - prePassDecls ExceptionDecl dual-write: both ExnTags and TypeEnv; exception ctors have tag=exnCounter++ and arity 0/1 (19-01)
 - freeVars Raise/TryWith use inline patBoundVars — MatchCompiler.boundVarsOfPattern does not exist (19-01)
 - [v4.0 pending] Pop handler stack before handler body executes, not after (C-16)
+- Raise deadVal defined via ArithConstantOp(0L) before llvm.unreachable — MLIR SSA requires all referenced names be defined (19-02)
+- appendReturnIfNeeded: suppress ReturnOp when last op is LlvmUnreachableOp in elaborateModule/elaborateProgram (19-02)
 - AdtCtor real tag now supplied from TypeEnv in emitCtorTest (17-01); Phase 16 placeholder replaced
 - RecordCtor identity = sorted field names list; canonical ordering enforced at desugarPattern site (16-02)
 - parseModule fallback: parseProgram tries parseModule, falls back to parseExpr + synthetic Module for bare-expression inputs (16-01)
@@ -68,10 +70,10 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 19-02 (TryWith codegen): implement Raise and TryWith elaboration using the now-registered external functions and validated returns_twice runtime
+- Phase 20 (if applicable): TryWith codegen can now be implemented using the Raise + lang_throw infrastructure from 19-02
 
 ## Session Continuity
 
-Last session: 2026-03-27T05:15:02Z
-Stopped at: Completed 19-01-PLAN.md — Phase 19 in progress (1/2 plans done)
+Last session: 2026-03-27T05:24:43Z
+Stopped at: Completed 19-02-PLAN.md — Phase 19 complete (2/2 plans done)
 Resume file: None
