@@ -1,0 +1,10 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -f /tmp/lang_test_26_04.txt $OUTBIN; echo $RC'
+// --- Input:
+let path = "/tmp/lang_test_26_04.txt" in
+write_file path "hello";
+append_file path " world";
+let content = read_file path in
+println content
+// --- Output:
+hello world
+0

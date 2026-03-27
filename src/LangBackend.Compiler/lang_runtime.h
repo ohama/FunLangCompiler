@@ -56,7 +56,9 @@ int64_t* lang_array_map(void* closure, int64_t* arr);
 int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr);
 int64_t* lang_array_init(int64_t n, void* closure);
 
-typedef struct { int64_t length; char* data; } LangString;
+/* Forward declaration for LangString (defined in lang_runtime.c) */
+struct LangString_s;
+typedef struct LangString_s LangString;
 LangString* lang_file_read(LangString* path);
 void        lang_file_write(LangString* path, LangString* content);
 void        lang_file_append(LangString* path, LangString* content);

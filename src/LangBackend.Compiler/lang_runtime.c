@@ -6,7 +6,7 @@
 #include "lang_runtime.h"
 
 /* String struct layout matches MLIR {i64 length, ptr data} at offsets 0 and 8 */
-typedef struct {
+typedef struct LangString_s {
     int64_t length;
     char*   data;
 } LangString;

@@ -1,0 +1,7 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let result = try read_file "/tmp/lang_nonexistent_26_05.txt" with e -> e in
+println result
+// --- Output:
+read_file: file not found: /tmp/lang_nonexistent_26_05.txt
+0
