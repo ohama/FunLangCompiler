@@ -1,0 +1,13 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+exception Failure of string
+exception NotFound
+let _ =
+  try
+    try raise NotFound
+    with
+    | NotFound -> raise (Failure "from handler")
+  with
+  | Failure msg -> 42
+// --- Output:
+42

@@ -1,0 +1,10 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+type Tree = Leaf | Node of Tree * int * Tree
+let inner = Node(Leaf, 5, Leaf) in
+let outer = Node(inner, 10, Leaf) in
+match outer with
+| Node(Node(_, v, _), root, _) -> root + v
+| _ -> 0
+// --- Output:
+15
