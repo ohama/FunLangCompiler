@@ -1091,6 +1091,57 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let ops = [LlvmCallVoidOp("@lang_eprintln", [strVal]); ArithConstantOp(unitVal, 0L)]
         (unitVal, strOps @ ops)
 
+    // Phase 27: write_lines — two-arg, void return (MUST come before one-arg arms)
+    | App (App (Var ("write_lines", _), pathExpr, _), linesExpr, _) ->
+        let (pathVal,  pathOps)  = elaborateExpr env pathExpr
+        let (linesVal, linesOps) = elaborateExpr env linesExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [LlvmCallVoidOp("@lang_write_lines", [pathVal; linesVal]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, pathOps @ linesOps @ ops)
+
+    // Phase 27: path_combine — two-arg, returns Ptr (MUST come before one-arg arms)
+    | App (App (Var ("path_combine", _), dirExpr, _), fileExpr, _) ->
+        let (dirVal,  dirOps)  = elaborateExpr env dirExpr
+        let (fileVal, fileOps) = elaborateExpr env fileExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, dirOps @ fileOps @ [LlvmCallOp(result, "@lang_path_combine", [dirVal; fileVal])])
+
+    // Phase 27: read_lines — one-arg, returns Ptr
+    | App (Var ("read_lines", _), pathExpr, _) ->
+        let (pathVal, pathOps) = elaborateExpr env pathExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, pathOps @ [LlvmCallOp(result, "@lang_read_lines", [pathVal])])
+
+    // Phase 27: get_env — one-arg, returns Ptr
+    | App (Var ("get_env", _), nameExpr, _) ->
+        let (nameVal, nameOps) = elaborateExpr env nameExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, nameOps @ [LlvmCallOp(result, "@lang_get_env", [nameVal])])
+
+    // Phase 27: dir_files — one-arg, returns Ptr
+    | App (Var ("dir_files", _), pathExpr, _) ->
+        let (pathVal, pathOps) = elaborateExpr env pathExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, pathOps @ [LlvmCallOp(result, "@lang_dir_files", [pathVal])])
+
+    // Phase 27: stdin_read_line — unit-arg, returns Ptr (elaborate unit, discard, call with no args)
+    | App (Var ("stdin_read_line", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_stdin_read_line", [])])
+
+    // Phase 27: stdin_read_all — unit-arg, returns Ptr
+    | App (Var ("stdin_read_all", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_stdin_read_all", [])])
+
+    // Phase 27: get_cwd — unit-arg, returns Ptr
+    | App (Var ("get_cwd", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_get_cwd", [])])
+
     // Phase 14: char_to_int — identity (char is already i64)
     | App (Var ("char_to_int", _), charExpr, _) ->
         elaborateExpr env charExpr
@@ -2379,6 +2430,14 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_file_exists";  ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_eprint";       ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_eprintln";     ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_read_lines";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_write_lines";      ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_stdin_read_line";  ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_stdin_read_all";   ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_get_env";          ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_get_cwd";          ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_path_combine";     ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_dir_files";        ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -2556,5 +2615,13 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_file_exists";  ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_eprint";       ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_eprintln";     ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_read_lines";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_write_lines";      ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_stdin_read_line";  ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_stdin_read_all";   ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_get_env";          ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_get_cwd";          ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_path_combine";     ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_dir_files";        ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
