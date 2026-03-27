@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v5.0 Mutable & Collections — Phase 22: Array Core (next)
+**Current focus:** v5.0 Mutable & Collections — Phase 22: Array Core (in progress)
 
 ## Current Position
 
-Phase: 21 of 24 (Mutable Variables) — COMPLETE
-Plan: 2 of 2 in phase 21 — phase complete
-Status: Phase complete, ready for Phase 22
-Last activity: 2026-03-27 — Completed 21-02-PLAN.md (closure capture of mutable vars)
+Phase: 22 of 24 (Array Core) — In progress
+Plan: 1 of 2 in phase 22
+Status: In progress
+Last activity: 2026-03-27 — Completed 22-01-PLAN.md (LlvmGEPDynamicOp + C runtime array functions)
 
-Progress: [###########░░░░░░░░░░░░░░░░░░░] v4.0 complete, v5.0 phase 21 done (73 tests passing)
+Progress: [############░░░░░░░░░░░░░░░░░░] v4.0 complete, v5.0 phase 21 done + 22-01 done (73 tests passing)
 
 ## Performance Metrics
 
@@ -23,7 +23,7 @@ Progress: [###########░░░░░░░░░░░░░░░░░░░]
 - v2.0: 9 plans, 5 phases — 34 FsLit tests, 1,861 LOC
 - v3.0: 5 plans, 4 phases — 45 FsLit tests
 - v4.0: 12 plans, 5 phases — 67 FsLit tests, 2,861 F# LOC + 184 C LOC
-- v5.0: 2 plans, 1/4 phases complete — Phase 21 done (73 E2E tests)
+- v5.0: 3 plans, 1.5/4 phases complete — Phase 21 done + 22-01 done (73 E2E tests)
 
 **By Phase:**
 
@@ -49,6 +49,9 @@ Recent decisions affecting v5.0:
 - [21-01] Assign returns unit 0L via ArithConstantOp after store
 - [21-02] Closure captures mutable var as Ptr (ref cell pointer); capType conditional on MutableVars membership
 - [21-02] freeVars must handle LetPat(WildcardPat) and LetPat(VarPat) — previously fell to Set.empty causing invisible captures
+- [22-01] lang_array_bounds_check uses lang_throw (not lang_failwith) — OOB is catchable by try/with
+- [22-01] LlvmGEPDynamicOp element type is i64 (not !llvm.ptr) — MLIR verifier requires element type, i64 gives 8-byte stride
+- [22-01] lang_array_to_list iterates backwards (arr[n] to arr[1]) to build cons list in correct forward order
 
 ### Pending Todos
 
@@ -56,11 +59,10 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 22 (Array Core) requires LlvmGEPDynamicOp (dynamic SSA-value index GEP) — new IR op needed
 - Phase 23 (Hashtable) requires new C runtime file with LangHashtable struct and lang_ht_* functions + value hash function
 
 ## Session Continuity
 
-Last session: 2026-03-27T09:57:00Z
-Stopped at: Completed 21-02-PLAN.md — closure capture of mutable variables (73 tests)
+Last session: 2026-03-27T11:02:54Z
+Stopped at: Completed 22-01-PLAN.md — LlvmGEPDynamicOp + C runtime array functions (73 tests)
 Resume file: None
