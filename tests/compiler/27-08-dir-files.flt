@@ -1,0 +1,6 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && rm -rf /tmp/langdir_test27 && mkdir /tmp/langdir_test27 && touch /tmp/langdir_test27/a.txt && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -rf /tmp/langdir_test27 $OUTBIN; echo $RC'
+// --- Input:
+let files = dir_files "/tmp/langdir_test27" in match files with | _ :: _ -> println "found" | [] -> println "empty"
+// --- Output:
+found
+0

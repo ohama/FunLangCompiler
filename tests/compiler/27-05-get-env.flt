@@ -1,0 +1,6 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && LANG_TEST_VAR=hello42 $OUTBIN; RC=$?; rm -f $OUTBIN; echo $RC'
+// --- Input:
+let v = get_env "LANG_TEST_VAR" in println v
+// --- Output:
+hello42
+0

@@ -1,0 +1,6 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && (cd /tmp && $OUTBIN); RC=$?; rm -f $OUTBIN; echo $RC'
+// --- Input:
+let cwd = get_cwd () in let ok = if string_length cwd > 0 then "ok" else "fail" in println ok
+// --- Output:
+ok
+0

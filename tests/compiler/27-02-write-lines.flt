@@ -1,0 +1,7 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -f /tmp/lang_test_27_02.txt $OUTBIN; echo $RC'
+// --- Input:
+let _ = write_lines "/tmp/lang_test_27_02.txt" ["alpha"; "beta"] in let content = read_file "/tmp/lang_test_27_02.txt" in print content
+// --- Output:
+alpha
+beta
+0

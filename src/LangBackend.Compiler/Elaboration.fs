@@ -1176,22 +1176,35 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (unitVal, ops)
 
     // Phase 8: general print/println for string struct variables (Ptr type)
+    // Phase 27: if strVal has I64 type (e.g., extracted from list cons cell head), cast to Ptr first
     | App (Var ("print", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
+        let (ptrVal, castOps) =
+            if strVal.Type = I64 then
+                let p = { Name = freshName env; Type = Ptr }
+                (p, [LlvmIntToPtrOp(p, strVal)])
+            else
+                (strVal, [])
         let dataPtrVal  = { Name = freshName env; Type = Ptr }
         let dataAddrVal = { Name = freshName env; Type = Ptr }
         let fmtRes      = { Name = freshName env; Type = I32 }
         let unitVal     = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPStructOp(dataPtrVal, strVal, 1)
+            LlvmGEPStructOp(dataPtrVal, ptrVal, 1)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
             LlvmCallOp(fmtRes, "@printf", [dataAddrVal])
             ArithConstantOp(unitVal, 0L)
         ]
-        (unitVal, strOps @ ops)
+        (unitVal, strOps @ castOps @ ops)
 
     | App (Var ("println", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
+        let (ptrVal, castOps) =
+            if strVal.Type = I64 then
+                let p = { Name = freshName env; Type = Ptr }
+                (p, [LlvmIntToPtrOp(p, strVal)])
+            else
+                (strVal, [])
         let dataPtrVal  = { Name = freshName env; Type = Ptr }
         let dataAddrVal = { Name = freshName env; Type = Ptr }
         let nlGlobal    = addStringGlobal env "\n"
@@ -1200,14 +1213,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let fmtRes2     = { Name = freshName env; Type = I32 }
         let unitVal     = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPStructOp(dataPtrVal, strVal, 1)
+            LlvmGEPStructOp(dataPtrVal, ptrVal, 1)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
             LlvmCallOp(fmtRes1, "@printf", [dataAddrVal])
             LlvmAddressOfOp(nlPtrVal, nlGlobal)
             LlvmCallOp(fmtRes2, "@printf", [nlPtrVal])
             ArithConstantOp(unitVal, 0L)
         ]
-        (unitVal, strOps @ ops)
+        (unitVal, strOps @ castOps @ ops)
 
     // Phase 25: Qualified function call desugar — M.f arg → App(Var("f"), arg)
     // Only for non-constructor members (constructors are handled by the FieldAccess arm → Constructor node).

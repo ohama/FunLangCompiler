@@ -1,0 +1,6 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && echo "hello" | $OUTBIN; RC=$?; rm -f $OUTBIN; echo $RC'
+// --- Input:
+let line = stdin_read_line () in println line
+// --- Output:
+hello
+0
