@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 19 of 20 (Exception Handling) — Complete
-Plan: 02 of 2 complete
-Status: Phase 19 complete — all plans done (19-01, 19-02)
-Last activity: 2026-03-27 — Completed 19-02-PLAN.md (Raise elaboration + 2 E2E tests, 59/59 tests)
+Phase: 19 of 20 (Exception Handling) — In progress
+Plan: 03 of 3 complete
+Status: Plan 19-03 complete — TryWith elaboration done (63/63 tests)
+Last activity: 2026-03-27 — Completed 19-03-PLAN.md (TryWith elaboration + 4 E2E tests, 63/63 tests)
 
-Progress: [███████░░░] 67% (v4.0, phase 19 done)
+Progress: [███████░░░] 70% (v4.0, phase 19 plan 03 done)
 
 ## Performance Metrics
 
@@ -48,6 +48,10 @@ Progress: [███████░░░] 67% (v4.0, phase 19 done)
 - Exception runtime: out-of-line lang_try_enter with returns_twice validated by nm; handler stack works with MLIR external linkage (19-01)
 - prePassDecls ExceptionDecl dual-write: both ExnTags and TypeEnv; exception ctors have tag=exnCounter++ and arity 0/1 (19-01)
 - freeVars Raise/TryWith use inline patBoundVars — MatchCompiler.boundVarsOfPattern does not exist (19-01)
+- TryWith uses inline _setjmp (not lang_try_enter wrapper) — ARM64 PAC: out-of-line setjmp wrapper freed stack before longjmp; _setjmp must be called in same function as try-with expression (19-03)
+- Exception payload GEP uses Ptr type (not I64) — payloads are heap strings, resolveAccessorTyped2 must use Ptr (19-03)
+- Let nested-terminator fix: track blocksBeforeBind, detect isTerminator (CfBrOp/CfCondBrOp/LlvmUnreachableOp), patch last side block with body ops when inner bind ends with terminator (19-03)
+- ExternalFuncDecl.Attrs: string list for MLIR function attributes; returns_twice on @_setjmp declaration (19-03)
 - [v4.0 pending] Pop handler stack before handler body executes, not after (C-16)
 - Raise deadVal defined via ArithConstantOp(0L) before llvm.unreachable — MLIR SSA requires all referenced names be defined (19-02)
 - appendReturnIfNeeded: suppress ReturnOp when last op is LlvmUnreachableOp in elaborateModule/elaborateProgram (19-02)
@@ -70,10 +74,10 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 20 (if applicable): TryWith codegen can now be implemented using the Raise + lang_throw infrastructure from 19-02
+None.
 
 ## Session Continuity
 
-Last session: 2026-03-27T05:24:43Z
-Stopped at: Completed 19-02-PLAN.md — Phase 19 complete (2/2 plans done)
+Last session: 2026-03-27
+Stopped at: Completed 19-03-PLAN.md — TryWith elaboration (63/63 tests)
 Resume file: None
