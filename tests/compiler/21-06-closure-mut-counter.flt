@@ -1,0 +1,5 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let mut c = 0 in let inc = fun z -> let _ = c <- c + 1 in c in let _ = inc 0 in let _ = inc 0 in inc 0
+// --- Output:
+3
