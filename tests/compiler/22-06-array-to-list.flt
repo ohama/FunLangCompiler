@@ -1,0 +1,9 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let a = array_of_list (10 :: 20 :: 30 :: []) in
+let lst = array_to_list a in
+match lst with
+| h :: _ -> h
+| [] -> 0
+// --- Output:
+10
