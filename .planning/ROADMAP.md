@@ -43,7 +43,7 @@ Delivered: Modulo/Char/Pipe/Compose operators, when guards, OrPat, CharConst pat
 **Milestone Goal:** ADT/GADT(discriminated unions), Records(mutable fields), Exception handling(setjmp/longjmp)을 컴파일하여 LangThree의 타입 시스템 기능 대부분을 네이티브 코드로 지원한다.
 
 - [x] **Phase 16: Environment Infrastructure** — TypeEnv/RecordEnv/ExnTags 구성 + MatchCompiler CtorTag 확장
-- [ ] **Phase 17: ADT Construction & Pattern Matching** — Constructor elaboration + ConstructorPat round-trip
+- [x] **Phase 17: ADT Construction & Pattern Matching** — Constructor elaboration + ConstructorPat round-trip ✓
 - [ ] **Phase 18: Records** — RecordExpr/FieldAccess/RecordUpdate/SetField/RecordPat elaboration
 - [ ] **Phase 19: Exception Handling** — setjmp/longjmp C runtime + Raise/TryWith elaboration
 - [ ] **Phase 20: Completeness** — First-class constructors, nested ADT patterns, exception re-raise/in-handler
@@ -82,8 +82,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 17-01-PLAN.md — Constructor elaboration: nullary/unary/multi-arg ADT value construction + 3 E2E tests (ADT-05, ADT-06, ADT-07)
-- [ ] 17-02-PLAN.md — ConstructorPat elaboration: tag comparison + payload GEP + sub-pattern dispatch + resolveAccessor Ptr-retype guard + 3 E2E tests (ADT-08, ADT-09, ADT-10)
+- [x] 17-01-PLAN.md — Constructor elaboration: nullary/unary/multi-arg ADT value construction + 3 E2E tests (ADT-05, ADT-06, ADT-07)
+- [x] 17-02-PLAN.md — ConstructorPat elaboration: tag comparison + payload GEP + sub-pattern dispatch + resolveAccessor Ptr-retype guard + 3 E2E tests (ADT-08, ADT-09, ADT-10)
 
 ---
 
@@ -158,7 +158,7 @@ Plans:
 | 7-11. Data Types & Pattern Matching | v2.0 | 9/9 | Complete | 2026-03-26 |
 | 12-15. Language Completeness | v3.0 | 5/5 | Complete | 2026-03-26 |
 | 16. Environment Infrastructure | v4.0 | 2/2 | Complete | 2026-03-27 |
-| 17. ADT Construction & Pattern Matching | v4.0 | 0/2 | Not started | - |
+| 17. ADT Construction & Pattern Matching | v4.0 | 2/2 | Complete | 2026-03-27 |
 | 18. Records | v4.0 | 0/2 | Not started | - |
 | 19. Exception Handling | v4.0 | 0/3 | Not started | - |
 | 20. Completeness | v4.0 | 0/3 | Not started | - |

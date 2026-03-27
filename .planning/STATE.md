@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v4.0 Type System & Error Handling — Phase 18: Records (next)
+**Current focus:** v4.0 Type System & Error Handling — Phase 18: Records
 
 ## Current Position
 
-Phase: 17 of 20 (ADT Construction & Pattern Matching) — COMPLETE
-Plan: 2 of 2 (17-02 complete)
-Status: Phase complete
-Last activity: 2026-03-27 — Completed 17-02-PLAN.md (ADT pattern matching, 51/51 tests pass)
+Phase: 18 of 20 (Records)
+Plan: — (not started)
+Status: Ready to plan
+Last activity: 2026-03-27 — Phase 17 complete and verified (2/2 plans, 5/5 must-haves, 51 tests)
 
-Progress: [████░░░░░░] 40% (v4.0, 2/5 phases complete, Phase 17 done)
+Progress: [████░░░░░░] 40% (v4.0, 2/5 phases complete)
 
 ## Performance Metrics
 
@@ -64,5 +64,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 17-02-PLAN.md — ADT pattern matching complete, 51/51 tests pass
+Stopped at: Phase 17 verified — ready to plan Phase 18
 Resume file: None
