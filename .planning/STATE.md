@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 ## Current Position
 
 Phase: 17 of 20 (ADT Construction & Pattern Matching)
-Plan: — (not started)
-Status: Ready to plan
-Last activity: 2026-03-27 — Phase 16 complete and verified (2/2 plans, 4/4 must-haves)
+Plan: 1 of 2 (17-01 complete)
+Status: In progress
+Last activity: 2026-03-26 — Completed 17-01-PLAN.md (ADT constructor elaboration, 48/48 tests pass)
 
-Progress: [██░░░░░░░░] 20% (v4.0, 1/5 phases complete)
+Progress: [███░░░░░░░] 30% (v4.0, 1/5 phases complete, 17-01 done)
 
 ## Performance Metrics
 
@@ -39,11 +39,12 @@ Progress: [██░░░░░░░░] 20% (v4.0, 1/5 phases complete)
 - OrPat expanded in Elaboration.fs before MatchCompiler; char is already i64 (13-01, 14-01)
 - Range -> lang_range(start, stop, step): C runtime returns Phase-10-compatible cons list (15)
 - FsLit test inputs must not have trailing newlines — indent-sensitive lexer (15)
-- [v4.0 pending] ADT layout: {i64 tag @field0, ptr payload @field1} — separate from tuple/cons-cell paths (C-11)
-- [v4.0 pending] Nullary ctors always allocate real 16-byte block with tag — null encoding reserved for NilCtor (C-12)
+- ADT layout: 16-byte GC_malloc block, slot 0 = i64 tag (LlvmGEPLinearOp), slot 1 = payload stored directly (I64 or Ptr) — live in Elaboration.fs (17-01)
+- Nullary ctors allocate real 16-byte block with tag and null at slot 1 — null encoding reserved for NilCtor (17-01)
+- ADT payload stored directly at slot 1 (no extra heap indirection) — I64 and Ptr both work; resolveAccessor default I64 load correct for int payloads (17-01)
 - [v4.0 pending] lang_try_enter must call setjmp via static inline/macro — not out-of-line C function (C-15)
 - [v4.0 pending] Pop handler stack before handler body executes, not after (C-16)
-- AdtCtor tag=0 placeholder in MatchCompiler for Phase 16; Phase 17 must supply real integer tag from ADT layout table (16-02)
+- AdtCtor real tag now supplied from TypeEnv in emitCtorTest (17-01); Phase 16 placeholder replaced
 - RecordCtor identity = sorted field names list; canonical ordering enforced at desugarPattern site (16-02)
 - parseModule fallback: parseProgram tries parseModule, falls back to parseExpr + synthetic Module for bare-expression inputs (16-01)
 - ElabEnv gains TypeEnv/RecordEnv/ExnTags; elaborateProgram is new entry point; prePassDecls scans Decl list (16-01)
@@ -59,6 +60,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27
-Stopped at: Phase 16 verified — ready to plan Phase 17
+Last session: 2026-03-26
+Stopped at: Completed 17-01-PLAN.md — ADT constructor elaboration complete, 48/48 tests pass
 Resume file: None
