@@ -90,8 +90,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 24-01-PLAN.md — C runtime HOF functions (LangClosureFn typedef, lang_array_iter/map/fold/init)
-- [ ] 24-02-PLAN.md — HOF elaboration cases, ExternalFuncDecl entries, and 4 E2E tests
+- [x] 24-01-PLAN.md — C runtime HOF functions (LangClosureFn typedef, lang_array_iter/map/fold/init)
+- [x] 24-02-PLAN.md — HOF elaboration cases, ExternalFuncDecl entries, and 4 E2E tests
 
 ## Progress
 
@@ -103,4 +103,4 @@ Plans:
 | 21. Mutable Variables | v5.0 | 2/2 | Complete | 2026-03-27 |
 | 22. Array Core | v5.0 | 2/2 | Complete | 2026-03-27 |
 | 23. Hashtable | v5.0 | 2/2 | Complete | 2026-03-27 |
-| 24. Array HOF Builtins | v5.0 | 0/2 | Not started | - |
+| 24. Array HOF Builtins | v5.0 | 2/2 | Complete | 2026-03-28 |

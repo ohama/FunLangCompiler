@@ -84,10 +84,10 @@ Deferred to future release.
 | ARR-05 | Phase 22 | Complete |
 | ARR-06 | Phase 22 | Complete |
 | ARR-07 | Phase 22 | Complete |
-| ARR-08 | Phase 24 | Pending |
-| ARR-09 | Phase 24 | Pending |
-| ARR-10 | Phase 24 | Pending |
-| ARR-11 | Phase 24 | Pending |
+| ARR-08 | Phase 24 | Complete |
+| ARR-09 | Phase 24 | Complete |
+| ARR-10 | Phase 24 | Complete |
+| ARR-11 | Phase 24 | Complete |
 | HT-01 | Phase 23 | Complete |
 | HT-02 | Phase 23 | Complete |
 | HT-03 | Phase 23 | Complete |
@@ -96,7 +96,7 @@ Deferred to future release.
 | HT-06 | Phase 23 | Complete |
 | HT-07 | Phase 23 | Complete |
 | HT-08 | Phase 23 | Complete |
-| REG-01 | All phases | Pending |
+| REG-01 | All phases | Complete |
 
 **Coverage:**
 - v1 requirements: 26 total
