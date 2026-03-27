@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <dirent.h>
 #include <gc.h>
 #include "lang_runtime.h"
 
@@ -450,4 +452,210 @@ void lang_eprintln(LangString* s) {
     fwrite(s->data, 1, (size_t)s->length, stderr);
     fputc('\n', stderr);
     fflush(stderr);
+}
+
+/* Extended File I/O and system runtime functions */
+
+LangCons* lang_read_lines(LangString* path) {
+    FILE* f = fopen(path->data, "r");
+    if (f == NULL) {
+        const char* msg_prefix = "read_lines: file not found: ";
+        int64_t prefix_len = (int64_t)strlen(msg_prefix);
+        int64_t total_len = prefix_len + path->length;
+        char* buf = (char*)GC_malloc((size_t)(total_len + 1));
+        memcpy(buf, msg_prefix, (size_t)prefix_len);
+        memcpy(buf + prefix_len, path->data, (size_t)path->length);
+        buf[total_len] = '\0';
+        LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->length = total_len;
+        msg->data = buf;
+        lang_throw((void*)msg);
+        return NULL; /* unreachable */
+    }
+    LangCons* head = NULL;
+    LangCons** cursor = &head;
+    char line_buf[4096];
+    while (fgets(line_buf, sizeof(line_buf), f) != NULL) {
+        int64_t len = (int64_t)strlen(line_buf);
+        if (len > 0 && line_buf[len-1] == '\n') {
+            line_buf[--len] = '\0';
+            if (len > 0 && line_buf[len-1] == '\r') line_buf[--len] = '\0';
+        }
+        char* data = (char*)GC_malloc((size_t)(len + 1));
+        memcpy(data, line_buf, (size_t)(len + 1));
+        LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+        s->length = len;
+        s->data = data;
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->head = (int64_t)(uintptr_t)s;
+        cell->tail = NULL;
+        *cursor = cell;
+        cursor = &cell->tail;
+    }
+    fclose(f);
+    return head;
+}
+
+void lang_write_lines(LangString* path, LangCons* lines) {
+    FILE* f = fopen(path->data, "w");
+    if (f == NULL) return;
+    LangCons* cur = lines;
+    while (cur != NULL) {
+        LangString* s = (LangString*)(uintptr_t)cur->head;
+        fwrite(s->data, 1, (size_t)s->length, f);
+        fputc('\n', f);
+        cur = cur->tail;
+    }
+    fclose(f);
+}
+
+LangString* lang_stdin_read_line(void) {
+    int64_t cap = 256;
+    char* buf = (char*)GC_malloc((size_t)cap);
+    int64_t len = 0;
+    int c;
+    while ((c = fgetc(stdin)) != EOF && c != '\n') {
+        if (len + 1 >= cap) {
+            cap *= 2;
+            char* newbuf = (char*)GC_malloc((size_t)cap);
+            memcpy(newbuf, buf, (size_t)len);
+            buf = newbuf;
+        }
+        buf[len++] = (char)c;
+    }
+    buf[len] = '\0';
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_stdin_read_all(void) {
+    int64_t cap = 1024;
+    char* buf = (char*)GC_malloc((size_t)cap);
+    int64_t len = 0;
+    int c;
+    while ((c = fgetc(stdin)) != EOF) {
+        if (len + 1 >= cap) {
+            cap *= 2;
+            char* newbuf = (char*)GC_malloc((size_t)cap);
+            memcpy(newbuf, buf, (size_t)len);
+            buf = newbuf;
+        }
+        buf[len++] = (char)c;
+    }
+    buf[len] = '\0';
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_get_env(LangString* varName) {
+    const char* val = getenv(varName->data);
+    if (val == NULL) {
+        const char* msg_prefix = "get_env: variable '";
+        const char* msg_suffix = "' not set";
+        int64_t prefix_len = (int64_t)strlen(msg_prefix);
+        int64_t suffix_len = (int64_t)strlen(msg_suffix);
+        int64_t total_len = prefix_len + varName->length + suffix_len;
+        char* buf = (char*)GC_malloc((size_t)(total_len + 1));
+        memcpy(buf, msg_prefix, (size_t)prefix_len);
+        memcpy(buf + prefix_len, varName->data, (size_t)varName->length);
+        memcpy(buf + prefix_len + varName->length, msg_suffix, (size_t)(suffix_len + 1));
+        LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->length = total_len;
+        msg->data = buf;
+        lang_throw((void*)msg);
+        return NULL; /* unreachable */
+    }
+    int64_t len = (int64_t)strlen(val);
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    memcpy(buf, val, (size_t)(len + 1));
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_get_cwd(void) {
+    char tmp[4096];
+    if (getcwd(tmp, sizeof(tmp)) == NULL) {
+        const char* msg_str = "get_cwd: failed";
+        int64_t msg_len = (int64_t)strlen(msg_str);
+        char* buf = (char*)GC_malloc((size_t)(msg_len + 1));
+        memcpy(buf, msg_str, (size_t)(msg_len + 1));
+        LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->length = msg_len;
+        msg->data = buf;
+        lang_throw((void*)msg);
+        return NULL; /* unreachable */
+    }
+    int64_t len = (int64_t)strlen(tmp);
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    memcpy(buf, tmp, (size_t)(len + 1));
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_path_combine(LangString* dir, LangString* file) {
+    int add_sep = (dir->length > 0 && dir->data[dir->length - 1] != '/') ? 1 : 0;
+    int64_t total_len = dir->length + add_sep + file->length;
+    char* buf = (char*)GC_malloc((size_t)(total_len + 1));
+    memcpy(buf, dir->data, (size_t)dir->length);
+    if (add_sep) buf[dir->length] = '/';
+    memcpy(buf + dir->length + add_sep, file->data, (size_t)file->length);
+    buf[total_len] = '\0';
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = total_len;
+    s->data = buf;
+    return s;
+}
+
+LangCons* lang_dir_files(LangString* path) {
+    DIR* d = opendir(path->data);
+    if (d == NULL) {
+        const char* msg_prefix = "dir_files: directory not found: ";
+        int64_t prefix_len = (int64_t)strlen(msg_prefix);
+        int64_t total_len = prefix_len + path->length;
+        char* buf = (char*)GC_malloc((size_t)(total_len + 1));
+        memcpy(buf, msg_prefix, (size_t)prefix_len);
+        memcpy(buf + prefix_len, path->data, (size_t)path->length);
+        buf[total_len] = '\0';
+        LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->length = total_len;
+        msg->data = buf;
+        lang_throw((void*)msg);
+        return NULL; /* unreachable */
+    }
+    LangCons* head = NULL;
+    LangCons** cursor = &head;
+    struct dirent* entry;
+    while ((entry = readdir(d)) != NULL) {
+        if (entry->d_name[0] == '.' &&
+            (entry->d_name[1] == '\0' || (entry->d_name[1] == '.' && entry->d_name[2] == '\0'))) {
+            continue;
+        }
+        if (entry->d_type != DT_REG && entry->d_type != DT_UNKNOWN) continue;
+        /* Build full path: path + "/" + d_name */
+        int64_t name_len = (int64_t)strlen(entry->d_name);
+        int add_sep = (path->length > 0 && path->data[path->length - 1] != '/') ? 1 : 0;
+        int64_t full_len = path->length + add_sep + name_len;
+        char* full = (char*)GC_malloc((size_t)(full_len + 1));
+        memcpy(full, path->data, (size_t)path->length);
+        if (add_sep) full[path->length] = '/';
+        memcpy(full + path->length + add_sep, entry->d_name, (size_t)(name_len + 1));
+        LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+        s->length = full_len;
+        s->data = full;
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->head = (int64_t)(uintptr_t)s;
+        cell->tail = NULL;
+        *cursor = cell;
+        cursor = &cell->tail;
+    }
+    closedir(d);
+    return head;
 }
