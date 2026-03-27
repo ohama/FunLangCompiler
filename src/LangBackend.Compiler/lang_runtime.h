@@ -56,4 +56,12 @@ int64_t* lang_array_map(void* closure, int64_t* arr);
 int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr);
 int64_t* lang_array_init(int64_t n, void* closure);
 
+typedef struct { int64_t length; char* data; } LangString;
+LangString* lang_file_read(LangString* path);
+void        lang_file_write(LangString* path, LangString* content);
+void        lang_file_append(LangString* path, LangString* content);
+int64_t     lang_file_exists(LangString* path);
+void        lang_eprint(LangString* s);
+void        lang_eprintln(LangString* s);
+
 #endif

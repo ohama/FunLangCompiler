@@ -389,3 +389,65 @@ int64_t* lang_array_init(int64_t n, void* closure) {
     }
     return out;
 }
+
+/* File I/O runtime functions */
+
+LangString* lang_file_read(LangString* path) {
+    FILE* f = fopen(path->data, "rb");
+    if (f == NULL) {
+        const char* msg_prefix = "read_file: file not found: ";
+        int64_t prefix_len = (int64_t)strlen(msg_prefix);
+        int64_t total_len = prefix_len + path->length;
+        char* buf = (char*)GC_malloc((size_t)(total_len + 1));
+        memcpy(buf, msg_prefix, (size_t)prefix_len);
+        memcpy(buf + prefix_len, path->data, (size_t)path->length);
+        buf[total_len] = '\0';
+        LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->length = total_len;
+        msg->data = buf;
+        lang_throw((void*)msg);
+        return NULL; /* unreachable */
+    }
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    char* content = (char*)GC_malloc((size_t)(size + 1));
+    fread(content, 1, (size_t)size, f);
+    fclose(f);
+    content[size] = '\0';
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = (int64_t)size;
+    s->data = content;
+    return s;
+}
+
+void lang_file_write(LangString* path, LangString* content) {
+    FILE* f = fopen(path->data, "wb");
+    if (f == NULL) return;
+    fwrite(content->data, 1, (size_t)content->length, f);
+    fclose(f);
+}
+
+void lang_file_append(LangString* path, LangString* content) {
+    FILE* f = fopen(path->data, "ab");
+    if (f == NULL) return;
+    fwrite(content->data, 1, (size_t)content->length, f);
+    fclose(f);
+}
+
+int64_t lang_file_exists(LangString* path) {
+    FILE* f = fopen(path->data, "r");
+    if (f != NULL) { fclose(f); return 1; }
+    return 0;
+}
+
+void lang_eprint(LangString* s) {
+    fwrite(s->data, 1, (size_t)s->length, stderr);
+    fflush(stderr);
+}
+
+void lang_eprintln(LangString* s) {
+    fwrite(s->data, 1, (size_t)s->length, stderr);
+    fputc('\n', stderr);
+    fflush(stderr);
+}
