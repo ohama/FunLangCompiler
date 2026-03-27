@@ -1005,7 +1005,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         (ptrVal, [LlvmIntToPtrOp(ptrVal, v)])
                     else (v, [])
                 | MatchCompiler.Field (parent, idx) ->
-                    let (parentVal, parentOps) = resolveAccessor parent
+                    // GEP requires a Ptr base — ensure parent is resolved as Ptr.
+                    let (parentVal, parentOps) = resolveAccessorTyped parent Ptr
                     let slotVal  = { Name = freshName env; Type = Ptr }
                     let fieldVal = { Name = freshName env; Type = ty }
                     let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
@@ -1016,7 +1017,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 match acc with
                 | MatchCompiler.Root _ -> failwith "resolveAccessorTyped: Root not in cache"
                 | MatchCompiler.Field (parent, idx) ->
-                    let (parentVal, parentOps) = resolveAccessor parent
+                    // GEP requires a Ptr base — ensure parent is resolved as Ptr.
+                    let (parentVal, parentOps) = resolveAccessorTyped parent Ptr
                     let slotVal  = { Name = freshName env; Type = Ptr }
                     let fieldVal = { Name = freshName env; Type = ty }
                     let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
@@ -1186,12 +1188,17 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let (_pat, _guard, bodyExpr) = clauses.[bodyIdx]
                 let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
                 resultType.Value <- bodyVal.Type
-                // Create a body block and branch to merge
+                // Create a body block and branch to merge (skip merge branch if body already terminated)
+                let terminatedOps =
+                    match List.tryLast bodyOps with
+                    | Some LlvmUnreachableOp -> bodyOps
+                    | Some (CfBrOp _) | Some (CfCondBrOp _) -> bodyOps
+                    | _ -> bodyOps @ [CfBrOp(mergeLabel, [bodyVal])]
                 let bodyLabel = freshLabel env (sprintf "match_body%d" bodyIdx)
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some bodyLabel
                         Args  = []
-                        Body  = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                        Body  = terminatedOps } ]
                 bindOps @ [ CfBrOp(bodyLabel, []) ]
             | MatchCompiler.Switch (scrutAcc, tag, argAccs, ifMatch, ifNoMatch) ->
                 // Resolve the scrutinee accessor with the correct type for this tag
@@ -1232,13 +1239,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let guardFailOps = emitDecisionTree ifFalse
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some guardFailLabel; Args = []; Body = guardFailOps } ]
-                // 4. Emit the body block (same as Leaf)
+                // 4. Emit the body block (same as Leaf, skip merge branch if body already terminated)
                 let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
                 resultType.Value <- bodyVal.Type
+                let terminatedOps =
+                    match List.tryLast bodyOps with
+                    | Some LlvmUnreachableOp -> bodyOps
+                    | Some (CfBrOp _) | Some (CfCondBrOp _) -> bodyOps
+                    | _ -> bodyOps @ [CfBrOp(mergeLabel, [bodyVal])]
                 let bodyLabel = freshLabel env (sprintf "match_body%d" bodyIdx)
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some bodyLabel; Args = [];
-                        Body = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                        Body = terminatedOps } ]
                 // 5. Return: bind ops + guard eval + conditional branch
                 bindOps @ guardOps @ [CfCondBrOp(guardVal, bodyLabel, [], guardFailLabel, [])]
 
@@ -1575,7 +1587,25 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let innerBlocks = env.Blocks.Value
                 if innerBlocks.Length > bodyBlocksBeforeCount then
                     let lastBlock = List.last innerBlocks
-                    let patchedOps = lastBlock.Body @ [CfBrOp(mergeLabel, [bodyVal])]
+                    // Check if the last block (inner merge) has any predecessors.
+                    // If all inner handler arms raised (noreturn), the inner merge is dead.
+                    // In that case, emit llvm.unreachable instead of cf.br to avoid
+                    // MLIR type errors from undefined block arguments in dead code.
+                    let innerMergeLabel = lastBlock.Label
+                    let hasPredecessors =
+                        let allBlocks = innerBlocks |> List.take (innerBlocks.Length - 1)
+                        allBlocks |> List.exists (fun b ->
+                            b.Body |> List.exists (fun op ->
+                                match op with
+                                | CfBrOp(lbl, _) -> Some lbl = innerMergeLabel
+                                | CfCondBrOp(_, tLbl, _, fLbl, _) ->
+                                    Some tLbl = innerMergeLabel || Some fLbl = innerMergeLabel
+                                | _ -> false))
+                    let patchedOps =
+                        if hasPredecessors then
+                            lastBlock.Body @ [CfBrOp(mergeLabel, [bodyVal])]
+                        else
+                            lastBlock.Body @ [LlvmUnreachableOp]
                     let patchedLast = { lastBlock with Body = patchedOps }
                     env.Blocks.Value <- (List.take (innerBlocks.Length - 1) innerBlocks) @ [patchedLast]
                 // The try_body block just holds the inner entry ops (which branch to inner blocks)
@@ -1644,7 +1674,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         (ptrVal, [LlvmIntToPtrOp(ptrVal, v)])
                     else (v, [])
                 | MatchCompiler.Field (parent, idx) ->
-                    let (parentVal, parentOps) = resolveAccessor2 parent
+                    // GEP requires a Ptr base — ensure parent is resolved as Ptr.
+                    let (parentVal, parentOps) = resolveAccessorTyped2 parent Ptr
                     let slotVal  = { Name = freshName env; Type = Ptr }
                     let fieldVal = { Name = freshName env; Type = ty }
                     let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
@@ -1655,7 +1686,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 match acc with
                 | MatchCompiler.Root _ -> failwith "resolveAccessorTyped2: Root not in cache"
                 | MatchCompiler.Field (parent, idx) ->
-                    let (parentVal, parentOps) = resolveAccessor2 parent
+                    // GEP requires a Ptr base — ensure parent is resolved as Ptr.
+                    let (parentVal, parentOps) = resolveAccessorTyped2 parent Ptr
                     let slotVal  = { Name = freshName env; Type = Ptr }
                     let fieldVal = { Name = freshName env; Type = ty }
                     let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
@@ -1798,11 +1830,17 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let (_pat, _guard, bodyExpr) = clauses.[bodyIdx]
                 let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
                 resultType.Value <- bodyVal.Type
+                // Skip merge branch if body already terminated (e.g. raise inside handler arm)
+                let terminatedOps =
+                    match List.tryLast bodyOps with
+                    | Some LlvmUnreachableOp -> bodyOps
+                    | Some (CfBrOp _) | Some (CfCondBrOp _) -> bodyOps
+                    | _ -> bodyOps @ [CfBrOp(mergeLabel, [bodyVal])]
                 let bodyLabel = freshLabel env (sprintf "try_arm%d" bodyIdx)
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some bodyLabel
                         Args  = []
-                        Body  = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                        Body  = terminatedOps } ]
                 bindOps @ [ CfBrOp(bodyLabel, []) ]
             | MatchCompiler.Switch (scrutAcc, tag, argAccs, ifMatch, ifNoMatch) ->
                 let expectedType = scrutineeTypeForTag2 tag
@@ -1838,10 +1876,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     [ { Label = Some guardFailLabel; Args = []; Body = guardFailOps } ]
                 let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
                 resultType.Value <- bodyVal.Type
+                // Skip merge branch if body already terminated (e.g. raise inside handler guard)
+                let terminatedOps =
+                    match List.tryLast bodyOps with
+                    | Some LlvmUnreachableOp -> bodyOps
+                    | Some (CfBrOp _) | Some (CfCondBrOp _) -> bodyOps
+                    | _ -> bodyOps @ [CfBrOp(mergeLabel, [bodyVal])]
                 let bodyLabel = freshLabel env (sprintf "try_arm%d" bodyIdx)
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some bodyLabel; Args = [];
-                        Body = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                        Body = terminatedOps } ]
                 bindOps @ guardOps @ [CfCondBrOp(guardVal, bodyLabel, [], guardFailLabel, [])]
 
         let chainEntryOps = emitDecisionTree2 tree
