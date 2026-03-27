@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-26)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v4.0 Type System & Error Handling — Phase 17: ADT Construction & Pattern Matching
+**Current focus:** v4.0 Type System & Error Handling — Phase 18: Records (next)
 
 ## Current Position
 
-Phase: 17 of 20 (ADT Construction & Pattern Matching)
-Plan: 1 of 2 (17-01 complete)
-Status: In progress
-Last activity: 2026-03-26 — Completed 17-01-PLAN.md (ADT constructor elaboration, 48/48 tests pass)
+Phase: 17 of 20 (ADT Construction & Pattern Matching) — COMPLETE
+Plan: 2 of 2 (17-02 complete)
+Status: Phase complete
+Last activity: 2026-03-27 — Completed 17-02-PLAN.md (ADT pattern matching, 51/51 tests pass)
 
-Progress: [███░░░░░░░] 30% (v4.0, 1/5 phases complete, 17-01 done)
+Progress: [████░░░░░░] 40% (v4.0, 2/5 phases complete, Phase 17 done)
 
 ## Performance Metrics
 
@@ -42,6 +42,9 @@ Progress: [███░░░░░░░] 30% (v4.0, 1/5 phases complete, 17-01
 - ADT layout: 16-byte GC_malloc block, slot 0 = i64 tag (LlvmGEPLinearOp), slot 1 = payload stored directly (I64 or Ptr) — live in Elaboration.fs (17-01)
 - Nullary ctors allocate real 16-byte block with tag and null at slot 1 — null encoding reserved for NilCtor (17-01)
 - ADT payload stored directly at slot 1 (no extra heap indirection) — I64 and Ptr both work; resolveAccessor default I64 load correct for int payloads (17-01)
+- AdtCtor argAccessors offset by +1: slot 0 = tag, payload at slots 1..N; Field(selAcc, i+1) in MatchCompiler.splitClauses (17-02)
+- Ptr-retype guard in resolveAccessor Field case: when parent cached as I64 but GEP needed, re-resolve as Ptr via resolveAccessorTyped (17-02)
+- parseProgram uses LangThree.IndentFilter to produce INDENT/DEDENT tokens — raw NEWLINE tokens from Lexer.tokenize are not accepted by parser grammar (17-02)
 - [v4.0 pending] lang_try_enter must call setjmp via static inline/macro — not out-of-line C function (C-15)
 - [v4.0 pending] Pop handler stack before handler body executes, not after (C-16)
 - AdtCtor real tag now supplied from TypeEnv in emitCtorTest (17-01); Phase 16 placeholder replaced
@@ -60,6 +63,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: Completed 17-01-PLAN.md — ADT constructor elaboration complete, 48/48 tests pass
+Last session: 2026-03-27
+Stopped at: Completed 17-02-PLAN.md — ADT pattern matching complete, 51/51 tests pass
 Resume file: None
