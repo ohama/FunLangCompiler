@@ -71,12 +71,12 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MUT-01 | Phase 21 | Pending |
-| MUT-02 | Phase 21 | Pending |
-| MUT-03 | Phase 21 | Pending |
-| MUT-04 | Phase 21 | Pending |
-| MUT-05 | Phase 21 | Pending |
-| MUT-06 | Phase 21 | Pending |
+| MUT-01 | Phase 21 | Complete |
+| MUT-02 | Phase 21 | Complete |
+| MUT-03 | Phase 21 | Complete |
+| MUT-04 | Phase 21 | Complete |
+| MUT-05 | Phase 21 | Complete |
+| MUT-06 | Phase 21 | Complete |
 | ARR-01 | Phase 22 | Pending |
 | ARR-02 | Phase 22 | Pending |
 | ARR-03 | Phase 22 | Pending |

@@ -40,8 +40,8 @@ Phases 16–20: ADTs, records, exceptions, first-class constructors
 **Plans**: 2 plans
 
 Plans:
-- [ ] 21-01-PLAN.md — Core mutable variable support (freeVars, ElabEnv, LetMut/Assign/Var/LetMutDecl)
-- [ ] 21-02-PLAN.md — Closure capture of mutable ref cells
+- [x] 21-01-PLAN.md — Core mutable variable support (freeVars, ElabEnv, LetMut/Assign/Var/LetMutDecl)
+- [x] 21-02-PLAN.md — Closure capture of mutable ref cells
 
 #### Phase 22: Array Core
 
@@ -97,7 +97,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–20. Foundation–Exceptions | v1.0–v4.0 | 37/37 | Complete | 2026-03-27 |
-| 21. Mutable Variables | v5.0 | 0/2 | In progress | - |
+| 21. Mutable Variables | v5.0 | 2/2 | Complete | 2026-03-27 |
 | 22. Array Core | v5.0 | 0/? | Not started | - |
 | 23. Hashtable | v5.0 | 0/? | Not started | - |
 | 24. Array HOF Builtins | v5.0 | 0/? | Not started | - |
