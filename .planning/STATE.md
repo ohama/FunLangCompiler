@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v5.0 Mutable & Collections — Phase 24: Array HOFs (in progress, plan 1 of 2 complete)
+**Current focus:** v5.0 Mutable & Collections — COMPLETE (Phase 24 done, all 92 tests passing)
 
 ## Current Position
 
-Phase: 24 of 24 (Array HOF Builtins) — In progress
-Plan: 1 of 2 in phase 24
-Status: In progress
-Last activity: 2026-03-27 — Completed 24-01-PLAN.md (C runtime HOF functions: iter/map/fold/init, 88 tests passing)
+Phase: 24 of 24 (Array HOF Builtins) — COMPLETE
+Plan: 2 of 2 in phase 24
+Status: Phase 24 complete / v5.0 milestone complete
+Last activity: 2026-03-27 — Completed 24-02-PLAN.md (elaboration layer, 4 E2E tests, 92 tests passing)
 
-Progress: [#################░░░░░░░░░░░░░] v4.0 complete, v5.0 phases 21+22+23+24-01 done (88 tests passing)
+Progress: [##############################] v5.0 complete — 24 phases, all milestones v1.0–v5.0 done (92 E2E tests)
 
 ## Performance Metrics
 
@@ -23,13 +23,14 @@ Progress: [#################░░░░░░░░░░░░░] v4.0 comple
 - v2.0: 9 plans, 5 phases — 34 FsLit tests, 1,861 LOC
 - v3.0: 5 plans, 4 phases — 45 FsLit tests
 - v4.0: 12 plans, 5 phases — 67 FsLit tests, 2,861 F# LOC + 184 C LOC
-- v5.0: 6 plans, 3/4 phases complete — Phases 21+22+23 done (88 E2E tests)
+- v5.0: 7 plans, 4 phases — 92 FsLit E2E tests (Phases 21+22+23+24 done)
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | v1.0–v4.0 | 37 | — | — |
+| v5.0 | 7 | — | — |
 
 *Updated after each plan completion*
 
@@ -66,6 +67,9 @@ Recent decisions affecting v5.0:
 - [24-01] lang_array_fold uses two-call curried pattern: partial = fn(closure, acc), then cast i64 result to void* for fn2 call
 - [24-01] All HOF output arrays use GC_malloc (not GC_malloc_atomic) so GC scans interior closure pointers in array elements
 - [24-01] lang_array_init uses zero-based index (i=0..n-1), stores at out[i+1] per one-block layout convention
+- [24-02] LangThree parser does not support multi-param fun (fun x y -> ...); use explicit currying in test closures
+- [24-02] HOF closure coerce: inline per-arm — check fVal.Type = I64, emit LlvmIntToPtrOp to get Ptr, else use Ptr directly
+- [24-02] array_fold arm placed before array_iter/array_map/array_init (3-arg before 2-arg) to avoid mis-matching
 
 ### Pending Todos
 
@@ -73,10 +77,10 @@ None.
 
 ### Blockers/Concerns
 
-None — Phase 24 plan 01 complete. Plan 02 (elaboration layer wiring) ready to proceed.
+None — v5.0 complete. All 92 E2E tests passing.
 
 ## Session Continuity
 
-Last session: 2026-03-27T16:30:28Z
-Stopped at: Completed 24-01-PLAN.md — C runtime HOF functions (iter/map/fold/init), 88 tests passing
+Last session: 2026-03-27T16:45:03Z
+Stopped at: Completed 24-02-PLAN.md — elaboration layer HOF wiring, 4 E2E tests, 92 tests passing
 Resume file: None
