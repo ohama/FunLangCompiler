@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-26)
 
 ## Current Position
 
-Phase: 18 of 20 (Records) — COMPLETE
-Plan: 02 of 2 complete
-Status: Phase complete — ready for Phase 19
-Last activity: 2026-03-27 — Completed 18-02-PLAN.md (RecordPat pattern matching, 57/57 tests)
+Phase: 19 of 20 (Exception Handling) — In progress
+Plan: 01 of 2 complete
+Status: In progress — 19-01 done, 19-02 pending
+Last activity: 2026-03-27 — Completed 19-01-PLAN.md (C runtime exception infra + Elaboration.fs scaffolding, 57/57 tests)
 
-Progress: [██████░░░░] 60% (v4.0, 3/5 phases complete)
+Progress: [██████░░░░] 62% (v4.0, plan 19-01 done)
 
 ## Performance Metrics
 
@@ -45,7 +45,9 @@ Progress: [██████░░░░] 60% (v4.0, 3/5 phases complete)
 - AdtCtor argAccessors offset by +1: slot 0 = tag, payload at slots 1..N; Field(selAcc, i+1) in MatchCompiler.splitClauses (17-02)
 - Ptr-retype guard in resolveAccessor Field case: when parent cached as I64 but GEP needed, re-resolve as Ptr via resolveAccessorTyped (17-02)
 - parseProgram uses LangThree.IndentFilter to produce INDENT/DEDENT tokens — raw NEWLINE tokens from Lexer.tokenize are not accepted by parser grammar (17-02)
-- [v4.0 pending] lang_try_enter must call setjmp via static inline/macro — not out-of-line C function (C-15)
+- Exception runtime: out-of-line lang_try_enter with returns_twice validated by nm; handler stack works with MLIR external linkage (19-01)
+- prePassDecls ExceptionDecl dual-write: both ExnTags and TypeEnv; exception ctors have tag=exnCounter++ and arity 0/1 (19-01)
+- freeVars Raise/TryWith use inline patBoundVars — MatchCompiler.boundVarsOfPattern does not exist (19-01)
 - [v4.0 pending] Pop handler stack before handler body executes, not after (C-16)
 - AdtCtor real tag now supplied from TypeEnv in emitCtorTest (17-01); Phase 16 placeholder replaced
 - RecordCtor identity = sorted field names list; canonical ordering enforced at desugarPattern site (16-02)
@@ -66,10 +68,10 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 19 (Exception Handling): validate `static inline setjmp` + clang `-O2` interaction with MLIR-emitted LLVM IR before full TryWith codegen. Write standalone proof-of-concept first.
+- Phase 19-02 (TryWith codegen): implement Raise and TryWith elaboration using the now-registered external functions and validated returns_twice runtime
 
 ## Session Continuity
 
-Last session: 2026-03-27T04:22:22Z
-Stopped at: Completed 18-02-PLAN.md — Phase 18 complete (2/2 plans done)
+Last session: 2026-03-27T05:15:02Z
+Stopped at: Completed 19-01-PLAN.md — Phase 19 in progress (1/2 plans done)
 Resume file: None
