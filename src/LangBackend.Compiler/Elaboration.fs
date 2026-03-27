@@ -878,6 +878,96 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, arrOps @ [LlvmCallOp(result, "@lang_array_to_list", [arrVal])])
 
+    // Phase 23: hashtable builtins
+    // coerceToI64: converts a MlirValue to I64 if it isn't already (Ptr→I64, I1→I64)
+    // Returns (coerced value, coercion ops list)
+
+    // hashtable_set — three-arg (must appear before two-arg and one-arg patterns)
+    // hashtable_set ht key val: coerce key+val to i64, call lang_hashtable_set (void), return unit
+    | App (App (App (Var ("hashtable_set", _), htExpr, _), keyExpr, _), valExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let (keyI64, keyCoerce) =
+            match keyVal.Type with
+            | I64 -> (keyVal, [])
+            | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
+            | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, keyVal)])
+            | _   -> (keyVal, [])
+        let (valI64, valCoerce) =
+            match valVal.Type with
+            | I64 -> (valVal, [])
+            | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
+            | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, valVal)])
+            | _   -> (valVal, [])
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = keyCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_hashtable_set", [htVal; keyI64; valI64]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, htOps @ keyOps @ valOps @ ops)
+
+    // hashtable_get — two-arg
+    // hashtable_get ht key: coerce key to i64, call lang_hashtable_get → i64
+    | App (App (Var ("hashtable_get", _), htExpr, _), keyExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (keyI64, keyCoerce) =
+            match keyVal.Type with
+            | I64 -> (keyVal, [])
+            | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
+            | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, keyVal)])
+            | _   -> (keyVal, [])
+        let result = { Name = freshName env; Type = I64 }
+        (result, htOps @ keyOps @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_get", [htVal; keyI64])])
+
+    // hashtable_containsKey — two-arg
+    // hashtable_containsKey ht key: call lang_hashtable_containsKey → i64 (0 or 1), compare ne 0 → I1
+    | App (App (Var ("hashtable_containsKey", _), htExpr, _), keyExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (keyI64, keyCoerce) =
+            match keyVal.Type with
+            | I64 -> (keyVal, [])
+            | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
+            | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, keyVal)])
+            | _   -> (keyVal, [])
+        let rawVal  = { Name = freshName env; Type = I64 }
+        let zeroVal = { Name = freshName env; Type = I64 }
+        let boolVal = { Name = freshName env; Type = I1  }
+        let ops = keyCoerce @ [
+            LlvmCallOp(rawVal, "@lang_hashtable_containsKey", [htVal; keyI64])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolVal, "ne", rawVal, zeroVal)
+        ]
+        (boolVal, htOps @ keyOps @ ops)
+
+    // hashtable_remove — two-arg
+    // hashtable_remove ht key: coerce key to i64, call lang_hashtable_remove (void), return unit
+    | App (App (Var ("hashtable_remove", _), htExpr, _), keyExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (keyI64, keyCoerce) =
+            match keyVal.Type with
+            | I64 -> (keyVal, [])
+            | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
+            | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, keyVal)])
+            | _   -> (keyVal, [])
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = keyCoerce @ [LlvmCallVoidOp("@lang_hashtable_remove", [htVal; keyI64]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, htOps @ keyOps @ ops)
+
+    // hashtable_keys — one-arg
+    // hashtable_keys ht: call lang_hashtable_keys → Ptr (LangCons* list)
+    | App (Var ("hashtable_keys", _), htExpr, _) ->
+        let (htVal, htOps) = elaborateExpr env htExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, htOps @ [LlvmCallOp(result, "@lang_hashtable_keys", [htVal])])
+
+    // hashtable_create — one-arg (takes unit, which the parser gives as App(Var "hashtable_create", unitExpr))
+    // hashtable_create (): elaborate and discard the unit arg, call lang_hashtable_create() → Ptr
+    | App (Var ("hashtable_create", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr   // elaborate unit arg for side-effects (none); discard result
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_hashtable_create", [])])
+
     // Phase 14: char_to_int — identity (char is already i64)
     | App (Var ("char_to_int", _), charExpr, _) ->
         elaborateExpr env charExpr
@@ -2135,6 +2225,12 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_array_bounds_check"; ExtParams = [Ptr; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_of_list";      ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_to_list";      ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_create";      ExtParams = [];               ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_get";         ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_set";         ExtParams = [Ptr; I64; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_containsKey"; ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_keys";        ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -2272,5 +2368,11 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_array_bounds_check"; ExtParams = [Ptr; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_of_list";      ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_to_list";      ExtParams = [Ptr];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_create";      ExtParams = [];               ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_get";         ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_set";         ExtParams = [Ptr; I64; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_containsKey"; ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_keys";        ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
