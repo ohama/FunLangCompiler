@@ -1329,25 +1329,36 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 17: ADT constructor — nullary variant (e.g. Red in type Color = Red | Green | Blue)
     // Allocates a 16-byte block: slot 0 = i64 tag, slot 1 = null ptr.
+    // Phase 20: If arity >= 1, the constructor is used as a first-class value (e.g. `apply Some 42`).
+    // In that case, wrap as Lambda(param, Constructor(name, Some(Var(param)), _)) and re-elaborate.
     | Constructor(name, None, _) ->
-        let info        = Map.find name env.TypeEnv
-        let sizeVal     = { Name = freshName env; Type = I64 }
-        let blockPtr    = { Name = freshName env; Type = Ptr }
-        let tagSlot     = { Name = freshName env; Type = Ptr }
-        let tagVal      = { Name = freshName env; Type = I64 }
-        let paySlot     = { Name = freshName env; Type = Ptr }
-        let nullPayload = { Name = freshName env; Type = Ptr }
-        let ops = [
-            ArithConstantOp(sizeVal, 16L)
-            LlvmCallOp(blockPtr, "@GC_malloc", [sizeVal])
-            LlvmGEPLinearOp(tagSlot, blockPtr, 0)
-            ArithConstantOp(tagVal, int64 info.Tag)
-            LlvmStoreOp(tagVal, tagSlot)
-            LlvmGEPLinearOp(paySlot, blockPtr, 1)
-            LlvmNullOp(nullPayload)
-            LlvmStoreOp(nullPayload, paySlot)
-        ]
-        (blockPtr, ops)
+        let info = Map.find name env.TypeEnv
+        if info.Arity >= 1 then
+            // First-class unary+ constructor: produce a closure fun __ctor_N_Name x -> Name x
+            let n = env.Counter.Value
+            env.Counter.Value <- n + 1
+            let paramName = sprintf "__ctor_%d_%s" n name
+            let s = Ast.unknownSpan
+            elaborateExpr env (Lambda(paramName, Constructor(name, Some(Var(paramName, s)), s), s))
+        else
+            // Nullary constructor: allocate 16-byte block with tag and null payload
+            let sizeVal     = { Name = freshName env; Type = I64 }
+            let blockPtr    = { Name = freshName env; Type = Ptr }
+            let tagSlot     = { Name = freshName env; Type = Ptr }
+            let tagVal      = { Name = freshName env; Type = I64 }
+            let paySlot     = { Name = freshName env; Type = Ptr }
+            let nullPayload = { Name = freshName env; Type = Ptr }
+            let ops = [
+                ArithConstantOp(sizeVal, 16L)
+                LlvmCallOp(blockPtr, "@GC_malloc", [sizeVal])
+                LlvmGEPLinearOp(tagSlot, blockPtr, 0)
+                ArithConstantOp(tagVal, int64 info.Tag)
+                LlvmStoreOp(tagVal, tagSlot)
+                LlvmGEPLinearOp(paySlot, blockPtr, 1)
+                LlvmNullOp(nullPayload)
+                LlvmStoreOp(nullPayload, paySlot)
+            ]
+            (blockPtr, ops)
 
     // Phase 17: ADT constructor — unary/multi-arg variant (e.g. Some 42, Pair(3,4))
     // Allocates a 16-byte block: slot 0 = i64 tag, slot 1 = argVal (I64 or Ptr).
