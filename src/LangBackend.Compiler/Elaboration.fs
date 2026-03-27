@@ -2314,12 +2314,13 @@ let elaborateModule (expr: Expr) : MlirModule =
 
 // Phase 16: Declaration pre-pass — scans Decl list and populates TypeEnv, RecordEnv, ExnTags.
 // No MLIR IR is emitted in this pass; only F# Map structures are built.
-let private prePassDecls (decls: Ast.Decl list)
+// Phase 25: Made recursive with shared exnCounter so nested modules share the same counter,
+// preventing exception tag collisions across module boundaries.
+let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
     : Map<string, TypeInfo> * Map<string, Map<string, int>> * Map<string, int> =
     let mutable typeEnv  = Map.empty<string, TypeInfo>
     let mutable recordEnv = Map.empty<string, Map<string, int>>
     let mutable exnTags  = Map.empty<string, int>
-    let exnCounter = ref 0
     for decl in decls do
         match decl with
         | Ast.Decl.TypeDecl (Ast.TypeDecl(_, _, ctors, _)) ->
@@ -2344,20 +2345,39 @@ let private prePassDecls (decls: Ast.Decl list)
             exnTags <- Map.add name tag exnTags
             let arity = match dataTypeOpt with Some _ -> 1 | None -> 0
             typeEnv <- Map.add name { Tag = tag; Arity = arity } typeEnv
+        | Ast.Decl.ModuleDecl(_, innerDecls, _)
+        | Ast.Decl.NamespaceDecl(_, innerDecls, _) ->
+            let (innerTypeEnv, innerRecordEnv, innerExnTags) = prePassDecls exnCounter innerDecls
+            typeEnv   <- Map.fold (fun acc k v -> Map.add k v acc) typeEnv   innerTypeEnv
+            recordEnv <- Map.fold (fun acc k v -> Map.add k v acc) recordEnv innerRecordEnv
+            exnTags   <- Map.fold (fun acc k v -> Map.add k v acc) exnTags   innerExnTags
         | _ -> ()
     (typeEnv, recordEnv, exnTags)
+
+// Phase 25: flattenDecls — recursively flatten ModuleDecl/NamespaceDecl into a single Decl list.
+// This allows extractMainExpr to see all let bindings regardless of nesting depth.
+let rec private flattenDecls (decls: Ast.Decl list) : Ast.Decl list =
+    decls |> List.collect (fun d ->
+        match d with
+        | Ast.Decl.ModuleDecl(_, innerDecls, _) -> flattenDecls innerDecls
+        | Ast.Decl.NamespaceDecl(_, innerDecls, _) -> flattenDecls innerDecls
+        | _ -> [d])
 
 // Phase 16: Extract the main expression from a Decl list.
 // LetDecl("_", expr) → use expr as the body; it already contains nested Let bindings.
 // LetDecl(name, body) → wrap in Let(name, body, continuation).
 // Non-expression decls (TypeDecl, RecordTypeDecl, ExceptionDecl) are skipped.
 // LetRecDecl bindings are wrapped in LetRec expressions.
+// Phase 25: Flattens ModuleDecl/NamespaceDecl before processing; handles LetPatDecl;
+// OpenDecl is a no-op (filtered out by the wildcard in build).
 let private extractMainExpr (decls: Ast.Decl list) : Expr =
     let s = unknownSpan
+    let flatDecls = flattenDecls decls
     let exprDecls =
-        decls |> List.filter (fun d ->
+        flatDecls |> List.filter (fun d ->
             match d with
-            | Ast.Decl.LetDecl _ | Ast.Decl.LetRecDecl _ | Ast.Decl.LetMutDecl _ -> true
+            | Ast.Decl.LetDecl _ | Ast.Decl.LetRecDecl _ | Ast.Decl.LetMutDecl _
+            | Ast.Decl.LetPatDecl _ -> true
             | _ -> false)
     match exprDecls with
     | [] -> Number(0, s)  // empty module → produce 0 as unit sentinel
@@ -2374,6 +2394,8 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
                 match bindings with
                 | (name, param, body, _) :: _ -> LetRec(name, param, body, Number(0, s), s)
                 | [] -> Number(0, s)
+            | [Ast.Decl.LetPatDecl(pat, body, sp)] ->
+                LetPat(pat, body, Number(0, s), sp)
             | Ast.Decl.LetDecl("_", body, _) :: rest ->
                 // let _ = body → evaluate body for side effects, then rest
                 // Represent as Let("_", body, continuation)
@@ -2386,6 +2408,8 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
                 | [] -> build rest
             | Ast.Decl.LetMutDecl(name, body, _) :: rest ->
                 LetMut(name, body, build rest, s)
+            | Ast.Decl.LetPatDecl(pat, body, sp) :: rest ->
+                LetPat(pat, body, build rest, sp)
             | _ :: rest -> build rest
         build exprDecls
 
@@ -2396,7 +2420,7 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         match ast with
         | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) | Ast.NamespacedModule(_, decls, _) -> decls
         | Ast.EmptyModule _ -> []
-    let (typeEnv, recordEnv, exnTags) = prePassDecls decls
+    let (typeEnv, recordEnv, exnTags) = prePassDecls (ref 0) decls
     let mainExpr = extractMainExpr decls
     let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags }
     let (resultVal, entryOps) = elaborateExpr env mainExpr
