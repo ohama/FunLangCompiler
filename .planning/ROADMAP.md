@@ -66,10 +66,10 @@ Plans:
   4. `file_exists "path"` returns `true` for existing files and `false` for absent ones
   5. `eprint "msg"` and `eprintln "msg"` emit to stderr and do not appear on stdout
 
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 26-01: TBD
+- [ ] 26-01-PLAN.md — C runtime file I/O functions + Elaboration.fs wiring + E2E tests (FIO-01/02/03/04/09/14)
 
 ---
 
@@ -105,7 +105,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–24 | v1.0–v5.0 | 45/45 | Complete | 2026-03-28 |
 | 25. Module System | v6.0 | 2/2 | Complete | 2026-03-28 |
-| 26. File I/O Core | v6.0 | 0/TBD | Not started | - |
+| 26. File I/O Core | v6.0 | 0/1 | Not started | - |
 | 27. File I/O Extended | v6.0 | 0/TBD | Not started | - |
 
 **Regression gate (REG-01):** 92 E2E tests must pass at completion of every phase.
