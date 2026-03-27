@@ -115,14 +115,18 @@ LangCons* lang_range(int64_t start, int64_t stop, int64_t step) {
 }
 
 /* Exception handling runtime */
+/* Design: generated code calls _setjmp/_longjmp directly in the function frame.
+ * lang_try_push just inserts the frame into the handler stack (no setjmp here).
+ * lang_throw uses _longjmp to jump back to the try-site in the calling function.
+ * This avoids the ARM64 PAC/stack-frame issue with out-of-line setjmp wrappers. */
 LangExnFrame *lang_exn_top = NULL;
 void *lang_current_exception_val = NULL;
 
-__attribute__((returns_twice))
-int lang_try_enter(LangExnFrame *frame) {
+/* Push frame onto handler stack. Generated code calls _setjmp on frame->buf
+ * after this returns, in the same function that holds the try-with expression. */
+void lang_try_push(LangExnFrame *frame) {
     frame->prev = lang_exn_top;
     lang_exn_top = frame;
-    return setjmp(frame->buf);
 }
 
 void lang_try_exit(void) {
@@ -137,9 +141,16 @@ void lang_throw(void *exn_val) {
         exit(1);
     }
     LangExnFrame *frame = lang_exn_top;
-    longjmp(frame->buf, 1);
+    _longjmp(frame->buf, 1);
 }
 
 void *lang_current_exception(void) {
     return lang_current_exception_val;
+}
+
+/* Keep lang_try_enter for backward compatibility / tests that compiled against old ABI */
+__attribute__((returns_twice))
+int lang_try_enter(LangExnFrame *frame) {
+    lang_try_push(frame);
+    return _setjmp(frame->buf);
 }

@@ -11,24 +11,18 @@ typedef struct LangExnFrame {
 extern LangExnFrame *lang_exn_top;
 extern void *lang_current_exception_val;
 
-/* Push frame onto handler stack and call setjmp.
-   Returns 0 on normal entry, non-zero on longjmp (exception caught).
-
-   __attribute__((returns_twice)) tells the compiler this function may return
-   more than once (like setjmp itself), preventing stack frame optimizations
-   that would break longjmp. The jmp_buf lives in a GC_malloc'd LangExnFrame
-   (heap-allocated), so it persists after this function returns.
-
-   This is the same out-of-line-setjmp-wrapper pattern used by OCaml 4.x
-   (caml_setjmp) and Lua (luaD_rawrunprotected). It works reliably with
-   clang on all platforms when returns_twice is specified.
-
-   The MLIR-generated code calls this as an external llvm.func. */
-__attribute__((returns_twice))
-int lang_try_enter(LangExnFrame *frame);
+/* Push frame onto handler stack.
+   After calling this, the CALLER must call _setjmp(frame->buf) directly
+   to save the setjmp state in the caller's stack frame.
+   This avoids the ARM64 PAC/out-of-line-setjmp problem. */
+void lang_try_push(LangExnFrame *frame);
 
 void lang_try_exit(void);
-void lang_throw(void *exn_val);
+void lang_throw(void *exn_val);  // calls _longjmp to top handler
 void *lang_current_exception(void);
+
+/* Backward-compat: push + _setjmp combined. */
+__attribute__((returns_twice))
+int lang_try_enter(LangExnFrame *frame);
 
 #endif

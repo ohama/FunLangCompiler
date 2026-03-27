@@ -21,7 +21,10 @@ let private printExternalDecl (d: ExternalFuncDecl) : string =
         match d.ExtReturn with
         | None -> ""
         | Some t -> sprintf " -> %s" (printType t)
-    sprintf "  llvm.func %s(%s%s)%s" d.ExtName paramStr varargSuffix retStr
+    let attrsStr =
+        if d.Attrs.IsEmpty then ""
+        else sprintf " attributes {%s}" (d.Attrs |> String.concat ", ")
+    sprintf "  llvm.func %s(%s%s)%s%s" d.ExtName paramStr varargSuffix retStr attrsStr
 
 let private printOp (indent: string) (op: MlirOp) : string =
     match op with

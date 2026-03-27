@@ -24,6 +24,7 @@ type ExternalFuncDecl = {
     ExtParams: MlirType list
     ExtReturn: MlirType option  // None = void
     IsVarArg:  bool             // true for printf
+    Attrs:     string list      // Phase 19: extra MLIR attributes e.g. ["returns_twice"]
 }
 
 // Operations — one DU case per MLIR op

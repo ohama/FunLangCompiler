@@ -467,10 +467,27 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         elaborateExpr env' inExpr
 
     | Let (name, bindExpr, bodyExpr, _) ->
+        let blocksBeforeBind = env.Blocks.Value.Length
         let (bv, bops) = elaborateExpr env bindExpr
         let env' = { env with Vars = Map.add name bv env.Vars }
         let (rv, rops) = elaborateExpr env' bodyExpr
-        (rv, bops @ rops)
+        // If bops ends with a block terminator (from nested Match/TryWith), the
+        // continuation code (rops) must go into the last side block that was added
+        // (the inner expression's merge block), not after the terminator inline.
+        let isTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        match List.tryLast bops with
+        | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBind ->
+            // Place rops in the last side block (inner merge block) before its existing ops
+            let innerBlocks = env.Blocks.Value
+            let lastBlock = List.last innerBlocks
+            let patchedLast = { lastBlock with Body = rops @ lastBlock.Body }
+            env.Blocks.Value <- (List.take (innerBlocks.Length - 1) innerBlocks) @ [patchedLast]
+            (rv, bops)  // bops alone (terminator as last op — valid MLIR block ending)
+        | _ ->
+            (rv, bops @ rops)
     // Phase 7: LetPat with wildcard or var pattern — enables "let _ = print ... in ..."
     | LetPat (WildcardPat _, bindExpr, bodyExpr, _) ->
         let (_bv, bops) = elaborateExpr env bindExpr
@@ -1473,6 +1490,350 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let deadVal = { Name = freshName env; Type = I64 }
         (deadVal, exnOps @ [ ArithConstantOp(deadVal, 0L); LlvmCallVoidOp("@lang_throw", [exnVal]); LlvmUnreachableOp ])
 
+    // Phase 19: TryWith — setjmp/longjmp exception handling
+    // Control flow:
+    //   [entry] alloc frame, call lang_try_enter (setjmp), branch on result
+    //   ^try_body — elaborate body, pop handler, branch to merge
+    //   ^exn_caught — pop handler (C-16), get exception, dispatch via MatchCompiler
+    //   ^exn_fail — re-raise unmatched exception via @lang_throw
+    //   ^merge(%result) — join point
+    | TryWith(bodyExpr, clauses, _) ->
+        let mergeLabel     = freshLabel env "try_merge"
+        let tryBodyLabel   = freshLabel env "try_body"
+        let exnCaughtLabel = freshLabel env "exn_caught"
+        let exnFailLabel   = freshLabel env "exn_fail"
+
+        // --- Entry ops: allocate frame, push handler, call _setjmp directly, branch ---
+        // IMPORTANT: _setjmp must be called in the SAME function body (not a wrapper),
+        // so the saved jmp_buf refers to THIS function's stack frame.
+        // lang_try_push just links the frame into the handler stack.
+        // _setjmp returns i32 (int); we zero-extend to i64 for comparison.
+        let frameSizeVal = { Name = freshName env; Type = I64 }
+        let framePtr     = { Name = freshName env; Type = Ptr }
+        let sjResult32   = { Name = freshName env; Type = I32 }
+        let sjResult64   = { Name = freshName env; Type = I64 }
+        let zero64       = { Name = freshName env; Type = I64 }
+        let isNormal     = { Name = freshName env; Type = I1 }
+        let entryOps = [
+            ArithConstantOp(frameSizeVal, 272L)
+            LlvmCallOp(framePtr, "@GC_malloc", [frameSizeVal])
+            LlvmCallVoidOp("@lang_try_push", [framePtr])
+            LlvmCallOp(sjResult32, "@_setjmp", [framePtr])
+            ArithExtuIOp(sjResult64, sjResult32)
+            ArithConstantOp(zero64, 0L)
+            ArithCmpIOp(isNormal, "eq", sjResult64, zero64)
+            CfCondBrOp(isNormal, tryBodyLabel, [], exnCaughtLabel, [])
+        ]
+
+        // --- ^try_body block: elaborate body, pop handler, branch to merge ---
+        let bodyBlocksBeforeCount = env.Blocks.Value.Length
+        let (bodyVal, bodyOps) = elaborateExpr env bodyExpr
+        let resultType = ref bodyVal.Type
+        // Determine how the body terminates:
+        //   - LlvmUnreachableOp: body raises (noreturn), try_body needs no exit or merge branch
+        //   - CfBrOp / CfCondBrOp: body itself has multi-block control flow (nested Match/TryWith)
+        //     In this case the lang_try_exit + CfBrOp(mergeLabel) must go into the body's
+        //     LAST side block (its own merge block), not after bodyOps (which terminates the block).
+        //   - Otherwise: append exit + branch normally
+        let tryBodyBlock =
+            match List.tryLast bodyOps with
+            | Some LlvmUnreachableOp ->
+                // Body raises unconditionally — no exit or merge branch needed
+                { Label = Some tryBodyLabel; Args = []; Body = bodyOps }
+            | Some (CfBrOp _) | Some (CfCondBrOp _) ->
+                // Body itself terminates with a branch (e.g. nested Match/TryWith).
+                // The branch to outer merge must be appended to the last side block
+                // that was added by the inner expression (its merge block, currently empty body).
+                // NOTE: do NOT append lang_try_exit here — the inner expression's normal-path
+                // block already contains lang_try_exit before branching to its own merge.
+                let innerBlocks = env.Blocks.Value
+                if innerBlocks.Length > bodyBlocksBeforeCount then
+                    let lastBlock = List.last innerBlocks
+                    let patchedOps = lastBlock.Body @ [CfBrOp(mergeLabel, [bodyVal])]
+                    let patchedLast = { lastBlock with Body = patchedOps }
+                    env.Blocks.Value <- (List.take (innerBlocks.Length - 1) innerBlocks) @ [patchedLast]
+                // The try_body block just holds the inner entry ops (which branch to inner blocks)
+                { Label = Some tryBodyLabel; Args = []; Body = bodyOps }
+            | _ ->
+                // Normal case: body is a simple expression, append exit + merge branch
+                { Label = Some tryBodyLabel; Args = [];
+                  Body = bodyOps @ [
+                    LlvmCallVoidOp("@lang_try_exit", [])
+                    CfBrOp(mergeLabel, [bodyVal])
+                  ] }
+        env.Blocks.Value <- env.Blocks.Value @ [tryBodyBlock]
+
+        // --- ^exn_caught block: pop handler (C-16), get exception, dispatch ---
+        // Expand OrPat in handler clauses
+        let clauses =
+            clauses |> List.collect (fun (pat, guard, body) ->
+                match pat with
+                | OrPat(alts, _) -> alts |> List.map (fun altPat -> (altPat, guard, body))
+                | _ -> [(pat, guard, body)]
+            )
+
+        let exnPtrVal = { Name = freshName env; Type = Ptr }
+        let exnPreambleOps = [
+            LlvmCallVoidOp("@lang_try_exit", [])   // C-16: pop handler before dispatch
+            LlvmCallOp(exnPtrVal, "@lang_current_exception", [])
+        ]
+
+        // Build arms for MatchCompiler: (Pattern * hasGuard * bodyIndex) list
+        let arms = clauses |> List.mapi (fun i (pat, guardOpt, _body) -> (pat, guardOpt.IsSome, i))
+        let rootAcc = MatchCompiler.Root exnPtrVal.Name
+        let tree = MatchCompiler.compile rootAcc arms
+
+        // Accessor cache — initialize root to exnPtrVal
+        let accessorCache2 = System.Collections.Generic.Dictionary<MatchCompiler.Accessor, MlirValue>()
+        accessorCache2.[rootAcc] <- exnPtrVal
+
+        // Resolve an accessor to an MlirValue (duplicated from Match case; root = exnPtrVal)
+        let rec resolveAccessor2 (acc: MatchCompiler.Accessor) : MlirValue * MlirOp list =
+            match accessorCache2.TryGetValue(acc) with
+            | true, v -> (v, [])
+            | false, _ ->
+                match acc with
+                | MatchCompiler.Root _ -> failwith "resolveAccessor2: Root not in cache"
+                | MatchCompiler.Field (parent, idx) ->
+                    let (rawParentVal, parentOps) = resolveAccessor2 parent
+                    let (parentVal, retypeOps) =
+                        if rawParentVal.Type = Ptr then (rawParentVal, [])
+                        else resolveAccessorTyped2 parent Ptr
+                    let slotVal  = { Name = freshName env; Type = Ptr }
+                    let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
+                    let fieldVal = { Name = freshName env; Type = I64 }
+                    let loadOp   = LlvmLoadOp(fieldVal, slotVal)
+                    accessorCache2.[acc] <- fieldVal
+                    (fieldVal, parentOps @ retypeOps @ [gepOp; loadOp])
+
+        and resolveAccessorTyped2 (acc: MatchCompiler.Accessor) (ty: MlirType) : MlirValue * MlirOp list =
+            match accessorCache2.TryGetValue(acc) with
+            | true, v when v.Type = ty -> (v, [])
+            | true, v ->
+                match acc with
+                | MatchCompiler.Root _ -> (v, [])
+                | MatchCompiler.Field (parent, idx) ->
+                    let (parentVal, parentOps) = resolveAccessor2 parent
+                    let slotVal  = { Name = freshName env; Type = Ptr }
+                    let fieldVal = { Name = freshName env; Type = ty }
+                    let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
+                    let loadOp   = LlvmLoadOp(fieldVal, slotVal)
+                    accessorCache2.[acc] <- fieldVal
+                    (fieldVal, parentOps @ [gepOp; loadOp])
+            | false, _ ->
+                match acc with
+                | MatchCompiler.Root _ -> failwith "resolveAccessorTyped2: Root not in cache"
+                | MatchCompiler.Field (parent, idx) ->
+                    let (parentVal, parentOps) = resolveAccessor2 parent
+                    let slotVal  = { Name = freshName env; Type = Ptr }
+                    let fieldVal = { Name = freshName env; Type = ty }
+                    let gepOp    = LlvmGEPLinearOp(slotVal, parentVal, idx)
+                    let loadOp   = LlvmLoadOp(fieldVal, slotVal)
+                    accessorCache2.[acc] <- fieldVal
+                    (fieldVal, parentOps @ [gepOp; loadOp])
+
+        let scrutineeTypeForTag2 (tag: MatchCompiler.CtorTag) : MlirType =
+            match tag with
+            | MatchCompiler.IntLit _    -> I64
+            | MatchCompiler.BoolLit _   -> I1
+            | MatchCompiler.StringLit _ -> Ptr
+            | MatchCompiler.ConsCtor    -> Ptr
+            | MatchCompiler.NilCtor     -> Ptr
+            | MatchCompiler.TupleCtor _ -> Ptr
+            | MatchCompiler.AdtCtor _   -> Ptr
+            | MatchCompiler.RecordCtor _ -> Ptr
+
+        let emitCtorTest2 (scrutVal: MlirValue) (tag: MatchCompiler.CtorTag) : MlirValue * MlirOp list =
+            match tag with
+            | MatchCompiler.IntLit n ->
+                let kVal = { Name = freshName env; Type = I64 }
+                let cond = { Name = freshName env; Type = I1 }
+                let ops = [ ArithConstantOp(kVal, int64 n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+                (cond, ops)
+            | MatchCompiler.BoolLit b ->
+                let kVal = { Name = freshName env; Type = I1 }
+                let cond = { Name = freshName env; Type = I1 }
+                let n = if b then 1L else 0L
+                let ops = [ ArithConstantOp(kVal, n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+                (cond, ops)
+            | MatchCompiler.StringLit s ->
+                let (patStrVal, patStrOps) = elaborateStringLiteral env s
+                let patDataPtrVal   = { Name = freshName env; Type = Ptr }
+                let patDataVal      = { Name = freshName env; Type = Ptr }
+                let scrutDataPtrVal = { Name = freshName env; Type = Ptr }
+                let scrutDataVal    = { Name = freshName env; Type = Ptr }
+                let cmpRes  = { Name = freshName env; Type = I32 }
+                let zero32  = { Name = freshName env; Type = I32 }
+                let cond    = { Name = freshName env; Type = I1 }
+                let ops = patStrOps @ [
+                    LlvmGEPStructOp(patDataPtrVal, patStrVal, 1)
+                    LlvmLoadOp(patDataVal, patDataPtrVal)
+                    LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 1)
+                    LlvmLoadOp(scrutDataVal, scrutDataPtrVal)
+                    LlvmCallOp(cmpRes, "@strcmp", [scrutDataVal; patDataVal])
+                    ArithConstantOp(zero32, 0L)
+                    ArithCmpIOp(cond, "eq", cmpRes, zero32)
+                ]
+                (cond, ops)
+            | MatchCompiler.NilCtor ->
+                let nullVal = { Name = freshName env; Type = Ptr }
+                let cond    = { Name = freshName env; Type = I1 }
+                let ops = [ LlvmNullOp(nullVal); LlvmIcmpOp(cond, "eq", scrutVal, nullVal) ]
+                (cond, ops)
+            | MatchCompiler.ConsCtor ->
+                let nullVal = { Name = freshName env; Type = Ptr }
+                let cond    = { Name = freshName env; Type = I1 }
+                let ops = [ LlvmNullOp(nullVal); LlvmIcmpOp(cond, "ne", scrutVal, nullVal) ]
+                (cond, ops)
+            | MatchCompiler.TupleCtor _ ->
+                let cond = { Name = freshName env; Type = I1 }
+                let ops = [ ArithConstantOp(cond, 1L) ]
+                (cond, ops)
+            | MatchCompiler.AdtCtor(name, _, _) ->
+                let info     = Map.find name env.TypeEnv
+                let tagSlot  = { Name = freshName env; Type = Ptr }
+                let tagLoad  = { Name = freshName env; Type = I64 }
+                let tagConst = { Name = freshName env; Type = I64 }
+                let cond     = { Name = freshName env; Type = I1 }
+                let ops = [
+                    LlvmGEPLinearOp(tagSlot, scrutVal, 0)
+                    LlvmLoadOp(tagLoad, tagSlot)
+                    ArithConstantOp(tagConst, int64 info.Tag)
+                    ArithCmpIOp(cond, "eq", tagLoad, tagConst)
+                ]
+                (cond, ops)
+            | MatchCompiler.RecordCtor _ ->
+                let cond = { Name = freshName env; Type = I1 }
+                let ops  = [ ArithConstantOp(cond, 1L) ]
+                (cond, ops)
+
+        let ensureConsFieldTypes2 (_scrutAcc: MatchCompiler.Accessor) (argAccs: MatchCompiler.Accessor list) : MlirOp list =
+            let mutable ops = []
+            if argAccs.Length >= 1 then
+                let (_, headOps) = resolveAccessorTyped2 argAccs.[0] I64
+                ops <- ops @ headOps
+            if argAccs.Length >= 2 then
+                let (_, tailOps) = resolveAccessorTyped2 argAccs.[1] Ptr
+                ops <- ops @ tailOps
+            ops
+
+        // Exception payloads are always heap objects (Ptr): strings, tuples, ADTs.
+        // Load as Ptr so handler bindings are correctly typed for GEP/load usage.
+        let ensureAdtFieldTypes2 (_scrutAcc: MatchCompiler.Accessor) (argAccs: MatchCompiler.Accessor list) : MlirOp list =
+            let mutable ops = []
+            if argAccs.Length >= 1 then
+                let (_, payOps) = resolveAccessorTyped2 argAccs.[0] Ptr
+                ops <- ops @ payOps
+            ops
+
+        let ensureRecordFieldTypes2 (fields: string list) (scrutAcc: MatchCompiler.Accessor) (argAccs: MatchCompiler.Accessor list) : MlirOp list =
+            let fieldSet = Set.ofList fields
+            let fieldMap =
+                env.RecordEnv
+                |> Map.toSeq
+                |> Seq.tryPick (fun (_, fm) ->
+                    let fmFields = fm |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+                    if fieldSet |> Set.forall (fun f -> Set.contains f fmFields) then Some fm
+                    else None)
+                |> Option.defaultWith (fun () ->
+                    failwithf "ensureRecordFieldTypes2: cannot resolve record type for fields %A" fields)
+            let mutable ops = []
+            fields |> List.iteri (fun i fieldName ->
+                if i < argAccs.Length then
+                    let declSlotIdx = Map.find fieldName fieldMap
+                    let (parentVal, parentOps) = resolveAccessorTyped2 scrutAcc Ptr
+                    let slotPtr  = { Name = freshName env; Type = Ptr }
+                    let fieldVal = { Name = freshName env; Type = I64 }
+                    let gepOp  = LlvmGEPLinearOp(slotPtr, parentVal, declSlotIdx)
+                    let loadOp = LlvmLoadOp(fieldVal, slotPtr)
+                    accessorCache2.[argAccs.[i]] <- fieldVal
+                    ops <- ops @ parentOps @ [gepOp; loadOp]
+            )
+            ops
+
+        // Recursively emit blocks for the TryWith decision tree.
+        // Fail case: branch to exnFailLabel (re-raise via @lang_throw).
+        let rec emitDecisionTree2 (tree: MatchCompiler.DecisionTree) : MlirOp list =
+            match tree with
+            | MatchCompiler.Fail ->
+                [ CfBrOp(exnFailLabel, []) ]
+            | MatchCompiler.Leaf (bindings, bodyIdx) ->
+                let mutable bindOps = []
+                let mutable bindEnv = env
+                for (varName, acc) in bindings do
+                    let (v, ops) = resolveAccessor2 acc
+                    bindOps <- bindOps @ ops
+                    bindEnv <- { bindEnv with Vars = Map.add varName v bindEnv.Vars }
+                let (_pat, _guard, bodyExpr) = clauses.[bodyIdx]
+                let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
+                resultType.Value <- bodyVal.Type
+                let bodyLabel = freshLabel env (sprintf "try_arm%d" bodyIdx)
+                env.Blocks.Value <- env.Blocks.Value @
+                    [ { Label = Some bodyLabel
+                        Args  = []
+                        Body  = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                bindOps @ [ CfBrOp(bodyLabel, []) ]
+            | MatchCompiler.Switch (scrutAcc, tag, argAccs, ifMatch, ifNoMatch) ->
+                let expectedType = scrutineeTypeForTag2 tag
+                let (sVal, resolveOps) = resolveAccessorTyped2 scrutAcc expectedType
+                let (cond, testOps) = emitCtorTest2 sVal tag
+                let preloadOps =
+                    match tag with
+                    | MatchCompiler.ConsCtor -> ensureConsFieldTypes2 scrutAcc argAccs
+                    | MatchCompiler.AdtCtor(_, _, arity) when arity > 0 -> ensureAdtFieldTypes2 scrutAcc argAccs
+                    | MatchCompiler.RecordCtor fields -> ensureRecordFieldTypes2 fields scrutAcc argAccs
+                    | _ -> []
+                let matchLabel   = freshLabel env "try_yes"
+                let noMatchLabel = freshLabel env "try_no"
+                let matchOps   = emitDecisionTree2 ifMatch
+                let noMatchOps = emitDecisionTree2 ifNoMatch
+                env.Blocks.Value <- env.Blocks.Value @
+                    [ { Label = Some matchLabel; Args = []; Body = preloadOps @ matchOps }
+                      { Label = Some noMatchLabel; Args = []; Body = noMatchOps } ]
+                resolveOps @ testOps @ [ CfCondBrOp(cond, matchLabel, [], noMatchLabel, []) ]
+            | MatchCompiler.Guard (bindings, bodyIdx, ifFalse) ->
+                let mutable bindOps = []
+                let mutable bindEnv = env
+                for (varName, acc) in bindings do
+                    let (v, ops) = resolveAccessor2 acc
+                    bindOps <- bindOps @ ops
+                    bindEnv <- { bindEnv with Vars = Map.add varName v bindEnv.Vars }
+                let (_pat, guardOpt, bodyExpr) = clauses.[bodyIdx]
+                let guard = guardOpt.Value
+                let (guardVal, guardOps) = elaborateExpr bindEnv guard
+                let guardFailLabel = freshLabel env (sprintf "try_guard_fail%d" bodyIdx)
+                let guardFailOps = emitDecisionTree2 ifFalse
+                env.Blocks.Value <- env.Blocks.Value @
+                    [ { Label = Some guardFailLabel; Args = []; Body = guardFailOps } ]
+                let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
+                resultType.Value <- bodyVal.Type
+                let bodyLabel = freshLabel env (sprintf "try_arm%d" bodyIdx)
+                env.Blocks.Value <- env.Blocks.Value @
+                    [ { Label = Some bodyLabel; Args = [];
+                        Body = bodyOps @ [CfBrOp(mergeLabel, [bodyVal])] } ]
+                bindOps @ guardOps @ [CfCondBrOp(guardVal, bodyLabel, [], guardFailLabel, [])]
+
+        let chainEntryOps = emitDecisionTree2 tree
+
+        // ^exn_caught block
+        env.Blocks.Value <- env.Blocks.Value @
+            [ { Label = Some exnCaughtLabel
+                Args  = []
+                Body  = exnPreambleOps @ chainEntryOps } ]
+
+        // ^exn_fail block — re-raise to outer handler (or abort if none)
+        env.Blocks.Value <- env.Blocks.Value @
+            [ { Label = Some exnFailLabel
+                Args  = []
+                Body  = [ LlvmCallVoidOp("@lang_throw", [exnPtrVal]); LlvmUnreachableOp ] } ]
+
+        // ^merge block — MUST be last so appendReturnIfNeeded targets it
+        let mergeArg = { Name = freshName env; Type = resultType.Value }
+        env.Blocks.Value <- env.Blocks.Value @
+            [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
+
+        (mergeArg, entryOps)
+
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
@@ -1511,23 +1872,24 @@ let elaborateModule (expr: Expr) : MlirModule =
           IsLlvmFunc  = false }
     let globals = env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value))
     let externalFuncs = [
-        { ExtName = "@GC_init";              ExtParams = [];         ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@GC_malloc";            ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@printf";               ExtParams = [Ptr];      ExtReturn = Some I32; IsVarArg = true  }
-        { ExtName = "@strcmp";               ExtParams = [Ptr; Ptr]; ExtReturn = Some I32; IsVarArg = false }
-        { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false }
-        { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false }
-        { ExtName = "@lang_range";           ExtParams = [I64; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_try_enter";          ExtParams = [Ptr];  ExtReturn = Some I64; IsVarArg = false }
-        { ExtName = "@lang_try_exit";           ExtParams = [];     ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@lang_throw";              ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@lang_current_exception";  ExtParams = [];     ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@GC_init";              ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@GC_malloc";            ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@printf";               ExtParams = [Ptr];      ExtReturn = Some I32; IsVarArg = true;  Attrs = [] }
+        { ExtName = "@strcmp";               ExtParams = [Ptr; Ptr]; ExtReturn = Some I32; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_range";           ExtParams = [I64; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_try_push";           ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_try_exit";           ExtParams = [];     ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_throw";              ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_current_exception";  ExtParams = [];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@_setjmp";                 ExtParams = [Ptr];  ExtReturn = Some I32; IsVarArg = false; Attrs = ["returns_twice"] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -1641,22 +2003,23 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
           IsLlvmFunc  = false }
     let globals = env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value))
     let externalFuncs = [
-        { ExtName = "@GC_init";              ExtParams = [];         ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@GC_malloc";            ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@printf";               ExtParams = [Ptr];      ExtReturn = Some I32; IsVarArg = true  }
-        { ExtName = "@strcmp";               ExtParams = [Ptr; Ptr]; ExtReturn = Some I32; IsVarArg = false }
-        { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false }
-        { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false }
-        { ExtName = "@lang_range";           ExtParams = [I64; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false }
-        { ExtName = "@lang_try_enter";          ExtParams = [Ptr];  ExtReturn = Some I64; IsVarArg = false }
-        { ExtName = "@lang_try_exit";           ExtParams = [];     ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@lang_throw";              ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false }
-        { ExtName = "@lang_current_exception";  ExtParams = [];     ExtReturn = Some Ptr; IsVarArg = false }
+        { ExtName = "@GC_init";              ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@GC_malloc";            ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@printf";               ExtParams = [Ptr];      ExtReturn = Some I32; IsVarArg = true;  Attrs = [] }
+        { ExtName = "@strcmp";               ExtParams = [Ptr; Ptr]; ExtReturn = Some I32; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_range";           ExtParams = [I64; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_try_push";           ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_try_exit";           ExtParams = [];     ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_throw";              ExtParams = [Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_current_exception";  ExtParams = [];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@_setjmp";                 ExtParams = [Ptr];  ExtReturn = Some I32; IsVarArg = false; Attrs = ["returns_twice"] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
