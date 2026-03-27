@@ -996,7 +996,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | MatchCompiler.NilCtor     -> Ptr
             | MatchCompiler.TupleCtor _ -> Ptr
             | MatchCompiler.AdtCtor _    -> Ptr
-            | MatchCompiler.RecordCtor _ -> failwith "Phase 18: RecordCtor not yet implemented"
+            | MatchCompiler.RecordCtor _ -> Ptr
 
         // Emit test ops for a constructor match against a scrutinee value.
         // Returns (condValue, testOps).
@@ -1062,7 +1062,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 ]
                 (cond, ops)
             | MatchCompiler.RecordCtor _ ->
-                failwith "Phase 18: RecordCtor not yet implemented"
+                // Records always match structurally — emit unconditional true
+                let cond = { Name = freshName env; Type = I1 }
+                let ops  = [ ArithConstantOp(cond, 1L) ]
+                (cond, ops)
 
         // Pre-populate accessor cache for ConsCtor sub-fields with correct types.
         // field 0 = head (I64), field 1 = tail (Ptr).
@@ -1087,6 +1090,36 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 // Payload is at slot 1; default load as I64
                 let (_, payOps) = resolveAccessorTyped argAccs.[0] I64
                 ops <- ops @ payOps
+            ops
+
+        // Pre-populate accessor cache for RecordCtor sub-fields with declaration-order slot indices.
+        // MatchCompiler generates argAccessors in alphabetical field-name order, but RecordEnv stores
+        // fields using declaration-order slot indices.  We must remap: for each field name (in
+        // alphabetical order, matching argAccs.[i]), look up its declaration-order slot index in
+        // RecordEnv and emit GEP+load using that slot so the correct heap word is read.
+        let ensureRecordFieldTypes (fields: string list) (scrutAcc: MatchCompiler.Accessor) (argAccs: MatchCompiler.Accessor list) : MlirOp list =
+            let fieldSet = Set.ofList fields
+            let fieldMap =
+                env.RecordEnv
+                |> Map.toSeq
+                |> Seq.tryPick (fun (_, fm) ->
+                    let fmFields = fm |> Map.toSeq |> Seq.map fst |> Set.ofSeq
+                    if fieldSet |> Set.forall (fun f -> Set.contains f fmFields) then Some fm
+                    else None)
+                |> Option.defaultWith (fun () ->
+                    failwithf "ensureRecordFieldTypes: cannot resolve record type for fields %A" fields)
+            let mutable ops = []
+            fields |> List.iteri (fun i fieldName ->
+                if i < argAccs.Length then
+                    let declSlotIdx = Map.find fieldName fieldMap
+                    let (parentVal, parentOps) = resolveAccessorTyped scrutAcc Ptr
+                    let slotPtr  = { Name = freshName env; Type = Ptr }
+                    let fieldVal = { Name = freshName env; Type = I64 }
+                    let gepOp  = LlvmGEPLinearOp(slotPtr, parentVal, declSlotIdx)
+                    let loadOp = LlvmLoadOp(fieldVal, slotPtr)
+                    accessorCache.[argAccs.[i]] <- fieldVal
+                    ops <- ops @ parentOps @ [gepOp; loadOp]
+            )
             ops
 
         // Track the result type (determined by first leaf reached)
@@ -1128,6 +1161,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     match tag with
                     | MatchCompiler.ConsCtor -> ensureConsFieldTypes scrutAcc argAccs
                     | MatchCompiler.AdtCtor(_, _, arity) when arity > 0 -> ensureAdtFieldTypes scrutAcc argAccs
+                    | MatchCompiler.RecordCtor fields -> ensureRecordFieldTypes fields scrutAcc argAccs
                     | _ -> []
                 // Emit ifMatch and ifNoMatch as separate blocks
                 let matchLabel   = freshLabel env "match_yes"
