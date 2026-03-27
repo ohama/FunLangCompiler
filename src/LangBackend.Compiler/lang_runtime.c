@@ -154,3 +154,58 @@ int lang_try_enter(LangExnFrame *frame) {
     lang_try_push(frame);
     return _setjmp(frame->buf);
 }
+
+/* Array runtime functions.
+ * One-block layout: GC_malloc((n+1)*8) where arr[0]=n (length), arr[1..n]=elements. */
+
+int64_t* lang_array_create(int64_t n, int64_t default_val) {
+    if (n < 0) {
+        lang_failwith("array_create: negative length");
+    }
+    int64_t* arr = (int64_t*)GC_malloc((size_t)((n + 1) * 8));
+    arr[0] = n;
+    for (int64_t i = 1; i <= n; i++) {
+        arr[i] = default_val;
+    }
+    return arr;
+}
+
+void lang_array_bounds_check(int64_t* arr, int64_t i) {
+    int64_t len = arr[0];
+    if (i < 0 || i >= len) {
+        char tmp[64];
+        int msglen = snprintf(tmp, sizeof(tmp), "index out of bounds: %ld, length %ld", (long)i, (long)len);
+        char* buf = (char*)GC_malloc((size_t)(msglen + 1));
+        memcpy(buf, tmp, (size_t)(msglen + 1));
+        LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->length = (int64_t)msglen;
+        msg->data = buf;
+        lang_throw((void*)msg);
+    }
+}
+
+int64_t* lang_array_of_list(LangCons* list) {
+    int64_t n = 0;
+    LangCons* cur = list;
+    while (cur != NULL) { n++; cur = cur->tail; }
+    int64_t* arr = (int64_t*)GC_malloc((size_t)((n + 1) * 8));
+    arr[0] = n;
+    cur = list;
+    for (int64_t i = 1; i <= n; i++) {
+        arr[i] = cur->head;
+        cur = cur->tail;
+    }
+    return arr;
+}
+
+LangCons* lang_array_to_list(int64_t* arr) {
+    int64_t n = arr[0];
+    LangCons* head = NULL;
+    for (int64_t i = n; i >= 1; i--) {
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->head = arr[i];
+        cell->tail = head;
+        head = cell;
+    }
+    return head;
+}

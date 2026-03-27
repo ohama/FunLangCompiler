@@ -25,4 +25,10 @@ void *lang_current_exception(void);
 __attribute__((returns_twice))
 int lang_try_enter(LangExnFrame *frame);
 
+typedef struct LangCons LangCons;
+int64_t* lang_array_create(int64_t n, int64_t default_val);
+void lang_array_bounds_check(int64_t* arr, int64_t i);
+int64_t* lang_array_of_list(LangCons* list);
+LangCons* lang_array_to_list(int64_t* arr);
+
 #endif
