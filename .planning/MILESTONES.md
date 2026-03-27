@@ -75,6 +75,30 @@
 
 ---
 
+### v4.0 — Type System & Error Handling (2026-03-27)
+
+**Goal:** ADT/GADT, Records(mutable fields), Exception handling(setjmp/longjmp)으로 LangThree 타입 시스템 기능 대부분 네이티브 코드 지원
+
+**Phases:** 16–20 (12 plans, all verified)
+**Requirements:** 27/27 complete
+**Tests:** 67 FsLit E2E tests (22 new)
+**LOC:** 2,861 F# + 184 C
+
+**What shipped:**
+- ADT discriminated unions: nullary/unary/multi-arg constructors + full pattern matching round-trip
+- Record types: field access, functional update, mutable field mutation, structural pattern matching
+- Exception handling: setjmp/longjmp C runtime, nested try-with, payload extraction, handler-miss re-raise
+- First-class constructors: unary+ ctors as higher-order function arguments via Lambda closure wrapping
+- Nested ADT pattern matching: multi-level GEP chains with Ptr-retype resolution
+
+**Key decisions validated:**
+- ADT 16-byte block layout {tag, payload} with uniform boxed representation ✓
+- Record flat layout GC_malloc(n*8), no tag prefix ✓
+- setjmp/longjmp with inline _setjmp for ARM64 PAC compatibility ✓
+- Uniform closure ABI (ptr, i64) -> i64 with ptrtoint/inttoptr bridging ✓
+
+---
+
 ## Current
 
 Planning next milestone
