@@ -8,14 +8,37 @@ let parseExpr (src: string) (filename: string) : Ast.Expr =
     Lexer.setInitialPos lexbuf filename
     Parser.start Lexer.tokenize lexbuf
 
+// Tokenize and apply IndentFilter, returning a filtered token list.
+// Required for parseModule: the raw Lexer emits NEWLINE tokens that the
+// parser grammar expects to be converted to INDENT/DEDENT by IndentFilter.
+let private lexAndFilter (src: string) (filename: string) : Parser.token list =
+    let lexbuf = LexBuffer<char>.FromString src
+    Lexer.setInitialPos lexbuf filename
+    let rec collect () =
+        let tok = Lexer.tokenize lexbuf
+        if tok = Parser.EOF then [Parser.EOF]
+        else tok :: collect ()
+    let rawTokens = collect ()
+    LangThree.IndentFilter.filter LangThree.IndentFilter.defaultConfig rawTokens
+    |> Seq.toList
+
 // Phase 16: Parse a source file as a module (Ast.Module).
-// Falls back to parseExpr and wraps in a synthetic Module for backward compatibility
-// with bare-expression inputs (e.g. "42", "true") that the module grammar rejects.
+// Uses IndentFilter so that multi-line indented source (with NEWLINE/INDENT/DEDENT)
+// is handled correctly. Falls back to parseExpr and wraps in a synthetic Module for
+// backward compatibility with bare-expression inputs (e.g. "42", "true").
 let parseProgram (src: string) (filename: string) : Ast.Module =
     try
-        let lexbuf = LexBuffer<char>.FromString src
-        Lexer.setInitialPos lexbuf filename
-        Parser.parseModule Lexer.tokenize lexbuf
+        let filteredTokens = lexAndFilter src filename
+        let lexbuf2 = LexBuffer<char>.FromString src
+        Lexer.setInitialPos lexbuf2 filename
+        let mutable idx = 0
+        let tokenizer (_: LexBuffer<char>) =
+            if idx < filteredTokens.Length then
+                let tok = filteredTokens.[idx]
+                idx <- idx + 1
+                tok
+            else Parser.EOF
+        Parser.parseModule tokenizer lexbuf2
     with _ ->
         // Bare expression input (not a valid top-level declaration): parse as Expr
         // and wrap in a synthetic Module so elaborateProgram can process it uniformly.

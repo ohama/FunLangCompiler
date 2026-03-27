@@ -1,0 +1,10 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+type Color = Red | Green | Blue
+let c = Green in
+match c with
+| Red -> 1
+| Green -> 2
+| Blue -> 3
+// --- Output:
+2

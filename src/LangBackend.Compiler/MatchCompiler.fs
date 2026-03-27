@@ -179,8 +179,13 @@ let private splitClauses (selected: Test) (clauses: Clause list)
         match selected.Pattern with
         | CtorTest(tag, subPats) -> (tag, subPats)
     let arity = ctorArity selTag
-    // Generate accessor paths for constructor arguments
-    let argAccessors = List.init arity (fun i -> Field(selAcc, i))
+    // Generate accessor paths for constructor arguments.
+    // ADT layout: slot 0 = tag (i64), slot 1..N = payload fields.
+    // For AdtCtor the payload starts at slot 1, so offset by 1.
+    let argAccessors =
+        match selTag with
+        | AdtCtor _ -> List.init arity (fun i -> Field(selAcc, i + 1))
+        | _ -> List.init arity (fun i -> Field(selAcc, i))
 
     let matchClauses = ResizeArray<Clause>()
     let noMatchClauses = ResizeArray<Clause>()
