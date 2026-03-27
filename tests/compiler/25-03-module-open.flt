@@ -1,0 +1,9 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+module Utils =
+    let add x y = x + y
+
+open Utils
+let result = add 10 32
+// --- Output:
+42
