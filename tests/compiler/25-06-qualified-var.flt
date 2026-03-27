@@ -1,8 +1,8 @@
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
-module Math =
-    let pi = 3
-    let add x y = x + y
-let result = Math.add Math.pi 4
+module Config =
+    let x = 10
+    let y = 32
+let result = Config.x + Config.y
 // --- Output:
-7
+42
