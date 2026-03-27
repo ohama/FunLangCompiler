@@ -1109,6 +1109,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         ]
         (unitVal, strOps @ ops)
 
+    // Phase 25: Qualified function call desugar — M.f arg → App(Var("f"), arg)
+    // Only for non-constructor members (constructors are handled by the FieldAccess arm → Constructor node).
+    // Must come BEFORE the general App arm so direct-call dispatch applies.
+    | App (FieldAccess (Constructor (_, None, _), memberName, fspan), argExpr, span)
+        when not (Map.containsKey memberName env.TypeEnv) ->
+        elaborateExpr env (App (Var (memberName, fspan), argExpr, span))
+
     | App (funcExpr, argExpr, _) ->
         match funcExpr with
         | Var (name, _) ->
