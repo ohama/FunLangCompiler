@@ -240,6 +240,7 @@ static LangHashEntry* lang_ht_find(LangHashtable* ht, int64_t key) {
 
 LangHashtable* lang_hashtable_create(void) {
     LangHashtable* ht = (LangHashtable*)GC_malloc(sizeof(LangHashtable));
+    ht->tag = -1;
     ht->capacity = 16;
     ht->size = 0;
     ht->buckets = (LangHashEntry**)GC_malloc((size_t)(ht->capacity * (int64_t)sizeof(LangHashEntry*)));
@@ -338,6 +339,36 @@ LangCons* lang_hashtable_keys(LangHashtable* ht) {
         }
     }
     return result;
+}
+
+/* Phase 28: Runtime dispatch for .[...] indexing syntax.
+ * Dispatch on first word: arrays store length (>= 0) at offset 0;
+ * hashtables store tag = -1 at offset 0. */
+
+int64_t lang_index_get(void* collection, int64_t index) {
+    int64_t first_word = ((int64_t*)collection)[0];
+    if (first_word < 0) {
+        // Hashtable: tag is -1
+        return lang_hashtable_get((LangHashtable*)collection, index);
+    } else {
+        // Array: first word is non-negative length
+        int64_t* arr = (int64_t*)collection;
+        lang_array_bounds_check(arr, index);
+        return arr[index + 1];
+    }
+}
+
+void lang_index_set(void* collection, int64_t index, int64_t value) {
+    int64_t first_word = ((int64_t*)collection)[0];
+    if (first_word < 0) {
+        // Hashtable: tag is -1
+        lang_hashtable_set((LangHashtable*)collection, index, value);
+    } else {
+        // Array: first word is non-negative length
+        int64_t* arr = (int64_t*)collection;
+        lang_array_bounds_check(arr, index);
+        arr[index + 1] = value;
+    }
 }
 
 /* Array higher-order function runtime.

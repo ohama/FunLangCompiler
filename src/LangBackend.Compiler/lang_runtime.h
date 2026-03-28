@@ -38,6 +38,7 @@ typedef struct LangHashEntry {
 } LangHashEntry;
 
 typedef struct {
+    int64_t tag;        // -1 = hashtable (arrays have non-negative length at offset 0)
     int64_t capacity;
     int64_t size;
     LangHashEntry** buckets;
@@ -49,6 +50,8 @@ void lang_hashtable_set(LangHashtable* ht, int64_t key, int64_t val);
 int64_t lang_hashtable_containsKey(LangHashtable* ht, int64_t key);
 void lang_hashtable_remove(LangHashtable* ht, int64_t key);
 LangCons* lang_hashtable_keys(LangHashtable* ht);
+int64_t lang_index_get(void* collection, int64_t index);
+void lang_index_set(void* collection, int64_t index, int64_t value);
 
 typedef int64_t (*LangClosureFn)(void* env, int64_t arg);
 void lang_array_iter(void* closure, int64_t* arr);
