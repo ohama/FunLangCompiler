@@ -34,19 +34,19 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ANN-01 | TBD | Pending |
-| ANN-02 | TBD | Pending |
-| ANN-03 | TBD | Pending |
-| FIN-01 | TBD | Pending |
-| FIN-02 | TBD | Pending |
-| FIN-03 | TBD | Pending |
-| FIN-04 | TBD | Pending |
-| REG-01 | All | Pending |
+| ANN-01 | Phase 30 | Pending |
+| ANN-02 | Phase 30 | Pending |
+| ANN-03 | Phase 30 | Pending |
+| FIN-01 | Phase 30 | Pending |
+| FIN-02 | Phase 30 | Pending |
+| FIN-03 | Phase 30 | Pending |
+| FIN-04 | Phase 30 | Pending |
+| REG-01 | Phase 30 | Pending |
 
 **Coverage:**
 - v1 requirements: 8 total
-- Mapped to phases: 0 (TBD)
-- Unmapped: 8
+- Mapped to phases: 8
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-28*
