@@ -35,8 +35,11 @@ Progress: [███████████████████████
 See: .planning/PROJECT.md Key Decisions table (full history)
 
 Recent decisions relevant to v7.0:
-- Phase 28: SEQ/ITE desugar at elaboration time (LetPat(WildcardPat)/If with Tuple([]) else) — no new MLIR ops
-- Phase 28: IDX uses runtime dispatch via lang_index_get/set; LangHashtable gets tag=-1 as first field to distinguish from arrays (length >= 0 at offset 0)
+- Phase 28-01: SEQ/ITE desugar at elaboration time (LetPat(WildcardPat)/If with Tuple([]) else) — verified via E2E tests
+- Phase 28-01: Tuple([]) = I64 0 (not GC_malloc ptr) — unit type uniform across all builtins
+- Phase 28-01: LetPat(WildcardPat) needs same terminator handling as Let for if/match in bind position
+- Phase 28-01: ITE tests use "let _ = if cond then expr in result" (not bare multi-line if-then) due to module parser requirement
+- Phase 28-02: IDX uses runtime dispatch via lang_index_get/set; LangHashtable gets tag=-1 as first field to distinguish from arrays (length >= 0 at offset 0)
 - Phase 29: LOOP requires new codegen — WhileExpr/ForExpr are new AST nodes (scf.while/scf.for or tail-call)
 
 ### Pending Todos
@@ -51,5 +54,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: Completed 28-02-PLAN.md — Phase 28 done, Phase 29 (Loops) up next
+Stopped at: Completed 28-01-PLAN.md and 28-02-PLAN.md — Phase 28 done, Phase 29 (Loops) up next
 Resume file: None
