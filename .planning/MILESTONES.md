@@ -168,6 +168,23 @@
 
 ---
 
+### v8.0 — Final Parity (2026-03-28)
+
+**Goal:** Type annotations + for-in collection loops로 LangThree 인터프리터와의 기능 차이 해소
+
+**Phases:** 30 (2 plans, all verified)
+**Requirements:** 8/8 complete
+**Tests:** 144 FsLit E2E tests (6 new)
+
+**What shipped:**
+- Annot/LambdaAnnot type annotation pass-through
+- ForInExpr collection iteration (list + array) via C runtime closure callbacks
+
+**Key decisions validated:**
+- Compile-time dispatch (ArrayVars) instead of runtime GC_size check ✓
+
+---
+
 ## Current
 
 Planning next milestone
