@@ -63,10 +63,11 @@ Plans:
   3. `for i = start downto stop do body` iterates i from start down to stop inclusive, returns unit
   4. Loop variable `i` is immutable within the loop body — cannot be assigned
   5. All 118 existing E2E tests continue to pass after loop codegen additions
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 29-01: TBD
+- [ ] 29-01-PLAN.md — WhileExpr elaboration + freeVars + while loop E2E tests
+- [ ] 29-02-PLAN.md — ForExpr elaboration + freeVars + for loop E2E tests + full regression
 
 ## Progress
 
@@ -81,4 +82,4 @@ Plans:
 | 21–24. Mutable & Collections | v5.0 | 8/8 | Complete | 2026-03-28 |
 | 25–27. Modules & I/O | v6.0 | 5/5 | Complete | 2026-03-28 |
 | 28. Syntax Desugaring | v7.0 | 2/2 | Complete | 2026-03-28 |
-| 29. Loop Constructs | v7.0 | 0/TBD | Not started | - |
+| 29. Loop Constructs | v7.0 | 0/2 | Not started | - |
