@@ -123,6 +123,28 @@
 
 ---
 
+### v6.0 — Modules & I/O (2026-03-28)
+
+**Goal:** Module system + File I/O builtins로 LangThree 모듈화 프로그램과 파일 입출력 네이티브 코드 지원
+
+**Phases:** 25–27 (5 plans, all verified)
+**Requirements:** 21/21 complete
+**Tests:** 118 FsLit E2E tests (26 new)
+**LOC:** 3,367 F# + 739 C
+
+**What shipped:**
+- Module system: prePassDecls recursion, flattenDecls, qualified names (M.x, M.Ctor, M.f)
+- File I/O Core: read_file, write_file, append_file, file_exists, eprint, eprintln
+- File I/O Extended: read_lines, write_lines, stdin_read_line/all, get_env, get_cwd, path_combine, dir_files
+
+**Key decisions validated:**
+- Module = compile-time AST flattening (no runtime module objects) ✓
+- Shared exnCounter for recursive prePassDecls ✓
+- File I/O: open-use-close internally (no exposed handles) ✓
+- All file errors via lang_throw (catchable) ✓
+
+---
+
 ## Current
 
 Planning next milestone
