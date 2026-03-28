@@ -145,6 +145,29 @@
 
 ---
 
+### v7.0 — Imperative Syntax (2026-03-28)
+
+**Goal:** Expression sequencing, indexing syntax, if-then, while/for loops 네이티브 코드 지원
+
+**Phases:** 28–29 (4 plans, all verified)
+**Requirements:** 14/14 complete
+**Tests:** 138 FsLit E2E tests (20 new)
+
+**What shipped:**
+- Expression sequencing (e1; e2) via LetPat desugar
+- If-then without else via If(cond, then, Tuple([])) desugar
+- Array/hashtable indexing (arr.[i], ht.[key]) via runtime dispatch
+- While loops (3-block header CFG)
+- For loops ascending/descending (block-arg loop counter)
+
+**Key decisions validated:**
+- SEQ/ITE: parser-level desugar, zero new codegen ✓
+- IDX: runtime dispatch via tag=-1 sentinel ✓
+- While: header-block CFG with condition re-elaboration ✓
+- For: block argument %i:i64 for SSA-correct counter ✓
+
+---
+
 ## Current
 
 Planning next milestone
