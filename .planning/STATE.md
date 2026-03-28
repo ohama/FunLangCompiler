@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v7.0 Imperative Syntax — Phase 29 in progress (WhileExpr done)
+**Current focus:** v7.0 Imperative Syntax — Phase 29 COMPLETE (WhileExpr + ForExpr done)
 
 ## Current Position
 
-Phase: 29 of 29 (Loop Constructs) — In progress
-Plan: 01 of ?? complete
-Status: Phase 29 Plan 01 done (WhileExpr), ForExpr TBD
-Last activity: 2026-03-28 — Completed 29-01-PLAN.md (WhileExpr CFG elaboration + 4 E2E tests)
+Phase: 29 of 29 (Loop Constructs) — COMPLETE
+Plan: 02 of 02 complete
+Status: Phase 29 done — WhileExpr + ForExpr both implemented
+Last activity: 2026-03-28 — Completed 29-02-PLAN.md (ForExpr CFG elaboration + 6 E2E tests)
 
-Progress: [████████████████████████] 132 E2E tests passing, WhileExpr complete
+Progress: [████████████████████████] 138 E2E tests passing, Phase 29 complete
 
 ## Performance Metrics
 
@@ -44,6 +44,9 @@ Recent decisions relevant to v7.0:
 - Phase 29-01: unitConst defined in entry fragment (dominates all loop blocks) for MLIR SSA correctness
 - Phase 29-01: Nested loop back-edge patched into inner merge block at index (len-4) after pushing 3 while blocks
 - Phase 29-01: condExpr re-elaborated in body block (fresh SSA names) for mutable-variable safe back-edge
+- Phase 29-02: ForExpr uses ^for_header(%i : i64) block arg — startVal/stopVal from entry fragment (dominate header, SSA-valid)
+- Phase 29-02: ForExpr for-variable bound in env.Vars only (NOT MutableVars) — immutability enforced at elaboration level
+- Phase 29-02: Test exit-code constraint (0-255): sum 1..100=5050 overflows byte; use smaller ranges (1..10=55) in tests
 
 ### Pending Todos
 
@@ -52,10 +55,9 @@ None.
 ### Blockers/Concerns
 
 - Pre-existing MLIR domination bug with two named-ctor match arms (workaround documented)
-- ForExpr codegen not yet implemented (Phase 29 Plan 01 only covers WhileExpr)
 
 ## Session Continuity
 
-Last session: 2026-03-28T02:04:18Z
-Stopped at: Completed 29-01-PLAN.md — WhileExpr CFG elaboration + 4 E2E tests (132/132 passing)
+Last session: 2026-03-28T02:16:00Z
+Stopped at: Completed 29-02-PLAN.md — ForExpr CFG elaboration + 6 E2E tests (138/138 passing); Phase 29 COMPLETE
 Resume file: None
