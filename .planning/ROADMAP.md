@@ -46,10 +46,11 @@ See .planning/MILESTONES.md for full history.
   3. `if cond then expr` compiles without else branch — evaluates to unit when cond is false
   4. `arr.[i]` and `arr.[i] <- v` compile to correct array reads and writes
   5. `ht.[key]` and `ht.[key] <- v` compile to correct hashtable reads and writes
-**Plans**: TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 28-01: TBD
+- [ ] 28-01-PLAN.md — Verify SEQ + ITE already work (E2E tests only, no code changes)
+- [ ] 28-02-PLAN.md — Implement IndexGet/IndexSet elaboration (C runtime dispatch + Elaboration.fs)
 
 ### Phase 29: Loop Constructs
 
@@ -79,5 +80,5 @@ Plans:
 | 16–20. Type System | v4.0 | 12/12 | Complete | 2026-03-27 |
 | 21–24. Mutable & Collections | v5.0 | 8/8 | Complete | 2026-03-28 |
 | 25–27. Modules & I/O | v6.0 | 5/5 | Complete | 2026-03-28 |
-| 28. Syntax Desugaring | v7.0 | 0/TBD | Not started | - |
+| 28. Syntax Desugaring | v7.0 | 0/2 | Planning complete | - |
 | 29. Loop Constructs | v7.0 | 0/TBD | Not started | - |
