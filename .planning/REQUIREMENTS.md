@@ -56,14 +56,14 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEQ-01 | Phase 28 | Pending |
-| SEQ-02 | Phase 28 | Pending |
-| IDX-01 | Phase 28 | Pending |
-| IDX-02 | Phase 28 | Pending |
-| IDX-03 | Phase 28 | Pending |
-| IDX-04 | Phase 28 | Pending |
-| ITE-01 | Phase 28 | Pending |
-| ITE-02 | Phase 28 | Pending |
+| SEQ-01 | Phase 28 | Complete |
+| SEQ-02 | Phase 28 | Complete |
+| IDX-01 | Phase 28 | Complete |
+| IDX-02 | Phase 28 | Complete |
+| IDX-03 | Phase 28 | Complete |
+| IDX-04 | Phase 28 | Complete |
+| ITE-01 | Phase 28 | Complete |
+| ITE-02 | Phase 28 | Complete |
 | LOOP-01 | Phase 29 | Pending |
 | LOOP-02 | Phase 29 | Pending |
 | LOOP-03 | Phase 29 | Pending |

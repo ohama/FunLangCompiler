@@ -80,5 +80,5 @@ Plans:
 | 16–20. Type System | v4.0 | 12/12 | Complete | 2026-03-27 |
 | 21–24. Mutable & Collections | v5.0 | 8/8 | Complete | 2026-03-28 |
 | 25–27. Modules & I/O | v6.0 | 5/5 | Complete | 2026-03-28 |
-| 28. Syntax Desugaring | v7.0 | 0/2 | Planning complete | - |
+| 28. Syntax Desugaring | v7.0 | 2/2 | Complete | 2026-03-28 |
 | 29. Loop Constructs | v7.0 | 0/TBD | Not started | - |
