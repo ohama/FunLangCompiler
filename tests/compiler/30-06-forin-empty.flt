@@ -1,0 +1,8 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let xs = [] in
+let _ = (for x in xs do
+  print (to_string x)) in
+print "done"
+// --- Output:
+done0

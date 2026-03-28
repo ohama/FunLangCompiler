@@ -36,6 +36,8 @@ type ElabEnv = {
     ExnTags:        Map<string, int>                 // exception ctor name -> tag index
     // Phase 21: Mutable variable tracking — names that live in GC ref cells
     MutableVars:    Set<string>
+    // Phase 30: Array variable tracking — names bound to array-type collections (for for-in dispatch)
+    ArrayVars:      Set<string>
 }
 
 let emptyEnv () : ElabEnv =
@@ -43,7 +45,24 @@ let emptyEnv () : ElabEnv =
       KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0
       Globals = ref []; GlobalCounter = ref 0
       TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty
-      MutableVars = Set.empty }
+      MutableVars = Set.empty; ArrayVars = Set.empty }
+
+/// Phase 30: Determine if an expression is statically known to produce an array (not a list).
+/// Used by ForInExpr to select lang_for_in_array vs lang_for_in_list at compile time.
+/// Conservative: returns false (assume list) for variables or unknown expressions.
+let rec private isArrayExpr (arrayVars: Set<string>) (expr: Ast.Expr) : bool =
+    match expr with
+    // Direct array-creating builtins
+    | Ast.App (Ast.Var ("array_of_list", _), _, _)
+    | Ast.App (Ast.Var ("array_create", _), _, _)
+    | Ast.App (Ast.Var ("array_init", _), _, _)
+    | Ast.App (Ast.App (Ast.Var ("array_create", _), _, _), _, _)
+    | Ast.App (Ast.App (Ast.Var ("array_init", _), _, _), _, _) -> true
+    // Variable previously determined to be an array
+    | Ast.Var (name, _) -> Set.contains name arrayVars
+    // Type annotation — check inner expression
+    | Ast.Annot (inner, _, _) -> isArrayExpr arrayVars inner
+    | _ -> false
 
 let private addStringGlobal (env: ElabEnv) (rawValue: string) : string =
     match env.Globals.Value |> List.tryFind (fun (_, v) -> v = rawValue) with
@@ -175,6 +194,8 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
             freeVars boundVars stopExpr
             freeVars (Set.add var boundVars) body   // var is bound inside body
         ]
+    | ForInExpr (var, collExpr, body, _) ->
+        Set.union (freeVars boundVars collExpr) (freeVars (Set.add var boundVars) body)
     | Annot (expr, _, _) -> freeVars boundVars expr
     | LambdaAnnot (param, _, body, _) -> freeVars (Set.add param boundVars) body
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
@@ -422,7 +443,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = env.MutableVars }
+              MutableVars = env.MutableVars; ArrayVars = Set.empty }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -529,7 +550,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Let (name, bindExpr, bodyExpr, _) ->
         let blocksBeforeBind = env.Blocks.Value.Length
         let (bv, bops) = elaborateExpr env bindExpr
-        let env' = { env with Vars = Map.add name bv env.Vars }
+        let arrayVars' = if isArrayExpr env.ArrayVars bindExpr then Set.add name env.ArrayVars else env.ArrayVars
+        let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
         // If bops ends with a block terminator (from nested Match/TryWith), the
         // continuation code (rops) must go into the last side block that was added
@@ -571,7 +593,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             (rv, bops @ rops)
     | LetPat (VarPat (name, _), bindExpr, bodyExpr, _) ->
         let (bv, bops) = elaborateExpr env bindExpr
-        let env' = { env with Vars = Map.add name bv env.Vars }
+        let arrayVars' = if isArrayExpr env.ArrayVars bindExpr then Set.add name env.ArrayVars else env.ArrayVars
+        let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
         (rv, bops @ rops)
     // Phase 9: LetPat with TuplePat — destructure a heap-allocated tuple via GEP + load
@@ -729,7 +752,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = Set.empty }
+              MutableVars = Set.empty; ArrayVars = Set.empty }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
@@ -1810,7 +1833,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = env.MutableVars }
+              MutableVars = env.MutableVars; ArrayVars = Set.empty }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
@@ -2577,6 +2600,43 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Annot (expr, _, _) -> elaborateExpr env expr
     | LambdaAnnot (param, _, body, span) -> elaborateExpr env (Lambda(param, body, span))
 
+    // Phase 30: ForInExpr — desugar to Lambda closure + lang_for_in runtime call
+    // Strategy: wrap body as Lambda(var, bodyExpr), elaborate it to get closure struct,
+    // then call lang_for_in_list or lang_for_in_array (selected at compile time via isArrayExpr).
+    // The loop variable var becomes the lambda parameter — a fresh immutable binding per iteration (FIN-03).
+    | ForInExpr (var, collExpr, bodyExpr, span) ->
+        // Wrap body as a lambda: fun var -> bodyExpr
+        let closureLambda = Lambda(var, bodyExpr, span)
+        let (closureVal, closureOps) = elaborateExpr env closureLambda
+        // Elaborate collection
+        let (collVal, collOps) = elaborateExpr env collExpr
+        // Coerce closure to Ptr if needed (same pattern as array_iter)
+        let closurePtrVal =
+            if closureVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else closureVal
+        let closureCoerceOps =
+            if closureVal.Type = I64
+            then [LlvmIntToPtrOp(closurePtrVal, closureVal)]
+            else []
+        // Coerce collection to Ptr if needed (list pointer may arrive as I64)
+        let collPtrVal =
+            if collVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else collVal
+        let collCoerceOps =
+            if collVal.Type = I64
+            then [LlvmIntToPtrOp(collPtrVal, collVal)]
+            else []
+        // Select runtime function: array path if collection is statically known to be array; else list path
+        let forInFn =
+            if isArrayExpr env.ArrayVars collExpr
+            then "@lang_for_in_array"
+            else "@lang_for_in_list"
+        // Call lang_for_in_list/array(closure, collection), return unit
+        let unitVal = { Name = freshName env; Type = I64 }
+        (unitVal, closureOps @ collOps @ closureCoerceOps @ collCoerceOps @ [LlvmCallVoidOp(forInFn, [closurePtrVal; collPtrVal]); ArithConstantOp(unitVal, 0L)])
+
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
@@ -2649,6 +2709,9 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_array_init";            ExtParams = [I64; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_index_get";             ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_index_set";             ExtParams = [Ptr; I64; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in";                ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_list";           ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_array";          ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_read";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_write";   ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_append";  ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
@@ -2836,6 +2899,9 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_array_init";            ExtParams = [I64; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_index_get";             ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_index_set";             ExtParams = [Ptr; I64; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in";                ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_list";           ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_array";          ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_read";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_write";   ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_append";  ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }

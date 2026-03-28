@@ -383,53 +383,33 @@ void lang_array_iter(void* closure, int64_t* arr) {
     }
 }
 
-/* Phase 30: for-in loop — iterates list (cons cells) or array, calling closure for each element.
- * Dispatches on collection type at runtime using GC_size:
- *   - NULL          = empty list  -> zero iterations
- *   - block_size < 16 = 0-element array (8 bytes: just count field) -> zero iterations
- *   - block_size > 16 = 2+ element array (count+1 words > 2) -> array iteration
- *   - block_size == 16 = either cons cell (head+tail) or 1-element array: disambiguate via GC_base check
- */
-void lang_for_in(void* closure, void* collection) {
-    if (collection == NULL) return;  /* empty list */
+/* Phase 30: for-in loop over a cons-cell list.
+ * Iterates head values of LangCons chain until NULL. */
+void lang_for_in_list(void* closure, void* collection) {
     LangClosureFn fn = *(LangClosureFn*)closure;
-    size_t block_size = GC_size(collection);
-    if (block_size > 16) {
-        /* Array: cons cells are always exactly 16 bytes, so >16 must be array */
-        int64_t* arr = (int64_t*)collection;
-        int64_t n = arr[0];
-        for (int64_t i = 1; i <= n; i++) {
-            fn(closure, arr[i]);
-        }
-    } else {
-        /* 16 bytes or less */
-        if (block_size < 16) {
-            /* Must be 0-element array (8 bytes: just the count field) */
-            return;
-        }
-        /* block_size == 16: check if this is a 1-element array or a cons cell */
-        /* Heuristic: use GC_base to check if slot[1] is a heap pointer */
-        int64_t* slots = (int64_t*)collection;
-        void* second = (void*)slots[1];
-        if (second == NULL || (GC_base(second) != NULL && GC_size(second) == 16)) {
-            /* Cons cell: tail is NULL (end of list) or points to another cons cell */
-            LangCons* cur = (LangCons*)collection;
-            while (cur != NULL) {
-                fn(closure, cur->head);
-                cur = cur->tail;
-            }
-        } else if (slots[0] == 1) {
-            /* 1-element array: count=1, element=slots[1] */
-            fn(closure, slots[1]);
-        } else {
-            /* Fallback: treat as cons cell */
-            LangCons* cur = (LangCons*)collection;
-            while (cur != NULL) {
-                fn(closure, cur->head);
-                cur = cur->tail;
-            }
-        }
+    LangCons* cur = (LangCons*)collection;
+    while (cur != NULL) {
+        fn(closure, cur->head);
+        cur = cur->tail;
     }
+}
+
+/* Phase 30: for-in loop over an array (first word = count, elements at [1..n]).
+ * Handles NULL and zero-count arrays as zero iterations. */
+void lang_for_in_array(void* closure, void* collection) {
+    if (collection == NULL) return;
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    int64_t* arr = (int64_t*)collection;
+    int64_t n = arr[0];
+    for (int64_t i = 1; i <= n; i++) {
+        fn(closure, arr[i]);
+    }
+}
+
+/* Phase 30: for-in loop — generic version kept for backward compatibility.
+ * NOTE: Use lang_for_in_list or lang_for_in_array when the collection type is known. */
+void lang_for_in(void* closure, void* collection) {
+    lang_for_in_list(closure, collection);
 }
 
 int64_t* lang_array_map(void* closure, int64_t* arr) {
