@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v7.0 Imperative Syntax — Phase 28 complete, Phase 29 next
+**Current focus:** v7.0 Imperative Syntax — Phase 29 in progress (WhileExpr done)
 
 ## Current Position
 
-Phase: 28 of 29 (Syntax Desugaring) — COMPLETE
-Plan: 02 of 02 complete
-Status: Phase 28 done, Phase 29 (Loops) ready to plan
-Last activity: 2026-03-28 — Completed 28-02-PLAN.md (IDX desugaring)
+Phase: 29 of 29 (Loop Constructs) — In progress
+Plan: 01 of ?? complete
+Status: Phase 29 Plan 01 done (WhileExpr), ForExpr TBD
+Last activity: 2026-03-28 — Completed 29-01-PLAN.md (WhileExpr CFG elaboration + 4 E2E tests)
 
-Progress: [███████████████████████░] Phase 28 complete (28/29 phases), 1 phase remaining
+Progress: [████████████████████████] 132 E2E tests passing, WhileExpr complete
 
 ## Performance Metrics
 
@@ -40,7 +40,10 @@ Recent decisions relevant to v7.0:
 - Phase 28-01: LetPat(WildcardPat) needs same terminator handling as Let for if/match in bind position
 - Phase 28-01: ITE tests use "let _ = if cond then expr in result" (not bare multi-line if-then) due to module parser requirement
 - Phase 28-02: IDX uses runtime dispatch via lang_index_get/set; LangHashtable gets tag=-1 as first field to distinguish from arrays (length >= 0 at offset 0)
-- Phase 29: LOOP requires new codegen — WhileExpr/ForExpr are new AST nodes (scf.while/scf.for or tail-call)
+- Phase 29-01: WhileExpr uses header-block CFG (3 side blocks: while_header/body/exit) — NOT scf.while
+- Phase 29-01: unitConst defined in entry fragment (dominates all loop blocks) for MLIR SSA correctness
+- Phase 29-01: Nested loop back-edge patched into inner merge block at index (len-4) after pushing 3 while blocks
+- Phase 29-01: condExpr re-elaborated in body block (fresh SSA names) for mutable-variable safe back-edge
 
 ### Pending Todos
 
@@ -49,10 +52,10 @@ None.
 ### Blockers/Concerns
 
 - Pre-existing MLIR domination bug with two named-ctor match arms (workaround documented)
-- Phase 29 loop codegen approach TBD: scf.while/scf.for vs recursive tail-call vs C runtime helper
+- ForExpr codegen not yet implemented (Phase 29 Plan 01 only covers WhileExpr)
 
 ## Session Continuity
 
-Last session: 2026-03-28
-Stopped at: Completed 28-01-PLAN.md and 28-02-PLAN.md — Phase 28 done, Phase 29 (Loops) up next
+Last session: 2026-03-28T02:04:18Z
+Stopped at: Completed 29-01-PLAN.md — WhileExpr CFG elaboration + 4 E2E tests (132/132 passing)
 Resume file: None
