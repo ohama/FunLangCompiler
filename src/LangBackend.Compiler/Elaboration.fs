@@ -167,6 +167,8 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         Set.union (freeVars boundVars collExpr) (freeVars boundVars idxExpr)
     | IndexSet (collExpr, idxExpr, valExpr, _) ->
         Set.unionMany [freeVars boundVars collExpr; freeVars boundVars idxExpr; freeVars boundVars valExpr]
+    | WhileExpr (cond, body, _) ->
+        Set.union (freeVars boundVars cond) (freeVars boundVars body)
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
@@ -2419,6 +2421,42 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
 
         (mergeArg, entryOps)
+
+    // Phase 29: WhileExpr — header-block CFG pattern
+    // Control flow:
+    //   [entry] define unitConst, cf.br ^while_header
+    //   ^while_header — elaborate cond, cf.cond_br to ^while_body or ^while_exit
+    //   ^while_body — elaborate body (discard value), re-elaborate cond, cf.cond_br back or exit
+    //   ^while_exit(%exitArg : i64) — empty body, patched by LetPat/Let continuation
+    | WhileExpr (condExpr, bodyExpr, _) ->
+        let headerLabel = freshLabel env "while_header"
+        let bodyLabel   = freshLabel env "while_body"
+        let exitLabel   = freshLabel env "while_exit"
+        // Elaborate condition for the header block
+        let (condVal, condOps)    = elaborateExpr env condExpr
+        // Elaborate body for the body block
+        let (_bodyVal, bodyOps)   = elaborateExpr env bodyExpr
+        // Re-elaborate condition in body block for mutable-safe back-edge evaluation
+        let (condVal2, condOps2)  = elaborateExpr env condExpr
+        // Unit constant — defined in entry fragment so it dominates the header block
+        let unitConst = { Name = freshName env; Type = I64 }
+        // Exit block argument carries the unit result out
+        let exitArg = { Name = freshName env; Type = I64 }
+        // Push the three while blocks AFTER elaborating both cond and body
+        // (so any inner side blocks from nested expressions come first)
+        env.Blocks.Value <- env.Blocks.Value @
+            [ { Label = Some headerLabel
+                Args  = []
+                Body  = condOps @ [ CfCondBrOp(condVal, bodyLabel, [], exitLabel, [unitConst]) ] }
+              { Label = Some bodyLabel
+                Args  = []
+                Body  = bodyOps @ [ ArithConstantOp(unitConst, 0L) ] @ condOps2
+                        @ [ CfCondBrOp(condVal2, bodyLabel, [], exitLabel, [unitConst]) ] }
+              { Label = Some exitLabel
+                Args  = [exitArg]
+                Body  = [] } ]
+        // Entry fragment: define unit constant, then branch to header
+        (exitArg, [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, []) ])
 
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
