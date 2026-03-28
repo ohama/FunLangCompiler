@@ -175,6 +175,8 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
             freeVars boundVars stopExpr
             freeVars (Set.add var boundVars) body   // var is bound inside body
         ]
+    | Annot (expr, _, _) -> freeVars boundVars expr
+    | LambdaAnnot (param, _, body, _) -> freeVars (Set.add param boundVars) body
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
@@ -2570,6 +2572,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerLastIdx then patched else b)
         // Entry fragment: elaborate start/stop, define unit constant, branch to header with start value
         (exitArg, startOps @ stopOps @ [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, [startVal]) ])
+
+    // Phase 30: Type annotation pass-through — ignore type at codegen
+    | Annot (expr, _, _) -> elaborateExpr env expr
+    | LambdaAnnot (param, _, body, span) -> elaborateExpr env (Lambda(param, body, span))
 
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
