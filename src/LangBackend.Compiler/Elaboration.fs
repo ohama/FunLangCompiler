@@ -163,6 +163,10 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
             if Set.contains name boundVars then Set.empty
             else Set.singleton name
         Set.union nameFree (freeVars boundVars valExpr)
+    | IndexGet (collExpr, idxExpr, _) ->
+        Set.union (freeVars boundVars collExpr) (freeVars boundVars idxExpr)
+    | IndexSet (collExpr, idxExpr, valExpr, _) ->
+        Set.unionMany [freeVars boundVars collExpr; freeVars boundVars idxExpr; freeVars boundVars valExpr]
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
@@ -535,10 +539,26 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         | _ ->
             (rv, bops @ rops)
     // Phase 7: LetPat with wildcard or var pattern — enables "let _ = print ... in ..."
+    // Phase 28: Also handles "e1; e2" (desugared to LetPat(WildcardPat, e1, e2)) where e1 is If(cond, then, unit).
+    //   If bops ends with a block terminator (from nested If/Match), rops must go into the merge block,
+    //   not appended inline (which would violate MLIR's block terminator rule).
     | LetPat (WildcardPat _, bindExpr, bodyExpr, _) ->
+        let blocksBeforeBind = env.Blocks.Value.Length
         let (_bv, bops) = elaborateExpr env bindExpr
         let (rv, rops) = elaborateExpr env bodyExpr
-        (rv, bops @ rops)
+        let isTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        match List.tryLast bops with
+        | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBind ->
+            let innerBlocks = env.Blocks.Value
+            let lastBlock = List.last innerBlocks
+            let patchedLast = { lastBlock with Body = rops @ lastBlock.Body }
+            env.Blocks.Value <- (List.take (innerBlocks.Length - 1) innerBlocks) @ [patchedLast]
+            (rv, bops)
+        | _ ->
+            (rv, bops @ rops)
     | LetPat (VarPat (name, _), bindExpr, bodyExpr, _) ->
         let (bv, bops) = elaborateExpr env bindExpr
         let env' = { env with Vars = Map.add name bv env.Vars }
@@ -917,6 +937,33 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | _   -> (keyVal, [])
         let result = { Name = freshName env; Type = I64 }
         (result, htOps @ keyOps @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_get", [htVal; keyI64])])
+
+    // Phase 28: IndexGet — arr.[i] or ht.[key] via runtime dispatch
+    | IndexGet (collExpr, idxExpr, _) ->
+        let (collVal, collOps) = elaborateExpr env collExpr
+        let (idxVal, idxOps) = elaborateExpr env idxExpr
+        let idxI64 =
+            if idxVal.Type = I64 then (idxVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
+        let (idxV, idxCoerce) = idxI64
+        let result = { Name = freshName env; Type = I64 }
+        (result, collOps @ idxOps @ idxCoerce @ [LlvmCallOp(result, "@lang_index_get", [collVal; idxV])])
+
+    // Phase 28: IndexSet — arr.[i] <- v or ht.[key] <- v via runtime dispatch
+    | IndexSet (collExpr, idxExpr, valExpr, _) ->
+        let (collVal, collOps) = elaborateExpr env collExpr
+        let (idxVal, idxOps) = elaborateExpr env idxExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let idxI64 =
+            if idxVal.Type = I64 then (idxVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
+        let valI64 =
+            if valVal.Type = I64 then (valVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
+        let (idxV, idxCoerce) = idxI64
+        let (valV, valCoerce) = valI64
+        let unitVal = { Name = freshName env; Type = I64 }
+        (unitVal, collOps @ idxOps @ valOps @ idxCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_index_set", [collVal; idxV; valV]); ArithConstantOp(unitVal, 0L)])
 
     // hashtable_containsKey — two-arg
     // hashtable_containsKey ht key: call lang_hashtable_containsKey → i64 (0 or 1), compare ne 0 → I1
@@ -1311,8 +1358,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             else
                 failwithf "Elaboration: unsupported App — function expression elaborated to unsupported type %A" funcVal.Type
     // Phase 9: Tuple construction — GC_malloc(n*8) + sequential GEP + store
+    // Phase 28: Tuple([]) = unit — return I64 0 (matches print/println unit convention; avoids type mismatch in if-then-without-else)
     | Tuple (exprs, _) ->
         let n = List.length exprs
+        if n = 0 then
+            // Empty tuple = unit value: return I64 0 (same as print/println)
+            let unitVal = { Name = freshName env; Type = I64 }
+            (unitVal, [ArithConstantOp(unitVal, 0L)])
+        else
         // Elaborate all field expressions first
         let fieldResults = exprs |> List.map (fun e -> elaborateExpr env e)
         let allFieldOps  = fieldResults |> List.collect snd
@@ -2437,6 +2490,8 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_array_map";             ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_fold";            ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_init";            ExtParams = [I64; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_index_get";             ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_index_set";             ExtParams = [Ptr; I64; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_read";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_write";   ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_append";  ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
@@ -2622,6 +2677,8 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_array_map";             ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_fold";            ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_init";            ExtParams = [I64; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_index_get";             ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_index_set";             ExtParams = [Ptr; I64; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_read";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_write";   ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_file_append";  ExtParams = [Ptr; Ptr];  ExtReturn = None;     IsVarArg = false; Attrs = [] }

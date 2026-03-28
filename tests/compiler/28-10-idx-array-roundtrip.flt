@@ -1,0 +1,9 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let a = array_create 5 0 in
+a.[0] <- 10;
+a.[1] <- 20;
+a.[2] <- 30;
+a.[0] + a.[1] + a.[2]
+// --- Output:
+60
