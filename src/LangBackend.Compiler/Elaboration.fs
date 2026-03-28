@@ -169,6 +169,12 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         Set.unionMany [freeVars boundVars collExpr; freeVars boundVars idxExpr; freeVars boundVars valExpr]
     | WhileExpr (cond, body, _) ->
         Set.union (freeVars boundVars cond) (freeVars boundVars body)
+    | ForExpr (var, startExpr, _, stopExpr, body, _) ->
+        Set.unionMany [
+            freeVars boundVars startExpr
+            freeVars boundVars stopExpr
+            freeVars (Set.add var boundVars) body   // var is bound inside body
+        ]
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Detect whether a LetRec body uses list patterns on the parameter,
@@ -2492,6 +2498,78 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerLastIdx then patched else b)
         // Entry fragment: define unit constant (dominates all loop blocks), then branch to header
         (exitArg, [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, []) ])
+
+    // Phase 29: ForExpr — block-argument CFG pattern for loop counter
+    // Control flow:
+    //   [entry] elaborate start/stop, define unitConst, cf.br ^for_header(%start)
+    //   ^for_header(%i : i64) — compare %i sle/%sge %stop, cf.cond_br to ^for_body or ^for_exit(%unitConst)
+    //   ^for_body — elaborate body (discard value), compute %next = %i +/- 1, cf.br ^for_header(%next)
+    //   ^for_exit(%exitArg : i64) — empty body, patched by LetPat/Let continuation
+    | ForExpr (var, startExpr, isTo, stopExpr, bodyExpr, _) ->
+        let headerLabel = freshLabel env "for_header"
+        let bodyLabel   = freshLabel env "for_body"
+        let exitLabel   = freshLabel env "for_exit"
+        // Elaborate start and stop in entry fragment
+        let (startVal, startOps) = elaborateExpr env startExpr
+        let (stopVal, stopOps)   = elaborateExpr env stopExpr
+        // Block argument for loop counter (carried into ^for_header)
+        let iArg = { Name = freshName env; Type = I64 }
+        // Unit constant — defined in entry fragment so it dominates all loop blocks
+        let unitConst = { Name = freshName env; Type = I64 }
+        // Exit block argument carries the unit result out
+        let exitArg = { Name = freshName env; Type = I64 }
+        // Body env: loop variable bound immutably (NOT in MutableVars — LOOP-04)
+        let bodyEnv = { env with Vars = Map.add var iArg env.Vars }
+        // Track side blocks before elaborating body (for nested loop detection)
+        let blocksBeforeBody = env.Blocks.Value.Length
+        // Elaborate body (value discarded — for loop returns unit)
+        let (_bodyVal, bodyOps) = elaborateExpr bodyEnv bodyExpr
+        // Increment/decrement: addi for `to`, subi for `downto`
+        let oneConst = { Name = freshName env; Type = I64 }
+        let nextVal  = { Name = freshName env; Type = I64 }
+        let incrOp =
+            if isTo then ArithAddIOp(nextVal, iArg, oneConst)
+            else          ArithSubIOp(nextVal, iArg, oneConst)
+        // Back-edge ops: increment counter and branch back to header
+        let backEdgeOps = [ ArithConstantOp(oneConst, 1L); incrOp; CfBrOp(headerLabel, [nextVal]) ]
+        // Comparison predicate: sle for ascending, sge for descending
+        let predicate = if isTo then "sle" else "sge"
+        let cmpVal = { Name = freshName env; Type = I1 }
+        // Detect nested loop: same pattern as WhileExpr
+        let isTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        let bodyBlockBody, needPatchLast =
+            match List.tryLast bodyOps with
+            | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
+                // Body has inner side blocks — back-edge goes into the inner last block
+                (bodyOps, true)
+            | _ ->
+                // Simple body — append back-edge inline
+                (bodyOps @ backEdgeOps, false)
+        // Push the three for blocks AFTER elaborating body
+        env.Blocks.Value <- env.Blocks.Value @
+            [ { Label = Some headerLabel
+                Args  = [iArg]
+                Body  = [ ArithCmpIOp(cmpVal, predicate, iArg, stopVal)
+                          CfCondBrOp(cmpVal, bodyLabel, [], exitLabel, [unitConst]) ] }
+              { Label = Some bodyLabel
+                Args  = []
+                Body  = bodyBlockBody }
+              { Label = Some exitLabel
+                Args  = [exitArg]
+                Body  = [] } ]
+        // Patch nested loop's inner merge block with back-edge ops if needed
+        if needPatchLast then
+            let allBlocks = env.Blocks.Value
+            let innerLastIdx = allBlocks.Length - 4  // 4th from end = just before header/body/exit
+            if innerLastIdx >= 0 then
+                let innerLast = allBlocks.[innerLastIdx]
+                let patched = { innerLast with Body = innerLast.Body @ backEdgeOps }
+                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerLastIdx then patched else b)
+        // Entry fragment: elaborate start/stop, define unit constant, branch to header with start value
+        (exitArg, startOps @ stopOps @ [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, [startVal]) ])
 
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
