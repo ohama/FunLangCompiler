@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v7.0 Imperative Syntax — Phase 28: Syntax Desugaring
+**Current focus:** v7.0 Imperative Syntax — Phase 28 complete, Phase 29 next
 
 ## Current Position
 
-Phase: 28 of 29 (Syntax Desugaring)
-Plan: — of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-27 — v7.0 roadmap created (Phases 28–29)
+Phase: 28 of 29 (Syntax Desugaring) — COMPLETE
+Plan: 02 of 02 complete
+Status: Phase 28 done, Phase 29 (Loops) ready to plan
+Last activity: 2026-03-28 — Completed 28-02-PLAN.md (IDX desugaring)
 
-Progress: [██████████████████████░░] v6.0 shipped (27 phases complete), 2 phases remaining
+Progress: [███████████████████████░] Phase 28 complete (28/29 phases), 1 phase remaining
 
 ## Performance Metrics
 
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md Key Decisions table (full history)
 
 Recent decisions relevant to v7.0:
 - Phase 28: SEQ/ITE desugar at elaboration time (LetPat(WildcardPat)/If with Tuple([]) else) — no new MLIR ops
-- Phase 28: IDX desugar to existing array_get/set/hashtable_get/set builtins in elaborateExpr
+- Phase 28: IDX uses runtime dispatch via lang_index_get/set; LangHashtable gets tag=-1 as first field to distinguish from arrays (length >= 0 at offset 0)
 - Phase 29: LOOP requires new codegen — WhileExpr/ForExpr are new AST nodes (scf.while/scf.for or tail-call)
 
 ### Pending Todos
@@ -50,6 +50,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27
-Stopped at: v7.0 roadmap created — Phase 28 ready to plan
+Last session: 2026-03-28
+Stopped at: Completed 28-02-PLAN.md — Phase 28 done, Phase 29 (Loops) up next
 Resume file: None
