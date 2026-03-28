@@ -64,12 +64,12 @@ Deferred to future release.
 | IDX-04 | Phase 28 | Complete |
 | ITE-01 | Phase 28 | Complete |
 | ITE-02 | Phase 28 | Complete |
-| LOOP-01 | Phase 29 | Pending |
-| LOOP-02 | Phase 29 | Pending |
-| LOOP-03 | Phase 29 | Pending |
-| LOOP-04 | Phase 29 | Pending |
-| LOOP-05 | Phase 29 | Pending |
-| REG-01 | Phase 29 | Pending |
+| LOOP-01 | Phase 29 | Complete |
+| LOOP-02 | Phase 29 | Complete |
+| LOOP-03 | Phase 29 | Complete |
+| LOOP-04 | Phase 29 | Complete |
+| LOOP-05 | Phase 29 | Complete |
+| REG-01 | Phase 29 | Complete |
 
 **Coverage:**
 - v1 requirements: 14 total
