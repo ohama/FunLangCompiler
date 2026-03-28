@@ -35,11 +35,14 @@ Phases 1–29 complete. 138 E2E tests passing. See PROJECT.md for full history.
   3. `for x in list do body` iterates every element of a cons-cell list in order
   4. `for x in arr do body` iterates every element of an array in order
   5. All 138 existing E2E tests continue to pass after the new features land
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 30-01-PLAN.md — Annotations pass-through (Annot/LambdaAnnot in freeVars + elaborateExpr)
+- [ ] 30-02-PLAN.md — ForInExpr collection loop (C runtime + elaboration + E2E tests)
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–29 | v1.0–v7.0 | 56/56 | Complete | 2026-03-28 |
-| 30. Annotations and For-In Loop | v8.0 | 0/TBD | Not started | - |
+| 30. Annotations and For-In Loop | v8.0 | 0/2 | In progress | - |
