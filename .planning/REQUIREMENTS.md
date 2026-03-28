@@ -7,12 +7,12 @@
 
 Requirements for v7.0 milestone. Each maps to roadmap phases.
 
-### Expression Sequencing (Phase 45)
+### Expression Sequencing (Phase 28)
 
 - [ ] **SEQ-01**: Semicolon sequencing — `e1; e2` desugars to `LetPat(WildcardPat, e1, e2)` at elaboration time
 - [ ] **SEQ-02**: Multi-statement sequencing — `e1; e2; e3` chains correctly (right-associative nesting)
 
-### Loop Constructs (Phase 46)
+### Loop Constructs (Phase 29)
 
 - [ ] **LOOP-01**: WhileExpr elaboration — `while cond do body` compiles to MLIR loop or recursive structure, returns unit
 - [ ] **LOOP-02**: ForExpr ascending — `for i = start to stop do body` iterates inclusive range, returns unit
@@ -20,14 +20,14 @@ Requirements for v7.0 milestone. Each maps to roadmap phases.
 - [ ] **LOOP-04**: For-loop variable is immutable — `i` is a fresh binding per iteration, not a mutable ref cell
 - [ ] **LOOP-05**: freeVars extension — WhileExpr/ForExpr cases for correct closure variable capture
 
-### Array/Hashtable Indexing (Phase 47)
+### Array/Hashtable Indexing (Phase 28)
 
 - [ ] **IDX-01**: IndexGet for arrays — `arr.[i]` desugars to `array_get arr i` elaboration
 - [ ] **IDX-02**: IndexSet for arrays — `arr.[i] <- v` desugars to `array_set arr i v` elaboration
 - [ ] **IDX-03**: IndexGet for hashtables — `ht.[key]` desugars to `hashtable_get ht key` elaboration
 - [ ] **IDX-04**: IndexSet for hashtables — `ht.[key] <- v` desugars to `hashtable_set ht key v` elaboration
 
-### If-Then Without Else (Phase 48)
+### If-Then Without Else (Phase 28)
 
 - [ ] **ITE-01**: If-then without else — `if cond then expr` desugars to `If(cond, expr, Tuple([]))` at elaboration time
 - [ ] **ITE-02**: Then-branch must be unit-typed — non-unit then-branch behavior matches interpreter
@@ -56,26 +56,26 @@ Deferred to future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SEQ-01 | TBD | Pending |
-| SEQ-02 | TBD | Pending |
-| LOOP-01 | TBD | Pending |
-| LOOP-02 | TBD | Pending |
-| LOOP-03 | TBD | Pending |
-| LOOP-04 | TBD | Pending |
-| LOOP-05 | TBD | Pending |
-| IDX-01 | TBD | Pending |
-| IDX-02 | TBD | Pending |
-| IDX-03 | TBD | Pending |
-| IDX-04 | TBD | Pending |
-| ITE-01 | TBD | Pending |
-| ITE-02 | TBD | Pending |
-| REG-01 | All | Pending |
+| SEQ-01 | Phase 28 | Pending |
+| SEQ-02 | Phase 28 | Pending |
+| IDX-01 | Phase 28 | Pending |
+| IDX-02 | Phase 28 | Pending |
+| IDX-03 | Phase 28 | Pending |
+| IDX-04 | Phase 28 | Pending |
+| ITE-01 | Phase 28 | Pending |
+| ITE-02 | Phase 28 | Pending |
+| LOOP-01 | Phase 29 | Pending |
+| LOOP-02 | Phase 29 | Pending |
+| LOOP-03 | Phase 29 | Pending |
+| LOOP-04 | Phase 29 | Pending |
+| LOOP-05 | Phase 29 | Pending |
+| REG-01 | Phase 29 | Pending |
 
 **Coverage:**
 - v1 requirements: 14 total
-- Mapped to phases: 0 (TBD)
-- Unmapped: 14
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-28*
-*Last updated: 2026-03-28 after initial definition*
+*Last updated: 2026-03-27 after v7.0 roadmap created*
