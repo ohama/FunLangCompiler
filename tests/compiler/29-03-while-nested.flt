@@ -1,0 +1,13 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let mut count = 0
+let mut i = 0
+let _ = while i < 3 do
+  let mut j = 0
+  let _ = while j < 4 do
+    let _ = count <- count + 1
+    j <- j + 1
+  i <- i + 1
+let _ = count
+// --- Output:
+12

@@ -2432,16 +2432,36 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let headerLabel = freshLabel env "while_header"
         let bodyLabel   = freshLabel env "while_body"
         let exitLabel   = freshLabel env "while_exit"
-        // Elaborate condition for the header block
-        let (condVal, condOps)    = elaborateExpr env condExpr
-        // Elaborate body for the body block
-        let (_bodyVal, bodyOps)   = elaborateExpr env bodyExpr
-        // Re-elaborate condition in body block for mutable-safe back-edge evaluation
-        let (condVal2, condOps2)  = elaborateExpr env condExpr
-        // Unit constant — defined in entry fragment so it dominates the header block
+        // Unit constant — defined in entry fragment so it dominates all loop blocks
         let unitConst = { Name = freshName env; Type = I64 }
         // Exit block argument carries the unit result out
         let exitArg = { Name = freshName env; Type = I64 }
+        // Elaborate condition for the header block
+        let (condVal, condOps)    = elaborateExpr env condExpr
+        // Track how many side blocks exist before elaborating body (for detecting inner blocks)
+        let blocksBeforeBody = env.Blocks.Value.Length
+        // Elaborate body for the body block
+        let (_bodyVal, bodyOps)   = elaborateExpr env bodyExpr
+        // Re-elaborate condition for mutable-safe back-edge evaluation
+        let (condVal2, condOps2)  = elaborateExpr env condExpr
+        // Back-edge ops: re-evaluated condition + branch back to header or to exit
+        let backEdgeOps = condOps2 @ [ CfCondBrOp(condVal2, bodyLabel, [], exitLabel, [unitConst]) ]
+        // Determine where to place the back-edge ops.
+        // If bodyOps ends with a block terminator (from a nested while/if/match inside the body),
+        // the back-edge must be appended to the LAST side block (the inner expression's merge/exit
+        // block, which was left empty for patching), NOT inline in bodyOps.
+        let isTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        let bodyBlockBody, needPatchLast =
+            match List.tryLast bodyOps with
+            | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
+                // Body itself has side blocks. Back-edge goes into the inner last block.
+                (bodyOps, true)
+            | _ ->
+                // Simple body or no new side blocks — append back-edge inline.
+                (bodyOps @ backEdgeOps, false)
         // Push the three while blocks AFTER elaborating both cond and body
         // (so any inner side blocks from nested expressions come first)
         env.Blocks.Value <- env.Blocks.Value @
@@ -2450,12 +2470,27 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 Body  = condOps @ [ CfCondBrOp(condVal, bodyLabel, [], exitLabel, [unitConst]) ] }
               { Label = Some bodyLabel
                 Args  = []
-                Body  = bodyOps @ [ ArithConstantOp(unitConst, 0L) ] @ condOps2
-                        @ [ CfCondBrOp(condVal2, bodyLabel, [], exitLabel, [unitConst]) ] }
+                Body  = bodyBlockBody }
               { Label = Some exitLabel
                 Args  = [exitArg]
                 Body  = [] } ]
-        // Entry fragment: define unit constant, then branch to header
+        // If the body had inner side blocks, patch the back-edge into what is now the last
+        // side block among the while's blocks (which is while_body itself — no, we need the
+        // last block pushed before while_body that is the inner merge block).
+        // Actually: inner blocks were already in env.Blocks.Value before we appended header/body/exit.
+        // We need to patch the last block that was present AFTER elaborating body but BEFORE
+        // we appended the three while blocks — i.e., the inner merge/exit block.
+        if needPatchLast then
+            // The inner merge block is at position (env.Blocks.Value.Length - 4) i.e. right before
+            // the three while blocks we just pushed (header, body, exit = last 3).
+            // Patch the back-edge ops into that inner last block.
+            let allBlocks = env.Blocks.Value
+            let innerLastIdx = allBlocks.Length - 4  // 4th from end = just before header/body/exit
+            if innerLastIdx >= 0 then
+                let innerLast = allBlocks.[innerLastIdx]
+                let patched = { innerLast with Body = innerLast.Body @ backEdgeOps }
+                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerLastIdx then patched else b)
+        // Entry fragment: define unit constant (dominates all loop blocks), then branch to header
         (exitArg, [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, []) ])
 
     | _ ->
