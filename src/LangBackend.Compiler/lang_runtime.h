@@ -55,6 +55,7 @@ void lang_index_set(void* collection, int64_t index, int64_t value);
 
 typedef int64_t (*LangClosureFn)(void* env, int64_t arg);
 void lang_array_iter(void* closure, int64_t* arr);
+void lang_for_in(void* closure, void* collection);
 int64_t* lang_array_map(void* closure, int64_t* arr);
 int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr);
 int64_t* lang_array_init(int64_t n, void* closure);
