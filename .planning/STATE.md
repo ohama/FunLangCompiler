@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 ## Current Position
 
 Phase: 30 of 30 (Annotations and For-In Loop)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-28 — v8.0 roadmap created, Phase 30 defined
+Plan: 01 of 2 (30-01 complete)
+Status: In progress
+Last activity: 2026-03-28 — Completed 30-01-PLAN.md (annotation pass-through)
 
-Progress: v1.0-v7.0 shipped (29 phases, 56 plans) ▓▓▓▓▓▓▓▓▓▓ Phase 30 starting
+Progress: v1.0-v7.0 shipped (29 phases, 56 plans) + Phase 30 Plan 01 ▓▓▓▓▓▓▓▓▓▓░
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 56
+- Total plans completed: 57
 - Average duration: tracked per phase
 - Total execution time: see phase summaries
 
@@ -35,6 +35,8 @@ Progress: v1.0-v7.0 shipped (29 phases, 56 plans) ▓▓▓▓▓▓▓▓▓▓
 See: .planning/PROJECT.md Key Decisions table (full history)
 
 Recent decisions affecting current work:
+- [Phase 30-01] LambdaAnnot rewrites to Lambda and re-elaborates (cleaner than duplicating Lambda logic)
+- [Phase 30-01] Annot/LambdaAnnot added to freeVars — annotated lambdas capture free variables correctly
 - [Phase 29] For-loops use block-arg loop counter (SSA-correct, no ref cell) — same CFG pattern applies to for-in
 - [Phase 28] While loops use 3-block header CFG — for-in will follow similar pattern with collection pointer
 - [Phase 17-19] ADT/Records share uniform boxed representation — list cons cells already available for FIN-01
@@ -49,6 +51,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28
-Stopped at: Roadmap created, Phase 30 ready to plan
+Last session: 2026-03-28T03:03:31Z
+Stopped at: Completed 30-01-PLAN.md (annotation pass-through, 140 tests passing)
 Resume file: None
