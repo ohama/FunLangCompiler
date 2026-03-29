@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 32 of 35 (Hashtable & List/Array Builtins) — In Progress
-Plan: 1 of N in current phase (plan 01 done)
-Status: Plan 32-01 complete (157 E2E tests)
-Last activity: 2026-03-29 — Completed 32-01-PLAN.md (hashtable_trygetvalue + hashtable_count, 2 new E2E tests)
+Plan: 2 of N in current phase (plans 01 and 02 done)
+Status: Plan 32-02 complete (159 E2E tests)
+Last activity: 2026-03-29 — Completed 32-02-PLAN.md (list_sort_by + list_of_seq, 2 new E2E tests)
 
-Progress: [██████████████████░░] 89% (31/35 phases complete, 1 plan in Phase 32 done)
+Progress: [██████████████████░░] 89% (31/35 phases complete, 2 plans in Phase 32 done)
 
 ## Performance Metrics
 
@@ -41,6 +41,8 @@ Progress: [██████████████████░░] 89% (31
 
 Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 
+- v9.0 Phase 32-02: list_sort_by uses insertion sort with parallel int64_t arrays + LangClosureFn key extractor
+- v9.0 Phase 32-02: list_of_seq is identity void* cast — no C logic, just type coercion at elaboration time
 - v9.0 Phase 32-01: hashtable_count uses inline GEP at LangHashtable field index 2 (size), no C function needed
 - v9.0 Phase 32-01: E2E tests use `println (to_string ...)` — `printfn "%d"` does not exist in elaborator
 - v9.0 Phase 31-03: eprintfn desugars to @lang_eprintln (two-arg %s case); two-arg App(App(...)) arm must appear before one-arg App(...) arm
@@ -65,6 +67,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-29T14:26:53Z
-Stopped at: Completed 32-01-PLAN.md (hashtable_trygetvalue + hashtable_count — 157 tests pass)
+Last session: 2026-03-29T14:37:51Z
+Stopped at: Completed 32-02-PLAN.md (list_sort_by + list_of_seq — 159 tests pass)
 Resume file: None
