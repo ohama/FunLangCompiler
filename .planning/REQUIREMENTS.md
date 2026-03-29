@@ -55,27 +55,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RT-01 | — | Pending |
-| RT-02 | — | Pending |
-| RT-03 | — | Pending |
-| RT-04 | — | Pending |
-| RT-05 | — | Pending |
-| RT-06 | — | Pending |
-| RT-07 | — | Pending |
-| RT-08 | — | Pending |
-| COMP-01 | — | Pending |
-| COMP-02 | — | Pending |
-| COMP-03 | — | Pending |
-| COMP-04 | — | Pending |
-| FIX-01 | — | Pending |
-| FIX-02 | — | Pending |
-| FIX-03 | — | Pending |
+| FIX-01 | Phase 36 | Pending |
+| FIX-02 | Phase 36 | Pending |
+| FIX-03 | Phase 36 | Pending |
+| RT-01 | Phase 37 | Pending |
+| RT-02 | Phase 37 | Pending |
+| RT-03 | Phase 38 | Pending |
+| RT-04 | Phase 38 | Pending |
+| RT-05 | Phase 39 | Pending |
+| RT-06 | Phase 39 | Pending |
+| RT-07 | Phase 39 | Pending |
+| RT-08 | Phase 39 | Pending |
+| COMP-01 | Phase 40 | Pending |
+| COMP-02 | Phase 40 | Pending |
+| COMP-03 | Phase 40 | Pending |
+| COMP-04 | Phase 40 | Pending |
 
 **Coverage:**
 - v10 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15 ⚠️
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-30*
-*Last updated: 2026-03-30 after initial definition*
+*Last updated: 2026-03-30 after roadmap creation*
