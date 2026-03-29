@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 40 — Multi-file Import (v10.0)
+**Current focus:** v10.0 COMPLETE — Multi-file Import shipped
 
 ## Current Position
 
 Phase: 40 of 40 (Multi-file Import)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-30 — Phase 39 complete (Format Strings verified)
+Plan: 01 of 01
+Status: COMPLETE — v10.0 milestone achieved
+Last activity: 2026-03-30 — Completed 40-01-PLAN.md — expandImports with cycle detection (197/197 pass)
 
-Progress: [████████░░] 80% (v10.0, Phases 36-39 complete)
+Progress: [██████████] 100% (v10.0 COMPLETE — all phases done)
 
 ## Performance Metrics
 
@@ -61,6 +61,10 @@ Recent decisions affecting current work:
 - Phase 39-01: Format string literal uses addStringGlobal + LlvmAddressOfOp (avoids GEP+Load overhead)
 - Phase 39-01: printfn desugars to println(sprintf ...) at elaboration time — zero new C code
 - Phase 39-01: ExternalFuncDecl entries for sprintf wrappers added to BOTH externalFuncs lists
+- Phase 40-01: expandImports in Program.fs (not Elaboration.fs) — keeps I/O at CLI boundary, elaboration stays pure
+- Phase 40-01: HashSet push/pop (not global visited set) — diamond imports correctly handled, pop after subtree allows sibling imports
+- Phase 40-01: Imported files parsed standalone (no prelude prefix) — prelude already injected in outer combinedSrc
+- Phase 40-01: printf \x22 hex escape for double quotes in flt test commands inside single-quoted bash -c strings
 
 ### Pending Todos
 
@@ -76,5 +80,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-30
-Stopped at: Completed 39-01-PLAN.md — sprintf/printfn builtins via 6 snprintf wrappers (192/192 pass)
+Stopped at: Completed 40-01-PLAN.md — v10.0 COMPLETE (multi-file import, 197/197 pass)
 Resume file: None
