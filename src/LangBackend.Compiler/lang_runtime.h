@@ -86,4 +86,11 @@ int64_t     lang_string_startswith(LangString* s, LangString* prefix);
 LangString* lang_string_trim(LangString* s);
 LangString* lang_string_concat_list(LangString* sep, LangCons* list);
 
+int64_t lang_char_is_digit(int64_t c);
+int64_t lang_char_is_letter(int64_t c);
+int64_t lang_char_is_upper(int64_t c);
+int64_t lang_char_is_lower(int64_t c);
+int64_t lang_char_to_upper(int64_t c);
+int64_t lang_char_to_lower(int64_t c);
+
 #endif

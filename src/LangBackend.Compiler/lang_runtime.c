@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <ctype.h>
 #include <gc.h>
 #include "lang_runtime.h"
 
@@ -107,6 +108,25 @@ LangString* lang_string_trim(LangString* s) {
 
 int64_t lang_string_to_int(LangString* s) {
     return (int64_t)strtol(s->data, NULL, 10);
+}
+
+int64_t lang_char_is_digit(int64_t c) {
+    return isdigit((int)c) ? 1 : 0;
+}
+int64_t lang_char_is_letter(int64_t c) {
+    return isalpha((int)c) ? 1 : 0;
+}
+int64_t lang_char_is_upper(int64_t c) {
+    return isupper((int)c) ? 1 : 0;
+}
+int64_t lang_char_is_lower(int64_t c) {
+    return islower((int)c) ? 1 : 0;
+}
+int64_t lang_char_to_upper(int64_t c) {
+    return (int64_t)toupper((int)c);
+}
+int64_t lang_char_to_lower(int64_t c) {
+    return (int64_t)tolower((int)c);
 }
 
 /* Cons cell layout: {int64_t head @ offset 0, ConsCell* tail @ offset 8} — 16 bytes total */
