@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 32 of 35 (Hashtable & List/Array Builtins) — In Progress
-Plan: 2 of N in current phase (plans 01 and 02 done)
-Status: Plan 32-02 complete (159 E2E tests)
-Last activity: 2026-03-29 — Completed 32-02-PLAN.md (list_sort_by + list_of_seq, 2 new E2E tests)
+Plan: 3 of N in current phase (plans 01, 02, and 03 done)
+Status: Plan 32-03 complete (161 E2E tests)
+Last activity: 2026-03-29 — Completed 32-03-PLAN.md (array_sort + array_of_seq, 2 new E2E tests)
 
 Progress: [██████████████████░░] 89% (31/35 phases complete, 2 plans in Phase 32 done)
 
@@ -41,6 +41,8 @@ Progress: [██████████████████░░] 89% (31
 
 Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 
+- v9.0 Phase 32-03: array_sort uses LlvmCallVoidOp (void C return); array_of_seq delegates to lang_array_of_list at C level
+- v9.0 Phase 32-03: externalFuncs appears twice in Elaboration.fs (elaborateModule + elaborateProgram) — both must be kept in sync
 - v9.0 Phase 32-02: list_sort_by uses insertion sort with parallel int64_t arrays + LangClosureFn key extractor
 - v9.0 Phase 32-02: list_of_seq is identity void* cast — no C logic, just type coercion at elaboration time
 - v9.0 Phase 32-01: hashtable_count uses inline GEP at LangHashtable field index 2 (size), no C function needed
@@ -67,6 +69,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-29T14:37:51Z
-Stopped at: Completed 32-02-PLAN.md (list_sort_by + list_of_seq — 159 tests pass)
+Last session: 2026-03-29T14:46:38Z
+Stopped at: Completed 32-03-PLAN.md (array_sort + array_of_seq — 161 tests pass)
 Resume file: None
