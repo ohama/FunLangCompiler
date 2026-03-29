@@ -1090,6 +1090,30 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, uOps @ [LlvmCallOp(result, "@lang_hashtable_create", [])])
 
+    // hashtable_trygetvalue — two-arg curried builtin returning Ptr (2-slot tuple: [bool, value])
+    // hashtable_trygetvalue ht key: call lang_hashtable_trygetvalue → Ptr
+    | App (App (Var ("hashtable_trygetvalue", _), htExpr, _), keyExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let keyI64 =
+            if keyVal.Type = I64 then (keyVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
+        let (kv, kCoerce) = keyI64
+        let result = { Name = freshName env; Type = Ptr }
+        (result, htOps @ keyOps @ kCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue", [htVal; kv])])
+
+    // hashtable_count — one-arg, inline GEP+load at field index 2 (size field of LangHashtable struct)
+    // No C call needed: LangHashtable.size is at field index 2
+    | App (Var ("hashtable_count", _), htExpr, _) ->
+        let (htVal, htOps) = elaborateExpr env htExpr
+        let sizePtr = { Name = freshName env; Type = Ptr }
+        let result  = { Name = freshName env; Type = I64 }
+        let ops = [
+            LlvmGEPLinearOp(sizePtr, htVal, 2)   // field index 2 = size
+            LlvmLoadOp(result, sizePtr)
+        ]
+        (result, htOps @ ops)
+
     // Phase 24: array HOF builtins
     // array_fold — three-arg (must appear before two-arg patterns)
     // array_fold closure init arr: coerce closure to Ptr, coerce init to I64, call lang_array_fold → I64
@@ -2821,7 +2845,8 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_hashtable_set";         ExtParams = [Ptr; I64; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_containsKey"; ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_keys";        ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_keys";           ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_trygetvalue";    ExtParams = [Ptr; I64];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_iter";            ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_map";             ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_fold";            ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
@@ -3021,7 +3046,8 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_hashtable_set";         ExtParams = [Ptr; I64; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_containsKey"; ExtParams = [Ptr; I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_keys";        ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_keys";           ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_trygetvalue";    ExtParams = [Ptr; I64];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_iter";            ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_map";             ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_fold";            ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
