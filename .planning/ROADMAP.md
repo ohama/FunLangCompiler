@@ -54,10 +54,10 @@ Plans:
   1. `@main` accepts `(i64, ptr)` (argc, argv) and passes them to the runtime
   2. `get_args ()` returns a `string list` containing all CLI arguments
   3. A compiled binary invoked with `./prog foo bar` can print each argument
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 38-01: TBD
+- [ ] 38-01-PLAN.md — C runtime args + Elaboration @main/get_args + E2E test
 
 ### Phase 39: Format Strings
 **Goal**: sprintf and printfn produce formatted output using C snprintf delegation
@@ -89,12 +89,12 @@ Plans:
 
 ## Progress
 
-**Execution Order:** 36 → 37 → 38 → 39 → 40
+**Execution Order:** 36 -> 37 -> 38 -> 39 -> 40
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 36. Bug Fixes | 1/1 | Complete | 2026-03-30 |
 | 37. Hashtable String Keys | 2/2 | Complete | 2026-03-30 |
-| 38. CLI Arguments | 0/TBD | Not started | - |
+| 38. CLI Arguments | 0/1 | Not started | - |
 | 39. Format Strings | 0/TBD | Not started | - |
 | 40. Multi-file Import | 0/TBD | Not started | - |
