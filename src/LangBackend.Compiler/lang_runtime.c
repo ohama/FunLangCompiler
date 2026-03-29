@@ -320,6 +320,19 @@ static LangHashEntry* lang_ht_find(LangHashtable* ht, int64_t key) {
     return NULL;
 }
 
+int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key) {
+    int64_t* tup = (int64_t*)GC_malloc(16);  /* 2 slots x 8 bytes */
+    LangHashEntry* e = lang_ht_find(ht, key);
+    if (e != NULL) {
+        tup[0] = 1;       /* true */
+        tup[1] = e->val;
+    } else {
+        tup[0] = 0;       /* false */
+        tup[1] = 0;       /* placeholder */
+    }
+    return tup;
+}
+
 LangHashtable* lang_hashtable_create(void) {
     LangHashtable* ht = (LangHashtable*)GC_malloc(sizeof(LangHashtable));
     ht->tag = -1;

@@ -50,6 +50,7 @@ void lang_hashtable_set(LangHashtable* ht, int64_t key, int64_t val);
 int64_t lang_hashtable_containsKey(LangHashtable* ht, int64_t key);
 void lang_hashtable_remove(LangHashtable* ht, int64_t key);
 LangCons* lang_hashtable_keys(LangHashtable* ht);
+int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key);
 int64_t lang_index_get(void* collection, int64_t index);
 void lang_index_set(void* collection, int64_t index, int64_t value);
 
