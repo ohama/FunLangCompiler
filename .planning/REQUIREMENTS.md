@@ -75,12 +75,47 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (to be filled by roadmapper) | | |
+| STR-01 | Phase 31 | Pending |
+| STR-02 | Phase 31 | Pending |
+| STR-03 | Phase 31 | Pending |
+| STR-04 | Phase 31 | Pending |
+| CHR-01 | Phase 31 | Pending |
+| CHR-02 | Phase 31 | Pending |
+| CHR-03 | Phase 31 | Pending |
+| CHR-04 | Phase 31 | Pending |
+| CHR-05 | Phase 31 | Pending |
+| CHR-06 | Phase 31 | Pending |
+| IO-01 | Phase 31 | Pending |
+| HT-01 | Phase 32 | Pending |
+| HT-02 | Phase 32 | Pending |
+| LA-01 | Phase 32 | Pending |
+| LA-02 | Phase 32 | Pending |
+| LA-03 | Phase 32 | Pending |
+| LA-04 | Phase 32 | Pending |
+| COL-01 | Phase 33 | Pending |
+| COL-02 | Phase 33 | Pending |
+| COL-03 | Phase 33 | Pending |
+| COL-04 | Phase 33 | Pending |
+| LANG-01 | Phase 34 | Pending |
+| LANG-02 | Phase 34 | Pending |
+| LANG-03 | Phase 34 | Pending |
+| LANG-04 | Phase 34 | Pending |
+| PRE-01 | Phase 35 | Pending |
+| PRE-02 | Phase 35 | Pending |
+| PRE-03 | Phase 35 | Pending |
+| PRE-04 | Phase 35 | Pending |
+| PRE-05 | Phase 35 | Pending |
+| PRE-06 | Phase 35 | Pending |
+| PRE-07 | Phase 35 | Pending |
+| PRE-08 | Phase 35 | Pending |
 
 **Coverage:**
-- v9.0 requirements: 30 total
-- Mapped to phases: 0
-- Unmapped: 30
+- v9.0 requirements: 33 total (4 STR + 6 CHR + 1 IO + 2 HT + 4 LA + 4 COL + 4 LANG + 8 PRE)
+- Mapped to phases: 33
+- Unmapped: 0
+
+**Note:** The original requirement count of "30" in the header was incorrect. Actual count is 33 (confirmed by enumerating all requirement IDs above).
 
 ---
 *Requirements defined: 2026-03-29*
+*Traceability added: 2026-03-29*
