@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 38 of 40 (CLI Arguments)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-30 — Phase 37 complete (Hashtable String Keys verified)
+Plan: 01 of ? complete
+Status: In progress
+Last activity: 2026-03-30 — Completed 38-01-PLAN.md (CLI arguments: lang_init_args/lang_get_args + get_args builtin)
 
-Progress: [████░░░░░░] 40% (v10.0, Phases 36-37 complete)
+Progress: [████░░░░░░] 42% (v10.0, Phases 36-37 + 38-01 complete)
 
 ## Performance Metrics
 
@@ -54,6 +54,9 @@ Recent decisions affecting current work:
 - Phase 37-02: IndexSet Ptr-value coercion uses LlvmPtrToIntOp (consistent with hashtable_set value handling)
 - Phase 37-02: list_length not a builtin; use recursive len or hashtable_count for key count verification
 - Phase 37-02: ^ string concat operator not supported by parser; use string_concat builtin instead
+- Phase 38-01: Both elaborateModule and elaborateProgram must have InputTypes=[I64;Ptr] + initArgsOp prepended — missing one causes MLIR validation failures
+- Phase 38-01: lang_get_args starts from argv[1] to skip program name (argv[0] excluded per RT-03 spec)
+- Phase 38-01: get_args builtin mirrors stdin_read_all pattern (unit-arg, returns Ptr)
 
 ### Pending Todos
 
@@ -69,5 +72,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-30
-Stopped at: Completed 37-02-PLAN.md — Elaboration dispatch + Prelude wrappers + E2E tests (Phase 37 complete)
+Stopped at: Completed 38-01-PLAN.md — lang_init_args/lang_get_args + get_args builtin + E2E test (189/189 pass)
 Resume file: None
