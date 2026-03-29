@@ -126,12 +126,12 @@ Plans:
   3. A program calling `Char.IsDigit`, `Char.ToUpper`, and other Char module functions compiles correctly.
   4. A program using List and Array extension functions (`sort`, `sortBy`, `ofSeq`, `tryFind`, `choose`, etc.) via their modules compiles and returns correct results.
   5. A program using `Option.map`, `Option.defaultValue`, `Result.map`, `Result.bind` and related utilities compiles and returns correct results.
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 35-01: String + Hashtable + StringBuilder + Char prelude modules (PRE-01, PRE-02, PRE-03, PRE-04) — .fun files + E2E tests
-- [ ] 35-02: List + Array extension modules (PRE-05, PRE-06) — .fun files + E2E tests
-- [ ] 35-03: Option + Result utility modules (PRE-07, PRE-08) — .fun files + E2E tests
+- [ ] 35-01-PLAN.md — String + Hashtable + StringBuilder + Char prelude .fun files + E2E tests
+- [ ] 35-02-PLAN.md — Option + Result + List + Array prelude .fun files + E2E tests
+- [ ] 35-03-PLAN.md — CLI prelude auto-loading in Program.fs + integration test
 
 ---
 
