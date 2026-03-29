@@ -54,6 +54,30 @@ int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key);
 int64_t lang_index_get(void* collection, int64_t index);
 void lang_index_set(void* collection, int64_t index, int64_t value);
 
+/* Phase 37: String-key hashtable (FNV-1a hash, memcmp equality) */
+typedef struct LangHashEntryStr {
+    struct LangString_s* key;
+    int64_t val;
+    struct LangHashEntryStr* next;
+} LangHashEntryStr;
+
+typedef struct {
+    int64_t tag;        // -2 = string-key hashtable
+    int64_t capacity;
+    int64_t size;
+    LangHashEntryStr** buckets;
+} LangHashtableStr;
+
+LangHashtableStr* lang_hashtable_create_str(void);
+int64_t lang_hashtable_get_str(LangHashtableStr* ht, struct LangString_s* key);
+void lang_hashtable_set_str(LangHashtableStr* ht, struct LangString_s* key, int64_t val);
+int64_t lang_hashtable_containsKey_str(LangHashtableStr* ht, struct LangString_s* key);
+void lang_hashtable_remove_str(LangHashtableStr* ht, struct LangString_s* key);
+LangCons* lang_hashtable_keys_str(LangHashtableStr* ht);
+int64_t* lang_hashtable_trygetvalue_str(LangHashtableStr* ht, struct LangString_s* key);
+int64_t lang_index_get_str(void* collection, struct LangString_s* key);
+void lang_index_set_str(void* collection, struct LangString_s* key, int64_t value);
+
 typedef int64_t (*LangClosureFn)(void* env, int64_t arg);
 void lang_array_iter(void* closure, int64_t* arr);
 void lang_for_in(void* closure, void* collection);
