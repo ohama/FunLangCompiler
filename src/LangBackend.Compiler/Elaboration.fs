@@ -801,6 +801,47 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         ]
         (boolResult, strOps @ subOps @ ops)
 
+    // Phase 31: string_endswith builtin — App(App(Var("string_endswith"), s), suffix)
+    | App (App (Var ("string_endswith", _), strExpr, _), suffixExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let (sufVal, sufOps) = elaborateExpr env suffixExpr
+        let rawResult  = { Name = freshName env; Type = I64 }
+        let zeroVal    = { Name = freshName env; Type = I64 }
+        let boolResult = { Name = freshName env; Type = I1 }
+        let ops = [
+            LlvmCallOp(rawResult, "@lang_string_endswith", [strVal; sufVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+        ]
+        (boolResult, strOps @ sufOps @ ops)
+
+    // Phase 31: string_startswith builtin — App(App(Var("string_startswith"), s), prefix)
+    | App (App (Var ("string_startswith", _), strExpr, _), prefixExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let (pfxVal, pfxOps) = elaborateExpr env prefixExpr
+        let rawResult  = { Name = freshName env; Type = I64 }
+        let zeroVal    = { Name = freshName env; Type = I64 }
+        let boolResult = { Name = freshName env; Type = I1 }
+        let ops = [
+            LlvmCallOp(rawResult, "@lang_string_startswith", [strVal; pfxVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+        ]
+        (boolResult, strOps @ pfxOps @ ops)
+
+    // Phase 31: string_trim builtin — App(Var("string_trim"), s)
+    | App (Var ("string_trim", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, strOps @ [LlvmCallOp(result, "@lang_string_trim", [strVal])])
+
+    // Phase 31: string_concat_list builtin — App(App(Var("string_concat_list"), sep), list)
+    | App (App (Var ("string_concat_list", _), sepExpr, _), listExpr, _) ->
+        let (sepVal,  sepOps)  = elaborateExpr env sepExpr
+        let (listVal, listOps) = elaborateExpr env listExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, sepOps @ listOps @ [LlvmCallOp(result, "@lang_string_concat_list", [sepVal; listVal])])
+
     // Phase 8: string_concat builtin — App(App(Var("string_concat"), a), b)
     // Must be placed BEFORE general App to avoid being caught by general App dispatch
     | App (App (Var ("string_concat", _), aExpr, _), bExpr, _) ->
@@ -2728,6 +2769,10 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_get_cwd";          ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_path_combine";     ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_dir_files";        ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_endswith";   ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_startswith"; ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_trim";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_concat_list";ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -2918,5 +2963,9 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_get_cwd";          ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_path_combine";     ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_dir_files";        ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_endswith";   ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_startswith"; ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_trim";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_concat_list";ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }

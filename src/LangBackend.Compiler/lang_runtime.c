@@ -105,6 +105,17 @@ LangString* lang_string_trim(LangString* s) {
     return r;
 }
 
+int64_t lang_string_to_int(LangString* s) {
+    return (int64_t)strtol(s->data, NULL, 10);
+}
+
+/* Cons cell layout: {int64_t head @ offset 0, ConsCell* tail @ offset 8} — 16 bytes total */
+/* Matches Phase 10 GC_malloc(16) cons cell layout exactly. */
+typedef struct LangCons {
+    int64_t         head;
+    struct LangCons* tail;
+} LangCons;
+
 LangString* lang_string_concat_list(LangString* sep, LangCons* list) {
     int64_t total = 0;
     int64_t count = 0;
@@ -137,17 +148,6 @@ LangString* lang_string_concat_list(LangString* sep, LangCons* list) {
     r->data = buf;
     return r;
 }
-
-int64_t lang_string_to_int(LangString* s) {
-    return (int64_t)strtol(s->data, NULL, 10);
-}
-
-/* Cons cell layout: {int64_t head @ offset 0, ConsCell* tail @ offset 8} — 16 bytes total */
-/* Matches Phase 10 GC_malloc(16) cons cell layout exactly. */
-typedef struct LangCons {
-    int64_t         head;
-    struct LangCons* tail;
-} LangCons;
 
 /* lang_range: build inclusive cons list [start..step..stop].
    step must be non-zero. Returns NULL (empty list) when range is immediately empty. */
