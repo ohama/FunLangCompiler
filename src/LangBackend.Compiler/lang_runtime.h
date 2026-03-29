@@ -100,4 +100,32 @@ LangCons* lang_list_of_seq(void* collection);
 void lang_array_sort(int64_t* arr);
 int64_t* lang_array_of_seq(void* collection);
 
+/* Phase 33-01: COL-01 StringBuilder */
+typedef struct {
+    char*   buf;
+    int64_t len;
+    int64_t cap;
+} LangStringBuilder;
+
+LangStringBuilder* lang_sb_create(void);
+LangStringBuilder* lang_sb_append(LangStringBuilder* sb, LangString* s);
+LangString* lang_sb_tostring(LangStringBuilder* sb);
+
+/* Phase 33-01: COL-02 HashSet */
+typedef struct LangHashSetEntry {
+    int64_t key;
+    struct LangHashSetEntry* next;
+} LangHashSetEntry;
+
+typedef struct {
+    int64_t capacity;
+    int64_t size;
+    LangHashSetEntry** buckets;
+} LangHashSet;
+
+LangHashSet* lang_hashset_create(void);
+int64_t lang_hashset_add(LangHashSet* hs, int64_t key);
+int64_t lang_hashset_contains(LangHashSet* hs, int64_t key);
+int64_t lang_hashset_count(LangHashSet* hs);
+
 #endif

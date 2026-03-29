@@ -611,6 +611,94 @@ int64_t* lang_array_of_seq(void* collection) {
     return lang_array_of_list((LangCons*)collection);
 }
 
+/* Phase 33-01: COL-01 StringBuilder */
+typedef struct {
+    char*   buf;
+    int64_t len;
+    int64_t cap;
+} LangStringBuilder;
+
+LangStringBuilder* lang_sb_create(void) {
+    LangStringBuilder* sb = (LangStringBuilder*)GC_malloc(sizeof(LangStringBuilder));
+    sb->cap = 64;
+    sb->buf = (char*)GC_malloc((size_t)sb->cap);
+    sb->len = 0;
+    return sb;
+}
+
+LangStringBuilder* lang_sb_append(LangStringBuilder* sb, LangString* s) {
+    int64_t new_len = sb->len + s->length;
+    if (new_len >= sb->cap) {
+        int64_t new_cap = sb->cap * 2;
+        while (new_cap <= new_len) new_cap *= 2;
+        char* new_buf = (char*)GC_malloc((size_t)new_cap);
+        memcpy(new_buf, sb->buf, (size_t)sb->len);
+        sb->buf = new_buf;
+        sb->cap = new_cap;
+    }
+    memcpy(sb->buf + sb->len, s->data, (size_t)s->length);
+    sb->len = new_len;
+    return sb;
+}
+
+LangString* lang_sb_tostring(LangStringBuilder* sb) {
+    char* data = (char*)GC_malloc((size_t)(sb->len + 1));
+    memcpy(data, sb->buf, (size_t)sb->len);
+    data[sb->len] = '\0';
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = sb->len;
+    s->data = data;
+    return s;
+}
+
+/* Phase 33-01: COL-02 HashSet (placed after lang_ht_hash for static visibility) */
+typedef struct LangHashSetEntry {
+    int64_t key;
+    struct LangHashSetEntry* next;
+} LangHashSetEntry;
+
+typedef struct {
+    int64_t capacity;
+    int64_t size;
+    LangHashSetEntry** buckets;
+} LangHashSet;
+
+LangHashSet* lang_hashset_create(void) {
+    LangHashSet* hs = (LangHashSet*)GC_malloc(sizeof(LangHashSet));
+    hs->capacity = 16;
+    hs->size = 0;
+    hs->buckets = (LangHashSetEntry**)GC_malloc((size_t)(16 * (int64_t)sizeof(LangHashSetEntry*)));
+    for (int64_t i = 0; i < 16; i++) hs->buckets[i] = NULL;
+    return hs;
+}
+
+int64_t lang_hashset_add(LangHashSet* hs, int64_t key) {
+    uint64_t bucket = lang_ht_hash(key) % (uint64_t)hs->capacity;
+    LangHashSetEntry* e = hs->buckets[bucket];
+    while (e != NULL) {
+        if (e->key == key) return 0; /* already present */
+        e = e->next;
+    }
+    LangHashSetEntry* ne = (LangHashSetEntry*)GC_malloc(sizeof(LangHashSetEntry));
+    ne->key = key;
+    ne->next = hs->buckets[bucket];
+    hs->buckets[bucket] = ne;
+    hs->size++;
+    return 1; /* newly added */
+}
+
+int64_t lang_hashset_contains(LangHashSet* hs, int64_t key) {
+    uint64_t bucket = lang_ht_hash(key) % (uint64_t)hs->capacity;
+    LangHashSetEntry* e = hs->buckets[bucket];
+    while (e != NULL) {
+        if (e->key == key) return 1;
+        e = e->next;
+    }
+    return 0;
+}
+
+int64_t lang_hashset_count(LangHashSet* hs) { return hs->size; }
+
 /* File I/O runtime functions */
 
 LangString* lang_file_read(LangString* path) {
