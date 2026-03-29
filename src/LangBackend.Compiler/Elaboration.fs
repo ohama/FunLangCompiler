@@ -1272,6 +1272,70 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("int_to_char", _), intExpr, _) ->
         elaborateExpr env intExpr
 
+    // Phase 31: char_is_digit — returns bool (bool-wrapping pattern)
+    | App (Var ("char_is_digit", _), charExpr, _) ->
+        let (charVal, charOps) = elaborateExpr env charExpr
+        let rawResult  = { Name = freshName env; Type = I64 }
+        let zeroVal    = { Name = freshName env; Type = I64 }
+        let boolResult = { Name = freshName env; Type = I1 }
+        let ops = [
+            LlvmCallOp(rawResult, "@lang_char_is_digit", [charVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+        ]
+        (boolResult, charOps @ ops)
+
+    // Phase 31: char_is_letter — returns bool (bool-wrapping pattern)
+    | App (Var ("char_is_letter", _), charExpr, _) ->
+        let (charVal, charOps) = elaborateExpr env charExpr
+        let rawResult  = { Name = freshName env; Type = I64 }
+        let zeroVal    = { Name = freshName env; Type = I64 }
+        let boolResult = { Name = freshName env; Type = I1 }
+        let ops = [
+            LlvmCallOp(rawResult, "@lang_char_is_letter", [charVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+        ]
+        (boolResult, charOps @ ops)
+
+    // Phase 31: char_is_upper — returns bool (bool-wrapping pattern)
+    | App (Var ("char_is_upper", _), charExpr, _) ->
+        let (charVal, charOps) = elaborateExpr env charExpr
+        let rawResult  = { Name = freshName env; Type = I64 }
+        let zeroVal    = { Name = freshName env; Type = I64 }
+        let boolResult = { Name = freshName env; Type = I1 }
+        let ops = [
+            LlvmCallOp(rawResult, "@lang_char_is_upper", [charVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+        ]
+        (boolResult, charOps @ ops)
+
+    // Phase 31: char_is_lower — returns bool (bool-wrapping pattern)
+    | App (Var ("char_is_lower", _), charExpr, _) ->
+        let (charVal, charOps) = elaborateExpr env charExpr
+        let rawResult  = { Name = freshName env; Type = I64 }
+        let zeroVal    = { Name = freshName env; Type = I64 }
+        let boolResult = { Name = freshName env; Type = I1 }
+        let ops = [
+            LlvmCallOp(rawResult, "@lang_char_is_lower", [charVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+        ]
+        (boolResult, charOps @ ops)
+
+    // Phase 31: char_to_upper — pass-through (returns i64 char code)
+    | App (Var ("char_to_upper", _), charExpr, _) ->
+        let (charVal, charOps) = elaborateExpr env charExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, charOps @ [LlvmCallOp(result, "@lang_char_to_upper", [charVal])])
+
+    // Phase 31: char_to_lower — pass-through (returns i64 char code)
+    | App (Var ("char_to_lower", _), charExpr, _) ->
+        let (charVal, charOps) = elaborateExpr env charExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, charOps @ [LlvmCallOp(result, "@lang_char_to_lower", [charVal])])
+
     // Phase 7: print/println builtins — static literal fast path (keep before general case)
     | App (Var ("print", _), String (s, _), _) ->
         let globalName = addStringGlobal env s
@@ -2773,6 +2837,12 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_string_startswith"; ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_trim";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_concat_list";ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_is_digit";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_is_letter";    ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_is_upper";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_is_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_to_upper";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_to_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -2967,5 +3037,11 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_string_startswith"; ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_trim";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_concat_list";ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_is_digit";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_is_letter";    ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_is_upper";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_is_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_to_upper";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_char_to_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
