@@ -82,10 +82,10 @@ Plans:
   2. Recursive imports work: if A opens B and B opens C, A sees C's bindings
   3. Circular import (A opens B, B opens A) produces a clear error message instead of infinite loop
   4. Relative paths resolve from the importing file's directory, not the working directory
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 40-01: TBD
+- [ ] 40-01-PLAN.md — expandImports in Program.fs + 5 E2E tests
 
 ## Progress
 
@@ -97,4 +97,4 @@ Plans:
 | 37. Hashtable String Keys | 2/2 | Complete | 2026-03-30 |
 | 38. CLI Arguments | 1/1 | Complete | 2026-03-30 |
 | 39. Format Strings | 1/1 | Complete | 2026-03-30 |
-| 40. Multi-file Import | 0/TBD | Not started | - |
+| 40. Multi-file Import | 0/1 | Not started | - |
