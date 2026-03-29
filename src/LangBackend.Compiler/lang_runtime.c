@@ -72,6 +72,14 @@ LangString* lang_string_sub(LangString* s, int64_t start, int64_t len) {
     return r;
 }
 
+/* Phase 34-01: LANG-01 String slicing — s.[start..stop] and s.[start..] */
+LangString* lang_string_slice(LangString* s, int64_t start, int64_t stop) {
+    // stop == -1 means open-ended (to end of string)
+    if (stop < 0) stop = s->length - 1;
+    int64_t len = stop - start + 1;
+    return lang_string_sub(s, start, len);
+}
+
 int64_t lang_string_contains(LangString* s, LangString* sub) {
     if (sub->length == 0) return 1;
     return strstr(s->data, sub->data) != NULL ? 1 : 0;
