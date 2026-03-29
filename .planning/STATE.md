@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v9.0 — Phase 31: String/Char/IO Builtins
+**Current focus:** v9.0 — Phase 32: Array Builtins (next)
 
 ## Current Position
 
-Phase: 31 of 35 (String/Char/IO Builtins)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-03-29 — Completed 31-02-PLAN.md (char builtins: is_digit, is_letter, is_upper, is_lower, to_upper, to_lower)
+Phase: 31 of 35 (String/Char/IO Builtins) — COMPLETE
+Plan: 3 of 3 in current phase (all done)
+Status: Phase complete — ready for Phase 32
+Last activity: 2026-03-29 — Completed 31-03-PLAN.md (eprintfn builtin desugaring to @lang_eprintln)
 
-Progress: [██████████████████░░] 87% (30/35 phases + 2 plans in Phase 31)
+Progress: [██████████████████░░] 89% (31/35 phases complete, 0 plans in Phase 32 started)
 
 ## Performance Metrics
 
@@ -41,6 +41,7 @@ Progress: [██████████████████░░] 87% (30
 
 Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 
+- v9.0 Phase 31-03: eprintfn desugars to @lang_eprintln (two-arg %s case); two-arg App(App(...)) arm must appear before one-arg App(...) arm
 - v9.0 Phase 31-02: Char transformer E2E tests use exit-code comparison (`result = char_to_int 'X'`) since compiler has no %c format printing
 - v9.0 Phase 31-01: E2E tests for bool-returning builtins use `to_string(bool)` pattern (not `if/then/else`) to avoid the two-sequential-if MLIR empty-block limitation
 - v9.0 Phase 31-01: LangCons-using C functions must be placed after LangCons typedef in lang_runtime.c
@@ -62,6 +63,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-29T13:16:03Z
-Stopped at: Completed 31-02-PLAN.md (char builtins: is_digit, is_letter, is_upper, is_lower, to_upper, to_lower)
+Last session: 2026-03-29T13:26:33Z
+Stopped at: Completed 31-03-PLAN.md (eprintfn builtin, Phase 31 complete — 155 tests pass)
 Resume file: None
