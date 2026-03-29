@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 36 of 40 (Bug Fixes)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-30 — Roadmap created for v10.0
+Plan: 01 of 1
+Status: Phase 36 plan 01 complete
+Last activity: 2026-03-30 — Completed 36-01-PLAN.md (bug fixes)
 
-Progress: [░░░░░░░░░░] 0% (v10.0)
+Progress: [█░░░░░░░░░] 10% (v10.0, 1/10 plans estimated)
 
 ## Performance Metrics
 
@@ -45,6 +45,9 @@ Recent decisions affecting current work:
 - v9.0 Phase 35-01: Hashtable string keys crash — C hashtable uses int64_t key ABI (now RT-01/RT-02)
 - v9.0 Phase 31-01: Two-sequential-if MLIR empty-block limitation (now FIX-02)
 - v9.0 Phase 35-01: Bool module function returns I64, needs `<> 0` workaround (now FIX-03)
+- Phase 36-01: FIX-02 uses blocksAfterBind - 1 index (not List.last) to target outer merge block
+- Phase 36-01: If case also needs terminator detection when condExpr is And/Or (patches CfCondBrOp into merge block)
+- Phase 36-01: FIX-01, FIX-02, FIX-03 all resolved — downstream workarounds can be removed
 
 ### Pending Todos
 
@@ -52,12 +55,13 @@ None.
 
 ### Blockers/Concerns
 
-- FIX-01 (for-in mutable capture segfault): Known since v9.0 Phase 34-03. Root cause: closure captures stale stack pointer.
-- FIX-02 (sequential if MLIR): Known since v9.0 Phase 31-01. E2E tests use workarounds.
-- FIX-03 (Bool module return): Known since v9.0 Phase 35-01. `<> 0` pattern used throughout.
+- RT-01/RT-02 (Hashtable string key ABI): C hashtable uses int64_t key, not string pointer. Still open.
+- FIX-01 RESOLVED: for-in mutable capture works correctly (verified by 36-01-forin-mutable-capture.flt)
+- FIX-02 RESOLVED: Sequential if expressions produce valid MLIR (verified by 36-02-sequential-if.flt)
+- FIX-03 RESOLVED: And/Or/While accept I1-typed conditions (verified by 36-03-bool-and-or-while.flt)
 
 ## Session Continuity
 
 Last session: 2026-03-30
-Stopped at: Roadmap created for v10.0 milestone
+Stopped at: Completed 36-01-PLAN.md — all three bug fixes applied and tested
 Resume file: None
