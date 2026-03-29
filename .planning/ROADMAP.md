@@ -27,10 +27,10 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
   1. A for-in loop that captures a `let mut` variable in a closure runs without segfault
   2. Two consecutive `if` expressions in the same block produce valid MLIR and execute correctly
   3. A module function returning Bool can be used directly as an `if` condition without `<> 0`
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 36-01: TBD
+- [ ] 36-01-PLAN.md — Fix FIX-01/02/03 in Elaboration.fs + E2E tests
 
 ### Phase 37: Hashtable String Keys
 **Goal**: Hashtable works with string keys, not just integer keys
@@ -92,7 +92,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 36. Bug Fixes | 0/TBD | Not started | - |
+| 36. Bug Fixes | 0/1 | Not started | - |
 | 37. Hashtable String Keys | 0/TBD | Not started | - |
 | 38. CLI Arguments | 0/TBD | Not started | - |
 | 39. Format Strings | 0/TBD | Not started | - |
