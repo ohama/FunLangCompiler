@@ -12,7 +12,7 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
 ## Phases
 
 - [x] **Phase 36: Bug Fixes** — Fix known compiler bugs blocking real-world code patterns
-- [ ] **Phase 37: Hashtable String Keys** — C runtime hash/compare extension for string struct keys
+- [x] **Phase 37: Hashtable String Keys** — C runtime hash/compare extension for string struct keys
 - [ ] **Phase 38: CLI Arguments** — @main signature change + get_args runtime helper
 - [ ] **Phase 39: Format Strings** — sprintf/printfn via C runtime snprintf delegation
 - [ ] **Phase 40: Multi-file Import** — AST flattening for `open "file.fun"` before elaboration
@@ -43,8 +43,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 37-01-PLAN.md — Add LangHashtableStr structs + _str C runtime functions
-- [ ] 37-02-PLAN.md — Elaboration key-type dispatch + Prelude + E2E tests
+- [x] 37-01-PLAN.md — Add LangHashtableStr structs + _str C runtime functions
+- [x] 37-02-PLAN.md — Elaboration key-type dispatch + Prelude + E2E tests
 
 ### Phase 38: CLI Arguments
 **Goal**: Compiled binaries can access command-line arguments as a string list
@@ -94,7 +94,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 36. Bug Fixes | 1/1 | Complete | 2026-03-30 |
-| 37. Hashtable String Keys | 0/2 | Not started | - |
+| 37. Hashtable String Keys | 2/2 | Complete | 2026-03-30 |
 | 38. CLI Arguments | 0/TBD | Not started | - |
 | 39. Format Strings | 0/TBD | Not started | - |
 | 40. Multi-file Import | 0/TBD | Not started | - |
