@@ -150,8 +150,9 @@ let main argv =
                 if dir = "" then ""
                 else
                     // Explicit load order: Option/Result before List (List uses None/Some constructors)
-                    let ordered = [| "Option.fun"; "Result.fun"; "String.fun"; "Char.fun";
-                                     "Hashtable.fun"; "StringBuilder.fun"; "List.fun"; "Array.fun" |]
+                    let ordered = [| "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun";
+                                     "Hashtable.fun"; "HashSet.fun"; "MutableList.fun"; "Queue.fun";
+                                     "StringBuilder.fun"; "List.fun"; "Array.fun" |]
                     ordered
                     |> Array.choose (fun f ->
                         let path = System.IO.Path.Combine(dir, f)

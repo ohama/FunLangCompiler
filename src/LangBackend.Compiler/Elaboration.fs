@@ -1572,19 +1572,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("hashset_add", _), hsExpr, _), valExpr, _) ->
         let (hsVal,  hsOps)  = elaborateExpr env hsExpr
         let (valVal, valOps) = elaborateExpr env valExpr
+        let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
         let result = { Name = freshName env; Type = I64 }
-        (result, hsOps @ valOps @ [LlvmCallOp(result, "@lang_hashset_add", [hsVal; valVal])])
+        (result, hsOps @ valOps @ hsCoerce @ [LlvmCallOp(result, "@lang_hashset_add", [hsPtr; valVal])])
 
     | App (App (Var ("hashset_contains", _), hsExpr, _), valExpr, _) ->
         let (hsVal,  hsOps)  = elaborateExpr env hsExpr
         let (valVal, valOps) = elaborateExpr env valExpr
+        let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
         let result = { Name = freshName env; Type = I64 }
-        (result, hsOps @ valOps @ [LlvmCallOp(result, "@lang_hashset_contains", [hsVal; valVal])])
+        (result, hsOps @ valOps @ hsCoerce @ [LlvmCallOp(result, "@lang_hashset_contains", [hsPtr; valVal])])
 
     | App (Var ("hashset_count", _), hsExpr, _) ->
         let (hsVal, hsOps) = elaborateExpr env hsExpr
+        let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
         let result = { Name = freshName env; Type = I64 }
-        (result, hsOps @ [LlvmCallOp(result, "@lang_hashset_count", [hsVal])])
+        (result, hsOps @ hsCoerce @ [LlvmCallOp(result, "@lang_hashset_count", [hsPtr])])
 
     // Phase 33-02: COL-03 Queue
     | App (Var ("queue_create", _), unitExpr, _) ->
@@ -1595,19 +1598,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("queue_enqueue", _), qExpr, _), valExpr, _) ->
         let (qVal,   qOps)   = elaborateExpr env qExpr
         let (valVal, valOps) = elaborateExpr env valExpr
+        let (qPtr, qCoerce) = coerceToPtrArg env qVal
         let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, qOps @ valOps @ [LlvmCallVoidOp("@lang_queue_enqueue", [qVal; valVal]); ArithConstantOp(unitVal, 0L)])
+        (unitVal, qOps @ valOps @ qCoerce @ [LlvmCallVoidOp("@lang_queue_enqueue", [qPtr; valVal]); ArithConstantOp(unitVal, 0L)])
 
     | App (App (Var ("queue_dequeue", _), qExpr, _), unitExpr, _) ->
         let (qVal,  qOps) = elaborateExpr env qExpr
         let (_uVal, uOps) = elaborateExpr env unitExpr
+        let (qPtr, qCoerce) = coerceToPtrArg env qVal
         let result = { Name = freshName env; Type = I64 }
-        (result, qOps @ uOps @ [LlvmCallOp(result, "@lang_queue_dequeue", [qVal])])
+        (result, qOps @ uOps @ qCoerce @ [LlvmCallOp(result, "@lang_queue_dequeue", [qPtr])])
 
     | App (Var ("queue_count", _), qExpr, _) ->
         let (qVal, qOps) = elaborateExpr env qExpr
+        let (qPtr, qCoerce) = coerceToPtrArg env qVal
         let result = { Name = freshName env; Type = I64 }
-        (result, qOps @ [LlvmCallOp(result, "@lang_queue_count", [qVal])])
+        (result, qOps @ qCoerce @ [LlvmCallOp(result, "@lang_queue_count", [qPtr])])
 
     // Phase 33-02: COL-04 MutableList
     // NOTE: mutablelist_set (three-arg) MUST appear BEFORE mutablelist_get (two-arg)
@@ -1615,20 +1621,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (mlVal,  mlOps)  = elaborateExpr env mlExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (valVal, valOps) = elaborateExpr env valExpr
+        let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
         let (idxV, idxCoerce) =
             if idxVal.Type = I64 then (idxVal, [])
             else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
         let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, mlOps @ idxOps @ idxCoerce @ valOps @ [LlvmCallVoidOp("@lang_mlist_set", [mlVal; idxV; valVal]); ArithConstantOp(unitVal, 0L)])
+        (unitVal, mlOps @ idxOps @ idxCoerce @ valOps @ mlCoerce @ [LlvmCallVoidOp("@lang_mlist_set", [mlPtr; idxV; valVal]); ArithConstantOp(unitVal, 0L)])
 
     | App (App (Var ("mutablelist_get", _), mlExpr, _), idxExpr, _) ->
         let (mlVal,  mlOps)  = elaborateExpr env mlExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
+        let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
         let (idxV, idxCoerce) =
             if idxVal.Type = I64 then (idxVal, [])
             else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
         let result = { Name = freshName env; Type = I64 }
-        (result, mlOps @ idxOps @ idxCoerce @ [LlvmCallOp(result, "@lang_mlist_get", [mlVal; idxV])])
+        (result, mlOps @ idxOps @ idxCoerce @ mlCoerce @ [LlvmCallOp(result, "@lang_mlist_get", [mlPtr; idxV])])
 
     | App (Var ("mutablelist_create", _), unitExpr, _) ->
         let (_uVal, uOps) = elaborateExpr env unitExpr
@@ -1638,13 +1646,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("mutablelist_add", _), mlExpr, _), valExpr, _) ->
         let (mlVal,  mlOps)  = elaborateExpr env mlExpr
         let (valVal, valOps) = elaborateExpr env valExpr
+        let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
         let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, mlOps @ valOps @ [LlvmCallVoidOp("@lang_mlist_add", [mlVal; valVal]); ArithConstantOp(unitVal, 0L)])
+        (unitVal, mlOps @ valOps @ mlCoerce @ [LlvmCallVoidOp("@lang_mlist_add", [mlPtr; valVal]); ArithConstantOp(unitVal, 0L)])
 
     | App (Var ("mutablelist_count", _), mlExpr, _) ->
         let (mlVal, mlOps) = elaborateExpr env mlExpr
+        let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
         let result = { Name = freshName env; Type = I64 }
-        (result, mlOps @ [LlvmCallOp(result, "@lang_mlist_count", [mlVal])])
+        (result, mlOps @ mlCoerce @ [LlvmCallOp(result, "@lang_mlist_count", [mlPtr])])
 
     // write_file — two-arg, void return
     | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
