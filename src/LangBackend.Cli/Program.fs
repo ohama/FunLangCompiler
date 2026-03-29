@@ -82,7 +82,33 @@ let main argv =
         // Parse, elaborate, compile — with error handling
         try
             let src = System.IO.File.ReadAllText(inputPath)
-            let ast = parseProgram src inputPath
+
+            // Phase 35: Auto-load Prelude modules
+            let preludeSrc =
+                let findPreludeDir () =
+                    // 1. Check CWD/Prelude
+                    let cwdCandidate = "Prelude"
+                    if System.IO.Directory.Exists cwdCandidate then cwdCandidate
+                    else
+                        // 2. Check assembly directory/Prelude
+                        let asmDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location)
+                        let asmCandidate = System.IO.Path.Combine(asmDir, "Prelude")
+                        if System.IO.Directory.Exists asmCandidate then asmCandidate
+                        else ""
+                let dir = findPreludeDir ()
+                if dir = "" then ""
+                else
+                    // Explicit load order: Option/Result before List (List uses None/Some constructors)
+                    let ordered = [| "Option.fun"; "Result.fun"; "String.fun"; "Char.fun";
+                                     "Hashtable.fun"; "StringBuilder.fun"; "List.fun"; "Array.fun" |]
+                    ordered
+                    |> Array.choose (fun f ->
+                        let path = System.IO.Path.Combine(dir, f)
+                        if System.IO.File.Exists path then Some (System.IO.File.ReadAllText path) else None)
+                    |> String.concat "\n"
+
+            let combinedSrc = if preludeSrc = "" then src else preludeSrc + "\n" + src
+            let ast = parseProgram combinedSrc inputPath
             let mlirMod = Elaboration.elaborateProgram ast
             match Pipeline.compile mlirMod outputPath with
             | Ok () ->
