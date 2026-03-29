@@ -611,13 +611,7 @@ int64_t* lang_array_of_seq(void* collection) {
     return lang_array_of_list((LangCons*)collection);
 }
 
-/* Phase 33-01: COL-01 StringBuilder */
-typedef struct {
-    char*   buf;
-    int64_t len;
-    int64_t cap;
-} LangStringBuilder;
-
+/* Phase 33-01: COL-01 StringBuilder (struct defined in lang_runtime.h) */
 LangStringBuilder* lang_sb_create(void) {
     LangStringBuilder* sb = (LangStringBuilder*)GC_malloc(sizeof(LangStringBuilder));
     sb->cap = 64;
@@ -651,18 +645,7 @@ LangString* lang_sb_tostring(LangStringBuilder* sb) {
     return s;
 }
 
-/* Phase 33-01: COL-02 HashSet (placed after lang_ht_hash for static visibility) */
-typedef struct LangHashSetEntry {
-    int64_t key;
-    struct LangHashSetEntry* next;
-} LangHashSetEntry;
-
-typedef struct {
-    int64_t capacity;
-    int64_t size;
-    LangHashSetEntry** buckets;
-} LangHashSet;
-
+/* Phase 33-01: COL-02 HashSet (struct defined in lang_runtime.h; placed after lang_ht_hash for static visibility) */
 LangHashSet* lang_hashset_create(void) {
     LangHashSet* hs = (LangHashSet*)GC_malloc(sizeof(LangHashSet));
     hs->capacity = 16;
@@ -698,6 +681,79 @@ int64_t lang_hashset_contains(LangHashSet* hs, int64_t key) {
 }
 
 int64_t lang_hashset_count(LangHashSet* hs) { return hs->size; }
+
+/* Phase 33-02: COL-03 Queue (struct defined in lang_runtime.h) */
+LangQueue* lang_queue_create(void) {
+    LangQueue* q = (LangQueue*)GC_malloc(sizeof(LangQueue));
+    q->head  = NULL;
+    q->tail  = NULL;
+    q->count = 0;
+    return q;
+}
+
+void lang_queue_enqueue(LangQueue* q, int64_t value) {
+    LangQueueNode* node = (LangQueueNode*)GC_malloc(sizeof(LangQueueNode));
+    node->value = value;
+    node->next  = NULL;
+    if (q->tail == NULL) {
+        q->head = node;
+        q->tail = node;
+    } else {
+        q->tail->next = node;
+        q->tail       = node;
+    }
+    q->count++;
+}
+
+int64_t lang_queue_dequeue(LangQueue* q) {
+    if (q->head == NULL) {
+        lang_failwith("Queue.Dequeue: queue is empty");
+    }
+    LangQueueNode* node = q->head;
+    int64_t value       = node->value;
+    q->head = node->next;
+    if (q->head == NULL) q->tail = NULL;
+    q->count--;
+    return value;
+}
+
+int64_t lang_queue_count(LangQueue* q) { return q->count; }
+
+/* Phase 33-02: COL-04 MutableList (struct defined in lang_runtime.h) */
+LangMutableList* lang_mlist_create(void) {
+    LangMutableList* ml = (LangMutableList*)GC_malloc(sizeof(LangMutableList));
+    ml->cap  = 8;
+    ml->data = (int64_t*)GC_malloc((size_t)(8 * (int64_t)sizeof(int64_t)));
+    ml->len  = 0;
+    return ml;
+}
+
+void lang_mlist_add(LangMutableList* ml, int64_t value) {
+    if (ml->len >= ml->cap) {
+        int64_t  new_cap  = ml->cap * 2;
+        int64_t* new_data = (int64_t*)GC_malloc((size_t)(new_cap * (int64_t)sizeof(int64_t)));
+        memcpy(new_data, ml->data, (size_t)(ml->len * (int64_t)sizeof(int64_t)));
+        ml->data = new_data;
+        ml->cap  = new_cap;
+    }
+    ml->data[ml->len++] = value;
+}
+
+int64_t lang_mlist_get(LangMutableList* ml, int64_t index) {
+    if (index < 0 || index >= ml->len) {
+        lang_failwith("MutableList.get: index out of bounds");
+    }
+    return ml->data[index];
+}
+
+void lang_mlist_set(LangMutableList* ml, int64_t index, int64_t value) {
+    if (index < 0 || index >= ml->len) {
+        lang_failwith("MutableList.set: index out of bounds");
+    }
+    ml->data[index] = value;
+}
+
+int64_t lang_mlist_count(LangMutableList* ml) { return ml->len; }
 
 /* File I/O runtime functions */
 

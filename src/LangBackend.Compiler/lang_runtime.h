@@ -128,4 +128,34 @@ int64_t lang_hashset_add(LangHashSet* hs, int64_t key);
 int64_t lang_hashset_contains(LangHashSet* hs, int64_t key);
 int64_t lang_hashset_count(LangHashSet* hs);
 
+/* Phase 33-02: COL-03 Queue */
+typedef struct LangQueueNode {
+    int64_t value;
+    struct LangQueueNode* next;
+} LangQueueNode;
+
+typedef struct {
+    LangQueueNode* head;
+    LangQueueNode* tail;
+    int64_t        count;
+} LangQueue;
+
+LangQueue* lang_queue_create(void);
+void       lang_queue_enqueue(LangQueue* q, int64_t value);
+int64_t    lang_queue_dequeue(LangQueue* q);
+int64_t    lang_queue_count(LangQueue* q);
+
+/* Phase 33-02: COL-04 MutableList */
+typedef struct {
+    int64_t* data;
+    int64_t  len;
+    int64_t  cap;
+} LangMutableList;
+
+LangMutableList* lang_mlist_create(void);
+void             lang_mlist_add(LangMutableList* ml, int64_t value);
+int64_t          lang_mlist_get(LangMutableList* ml, int64_t index);
+void             lang_mlist_set(LangMutableList* ml, int64_t index, int64_t value);
+int64_t          lang_mlist_count(LangMutableList* ml);
+
 #endif
