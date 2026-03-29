@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 33 of 35 (Collection Types) — In progress
-Plan: 1 of 3 in current phase (plan 01 done)
-Status: Phase 33 plan 01 complete, ready for plan 02
-Last activity: 2026-03-29 — Completed 33-01-PLAN.md (StringBuilder + HashSet — 163 E2E tests)
+Plan: 2 of 3 in current phase (plans 01-02 done)
+Status: Phase 33 plan 02 complete, ready for plan 03
+Last activity: 2026-03-29 — Completed 33-02-PLAN.md (Queue + MutableList — 165 E2E tests)
 
-Progress: [███████████████████░] 92% (32/35 phases + 1/3 plans in Phase 33)
+Progress: [███████████████████░] 93% (32/35 phases + 2/3 plans in Phase 33)
 
 ## Performance Metrics
 
@@ -45,6 +45,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 - v9.0 Phase 32-03: externalFuncs appears twice in Elaboration.fs (elaborateModule + elaborateProgram) — both must be kept in sync
 - v9.0 Phase 32-02: list_sort_by uses insertion sort with parallel int64_t arrays + LangClosureFn key extractor
 - v9.0 Phase 32-02: list_of_seq is identity void* cast — no C logic, just type coercion at elaboration time
+- v9.0 Phase 33-02: queue_dequeue is two-arg curried App(App(Var, q), unit) — unit elaborated and discarded; C function takes only queue pointer
+- v9.0 Phase 33-02: mutablelist_set (three-arg) BEFORE mutablelist_get (two-arg) in Elaboration.fs — same rule as hashtable_set before hashtable_get
+- v9.0 Phase 33-02: LangMutableList grow uses GC_malloc+memcpy (not realloc); LangQueue uses GC_malloc nodes with head/tail/count
 - v9.0 Phase 33-01: Struct typedefs defined only in lang_runtime.h — never redefined in lang_runtime.c (prevents clang redefinition errors)
 - v9.0 Phase 33-01: hashset_add uses LlvmCallOp returning I64 (not LlvmCallVoidOp) — matches LangThree bool return
 - v9.0 Phase 33-01: StringBuilder buffer growth uses GC_malloc + memcpy (not realloc); HashSet reuses lang_ht_hash murmurhash3
@@ -72,6 +75,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-29T15:20:39Z
-Stopped at: Completed 33-01-PLAN.md (StringBuilder + HashSet — 163 tests pass)
+Last session: 2026-03-29T15:27:29Z
+Stopped at: Completed 33-02-PLAN.md (Queue + MutableList — 165 tests pass)
 Resume file: None
