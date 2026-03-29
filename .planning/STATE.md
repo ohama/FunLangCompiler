@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 34 of 35 (Language Constructs) — VERIFIED ✓
-Plan: 3 of 3 in current phase (all done)
-Status: Phase 34 verified, ready for Phase 35
-Last activity: 2026-03-30 — Phase 34 verified (4/4 must-haves, 173 E2E tests)
+Phase: 35 of 35 (Prelude Modules) — In progress
+Plan: 1 of ~5 in current phase
+Status: Phase 35 Plan 01 complete — String/Hashtable/StringBuilder/Char modules
+Last activity: 2026-03-29 — Completed 35-01-PLAN.md (4 Prelude .fun files + 4 E2E tests, 179 passing)
 
-Progress: [████████████████████] 97% (34/35 phases complete, 0 plans in Phase 35 started)
+Progress: [████████████████████] 98% (34 phases complete, 1/~5 plans in Phase 35 done)
 
 ## Performance Metrics
 
@@ -58,6 +58,10 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 - v9.0 Phase 33-01: StringBuilder buffer growth uses GC_malloc + memcpy (not realloc); HashSet reuses lang_ht_hash murmurhash3
 - v9.0 Phase 32-01: hashtable_count uses inline GEP at LangHashtable field index 2 (size), no C function needed
 - v9.0 Phase 32-01: E2E tests use `println (to_string ...)` — `printfn "%d"` does not exist in elaborator
+- v9.0 Phase 35-01: Bool values from module-wrapped builtins return I64 (1/0) not I1; to_string calls @lang_to_string_int → "1"/"0"
+- v9.0 Phase 35-01: E2E module tests use top-level `let _ = expr` (no `in` chaining) — parseModule doesn't accept `in` at top level
+- v9.0 Phase 35-01: Hashtable tests use integer keys (not strings); C hashtable uses int64_t key ABI
+- v9.0 Phase 35-01: closure captures filter fix — two-param Let-Lambda-Lambda arm now filters by env.Vars; coerceToPtrArg/coerceToI64 helpers for closure ABI
 - v9.0 Phase 31-03: eprintfn desugars to @lang_eprintln (two-arg %s case); two-arg App(App(...)) arm must appear before one-arg App(...) arm
 - v9.0 Phase 31-02: Char transformer E2E tests use exit-code comparison (`result = char_to_int 'X'`) since compiler has no %c format printing
 - v9.0 Phase 31-01: E2E tests for bool-returning builtins use `to_string(bool)` pattern (not `if/then/else`) to avoid the two-sequential-if MLIR empty-block limitation
@@ -70,15 +74,23 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 
 None.
 
+### Phase 35 Progress Notes
+
+- 35-01 complete: String/Hashtable/StringBuilder/Char prelude .fun files + 4 E2E tests
+- 35-02 through 35-09 tests already pre-created (previous session); Option/Result tests (35-05, 35-06) pass
+- Remaining: Option.fun, Result.fun, List.fun, Array.fun prelude files
+
 ### Blockers/Concerns
 
 - LANG-03 and LANG-04 COMPLETE (Phase 34-03)
 - PRE-05 list extension module is large (12 functions); may need own plan
 - Two-sequential-if MLIR limitation: two `if` expressions in sequence produce invalid MLIR (empty entry block). E2E tests must avoid this pattern. Not blocking for current phases.
 - Pre-existing bug: for-in closures capturing `let mut` variables via `sum <- sum + x` segfaults (not fixed in v9.0)
+- Phase 35: Bool values from module-wrapped builtins return as I64 (1/0) not I1 (true/false); to_string prints "1"/"0"
+- Phase 35: Hashtable string keys crash — C hashtable uses int64_t key ABI; tests must use integer keys
 
 ## Session Continuity
 
 Last session: 2026-03-29
-Stopped at: Completed 34-03-PLAN.md (ForIn collection dispatch + TuplePat — 173 tests pass)
+Stopped at: Completed 35-01-PLAN.md (Prelude modules String/Hashtable/StringBuilder/Char — 179 tests pass)
 Resume file: None
