@@ -20,6 +20,9 @@ type FuncSignature = {
 // Phase 16: TypeInfo for ADT constructor entries in TypeEnv
 type TypeInfo = { Tag: int; Arity: int }
 
+// Phase 34-03: LANG-03/04 — collection kind for ForInExpr dispatch
+type CollectionKind = HashSet | Queue | MutableList | Hashtable
+
 type ElabEnv = {
     Vars:           Map<string, MlirValue>
     Counter:        int ref
@@ -38,6 +41,8 @@ type ElabEnv = {
     MutableVars:    Set<string>
     // Phase 30: Array variable tracking — names bound to array-type collections (for for-in dispatch)
     ArrayVars:      Set<string>
+    // Phase 34-03: Collection variable tracking — names bound to Phase 33 collection types
+    CollectionVars: Map<string, CollectionKind>
 }
 
 let emptyEnv () : ElabEnv =
@@ -45,7 +50,7 @@ let emptyEnv () : ElabEnv =
       KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0
       Globals = ref []; GlobalCounter = ref 0
       TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty
-      MutableVars = Set.empty; ArrayVars = Set.empty }
+      MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty }
 
 /// Phase 30: Determine if an expression is statically known to produce an array (not a list).
 /// Used by ForInExpr to select lang_for_in_array vs lang_for_in_list at compile time.
@@ -63,6 +68,18 @@ let rec private isArrayExpr (arrayVars: Set<string>) (expr: Ast.Expr) : bool =
     // Type annotation — check inner expression
     | Ast.Annot (inner, _, _) -> isArrayExpr arrayVars inner
     | _ -> false
+
+/// Phase 34-03: Detect which Phase 33 collection kind an expression produces.
+/// Returns Some kind if the expression is a known collection-creating call or variable.
+let rec private detectCollectionKind (collVars: Map<string, CollectionKind>) (expr: Ast.Expr) : CollectionKind option =
+    match expr with
+    | Ast.App (Ast.Var ("hashset_create", _), _, _)   -> Some HashSet
+    | Ast.App (Ast.Var ("queue_create", _), _, _)     -> Some Queue
+    | Ast.App (Ast.Var ("mutablelist_create", _), _, _) -> Some MutableList
+    | Ast.App (Ast.Var ("hashtable_create", _), _, _) -> Some Hashtable
+    | Ast.Var (name, _)                               -> Map.tryFind name collVars
+    | Ast.Annot (inner, _, _)                         -> detectCollectionKind collVars inner
+    | _ -> None
 
 let private addStringGlobal (env: ElabEnv) (rawValue: string) : string =
     match env.Globals.Value |> List.tryFind (fun (_, v) -> v = rawValue) with
@@ -444,7 +461,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = env.MutableVars; ArrayVars = Set.empty }
+              MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -552,7 +569,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let blocksBeforeBind = env.Blocks.Value.Length
         let (bv, bops) = elaborateExpr env bindExpr
         let arrayVars' = if isArrayExpr env.ArrayVars bindExpr then Set.add name env.ArrayVars else env.ArrayVars
-        let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars' }
+        let collVars' =
+            match detectCollectionKind env.CollectionVars bindExpr with
+            | Some kind -> Map.add name kind env.CollectionVars
+            | None -> env.CollectionVars
+        let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars'; CollectionVars = collVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
         // If bops ends with a block terminator (from nested Match/TryWith), the
         // continuation code (rops) must go into the last side block that was added
@@ -595,12 +616,24 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | LetPat (VarPat (name, _), bindExpr, bodyExpr, _) ->
         let (bv, bops) = elaborateExpr env bindExpr
         let arrayVars' = if isArrayExpr env.ArrayVars bindExpr then Set.add name env.ArrayVars else env.ArrayVars
-        let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars' }
+        let collVars' =
+            match detectCollectionKind env.CollectionVars bindExpr with
+            | Some kind -> Map.add name kind env.CollectionVars
+            | None -> env.CollectionVars
+        let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars'; CollectionVars = collVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
         (rv, bops @ rops)
     // Phase 9: LetPat with TuplePat — destructure a heap-allocated tuple via GEP + load
     | LetPat (TuplePat (pats, _), bindExpr, bodyExpr, _) ->
-        let (tupPtrVal, bindOps) = elaborateExpr env bindExpr
+        let (rawTupVal, bindOps) = elaborateExpr env bindExpr
+        // Phase 34-03: If the bind expression returns I64 (e.g., closure parameter from ForInExpr TuplePat),
+        // coerce to Ptr before GEP-based destructuring.
+        let (tupPtrVal, coerceOps) =
+            if rawTupVal.Type = I64 then
+                let pv = { Name = freshName env; Type = Ptr }
+                (pv, [LlvmIntToPtrOp(pv, rawTupVal)])
+            else
+                (rawTupVal, [])
         // Recursively bind patterns to extracted values from a tuple ptr
         let rec bindTuplePat (envAcc: ElabEnv) (ptrVal: MlirValue) (subPats: Pattern list) : MlirOp list * ElabEnv =
             let loadTypeOfPat = function
@@ -628,7 +661,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             ) ([], envAcc)
         let (extractOps, env') = bindTuplePat env tupPtrVal pats
         let (bodyVal, bodyOps) = elaborateExpr env' bodyExpr
-        (bodyVal, bindOps @ extractOps @ bodyOps)
+        (bodyVal, bindOps @ coerceOps @ extractOps @ bodyOps)
     | Bool (b, _) ->
         let v = { Name = freshName env; Type = I1 }
         let n = if b then 1L else 0L
@@ -753,7 +786,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = Set.empty; ArrayVars = Set.empty }
+              MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
@@ -2108,7 +2141,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = env.MutableVars; ArrayVars = Set.empty }
+              MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
@@ -2875,14 +2908,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Annot (expr, _, _) -> elaborateExpr env expr
     | LambdaAnnot (param, _, body, span) -> elaborateExpr env (Lambda(param, body, span))
 
-    // Phase 30: ForInExpr — desugar to Lambda closure + lang_for_in runtime call
-    // Strategy: wrap body as Lambda(var, bodyExpr), elaborate it to get closure struct,
-    // then call lang_for_in_list or lang_for_in_array (selected at compile time via isArrayExpr).
-    // The loop variable var becomes the lambda parameter — a fresh immutable binding per iteration (FIN-03).
+    // Phase 30 + 34-03: ForInExpr — desugar to Lambda closure + lang_for_in_* runtime call.
+    // Phase 34-03 extends: TuplePat support (for hashtable (k,v) destructuring) and
+    // collection dispatch (HashSet/Queue/MutableList/Hashtable via detectCollectionKind).
     | ForInExpr (var, collExpr, bodyExpr, span) ->
-        // Wrap body as a lambda: fun var -> bodyExpr
+        // Extract variable name from pattern; for TuplePat use a fresh param name.
         let varName = match var with Ast.VarPat(n, _) -> n | _ -> freshName env
-        let closureLambda = Lambda(varName, bodyExpr, span)
+        // For TuplePat: build lambda body that destructures the tuple param via LetPat.
+        // The closure parameter (varName) arrives as I64 (pointer to heap tuple cast to int64_t).
+        // LetPat(TuplePat, ...) now handles the I64->Ptr coercion internally (Phase 34-03 fix above).
+        let lambdaBody =
+            match var with
+            | Ast.TuplePat _ ->
+                LetPat(var, Var(varName, span), bodyExpr, span)
+            | _ -> bodyExpr
+        let closureLambda = Lambda(varName, lambdaBody, span)
         let (closureVal, closureOps) = elaborateExpr env closureLambda
         // Elaborate collection
         let (collVal, collOps) = elaborateExpr env collExpr
@@ -2904,12 +2944,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if collVal.Type = I64
             then [LlvmIntToPtrOp(collPtrVal, collVal)]
             else []
-        // Select runtime function: array path if collection is statically known to be array; else list path
+        // Select runtime function based on collection type (Phase 34-03: collection dispatch)
         let forInFn =
-            if isArrayExpr env.ArrayVars collExpr
-            then "@lang_for_in_array"
-            else "@lang_for_in_list"
-        // Call lang_for_in_list/array(closure, collection), return unit
+            match detectCollectionKind env.CollectionVars collExpr with
+            | Some HashSet     -> "@lang_for_in_hashset"
+            | Some Queue       -> "@lang_for_in_queue"
+            | Some MutableList -> "@lang_for_in_mlist"
+            | Some Hashtable   -> "@lang_for_in_hashtable"
+            | None ->
+                if isArrayExpr env.ArrayVars collExpr
+                then "@lang_for_in_array"
+                else "@lang_for_in_list"
+        // Call lang_for_in_*(closure, collection), return unit
         let unitVal = { Name = freshName env; Type = I64 }
         (unitVal, closureOps @ collOps @ closureCoerceOps @ collCoerceOps @ [LlvmCallVoidOp(forInFn, [closurePtrVal; collPtrVal]); ArithConstantOp(unitVal, 0L)])
 
@@ -3090,6 +3136,11 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 34-02: LANG-02 List comprehension
         { ExtName = "@lang_list_comp"; ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 34-03: LANG-03/04 for-in over Phase 33 collection types
+        { ExtName = "@lang_for_in_hashset";   ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_queue";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_mlist";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_hashtable"; ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -3319,5 +3370,10 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 34-02: LANG-02 List comprehension
         { ExtName = "@lang_list_comp"; ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 34-03: LANG-03/04 for-in over Phase 33 collection types
+        { ExtName = "@lang_for_in_hashset";   ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_queue";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_mlist";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_for_in_hashtable"; ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
