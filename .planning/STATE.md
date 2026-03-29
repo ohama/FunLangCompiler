@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 31 of 35 (String/Char/IO Builtins)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-03-29 — v9.0 roadmap created (Phases 31–35)
+Plan: 1 of 3 in current phase
+Status: In progress
+Last activity: 2026-03-29 — Completed 31-01-PLAN.md (string builtins: endswith, startswith, trim, concat_list)
 
-Progress: [██████████████████░░] 85% (30/35 phases; v9.0 starting)
+Progress: [██████████████████░░] 86% (30/35 phases + 1 plan in Phase 31)
 
 ## Performance Metrics
 
@@ -41,6 +41,8 @@ Progress: [██████████████████░░] 85% (30
 
 Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 
+- v9.0 Phase 31-01: E2E tests for bool-returning builtins use `to_string(bool)` pattern (not `if/then/else`) to avoid the two-sequential-if MLIR empty-block limitation
+- v9.0 Phase 31-01: LangCons-using C functions must be placed after LangCons typedef in lang_runtime.c
 - v8.0: ForInExpr uses compile-time ArrayVars dispatch (not runtime GC_size check)
 - v5.0: LangClosureFn callback ABI — C runtime calls MLIR closures via fn_ptr
 - v5.0: C runtime hashtable with chained buckets + murmurhash3
@@ -54,9 +56,11 @@ None.
 - LANG-03 (for-in pattern destructuring) depends on ForInExpr already working (done in v8.0 Phase 30)
 - LANG-04 (new collection for-in) needs Phase 33 collection types to exist first
 - PRE-05 list extension module is large (12 functions); may need own plan
+- Two-sequential-if MLIR limitation: two `if` expressions in sequence produce invalid MLIR (empty entry block). E2E tests must avoid this pattern. Not blocking for current phases.
+- ForInExpr `var: Pattern` mismatch was pre-existing bug (LangThree AST updated but LangBackend was not). Fixed in 31-01.
 
 ## Session Continuity
 
-Last session: 2026-03-29
-Stopped at: Roadmap created for v9.0 (Phases 31–35), ready to plan Phase 31
+Last session: 2026-03-29T13:00:25Z
+Stopped at: Completed 31-01-PLAN.md (string builtins: endswith, startswith, trim, concat_list)
 Resume file: None
