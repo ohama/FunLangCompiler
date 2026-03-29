@@ -106,12 +106,12 @@ Plans:
   2. A program using `[for x in coll -> expr]` or `[for i in 0..n -> expr]` list comprehension compiles and returns the correct list.
   3. A program using `for (k, v) in ht do ...` compiles and destructures tuple elements inside the loop body.
   4. A program using for-in over HashSet, Queue, MutableList, and Hashtable compiles and iterates all elements.
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 34-01: String slicing — AST elaboration for s.[start..end] and s.[start..] (C runtime helper + E2E tests)
-- [ ] 34-02: List comprehension — AST elaboration for [for x in coll -> expr] and range form (E2E tests)
-- [ ] 34-03: ForInExpr pattern destructuring + new collection for-in — tuple pattern in loop var, HashSet/Queue/MutableList/Hashtable iteration (Elaboration + E2E tests)
+- [x] 34-01-PLAN.md — String slicing (C runtime helper + E2E tests)
+- [x] 34-02-PLAN.md — List comprehension (E2E tests)
+- [x] 34-03-PLAN.md — ForInExpr TuplePat + collection for-in (Elaboration + E2E tests)
 
 ---
 
@@ -145,5 +145,5 @@ Plans:
 | 31. String/Char/IO Builtins | v9.0 | 3/3 | Complete | 2026-03-29 |
 | 32. Hashtable & List/Array Builtins | v9.0 | 3/3 | Complete | 2026-03-29 |
 | 33. Collection Types | v9.0 | 2/2 | Complete | 2026-03-30 |
-| 34. Language Constructs | v9.0 | 0/3 | Not started | - |
+| 34. Language Constructs | v9.0 | 3/3 | Complete | 2026-03-30 |
 | 35. Prelude Modules | v9.0 | 0/3 | Not started | - |

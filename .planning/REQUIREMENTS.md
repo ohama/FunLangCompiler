@@ -46,10 +46,10 @@
 
 ### Language Constructs
 
-- [ ] **LANG-01**: String slicing — `s.[start..end]` (inclusive), `s.[start..]` (끝까지) 구문 컴파일
-- [ ] **LANG-02**: List comprehension — `[for x in coll -> expr]`, `[for i in 0..n -> expr]` 컴파일
-- [ ] **LANG-03**: ForInExpr 패턴 분해 — `for (k, v) in ht do ...` 튜플 디스트럭처링 컴파일
-- [ ] **LANG-04**: Collection for-in — HashSet, Queue, MutableList, Hashtable 순회 컴파일
+- [x] **LANG-01**: String slicing — `s.[start..end]` (inclusive), `s.[start..]` (끝까지) 구문 컴파일
+- [x] **LANG-02**: List comprehension — `[for x in coll -> expr]`, `[for i in 0..n -> expr]` 컴파일
+- [x] **LANG-03**: ForInExpr 패턴 분해 — `for (k, v) in ht do ...` 튜플 디스트럭처링 컴파일
+- [x] **LANG-04**: Collection for-in — HashSet, Queue, MutableList, Hashtable 순회 컴파일
 
 ### Prelude Modules
 
@@ -96,10 +96,10 @@
 | COL-02 | Phase 33 | Complete |
 | COL-03 | Phase 33 | Complete |
 | COL-04 | Phase 33 | Complete |
-| LANG-01 | Phase 34 | Pending |
-| LANG-02 | Phase 34 | Pending |
-| LANG-03 | Phase 34 | Pending |
-| LANG-04 | Phase 34 | Pending |
+| LANG-01 | Phase 34 | Complete |
+| LANG-02 | Phase 34 | Complete |
+| LANG-03 | Phase 34 | Complete |
+| LANG-04 | Phase 34 | Complete |
 | PRE-01 | Phase 35 | Pending |
 | PRE-02 | Phase 35 | Pending |
 | PRE-03 | Phase 35 | Pending |
