@@ -547,6 +547,50 @@ int64_t* lang_array_init(int64_t n, void* closure) {
     return out;
 }
 
+/* Phase 32-02: list_sort_by — sort list ascending by key extractor closure */
+LangCons* lang_list_sort_by(void* closure, LangCons* list) {
+    int64_t n = 0;
+    LangCons* cur = list;
+    while (cur != NULL) { n++; cur = cur->tail; }
+    if (n <= 1) return list;
+
+    int64_t* elems = (int64_t*)GC_malloc((size_t)(n * 8));
+    int64_t* keys  = (int64_t*)GC_malloc((size_t)(n * 8));
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    cur = list;
+    for (int64_t i = 0; i < n; i++) {
+        elems[i] = cur->head;
+        keys[i]  = fn(closure, cur->head);
+        cur = cur->tail;
+    }
+
+    for (int64_t i = 1; i < n; i++) {
+        int64_t ke = keys[i], ve = elems[i];
+        int64_t j = i - 1;
+        while (j >= 0 && keys[j] > ke) {
+            keys[j+1]  = keys[j];
+            elems[j+1] = elems[j];
+            j--;
+        }
+        keys[j+1]  = ke;
+        elems[j+1] = ve;
+    }
+
+    LangCons* head = NULL;
+    for (int64_t i = n - 1; i >= 0; i--) {
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->head = elems[i];
+        cell->tail = head;
+        head = cell;
+    }
+    return head;
+}
+
+/* Phase 32-02: list_of_seq — identity pass-through (list already is a seq) */
+LangCons* lang_list_of_seq(void* collection) {
+    return (LangCons*)collection;
+}
+
 /* File I/O runtime functions */
 
 LangString* lang_file_read(LangString* path) {

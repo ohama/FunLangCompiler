@@ -94,4 +94,7 @@ int64_t lang_char_is_lower(int64_t c);
 int64_t lang_char_to_upper(int64_t c);
 int64_t lang_char_to_lower(int64_t c);
 
+LangCons* lang_list_sort_by(void* closure, LangCons* list);
+LangCons* lang_list_of_seq(void* collection);
+
 #endif
