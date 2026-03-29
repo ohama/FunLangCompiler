@@ -1213,6 +1213,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let ops = [LlvmCallVoidOp("@lang_eprintln", [strVal]); ArithConstantOp(unitVal, 0L)]
         (unitVal, strOps @ ops)
 
+    // eprintfn — two-arg case: eprintfn "%s" str  (MUST come before one-arg case)
+    | App (App (Var ("eprintfn", _), String (fmt, _), _), argExpr, _) when fmt = "%s" ->
+        let (argVal, argOps) = elaborateExpr env argExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = [LlvmCallVoidOp("@lang_eprintln", [argVal]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, argOps @ ops)
+
+    // eprintfn — one-arg case: eprintfn "literal" (desugar to eprintln "literal")
+    | App (Var ("eprintfn", _), String (fmt, _), _) ->
+        let s = Ast.unknownSpan
+        elaborateExpr env (App(Var("eprintln", s), String(fmt, s), s))
+
     // Phase 27: write_lines — two-arg, void return (MUST come before one-arg arms)
     | App (App (Var ("write_lines", _), pathExpr, _), linesExpr, _) ->
         let (pathVal,  pathOps)  = elaborateExpr env pathExpr
