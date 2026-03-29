@@ -7,9 +7,6 @@ module List =
     let rec append xs = fun ys -> match xs with | [] -> ys | h :: t -> h :: append t ys
     let hd xs = match xs with | h :: _ -> h
     let tl xs = match xs with | _ :: t -> t
-    let rec zip xs = fun ys -> match xs with | [] -> [] | x :: xt -> match ys with | [] -> [] | y :: yt -> (x, y) :: zip xt yt
-    let rec take n = fun xs -> if n = 0 then [] else match xs with | [] -> [] | h :: t -> h :: take (n - 1) t
-    let rec drop n = fun xs -> if n = 0 then xs else match xs with | [] -> [] | _ :: t -> drop (n - 1) t
     let rec any pred = fun xs -> match xs with | [] -> false | h :: t -> if pred h then true else any pred t
     let rec all pred = fun xs -> match xs with | [] -> true | h :: t -> if pred h then all pred t else false
     let rec flatten xss = match xss with | [] -> [] | xs :: rest -> append xs (flatten rest)

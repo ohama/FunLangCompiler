@@ -609,7 +609,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ParamTypes  = [I64]
               ReturnType  = Ptr
               ClosureInfo = Some closureInfo }
-        let env' = { env with KnownFuncs = Map.add name sig_ env.KnownFuncs }
+        // Phase 35: Module-qualified naming — also register short name alias in KnownFuncs
+        // so that references within the same module body resolve correctly.
+        let twoLambdaShortAlias =
+            let idx = name.IndexOf('_')
+            if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
+            else None
+        let env' =
+            let kf = Map.add name sig_ env.KnownFuncs
+            let kf' = match twoLambdaShortAlias with Some sn -> Map.add sn sig_ kf | None -> kf
+            { env with KnownFuncs = kf' }
 
         // Step 7: Elaborate inExpr with updated env
         elaborateExpr env' inExpr
@@ -622,7 +631,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             match detectCollectionKind env.CollectionVars bindExpr with
             | Some kind -> Map.add name kind env.CollectionVars
             | None -> env.CollectionVars
-        let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars'; CollectionVars = collVars' }
+        // Phase 35: Module-qualified naming — if name is module-prefixed (e.g., "List_hd"),
+        // also bind the short name ("hd") so internal cross-references within the module body work.
+        let moduleShortName =
+            let idx = name.IndexOf('_')
+            if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
+            else None
+        let baseVars = Map.add name bv env.Vars
+        let varsWithAlias = match moduleShortName with Some sn -> Map.add sn bv baseVars | None -> baseVars
+        let env' = { env with Vars = varsWithAlias; ArrayVars = arrayVars'; CollectionVars = collVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
         // If bops ends with a block terminator (from nested Match/TryWith), the
         // continuation code (rops) must go into the last side block that was added
@@ -843,12 +860,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let preReturnType = match body with | Lambda _ -> Ptr | _ -> I64
         let sig_ : FuncSignature =
             { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None }
+        // Phase 35: Module-qualified naming — if name is module-prefixed (e.g., "List_sort"),
+        // also register the short name ("sort") as an alias so internal recursive calls work.
+        // A module-prefixed name starts with a capital letter followed by underscore+lowercase.
+        let shortNameAlias =
+            let idx = name.IndexOf('_')
+            if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
+            else None
         let bodyEnv : ElabEnv =
             { Vars = Map.ofList [(param, { Name = "%arg0"; Type = paramType })]
               Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
               // Include outer KnownFuncs so inner closures can call other top-level functions,
-              // plus the function itself for recursive calls.
-              KnownFuncs = Map.add name sig_ env.KnownFuncs
+              // plus the function itself for recursive calls (both qualified and short-name alias).
+              KnownFuncs =
+                let kf = Map.add name sig_ env.KnownFuncs
+                match shortNameAlias with Some sn -> Map.add sn sig_ kf | None -> kf
               Funcs = env.Funcs
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
@@ -873,7 +899,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Body = { Blocks = allBodyBlocks }
               IsLlvmFunc = false }
         env.Funcs.Value <- env.Funcs.Value @ [funcOp]
-        let env' = { env with KnownFuncs = Map.add name { sig_ with ReturnType = bodyVal.Type } env.KnownFuncs }
+        let finalSig = { sig_ with ReturnType = bodyVal.Type }
+        let env' =
+            let kf = Map.add name finalSig env.KnownFuncs
+            let kf' = match shortNameAlias with Some sn -> Map.add sn finalSig kf | None -> kf
+            { env with KnownFuncs = kf' }
         elaborateExpr env' inExpr
     // Phase 8: String literal → GC_malloc'd header struct
     | String (s, _) ->
@@ -1717,10 +1747,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 25: Qualified function call desugar — M.f arg → App(Var("f"), arg)
     // Only for non-constructor members (constructors are handled by the FieldAccess arm → Constructor node).
+    // Phase 35: Use module-qualified name (modName + "_" + memberName) — matches flattenDecls prefixing.
     // Must come BEFORE the general App arm so direct-call dispatch applies.
-    | App (FieldAccess (Constructor (_, None, _), memberName, fspan), argExpr, span)
+    | App (FieldAccess (Constructor (modName, None, _), memberName, fspan), argExpr, span)
         when not (Map.containsKey memberName env.TypeEnv) ->
-        elaborateExpr env (App (Var (memberName, fspan), argExpr, span))
+        elaborateExpr env (App (Var (modName + "_" + memberName, fspan), argExpr, span))
 
     | App (funcExpr, argExpr, _) ->
         match funcExpr with
@@ -2426,13 +2457,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             )
         (recPtrVal, allFieldOps @ allocOps @ storeOps)
 
-    // Phase 25: Qualified name desugar — M.x → Var(x), M.Ctor → Constructor(Ctor)
+    // Phase 25: Qualified name desugar — M.x → Var(M_x), M.Ctor → Constructor(Ctor)
+    // Phase 35: Use module-qualified name (modName + "_" + memberName) to avoid collisions
+    // when multiple modules define functions with the same name (e.g., Option.map vs Result.map).
     // Must come BEFORE the record FieldAccess arm.
-    | FieldAccess(Constructor(_, None, _), memberName, span) ->
+    | FieldAccess(Constructor(modName, None, _), memberName, span) ->
         if Map.containsKey memberName env.TypeEnv then
             elaborateExpr env (Constructor(memberName, None, span))
         else
-            elaborateExpr env (Var(memberName, span))
+            elaborateExpr env (Var(modName + "_" + memberName, span))
 
     // Phase 18: FieldAccess — GEP into record block at declaration-order slot, load value
     | FieldAccess(recExpr, fieldName, _) ->
@@ -3332,11 +3365,19 @@ let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
 
 // Phase 25: flattenDecls — recursively flatten ModuleDecl/NamespaceDecl into a single Decl list.
 // This allows extractMainExpr to see all let bindings regardless of nesting depth.
-let rec private flattenDecls (decls: Ast.Decl list) : Ast.Decl list =
+// Phase 35: Module-qualified naming — when flattening a ModuleDecl, prefix all LetDecl/LetRecDecl
+// names with the module name (e.g., `module Option = let map f opt = ...` → `let Option_map f opt = ...`).
+// This prevents name collisions when multiple modules define functions with the same name (e.g., map, bind).
+let rec private flattenDecls (modName: string) (decls: Ast.Decl list) : Ast.Decl list =
     decls |> List.collect (fun d ->
         match d with
-        | Ast.Decl.ModuleDecl(_, innerDecls, _) -> flattenDecls innerDecls
-        | Ast.Decl.NamespaceDecl(_, innerDecls, _) -> flattenDecls innerDecls
+        | Ast.Decl.ModuleDecl(name, innerDecls, _) -> flattenDecls name innerDecls
+        | Ast.Decl.NamespaceDecl(_, innerDecls, _) -> flattenDecls modName innerDecls
+        | Ast.Decl.LetDecl(name, body, s) when modName <> "" && name <> "_" ->
+            [Ast.Decl.LetDecl(modName + "_" + name, body, s)]
+        | Ast.Decl.LetRecDecl(bindings, s) when modName <> "" ->
+            let prefixed = bindings |> List.map (fun (name, param, body, s2) -> (modName + "_" + name, param, body, s2))
+            [Ast.Decl.LetRecDecl(prefixed, s)]
         | _ -> [d])
 
 // Phase 16: Extract the main expression from a Decl list.
@@ -3348,7 +3389,7 @@ let rec private flattenDecls (decls: Ast.Decl list) : Ast.Decl list =
 // OpenDecl is a no-op (filtered out by the wildcard in build).
 let private extractMainExpr (decls: Ast.Decl list) : Expr =
     let s = unknownSpan
-    let flatDecls = flattenDecls decls
+    let flatDecls = flattenDecls "" decls
     let exprDecls =
         flatDecls |> List.filter (fun d ->
             match d with

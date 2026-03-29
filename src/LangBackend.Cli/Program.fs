@@ -86,11 +86,24 @@ let main argv =
             // Phase 35: Auto-load Prelude modules
             let preludeSrc =
                 let findPreludeDir () =
-                    // 1. Check CWD/Prelude
-                    let cwdCandidate = "Prelude"
-                    if System.IO.Directory.Exists cwdCandidate then cwdCandidate
+                    // Search for Prelude/ starting from the input file's directory and walking up.
+                    // This ensures prelude loading is scoped to the project that owns the input file,
+                    // not the arbitrary CWD. Users place Prelude/ in their project root; tools
+                    // that compile temp files in /tmp/ do not pick up a project's Prelude/.
+                    let inputDir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(inputPath))
+                    let rec walkUp (dir: string) =
+                        if dir = null || dir = "" then ""
+                        else
+                            let candidate = System.IO.Path.Combine(dir, "Prelude")
+                            if System.IO.Directory.Exists candidate then candidate
+                            else
+                                let parent = System.IO.Path.GetDirectoryName(dir)
+                                if parent = dir then ""  // reached filesystem root
+                                else walkUp parent
+                    let fromInput = walkUp inputDir
+                    if fromInput <> "" then fromInput
                     else
-                        // 2. Check assembly directory/Prelude
+                        // Fallback: check assembly directory/Prelude
                         let asmDir = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location)
                         let asmCandidate = System.IO.Path.Combine(asmDir, "Prelude")
                         if System.IO.Directory.Exists asmCandidate then asmCandidate
