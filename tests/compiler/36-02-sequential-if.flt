@@ -1,0 +1,11 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let _ = if true then println "first"
+let _ = if true then println "second"
+let _ = if 1 < 2 then println "third" else println "wrong"
+let _ = 0
+// --- Output:
+first
+second
+third
+0

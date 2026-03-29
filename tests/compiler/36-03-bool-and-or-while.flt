@@ -1,0 +1,19 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let always_true () = 1 <> 0
+let always_false () = 1 = 0
+let _ = if always_true () && always_true () then println "and_tt" else println "fail"
+let _ = if always_true () && always_false () then println "fail" else println "and_tf"
+let _ = if always_true () || always_false () then println "or_tf" else println "fail"
+let _ = if always_false () || always_true () then println "or_ft" else println "fail"
+let mut i = 0
+let _ = while i < 3 do i <- i + 1
+let _ = println (to_string i)
+let _ = 0
+// --- Output:
+and_tt
+and_tf
+or_tf
+or_ft
+3
+0
