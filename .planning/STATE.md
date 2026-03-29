@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v9.0 — Phase 34: Language Constructs (next)
+**Current focus:** v9.0 — Phase 35 (final phase)
 
 ## Current Position
 
-Phase: 34 of 35 (Language Constructs) — In Progress
-Plan: 2 of 3 in current phase
-Status: Plans 34-01 (StringSlice) and 34-02 (ListComp) complete, 1 plan remains
-Last activity: 2026-03-29 — Completed 34-02-PLAN.md (ListCompExpr — 169 E2E tests pass)
+Phase: 34 of 35 (Language Constructs) — Phase Complete
+Plan: 3 of 3 in current phase
+Status: Plans 34-01, 34-02, 34-03 all complete — Phase 34 done, 173 E2E tests pass
+Last activity: 2026-03-29 — Completed 34-03-PLAN.md (ForIn collection dispatch + TuplePat — 173 E2E tests pass)
 
-Progress: [███████████████████░] 96% (34/35 phases, 2/3 plans in Phase 34 done)
+Progress: [████████████████████] 99% (Phase 34 complete, Phase 35 remains)
 
 ## Performance Metrics
 
@@ -47,6 +47,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 - v9.0 Phase 32-02: list_of_seq is identity void* cast — no C logic, just type coercion at elaboration time
 - v9.0 Phase 33-02: queue_dequeue is two-arg curried App(App(Var, q), unit) — unit elaborated and discarded; C function takes only queue pointer
 - v9.0 Phase 33-02: mutablelist_set (three-arg) BEFORE mutablelist_get (two-arg) in Elaboration.fs — same rule as hashtable_set before hashtable_get
+- v9.0 Phase 34-03: for-in mutable capture in closures (`sum <- sum + x`) segfaults (pre-existing bug); E2E tests use single-element iteration for non-deterministic collections
+- v9.0 Phase 34-03: I64->Ptr coercion for TuplePat ForInExpr placed in LetPat(TuplePat) arm (generalizes to any tuple bind from I64 source)
+- v9.0 Phase 34-03: lang_for_in_* prototypes placed after Phase 33 typedefs in lang_runtime.h (types defined later in file)
 - v9.0 Phase 34-02: ListCompExpr var is a string (not Pattern); lang_list_comp uses LangCons* for both input and result; E2E tests use per-element for-in (not to_string on list)
 - v9.0 Phase 34-01: lang_string_slice uses stop<0 sentinel for open-ended slices (not a separate function); StringSliceExpr arm placed before failwithf catch-all
 - v9.0 Phase 33-02: LangMutableList grow uses GC_malloc+memcpy (not realloc); LangQueue uses GC_malloc nodes with head/tail/count
@@ -69,14 +72,13 @@ None.
 
 ### Blockers/Concerns
 
-- LANG-03 (for-in pattern destructuring) depends on ForInExpr already working (done in v8.0 Phase 30)
-- LANG-04 (new collection for-in) needs Phase 33 collection types to exist first
+- LANG-03 and LANG-04 COMPLETE (Phase 34-03)
 - PRE-05 list extension module is large (12 functions); may need own plan
 - Two-sequential-if MLIR limitation: two `if` expressions in sequence produce invalid MLIR (empty entry block). E2E tests must avoid this pattern. Not blocking for current phases.
-- ForInExpr `var: Pattern` mismatch was pre-existing bug (LangThree AST updated but LangBackend was not). Fixed in 31-01.
+- Pre-existing bug: for-in closures capturing `let mut` variables via `sum <- sum + x` segfaults (not fixed in v9.0)
 
 ## Session Continuity
 
-Last session: 2026-03-29T15:59:09Z
-Stopped at: Completed 34-02-PLAN.md (ListCompExpr — 169 tests pass)
+Last session: 2026-03-29
+Stopped at: Completed 34-03-PLAN.md (ForIn collection dispatch + TuplePat — 173 tests pass)
 Resume file: None
