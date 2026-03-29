@@ -1,0 +1,13 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+module StringBuilder =
+    let create () = stringbuilder_create ()
+    let add sb s  = stringbuilder_append sb s
+    let toString sb = stringbuilder_tostring sb
+let sb = StringBuilder.create ()
+let _ = StringBuilder.add sb "hello"
+let _ = StringBuilder.add sb " world"
+let _ = println (StringBuilder.toString sb)
+// --- Output:
+hello world
+0

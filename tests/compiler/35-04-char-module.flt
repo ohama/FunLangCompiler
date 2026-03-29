@@ -1,0 +1,19 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+module Char =
+    let IsDigit c = char_is_digit c
+    let ToUpper c = char_to_upper c
+    let IsLetter c = char_is_letter c
+    let IsUpper c = char_is_upper c
+    let IsLower c = char_is_lower c
+    let ToLower c = char_to_lower c
+let _ = println (to_string (Char.IsDigit '5'))
+let _ = println (to_string (Char.IsLetter 'a'))
+let _ = println (to_string (Char.IsUpper 'A'))
+let _ = println (to_string (Char.IsLower 'a'))
+// --- Output:
+1
+1
+1
+1
+0

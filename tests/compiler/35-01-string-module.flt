@@ -1,0 +1,23 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+module String =
+    let concat sep lst = string_concat_list sep lst
+    let endsWith s suffix = string_endswith s suffix
+    let startsWith s prefix = string_startswith s prefix
+    let trim s = string_trim s
+    let length s = string_length s
+    let contains s needle = string_contains s needle
+let _ = println (to_string (String.endsWith "hello.fun" ".fun"))
+let _ = println (to_string (String.startsWith "hello" "he"))
+let _ = println (String.trim "  hi  ")
+let _ = println (to_string (String.length "hello"))
+let _ = println (to_string (String.contains "hello world" "world"))
+let _ = println (String.concat ", " ["a"; "b"; "c"])
+// --- Output:
+1
+1
+hi
+5
+1
+a, b, c
+0
