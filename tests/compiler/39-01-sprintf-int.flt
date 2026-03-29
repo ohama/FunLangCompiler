@@ -1,0 +1,16 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let s1 = sprintf "%d" 42
+let s2 = sprintf "%x" 255
+let s3 = sprintf "%02x" 10
+let s4 = sprintf "%c" 65
+let _ = println s1
+let _ = println s2
+let _ = println s3
+let _ = println s4
+// --- Output:
+42
+ff
+0a
+A
+0

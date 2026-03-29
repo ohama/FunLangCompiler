@@ -1695,6 +1695,108 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let ops = [LlvmCallVoidOp("@lang_eprintln", [strVal]); ArithConstantOp(unitVal, 0L)]
         (unitVal, strOps @ ops)
 
+    // Phase 39: printfn — 2-arg case (MUST come before 1-arg case)
+    | App (App (App (Var ("printfn", _), String (fmt, _), _), arg1Expr, _), arg2Expr, _) ->
+        let s = Ast.unknownSpan
+        let sprintfExpr = App(App(App(Var("sprintf", s), String(fmt, s), s), arg1Expr, s), arg2Expr, s)
+        elaborateExpr env (App(Var("println", s), sprintfExpr, s))
+
+    // Phase 39: printfn — 1-arg case (MUST come before 0-arg case)
+    | App (App (Var ("printfn", _), String (fmt, _), _), argExpr, _) ->
+        let s = Ast.unknownSpan
+        let sprintfExpr = App(App(Var("sprintf", s), String(fmt, s), s), argExpr, s)
+        elaborateExpr env (App(Var("println", s), sprintfExpr, s))
+
+    // Phase 39: printfn — 0-arg case: printfn "literal" (desugar to println "literal")
+    | App (Var ("printfn", _), String (fmt, _), _) ->
+        let s = Ast.unknownSpan
+        elaborateExpr env (App(Var("println", s), String(fmt, s), s))
+
+    // Phase 39: sprintf — 2-arg case (MUST come BEFORE 1-arg cases — see Pitfall 1)
+    | App (App (App (Var ("sprintf", _), String (fmt, _), _), arg1Expr, _), arg2Expr, _)
+        when (let specs = fmtSpecTypes fmt in specs.Length = 2) ->
+        let specs = fmtSpecTypes fmt
+        let fmtGlobal  = addStringGlobal env fmt
+        let fmtPtrVal  = { Name = freshName env; Type = Ptr }
+        let (arg1Val, arg1Ops) = elaborateExpr env arg1Expr
+        let (arg2Val, arg2Ops) = elaborateExpr env arg2Expr
+        let result = { Name = freshName env; Type = Ptr }
+        match specs with
+        | [IntSpec; IntSpec] ->
+            let (a1, c1) = coerceToI64Arg env arg1Val
+            let (a2, c2) = coerceToI64Arg env arg2Val
+            let ops = [ LlvmAddressOfOp(fmtPtrVal, fmtGlobal); LlvmCallOp(result, "@lang_sprintf_2ii", [fmtPtrVal; a1; a2]) ]
+            (result, arg1Ops @ arg2Ops @ c1 @ c2 @ ops)
+        | [StrSpec; IntSpec] ->
+            let (a1Ptr, c1) = coerceToPtrArg env arg1Val
+            let dp1 = { Name = freshName env; Type = Ptr }
+            let da1 = { Name = freshName env; Type = Ptr }
+            let (a2, c2) = coerceToI64Arg env arg2Val
+            let ops = [
+                LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
+                LlvmGEPStructOp(dp1, a1Ptr, 1); LlvmLoadOp(da1, dp1)
+                LlvmCallOp(result, "@lang_sprintf_2si", [fmtPtrVal; da1; a2])
+            ]
+            (result, arg1Ops @ arg2Ops @ c1 @ c2 @ ops)
+        | [IntSpec; StrSpec] ->
+            let (a1, c1) = coerceToI64Arg env arg1Val
+            let (a2Ptr, c2) = coerceToPtrArg env arg2Val
+            let dp2 = { Name = freshName env; Type = Ptr }
+            let da2 = { Name = freshName env; Type = Ptr }
+            let ops = [
+                LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
+                LlvmGEPStructOp(dp2, a2Ptr, 1); LlvmLoadOp(da2, dp2)
+                LlvmCallOp(result, "@lang_sprintf_2is", [fmtPtrVal; a1; da2])
+            ]
+            (result, arg1Ops @ arg2Ops @ c1 @ c2 @ ops)
+        | [StrSpec; StrSpec] ->
+            let (a1Ptr, c1) = coerceToPtrArg env arg1Val
+            let (a2Ptr, c2) = coerceToPtrArg env arg2Val
+            let dp1 = { Name = freshName env; Type = Ptr }
+            let da1 = { Name = freshName env; Type = Ptr }
+            let dp2 = { Name = freshName env; Type = Ptr }
+            let da2 = { Name = freshName env; Type = Ptr }
+            let ops = [
+                LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
+                LlvmGEPStructOp(dp1, a1Ptr, 1); LlvmLoadOp(da1, dp1)
+                LlvmGEPStructOp(dp2, a2Ptr, 1); LlvmLoadOp(da2, dp2)
+                LlvmCallOp(result, "@lang_sprintf_2ss", [fmtPtrVal; da1; da2])
+            ]
+            (result, arg1Ops @ arg2Ops @ c1 @ c2 @ ops)
+        | _ -> failwithf "sprintf: unsupported 2-arg specifier combo in '%s'" fmt
+
+    // Phase 39: sprintf — 1-arg integer case (%d, %x, %02x, %c, etc.)
+    | App (App (Var ("sprintf", _), String (fmt, _), _), argExpr, _)
+        when (let specs = fmtSpecTypes fmt in specs.Length = 1 && specs.[0] = IntSpec) ->
+        let fmtGlobal = addStringGlobal env fmt
+        let fmtPtrVal = { Name = freshName env; Type = Ptr }
+        let (argVal, argOps) = elaborateExpr env argExpr
+        let (i64Val, coerceOps) = coerceToI64Arg env argVal
+        let result = { Name = freshName env; Type = Ptr }
+        let ops = [
+            LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
+            LlvmCallOp(result, "@lang_sprintf_1i", [fmtPtrVal; i64Val])
+        ]
+        (result, argOps @ coerceOps @ ops)
+
+    // Phase 39: sprintf — 1-arg string case (%s)
+    | App (App (Var ("sprintf", _), String (fmt, _), _), argExpr, _)
+        when (let specs = fmtSpecTypes fmt in specs.Length = 1 && specs.[0] = StrSpec) ->
+        let fmtGlobal   = addStringGlobal env fmt
+        let fmtPtrVal   = { Name = freshName env; Type = Ptr }
+        let (argVal, argOps) = elaborateExpr env argExpr
+        let (argPtr, coerce) = coerceToPtrArg env argVal
+        let dataPtrVal  = { Name = freshName env; Type = Ptr }
+        let dataAddrVal = { Name = freshName env; Type = Ptr }
+        let result      = { Name = freshName env; Type = Ptr }
+        let ops = [
+            LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
+            LlvmGEPStructOp(dataPtrVal, argPtr, 1)
+            LlvmLoadOp(dataAddrVal, dataPtrVal)
+            LlvmCallOp(result, "@lang_sprintf_1s", [fmtPtrVal; dataAddrVal])
+        ]
+        (result, argOps @ coerce @ ops)
+
     // eprintfn — two-arg case: eprintfn "%s" str  (MUST come before one-arg case)
     | App (App (Var ("eprintfn", _), String (fmt, _), _), argExpr, _) when fmt = "%s" ->
         let (argVal, argOps) = elaborateExpr env argExpr
