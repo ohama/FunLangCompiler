@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 ## Current Position
 
 Phase: 39 of 40 (Format Strings)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-30 — Phase 38 complete (CLI Arguments verified)
+Plan: 01 of 01
+Status: Phase complete
+Last activity: 2026-03-30 — Completed 39-01-PLAN.md (sprintf/printfn builtins, 192/192 tests pass)
 
-Progress: [██████░░░░] 60% (v10.0, Phases 36-38 complete)
+Progress: [████████░░] 80% (v10.0, Phases 36-39 complete)
 
 ## Performance Metrics
 
@@ -57,6 +57,10 @@ Recent decisions affecting current work:
 - Phase 38-01: Both elaborateModule and elaborateProgram must have InputTypes=[I64;Ptr] + initArgsOp prepended — missing one causes MLIR validation failures
 - Phase 38-01: lang_get_args starts from argv[1] to skip program name (argv[0] excluded per RT-03 spec)
 - Phase 38-01: get_args builtin mirrors stdin_read_all pattern (unit-arg, returns Ptr)
+- Phase 39-01: 2-arg sprintf arms must come BEFORE 1-arg arms — outer App matches first (Pitfall 1)
+- Phase 39-01: Format string literal uses addStringGlobal + LlvmAddressOfOp (avoids GEP+Load overhead)
+- Phase 39-01: printfn desugars to println(sprintf ...) at elaboration time — zero new C code
+- Phase 39-01: ExternalFuncDecl entries for sprintf wrappers added to BOTH externalFuncs lists
 
 ### Pending Todos
 
@@ -72,5 +76,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-30
-Stopped at: Completed 38-01-PLAN.md — lang_init_args/lang_get_args + get_args builtin + E2E test (189/189 pass)
+Stopped at: Completed 39-01-PLAN.md — sprintf/printfn builtins via 6 snprintf wrappers (192/192 pass)
 Resume file: None
