@@ -88,13 +88,11 @@ Plans:
   2. A program creating a `HashSet`, calling `add` and `contains`, compiles and returns correct membership results.
   3. A program creating a `Queue`, calling `enqueue` and `dequeue`, compiles and returns elements in FIFO order.
   4. A program creating a `MutableList`, calling `add`, indexed get/set, and `count`, compiles and returns correct values.
-**Plans:** TBD
+**Plans:** 2 plans
 
 Plans:
-- [ ] 33-01: StringBuilder — C runtime struct + lang_stringbuilder_create/add/tostring, Elaboration + E2E test
-- [ ] 33-02: HashSet — C runtime struct + lang_hashset_create/add/contains/count, Elaboration + E2E test
-- [ ] 33-03: Queue — C runtime struct + lang_queue_create/enqueue/dequeue/count, Elaboration + E2E test
-- [ ] 33-04: MutableList — C runtime struct + lang_mutablelist_create/add/get/set/count, Elaboration + E2E test
+- [ ] 33-01-PLAN.md — StringBuilder + HashSet (C runtime, Elaboration, E2E tests)
+- [ ] 33-02-PLAN.md — Queue + MutableList (C runtime, Elaboration, E2E tests)
 
 ---
 
