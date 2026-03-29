@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Planning next milestone
+**Current focus:** v10.0 — FunLexYacc 네이티브 컴파일 지원
 
 ## Current Position
 
-Phase: Not started
-Plan: Not started
-Status: v9.0 milestone archived, ready to plan next milestone
-Last activity: 2026-03-30 — v9.0 milestone complete (183 E2E tests, 33 requirements)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-30 — Milestone v10.0 started
 
 Progress: v1.0–v9.0 shipped
 
