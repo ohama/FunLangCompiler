@@ -2913,6 +2913,55 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let unitVal = { Name = freshName env; Type = I64 }
         (unitVal, closureOps @ collOps @ closureCoerceOps @ collCoerceOps @ [LlvmCallVoidOp(forInFn, [closurePtrVal; collPtrVal]); ArithConstantOp(unitVal, 0L)])
 
+    // Phase 34-01: LANG-01 StringSliceExpr — s.[start..stop] or s.[start..] (open-ended)
+    // Compiles to lang_string_slice(s, start, stop) where stop=-1 means "to end"
+    | StringSliceExpr (strExpr, startExpr, stopOpt, _) ->
+        let (strVal, strOps)     = elaborateExpr env strExpr
+        let (startVal, startOps) = elaborateExpr env startExpr
+        let (stopVal, stopOps) =
+            match stopOpt with
+            | Some stopExpr -> elaborateExpr env stopExpr
+            | None ->
+                let sv = { Name = freshName env; Type = I64 }
+                (sv, [ArithConstantOp(sv, -1L)])
+        let strPtrVal =
+            if strVal.Type = I64 then { Name = freshName env; Type = Ptr } else strVal
+        let strCoerceOps =
+            if strVal.Type = I64 then [LlvmIntToPtrOp(strPtrVal, strVal)] else []
+        let result = { Name = freshName env; Type = Ptr }
+        (result, strOps @ startOps @ stopOps @ strCoerceOps
+                 @ [LlvmCallOp(result, "@lang_string_slice", [strPtrVal; startVal; stopVal])])
+
+    // Phase 34-02: LANG-02 ListCompExpr — [for x in coll -> expr] or [for i in 0..n -> expr]
+    // Wraps body as Lambda, calls lang_list_comp(closure, collection) → new LangCons* list.
+    // Range form: 0..n elaborates to @lang_range which returns a LangCons* list —
+    // so lang_list_comp works uniformly for both collection and range inputs.
+    | ListCompExpr (var, collExpr, bodyExpr, span) ->
+        let closureLambda = Lambda(var, bodyExpr, span)
+        let (closureVal, closureOps) = elaborateExpr env closureLambda
+        let (collVal, collOps) = elaborateExpr env collExpr
+        // Coerce closure to Ptr if needed (same pattern as ForInExpr)
+        let closurePtrVal =
+            if closureVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else closureVal
+        let closureCoerceOps =
+            if closureVal.Type = I64
+            then [LlvmIntToPtrOp(closurePtrVal, closureVal)]
+            else []
+        // Coerce collection to Ptr if needed (list pointer may arrive as I64)
+        let collPtrVal =
+            if collVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else collVal
+        let collCoerceOps =
+            if collVal.Type = I64
+            then [LlvmIntToPtrOp(collPtrVal, collVal)]
+            else []
+        let result = { Name = freshName env; Type = Ptr }
+        (result, closureOps @ collOps @ closureCoerceOps @ collCoerceOps
+                 @ [LlvmCallOp(result, "@lang_list_comp", [closurePtrVal; collPtrVal])])
+
     | _ ->
         failwithf "Elaboration: unsupported expression %A" expr
 
@@ -3037,6 +3086,10 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_mlist_get";         ExtParams = [Ptr; I64];      ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_mlist_set";         ExtParams = [Ptr; I64; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_mlist_count";       ExtParams = [Ptr];           ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        // Phase 34-01: LANG-01 String slicing
+        { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 34-02: LANG-02 List comprehension
+        { ExtName = "@lang_list_comp"; ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -3262,5 +3315,9 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_mlist_get";         ExtParams = [Ptr; I64];      ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_mlist_set";         ExtParams = [Ptr; I64; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_mlist_count";       ExtParams = [Ptr];           ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        // Phase 34-01: LANG-01 String slicing
+        { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 34-02: LANG-02 List comprehension
+        { ExtName = "@lang_list_comp"; ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
