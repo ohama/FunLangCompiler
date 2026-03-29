@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 35 of 35 (Prelude Modules) — In progress
-Plan: 2 of ~5 in current phase
-Status: Phase 35 Plan 02 complete — Option/Result/List/Array modules + compiler fixes
-Last activity: 2026-03-29 — Completed 35-02-PLAN.md (4 Prelude .fun files + 5 E2E tests, 182 passing)
+Plan: 3 of ~5 in current phase
+Status: Phase 35 Plan 03 complete — CLI prelude auto-loading + module-qualified naming
+Last activity: 2026-03-29 — Completed 35-03-PLAN.md (CLI prelude loading, 183 passing)
 
 Progress: [████████████████████] 99% (34 phases complete, 2/~5 plans in Phase 35 done)
 
@@ -83,6 +83,7 @@ None.
 
 - 35-01 complete: String/Hashtable/StringBuilder/Char prelude .fun files + 4 E2E tests
 - 35-02 complete: Option/Result/List/Array prelude .fun files + 5 E2E tests (35-05 through 35-09); 8 compiler fixes; 182 passing
+- 35-03 complete: CLI prelude auto-loading (input-file-dir walk-up); module-qualified naming in Elaboration; 183 passing
 
 ### Blockers/Concerns
 
@@ -91,10 +92,11 @@ None.
 - Pre-existing bug: for-in closures capturing `let mut` variables via `sum <- sum + x` segfaults (not fixed in v9.0)
 - Phase 35: Bool values from module-wrapped builtins return as I64 (1/0) not I1 (true/false); to_string prints "1"/"0" (workaround: use `<> 0`)
 - Phase 35: Hashtable string keys crash — C hashtable uses int64_t key ABI; tests must use integer keys
-- Phase 35: Module name collision (Option.map vs List.map) — when all Prelude modules are loaded together in Phase 35-03, flattenDecls will produce duplicate @map functions. Phase 35-03 CLI loading must handle this (name-mangling or scoped elaboration).
+- Phase 35-03: RESOLVED — Module-qualified naming (Option_map, String_endsWith) eliminates MLIR collision; 183/183 tests pass.
+- Phase 35: take/drop/zip absent from List.fun (pre-existing if-else-match MLIR bug); can be added if compiler is fixed.
 
 ## Session Continuity
 
 Last session: 2026-03-29
-Stopped at: Completed 35-02-PLAN.md (Prelude modules Option/Result/List/Array — 182 tests pass)
+Stopped at: Completed 35-03-PLAN.md (CLI prelude auto-loading — 183 tests pass)
 Resume file: None
