@@ -40,10 +40,11 @@ Plans:
   1. `Hashtable.create ()` followed by `ht.["hello"] <- 42` stores and retrieves correctly
   2. `containsKey`, `remove`, and `keys` work with string keys
   3. String keys with identical content but different allocations hash to the same bucket
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 37-01: TBD
+- [ ] 37-01-PLAN.md — Add LangHashtableStr structs + _str C runtime functions
+- [ ] 37-02-PLAN.md — Elaboration key-type dispatch + Prelude + E2E tests
 
 ### Phase 38: CLI Arguments
 **Goal**: Compiled binaries can access command-line arguments as a string list
@@ -93,7 +94,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 36. Bug Fixes | 1/1 | Complete | 2026-03-30 |
-| 37. Hashtable String Keys | 0/TBD | Not started | - |
+| 37. Hashtable String Keys | 0/2 | Not started | - |
 | 38. CLI Arguments | 0/TBD | Not started | - |
 | 39. Format Strings | 0/TBD | Not started | - |
 | 40. Multi-file Import | 0/TBD | Not started | - |
