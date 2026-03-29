@@ -49,12 +49,12 @@ See .planning/MILESTONES.md for full history.
   2. A program calling `string_concat_list` with a separator and a list of strings compiles and returns the joined string.
   3. A program calling all six char builtins (`char_is_digit`, `char_to_upper`, `char_is_letter`, `char_is_upper`, `char_is_lower`, `char_to_lower`) compiles and returns correct values.
   4. A program calling `eprintfn` outputs its message to stderr (not stdout) at runtime.
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 31-01: String builtins — lang_string_endswith, lang_string_startswith, lang_string_trim, lang_string_concat_list (C runtime + Elaboration)
-- [ ] 31-02: Char builtins — char_is_digit/letter/upper/lower, char_to_upper/lower (Elaboration + E2E tests)
-- [ ] 31-03: eprintfn builtin — stderr output (C runtime + Elaboration + E2E test)
+- [ ] 31-01-PLAN.md — String builtins: C runtime + Elaboration + 4 E2E tests
+- [ ] 31-02-PLAN.md — Char builtins: C runtime (ctype.h) + Elaboration + 6 E2E tests
+- [ ] 31-03-PLAN.md — eprintfn: Elaboration desugaring to eprintln + 1 E2E test
 
 ---
 
@@ -144,7 +144,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–30. v1.0–v8.0 | v1.0–v8.0 | 58/58 | Complete | 2026-03-28 |
-| 31. String/Char/IO Builtins | v9.0 | 0/3 | Not started | - |
+| 31. String/Char/IO Builtins | v9.0 | 0/3 | Planned | - |
 | 32. Hashtable & List/Array Builtins | v9.0 | 0/3 | Not started | - |
 | 33. Collection Types | v9.0 | 0/4 | Not started | - |
 | 34. Language Constructs | v9.0 | 0/3 | Not started | - |
