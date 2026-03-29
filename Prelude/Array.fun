@@ -1,0 +1,13 @@
+module Array =
+    let create n def = array_create n def
+    let get arr i    = array_get arr i
+    let set arr i v  = array_set arr i v
+    let length arr   = array_length arr
+    let ofList xs    = array_of_list xs
+    let toList arr   = array_to_list arr
+    let iter f arr       = array_iter f arr
+    let map f arr        = array_map f arr
+    let fold f init arr  = array_fold f init arr
+    let init n f         = array_init n f
+    let sort arr         = array_sort arr
+    let ofSeq coll       = array_of_seq coll

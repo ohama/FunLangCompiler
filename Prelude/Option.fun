@@ -1,0 +1,9 @@
+module Option =
+    type Option 'a = None | Some of 'a
+    let map f opt = match opt with | Some x -> Some (f x) | None -> None
+    let bind f opt = match opt with | Some x -> f x | None -> None
+    let defaultValue def opt = match opt with | Some x -> x | None -> def
+    let iter f opt = match opt with | Some x -> f x | None -> ()
+    let filter pred opt = match opt with | Some x -> if pred x then Some x else None | None -> None
+    let isSome opt = match opt with | Some _ -> true | None -> false
+    let isNone opt = match opt with | Some _ -> false | None -> true
