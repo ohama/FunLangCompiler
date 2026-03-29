@@ -265,6 +265,55 @@ let private coerceToPtrArg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp l
         (r, [LlvmIntToPtrOp(r, v)])
     | _ -> (v, [])
 
+/// Phase 39: Format specifier type for compile-time dispatch.
+type FmtSpec = IntSpec | StrSpec
+
+/// Phase 39: Return ordered list of format specifier types in a format string.
+/// %d, %x, %02x, %c, %ld, %lx → IntSpec; %s → StrSpec; %% → ignored.
+let private fmtSpecTypes (fmt: string) : FmtSpec list =
+    let specs = System.Collections.Generic.List<FmtSpec>()
+    let mutable i = 0
+    while i < fmt.Length do
+        if fmt.[i] = '%' && i + 1 < fmt.Length then
+            if fmt.[i+1] = '%' then
+                i <- i + 2
+            else
+                let mutable j = i + 1
+                // Skip flags: -, +, space, 0, #
+                while j < fmt.Length && "-+ 0#".Contains(fmt.[j]) do j <- j + 1
+                // Skip width digits
+                while j < fmt.Length && fmt.[j] >= '0' && fmt.[j] <= '9' do j <- j + 1
+                // Skip precision
+                if j < fmt.Length && fmt.[j] = '.' then
+                    j <- j + 1
+                    while j < fmt.Length && fmt.[j] >= '0' && fmt.[j] <= '9' do j <- j + 1
+                // Skip length modifiers: l, h, z, t
+                while j < fmt.Length && "lhzt".Contains(fmt.[j]) do j <- j + 1
+                // Conversion character
+                if j < fmt.Length then
+                    match fmt.[j] with
+                    | 's' -> specs.Add(StrSpec)
+                    | _   -> specs.Add(IntSpec)  // d, i, o, u, x, X, c, p all map to i64
+                    j <- j + 1
+                i <- j
+        else
+            i <- i + 1
+    specs |> Seq.toList
+
+/// Phase 39: Coerce a value to I64 for int-typed sprintf wrapper args.
+/// I1 → zext to I64; I64 → pass through; Ptr → ptrtoint; I32 → pass through.
+let private coerceToI64Arg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
+    match v.Type with
+    | I64 -> (v, [])
+    | I1  ->
+        let ext = { Name = freshName env; Type = I64 }
+        (ext, [ArithExtuIOp(ext, v)])
+    | Ptr ->
+        let i = { Name = freshName env; Type = I64 }
+        (i, [LlvmPtrToIntOp(i, v)])
+    | I32 ->
+        (v, [])  // treat as I64 (should not normally arise)
+
 /// Detect whether a LetRec body uses list patterns on the parameter,
 /// indicating the parameter should be typed Ptr (list pointer) rather than I64.
 let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
@@ -3462,6 +3511,13 @@ let elaborateModule (expr: Expr) : MlirModule =
         // Phase 38: CLI argument support
         { ExtName = "@lang_init_args"; ExtParams = [I64; Ptr]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_get_args";  ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 39: Format string wrappers
+        { ExtName = "@lang_sprintf_1i";  ExtParams = [Ptr; I64];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_1s";  ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_2ii"; ExtParams = [Ptr; I64; I64];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_2si"; ExtParams = [Ptr; Ptr; I64];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_2is"; ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_2ss"; ExtParams = [Ptr; Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -3720,5 +3776,12 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         // Phase 38: CLI argument support
         { ExtName = "@lang_init_args"; ExtParams = [I64; Ptr]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_get_args";  ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 39: Format string wrappers
+        { ExtName = "@lang_sprintf_1i";  ExtParams = [Ptr; I64];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_1s";  ExtParams = [Ptr; Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_2ii"; ExtParams = [Ptr; I64; I64];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_2si"; ExtParams = [Ptr; Ptr; I64];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_2is"; ExtParams = [Ptr; I64; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sprintf_2ss"; ExtParams = [Ptr; Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }

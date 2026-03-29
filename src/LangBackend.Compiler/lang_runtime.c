@@ -1247,6 +1247,73 @@ LangCons* lang_dir_files(LangString* path) {
 }
 
 /* Phase 38: CLI argument support */
+/* Phase 39: Format string wrappers (snprintf delegation) */
+LangString* lang_sprintf_1i(char* fmt, int64_t a) {
+    int len = snprintf(NULL, 0, fmt, (long)a);
+    if (len < 0) len = 0;
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    snprintf(buf, (size_t)(len + 1), fmt, (long)a);
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = (int64_t)len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_sprintf_1s(char* fmt, char* a) {
+    int len = snprintf(NULL, 0, fmt, a);
+    if (len < 0) len = 0;
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    snprintf(buf, (size_t)(len + 1), fmt, a);
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = (int64_t)len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_sprintf_2ii(char* fmt, int64_t a, int64_t b) {
+    int len = snprintf(NULL, 0, fmt, (long)a, (long)b);
+    if (len < 0) len = 0;
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    snprintf(buf, (size_t)(len + 1), fmt, (long)a, (long)b);
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = (int64_t)len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_sprintf_2si(char* fmt, char* a, int64_t b) {
+    int len = snprintf(NULL, 0, fmt, a, (long)b);
+    if (len < 0) len = 0;
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    snprintf(buf, (size_t)(len + 1), fmt, a, (long)b);
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = (int64_t)len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_sprintf_2is(char* fmt, int64_t a, char* b) {
+    int len = snprintf(NULL, 0, fmt, (long)a, b);
+    if (len < 0) len = 0;
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    snprintf(buf, (size_t)(len + 1), fmt, (long)a, b);
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = (int64_t)len;
+    s->data = buf;
+    return s;
+}
+
+LangString* lang_sprintf_2ss(char* fmt, char* a, char* b) {
+    int len = snprintf(NULL, 0, fmt, a, b);
+    if (len < 0) len = 0;
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    snprintf(buf, (size_t)(len + 1), fmt, a, b);
+    LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->length = (int64_t)len;
+    s->data = buf;
+    return s;
+}
+
 static int64_t  s_argc = 0;
 static char**   s_argv = NULL;
 

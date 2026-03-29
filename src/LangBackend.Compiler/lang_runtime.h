@@ -196,4 +196,12 @@ void lang_for_in_hashtable(void* closure, LangHashtable* ht);
 void      lang_init_args(int64_t argc, char** argv);
 LangCons* lang_get_args(void);
 
+/* Phase 39: Format string wrappers (snprintf delegation) */
+LangString* lang_sprintf_1i(char* fmt, int64_t a);
+LangString* lang_sprintf_1s(char* fmt, char* a);
+LangString* lang_sprintf_2ii(char* fmt, int64_t a, int64_t b);
+LangString* lang_sprintf_2si(char* fmt, char* a, int64_t b);
+LangString* lang_sprintf_2is(char* fmt, int64_t a, char* b);
+LangString* lang_sprintf_2ss(char* fmt, char* a, char* b);
+
 #endif
