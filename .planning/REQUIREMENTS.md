@@ -75,17 +75,17 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STR-01 | Phase 31 | Pending |
-| STR-02 | Phase 31 | Pending |
-| STR-03 | Phase 31 | Pending |
-| STR-04 | Phase 31 | Pending |
-| CHR-01 | Phase 31 | Pending |
-| CHR-02 | Phase 31 | Pending |
-| CHR-03 | Phase 31 | Pending |
-| CHR-04 | Phase 31 | Pending |
-| CHR-05 | Phase 31 | Pending |
-| CHR-06 | Phase 31 | Pending |
-| IO-01 | Phase 31 | Pending |
+| STR-01 | Phase 31 | Complete |
+| STR-02 | Phase 31 | Complete |
+| STR-03 | Phase 31 | Complete |
+| STR-04 | Phase 31 | Complete |
+| CHR-01 | Phase 31 | Complete |
+| CHR-02 | Phase 31 | Complete |
+| CHR-03 | Phase 31 | Complete |
+| CHR-04 | Phase 31 | Complete |
+| CHR-05 | Phase 31 | Complete |
+| CHR-06 | Phase 31 | Complete |
+| IO-01 | Phase 31 | Complete |
 | HT-01 | Phase 32 | Pending |
 | HT-02 | Phase 32 | Pending |
 | LA-01 | Phase 32 | Pending |

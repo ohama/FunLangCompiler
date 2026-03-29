@@ -52,9 +52,9 @@ See .planning/MILESTONES.md for full history.
 **Plans:** 3 plans
 
 Plans:
-- [ ] 31-01-PLAN.md — String builtins: C runtime + Elaboration + 4 E2E tests
-- [ ] 31-02-PLAN.md — Char builtins: C runtime (ctype.h) + Elaboration + 6 E2E tests
-- [ ] 31-03-PLAN.md — eprintfn: Elaboration desugaring to eprintln + 1 E2E test
+- [x] 31-01-PLAN.md — String builtins: C runtime + Elaboration + 4 E2E tests
+- [x] 31-02-PLAN.md — Char builtins: C runtime (ctype.h) + Elaboration + 6 E2E tests
+- [x] 31-03-PLAN.md — eprintfn: Elaboration desugaring to eprintln + 1 E2E test
 
 ---
 
@@ -144,7 +144,7 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–30. v1.0–v8.0 | v1.0–v8.0 | 58/58 | Complete | 2026-03-28 |
-| 31. String/Char/IO Builtins | v9.0 | 0/3 | Planned | - |
+| 31. String/Char/IO Builtins | v9.0 | 3/3 | Complete | 2026-03-29 |
 | 32. Hashtable & List/Array Builtins | v9.0 | 0/3 | Not started | - |
 | 33. Collection Types | v9.0 | 0/4 | Not started | - |
 | 34. Language Constructs | v9.0 | 0/3 | Not started | - |

@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 31 of 35 (String/Char/IO Builtins) — COMPLETE
+Phase: 31 of 35 (String/Char/IO Builtins) — VERIFIED ✓
 Plan: 3 of 3 in current phase (all done)
-Status: Phase complete — ready for Phase 32
-Last activity: 2026-03-29 — Completed 31-03-PLAN.md (eprintfn builtin desugaring to @lang_eprintln)
+Status: Phase 31 verified, ready for Phase 32
+Last activity: 2026-03-29 — Phase 31 verified (11/11 must-haves, 155 E2E tests)
 
 Progress: [██████████████████░░] 89% (31/35 phases complete, 0 plans in Phase 32 started)
 
