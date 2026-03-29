@@ -11,7 +11,7 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
 
 ## Phases
 
-- [ ] **Phase 36: Bug Fixes** — Fix known compiler bugs blocking real-world code patterns
+- [x] **Phase 36: Bug Fixes** — Fix known compiler bugs blocking real-world code patterns
 - [ ] **Phase 37: Hashtable String Keys** — C runtime hash/compare extension for string struct keys
 - [ ] **Phase 38: CLI Arguments** — @main signature change + get_args runtime helper
 - [ ] **Phase 39: Format Strings** — sprintf/printfn via C runtime snprintf delegation
@@ -30,7 +30,7 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
 **Plans**: 1 plan
 
 Plans:
-- [ ] 36-01-PLAN.md — Fix FIX-01/02/03 in Elaboration.fs + E2E tests
+- [x] 36-01-PLAN.md — Fix FIX-01/02/03 in Elaboration.fs + E2E tests
 
 ### Phase 37: Hashtable String Keys
 **Goal**: Hashtable works with string keys, not just integer keys
@@ -92,7 +92,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 36. Bug Fixes | 0/1 | Not started | - |
+| 36. Bug Fixes | 1/1 | Complete | 2026-03-30 |
 | 37. Hashtable String Keys | 0/TBD | Not started | - |
 | 38. CLI Arguments | 0/TBD | Not started | - |
 | 39. Format Strings | 0/TBD | Not started | - |

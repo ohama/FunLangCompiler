@@ -27,9 +27,9 @@ Requirements for FunLexYacc 네이티브 컴파일 지원. Each maps to roadmap 
 
 ### 버그 수정
 
-- [ ] **FIX-01**: for-in 루프 내에서 `let mut` 변수 캡처가 segfault 없이 동작한다
-- [ ] **FIX-02**: 두 개의 연속 `if` 표현식이 유효한 MLIR을 생성한다
-- [ ] **FIX-03**: Bool 반환 모듈 함수가 조건문에서 `<> 0` 없이 직접 사용 가능하다
+- [x] **FIX-01**: for-in 루프 내에서 `let mut` 변수 캡처가 segfault 없이 동작한다
+- [x] **FIX-02**: 두 개의 연속 `if` 표현식이 유효한 MLIR을 생성한다
+- [x] **FIX-03**: Bool 반환 모듈 함수가 조건문에서 `<> 0` 없이 직접 사용 가능하다
 
 ## Future Requirements
 
@@ -55,9 +55,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FIX-01 | Phase 36 | Pending |
-| FIX-02 | Phase 36 | Pending |
-| FIX-03 | Phase 36 | Pending |
+| FIX-01 | Phase 36 | Complete |
+| FIX-02 | Phase 36 | Complete |
+| FIX-03 | Phase 36 | Complete |
 | RT-01 | Phase 37 | Pending |
 | RT-02 | Phase 37 | Pending |
 | RT-03 | Phase 38 | Pending |
