@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 33 of 35 (Collection Types) — VERIFIED ✓
-Plan: 2 of 2 in current phase (all done)
-Status: Phase 33 verified, ready for Phase 34
-Last activity: 2026-03-30 — Phase 33 verified (4/4 must-haves, 165 E2E tests)
+Phase: 34 of 35 (Language Constructs) — In Progress
+Plan: 1 of 3 in current phase
+Status: Plan 34-01 complete (string slicing), 2 plans remain
+Last activity: 2026-03-29 — Completed 34-01-PLAN.md (StringSliceExpr — 167 E2E tests pass)
 
-Progress: [███████████████████░] 94% (33/35 phases complete, 0 plans in Phase 34 started)
+Progress: [███████████████████░] 94% (33/35 phases complete, 1 plan in Phase 34 done)
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 - v9.0 Phase 32-02: list_of_seq is identity void* cast — no C logic, just type coercion at elaboration time
 - v9.0 Phase 33-02: queue_dequeue is two-arg curried App(App(Var, q), unit) — unit elaborated and discarded; C function takes only queue pointer
 - v9.0 Phase 33-02: mutablelist_set (three-arg) BEFORE mutablelist_get (two-arg) in Elaboration.fs — same rule as hashtable_set before hashtable_get
+- v9.0 Phase 34-01: lang_string_slice uses stop<0 sentinel for open-ended slices (not a separate function); StringSliceExpr arm placed before failwithf catch-all
 - v9.0 Phase 33-02: LangMutableList grow uses GC_malloc+memcpy (not realloc); LangQueue uses GC_malloc nodes with head/tail/count
 - v9.0 Phase 33-01: Struct typedefs defined only in lang_runtime.h — never redefined in lang_runtime.c (prevents clang redefinition errors)
 - v9.0 Phase 33-01: hashset_add uses LlvmCallOp returning I64 (not LlvmCallVoidOp) — matches LangThree bool return
@@ -75,6 +76,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-29T15:27:29Z
-Stopped at: Completed 33-02-PLAN.md (Queue + MutableList — 165 tests pass)
+Last session: 2026-03-29T00:08:00Z
+Stopped at: Completed 34-01-PLAN.md (StringSliceExpr — 167 tests pass)
 Resume file: None
