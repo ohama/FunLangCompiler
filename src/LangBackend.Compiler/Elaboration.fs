@@ -2138,7 +2138,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let (sVal, resolveOps) = resolveAccessorTyped scrutAcc expectedType
                 // Emit the test
                 let (cond, testOps) = emitCtorTest sVal tag
-                // Pre-load sub-fields with correct types into the cache
+                // Snapshot accessor cache before preloading branch-specific fields.
+                // preloadOps are only valid in the matchLabel block (ifMatch path).
+                // We must restore the cache before emitting ifNoMatch so it doesn't
+                // incorrectly reuse values defined only in the ifMatch branch, which
+                // would violate MLIR dominance constraints.
+                let cacheSnapshot = System.Collections.Generic.Dictionary<_, _>(accessorCache)
+                // Pre-load sub-fields with correct types into the cache (for ifMatch branch)
                 let preloadOps =
                     match tag with
                     | MatchCompiler.ConsCtor -> ensureConsFieldTypes scrutAcc argAccs
@@ -2149,6 +2155,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let matchLabel   = freshLabel env "match_yes"
                 let noMatchLabel = freshLabel env "match_no"
                 let matchOps   = emitDecisionTree ifMatch
+                // Restore accessor cache to pre-preload snapshot before emitting ifNoMatch.
+                // This prevents the ifNoMatch branch from seeing field values that were only
+                // loaded in the ifMatch block (which doesn't dominate the ifNoMatch block).
+                accessorCache.Clear()
+                for kvp in cacheSnapshot do accessorCache.[kvp.Key] <- kvp.Value
                 let noMatchOps = emitDecisionTree ifNoMatch
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some matchLabel; Args = []; Body = preloadOps @ matchOps }
@@ -2785,6 +2796,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let expectedType = scrutineeTypeForTag2 tag
                 let (sVal, resolveOps) = resolveAccessorTyped2 scrutAcc expectedType
                 let (cond, testOps) = emitCtorTest2 sVal tag
+                // Snapshot cache before preloading ifMatch-specific fields.
+                let cacheSnapshot2 = System.Collections.Generic.Dictionary<_, _>(accessorCache2)
                 let preloadOps =
                     match tag with
                     | MatchCompiler.ConsCtor -> ensureConsFieldTypes2 scrutAcc argAccs
@@ -2794,6 +2807,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let matchLabel   = freshLabel env "try_yes"
                 let noMatchLabel = freshLabel env "try_no"
                 let matchOps   = emitDecisionTree2 ifMatch
+                // Restore cache before emitting ifNoMatch branch.
+                accessorCache2.Clear()
+                for kvp in cacheSnapshot2 do accessorCache2.[kvp.Key] <- kvp.Value
                 let noMatchOps = emitDecisionTree2 ifNoMatch
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some matchLabel; Args = []; Body = preloadOps @ matchOps }
