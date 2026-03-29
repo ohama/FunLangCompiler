@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v9.0 — Phase 32: Array Builtins (next)
+**Current focus:** v9.0 — Phase 32: Hashtable & List/Array Builtins (in progress)
 
 ## Current Position
 
-Phase: 31 of 35 (String/Char/IO Builtins) — VERIFIED ✓
-Plan: 3 of 3 in current phase (all done)
-Status: Phase 31 verified, ready for Phase 32
-Last activity: 2026-03-29 — Phase 31 verified (11/11 must-haves, 155 E2E tests)
+Phase: 32 of 35 (Hashtable & List/Array Builtins) — In Progress
+Plan: 1 of N in current phase (plan 01 done)
+Status: Plan 32-01 complete (157 E2E tests)
+Last activity: 2026-03-29 — Completed 32-01-PLAN.md (hashtable_trygetvalue + hashtable_count, 2 new E2E tests)
 
-Progress: [██████████████████░░] 89% (31/35 phases complete, 0 plans in Phase 32 started)
+Progress: [██████████████████░░] 89% (31/35 phases complete, 1 plan in Phase 32 done)
 
 ## Performance Metrics
 
@@ -41,6 +41,8 @@ Progress: [██████████████████░░] 89% (31
 
 Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 
+- v9.0 Phase 32-01: hashtable_count uses inline GEP at LangHashtable field index 2 (size), no C function needed
+- v9.0 Phase 32-01: E2E tests use `println (to_string ...)` — `printfn "%d"` does not exist in elaborator
 - v9.0 Phase 31-03: eprintfn desugars to @lang_eprintln (two-arg %s case); two-arg App(App(...)) arm must appear before one-arg App(...) arm
 - v9.0 Phase 31-02: Char transformer E2E tests use exit-code comparison (`result = char_to_int 'X'`) since compiler has no %c format printing
 - v9.0 Phase 31-01: E2E tests for bool-returning builtins use `to_string(bool)` pattern (not `if/then/else`) to avoid the two-sequential-if MLIR empty-block limitation
@@ -63,6 +65,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-29T13:26:33Z
-Stopped at: Completed 31-03-PLAN.md (eprintfn builtin, Phase 31 complete — 155 tests pass)
+Last session: 2026-03-29T14:26:53Z
+Stopped at: Completed 32-01-PLAN.md (hashtable_trygetvalue + hashtable_count — 157 tests pass)
 Resume file: None
