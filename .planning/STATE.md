@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 ## Current Position
 
 Phase: 35 of 35 (Prelude Modules) — In progress
-Plan: 1 of ~5 in current phase
-Status: Phase 35 Plan 01 complete — String/Hashtable/StringBuilder/Char modules
-Last activity: 2026-03-29 — Completed 35-01-PLAN.md (4 Prelude .fun files + 4 E2E tests, 179 passing)
+Plan: 2 of ~5 in current phase
+Status: Phase 35 Plan 02 complete — Option/Result/List/Array modules + compiler fixes
+Last activity: 2026-03-29 — Completed 35-02-PLAN.md (4 Prelude .fun files + 5 E2E tests, 182 passing)
 
-Progress: [████████████████████] 98% (34 phases complete, 1/~5 plans in Phase 35 done)
+Progress: [████████████████████] 99% (34 phases complete, 2/~5 plans in Phase 35 done)
 
 ## Performance Metrics
 
@@ -58,6 +58,11 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 - v9.0 Phase 33-01: StringBuilder buffer growth uses GC_malloc + memcpy (not realloc); HashSet reuses lang_ht_hash murmurhash3
 - v9.0 Phase 32-01: hashtable_count uses inline GEP at LangHashtable field index 2 (size), no C function needed
 - v9.0 Phase 32-01: E2E tests use `println (to_string ...)` — `printfn "%d"` does not exist in elaborator
+- v9.0 Phase 35-02: Module name collision (Option.map vs List.map) — both produce flat @map in MLIR after flattenDecls; tests use bare `type Option 'a = ...` instead of inlining full Option module alongside List module
+- v9.0 Phase 35-02: coerceToPtrArg must be applied to ALL array/list builtin call sites — collection args captured in closure wrappers arrive as I64 (ptrtoint)
+- v9.0 Phase 35-02: Accessor cache snapshot/restore in emitDecisionTree Switch — prevents MLIR operand dominance violations across ifMatch/ifNoMatch branches
+- v9.0 Phase 35-02: LetRec preReturnType = match body with Lambda _ -> Ptr | _ -> I64 (predict before seeing actual return)
+- v9.0 Phase 35-02: LetRec KnownFuncs = Map.add name sig_ env.KnownFuncs (not Map.ofList — must include outer env)
 - v9.0 Phase 35-01: Bool values from module-wrapped builtins return I64 (1/0) not I1; to_string calls @lang_to_string_int → "1"/"0"
 - v9.0 Phase 35-01: E2E module tests use top-level `let _ = expr` (no `in` chaining) — parseModule doesn't accept `in` at top level
 - v9.0 Phase 35-01: Hashtable tests use integer keys (not strings); C hashtable uses int64_t key ABI
@@ -77,20 +82,19 @@ None.
 ### Phase 35 Progress Notes
 
 - 35-01 complete: String/Hashtable/StringBuilder/Char prelude .fun files + 4 E2E tests
-- 35-02 through 35-09 tests already pre-created (previous session); Option/Result tests (35-05, 35-06) pass
-- Remaining: Option.fun, Result.fun, List.fun, Array.fun prelude files
+- 35-02 complete: Option/Result/List/Array prelude .fun files + 5 E2E tests (35-05 through 35-09); 8 compiler fixes; 182 passing
 
 ### Blockers/Concerns
 
 - LANG-03 and LANG-04 COMPLETE (Phase 34-03)
-- PRE-05 list extension module is large (12 functions); may need own plan
 - Two-sequential-if MLIR limitation: two `if` expressions in sequence produce invalid MLIR (empty entry block). E2E tests must avoid this pattern. Not blocking for current phases.
 - Pre-existing bug: for-in closures capturing `let mut` variables via `sum <- sum + x` segfaults (not fixed in v9.0)
-- Phase 35: Bool values from module-wrapped builtins return as I64 (1/0) not I1 (true/false); to_string prints "1"/"0"
+- Phase 35: Bool values from module-wrapped builtins return as I64 (1/0) not I1 (true/false); to_string prints "1"/"0" (workaround: use `<> 0`)
 - Phase 35: Hashtable string keys crash — C hashtable uses int64_t key ABI; tests must use integer keys
+- Phase 35: Module name collision (Option.map vs List.map) — when all Prelude modules are loaded together in Phase 35-03, flattenDecls will produce duplicate @map functions. Phase 35-03 CLI loading must handle this (name-mangling or scoped elaboration).
 
 ## Session Continuity
 
 Last session: 2026-03-29
-Stopped at: Completed 35-01-PLAN.md (Prelude modules String/Hashtable/StringBuilder/Char — 179 tests pass)
+Stopped at: Completed 35-02-PLAN.md (Prelude modules Option/Result/List/Array — 182 tests pass)
 Resume file: None
