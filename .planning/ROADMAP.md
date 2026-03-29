@@ -13,7 +13,7 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
 
 - [x] **Phase 36: Bug Fixes** — Fix known compiler bugs blocking real-world code patterns
 - [x] **Phase 37: Hashtable String Keys** — C runtime hash/compare extension for string struct keys
-- [ ] **Phase 38: CLI Arguments** — @main signature change + get_args runtime helper
+- [x] **Phase 38: CLI Arguments** — @main signature change + get_args runtime helper
 - [ ] **Phase 39: Format Strings** — sprintf/printfn via C runtime snprintf delegation
 - [ ] **Phase 40: Multi-file Import** — AST flattening for `open "file.fun"` before elaboration
 
@@ -57,7 +57,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 38-01-PLAN.md — C runtime args + Elaboration @main/get_args + E2E test
+- [x] 38-01-PLAN.md — C runtime args + Elaboration @main/get_args + E2E test
 
 ### Phase 39: Format Strings
 **Goal**: sprintf and printfn produce formatted output using C snprintf delegation
@@ -95,6 +95,6 @@ Plans:
 |-------|----------------|--------|-----------|
 | 36. Bug Fixes | 1/1 | Complete | 2026-03-30 |
 | 37. Hashtable String Keys | 2/2 | Complete | 2026-03-30 |
-| 38. CLI Arguments | 0/1 | Not started | - |
+| 38. CLI Arguments | 1/1 | Complete | 2026-03-30 |
 | 39. Format Strings | 0/TBD | Not started | - |
 | 40. Multi-file Import | 0/TBD | Not started | - |

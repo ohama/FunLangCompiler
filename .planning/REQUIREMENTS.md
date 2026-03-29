@@ -11,8 +11,8 @@ Requirements for FunLexYacc 네이티브 컴파일 지원. Each maps to roadmap 
 
 - [x] **RT-01**: Hashtable이 문자열 키를 지원한다 — C runtime hash/compare가 string 구조체를 올바르게 처리
 - [x] **RT-02**: Hashtable 문자열 키로 get/set/containsKey/remove가 정상 동작한다
-- [ ] **RT-03**: 컴파일된 바이너리가 CLI 인자를 `get_args ()` 로 string list로 받을 수 있다
-- [ ] **RT-04**: `@main` 시그니처가 `(i64, ptr) -> i64` (argc, argv)를 받는다
+- [x] **RT-03**: 컴파일된 바이너리가 CLI 인자를 `get_args ()` 로 string list로 받을 수 있다
+- [x] **RT-04**: `@main` 시그니처가 `(i64, ptr) -> i64` (argc, argv)를 받는다
 - [ ] **RT-05**: `sprintf "%d" n` 이 포맷된 문자열을 반환한다
 - [ ] **RT-06**: `sprintf` 가 `%d`, `%s`, `%x`, `%02x`, `%c` 포맷 지정자를 지원한다
 - [ ] **RT-07**: `printfn "%d states" n` 이 포맷된 문자열을 stdout에 출력한다
@@ -60,8 +60,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FIX-03 | Phase 36 | Complete |
 | RT-01 | Phase 37 | Complete |
 | RT-02 | Phase 37 | Complete |
-| RT-03 | Phase 38 | Pending |
-| RT-04 | Phase 38 | Pending |
+| RT-03 | Phase 38 | Complete |
+| RT-04 | Phase 38 | Complete |
 | RT-05 | Phase 39 | Pending |
 | RT-06 | Phase 39 | Pending |
 | RT-07 | Phase 39 | Pending |
