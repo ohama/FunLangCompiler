@@ -626,6 +626,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Let (name, bindExpr, bodyExpr, _) ->
         let blocksBeforeBind = env.Blocks.Value.Length
         let (bv, bops) = elaborateExpr env bindExpr
+        // Phase 36 FIX-02: Capture block count AFTER bindExpr but BEFORE bodyExpr.
+        // This records the index of the OUTER expression's merge block, so we patch
+        // the correct block even when bodyExpr adds more side blocks (e.g. a second if).
+        let blocksAfterBind = env.Blocks.Value.Length
         let arrayVars' = if isArrayExpr env.ArrayVars bindExpr then Set.add name env.ArrayVars else env.ArrayVars
         let collVars' =
             match detectCollectionKind env.CollectionVars bindExpr with
@@ -641,20 +645,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let varsWithAlias = match moduleShortName with Some sn -> Map.add sn bv baseVars | None -> baseVars
         let env' = { env with Vars = varsWithAlias; ArrayVars = arrayVars'; CollectionVars = collVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
-        // If bops ends with a block terminator (from nested Match/TryWith), the
-        // continuation code (rops) must go into the last side block that was added
-        // (the inner expression's merge block), not after the terminator inline.
+        // If bops ends with a block terminator (from nested Match/TryWith/If), the
+        // continuation code (rops) must go into the outer if's merge block (at blocksAfterBind - 1),
+        // not the last block in env.Blocks (which may be the INNER if's merge block).
         let isTerminator op =
             match op with
             | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
             | _ -> false
         match List.tryLast bops with
-        | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBind ->
-            // Place rops in the last side block (inner merge block) before its existing ops
+        | Some op when isTerminator op && blocksAfterBind > blocksBeforeBind ->
+            // Place rops in the OUTER merge block (captured BEFORE bodyExpr elaboration)
             let innerBlocks = env.Blocks.Value
-            let lastBlock = List.last innerBlocks
-            let patchedLast = { lastBlock with Body = rops @ lastBlock.Body }
-            env.Blocks.Value <- (List.take (innerBlocks.Length - 1) innerBlocks) @ [patchedLast]
+            let targetIdx = blocksAfterBind - 1
+            let targetBlock = innerBlocks.[targetIdx]
+            let patchedTarget = { targetBlock with Body = rops @ targetBlock.Body }
+            env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (rv, bops)  // bops alone (terminator as last op — valid MLIR block ending)
         | _ ->
             (rv, bops @ rops)
@@ -665,17 +670,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | LetPat (WildcardPat _, bindExpr, bodyExpr, _) ->
         let blocksBeforeBind = env.Blocks.Value.Length
         let (_bv, bops) = elaborateExpr env bindExpr
+        // Phase 36 FIX-02: Capture block count AFTER bindExpr but BEFORE bodyExpr.
+        // Same fix as Let case — targets the OUTER merge block, not the innermost one.
+        let blocksAfterBind = env.Blocks.Value.Length
         let (rv, rops) = elaborateExpr env bodyExpr
         let isTerminator op =
             match op with
             | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
             | _ -> false
         match List.tryLast bops with
-        | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBind ->
+        | Some op when isTerminator op && blocksAfterBind > blocksBeforeBind ->
+            // Place rops in the OUTER merge block (captured BEFORE bodyExpr elaboration)
             let innerBlocks = env.Blocks.Value
-            let lastBlock = List.last innerBlocks
-            let patchedLast = { lastBlock with Body = rops @ lastBlock.Body }
-            env.Blocks.Value <- (List.take (innerBlocks.Length - 1) innerBlocks) @ [patchedLast]
+            let targetIdx = blocksAfterBind - 1
+            let targetBlock = innerBlocks.[targetIdx]
+            let patchedTarget = { targetBlock with Body = rops @ targetBlock.Body }
+            env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (rv, bops)
         | _ ->
             (rv, bops @ rops)
@@ -803,7 +813,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = I1 }
         (result, lops @ rops @ [ArithCmpIOp(result, "sge", lv, rv)])
     | If (condExpr, thenExpr, elseExpr, _) ->
+        let blocksBeforeCond = env.Blocks.Value.Length
         let (condVal, condOps) = elaborateExpr env condExpr
+        let blocksAfterCond = env.Blocks.Value.Length
         // Phase 35: If condition is I64 (e.g. result from module-wrapped bool builtin),
         // compare != 0 to produce I1 for cf.cond_br.
         let (i1CondVal, coerceCondOps) =
@@ -830,29 +842,78 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some elseLabel; Args = []; Body = elseOps @ elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
-        (mergeArg, condOps @ coerceCondOps @ [CfCondBrOp(i1CondVal, thenLabel, [], elseLabel, [])])
+        // Phase 36 FIX-03: If condOps ends with a terminator (e.g. And/Or produced a CfCondBrOp),
+        // the If's own CfCondBrOp must go into the And/Or's merge block (blocksAfterCond - 1),
+        // not appended inline after the terminator.
+        let isTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        let ifBranchOp = CfCondBrOp(i1CondVal, thenLabel, [], elseLabel, [])
+        match List.tryLast condOps with
+        | Some op when isTerminator op && blocksAfterCond > blocksBeforeCond ->
+            // Patch the If's CfCondBrOp into the condition's merge block
+            let allBlocks = env.Blocks.Value
+            let targetIdx = blocksAfterCond - 1
+            let targetBlock = allBlocks.[targetIdx]
+            let patchedTarget = { targetBlock with Body = coerceCondOps @ [ifBranchOp] @ targetBlock.Body }
+            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+            (mergeArg, condOps)
+        | _ ->
+            (mergeArg, condOps @ coerceCondOps @ [ifBranchOp])
     | And (lhsExpr, rhsExpr, _) ->
         let (leftVal, leftOps) = elaborateExpr env lhsExpr
+        // Phase 36 FIX-03: If leftVal is I64 (e.g. module Bool function returning I64),
+        // coerce to I1 via != 0 comparison before use in cf.cond_br.
+        let (i1LeftVal, coerceLeftOps) =
+            if leftVal.Type = I64 then
+                let zeroVal = { Name = freshName env; Type = I64 }
+                let boolVal = { Name = freshName env; Type = I1  }
+                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", leftVal, zeroVal)])
+            else (leftVal, [])
         let evalRightLabel = freshLabel env "and_right"
         let mergeLabel     = freshLabel env "and_merge"
         let (rightVal, rightOps) = elaborateExpr env rhsExpr
+        // Phase 36 FIX-03: Coerce rightVal to I1 as well (merge block arg type must be I1).
+        let (i1RightVal, coerceRightOps) =
+            if rightVal.Type = I64 then
+                let zeroVal = { Name = freshName env; Type = I64 }
+                let boolVal = { Name = freshName env; Type = I1  }
+                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
+            else (rightVal, [])
         let mergeArg = { Name = freshName env; Type = I1 }
         env.Blocks.Value <- env.Blocks.Value @
-            [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ [CfBrOp(mergeLabel, [rightVal])] } ]
+            [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
-        (mergeArg, leftOps @ [CfCondBrOp(leftVal, evalRightLabel, [], mergeLabel, [leftVal])])
+        (mergeArg, leftOps @ coerceLeftOps @ [CfCondBrOp(i1LeftVal, evalRightLabel, [], mergeLabel, [i1LeftVal])])
     | Or (lhsExpr, rhsExpr, _) ->
         let (leftVal, leftOps) = elaborateExpr env lhsExpr
+        // Phase 36 FIX-03: If leftVal is I64 (e.g. module Bool function returning I64),
+        // coerce to I1 via != 0 comparison before use in cf.cond_br.
+        // Note: Or is short-circuit: true → merge (with left), false → eval right.
+        let (i1LeftVal, coerceLeftOps) =
+            if leftVal.Type = I64 then
+                let zeroVal = { Name = freshName env; Type = I64 }
+                let boolVal = { Name = freshName env; Type = I1  }
+                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", leftVal, zeroVal)])
+            else (leftVal, [])
         let evalRightLabel = freshLabel env "or_right"
         let mergeLabel     = freshLabel env "or_merge"
         let (rightVal, rightOps) = elaborateExpr env rhsExpr
+        // Phase 36 FIX-03: Coerce rightVal to I1 as well (merge block arg type must be I1).
+        let (i1RightVal, coerceRightOps) =
+            if rightVal.Type = I64 then
+                let zeroVal = { Name = freshName env; Type = I64 }
+                let boolVal = { Name = freshName env; Type = I1  }
+                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
+            else (rightVal, [])
         let mergeArg = { Name = freshName env; Type = I1 }
         env.Blocks.Value <- env.Blocks.Value @
-            [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ [CfBrOp(mergeLabel, [rightVal])] } ]
+            [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
-        (mergeArg, leftOps @ [CfCondBrOp(leftVal, mergeLabel, [leftVal], evalRightLabel, [])])
+        (mergeArg, leftOps @ coerceLeftOps @ [CfCondBrOp(i1LeftVal, mergeLabel, [i1LeftVal], evalRightLabel, [])])
     | LetRec (name, param, body, inExpr, _) ->
         let paramType = if isListParamBody param body then Ptr else I64
         // Pre-determine return type: Lambda body returns Ptr (closure struct).
@@ -2954,14 +3015,28 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let exitArg = { Name = freshName env; Type = I64 }
         // Elaborate condition for the header block
         let (condVal, condOps)    = elaborateExpr env condExpr
+        // Phase 36 FIX-03: Coerce condVal to I1 if it is I64 (e.g. module Bool function).
+        let (i1CondVal, coerceCondOps) =
+            if condVal.Type = I64 then
+                let zeroVal = { Name = freshName env; Type = I64 }
+                let boolVal = { Name = freshName env; Type = I1  }
+                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", condVal, zeroVal)])
+            else (condVal, [])
         // Track how many side blocks exist before elaborating body (for detecting inner blocks)
         let blocksBeforeBody = env.Blocks.Value.Length
         // Elaborate body for the body block
         let (_bodyVal, bodyOps)   = elaborateExpr env bodyExpr
         // Re-elaborate condition for mutable-safe back-edge evaluation
         let (condVal2, condOps2)  = elaborateExpr env condExpr
+        // Phase 36 FIX-03: Coerce condVal2 to I1 if it is I64 (same pattern as header cond).
+        let (i1CondVal2, coerceCondOps2) =
+            if condVal2.Type = I64 then
+                let zeroVal = { Name = freshName env; Type = I64 }
+                let boolVal = { Name = freshName env; Type = I1  }
+                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", condVal2, zeroVal)])
+            else (condVal2, [])
         // Back-edge ops: re-evaluated condition + branch back to header or to exit
-        let backEdgeOps = condOps2 @ [ CfCondBrOp(condVal2, bodyLabel, [], exitLabel, [unitConst]) ]
+        let backEdgeOps = condOps2 @ coerceCondOps2 @ [ CfCondBrOp(i1CondVal2, bodyLabel, [], exitLabel, [unitConst]) ]
         // Determine where to place the back-edge ops.
         // If bodyOps ends with a block terminator (from a nested while/if/match inside the body),
         // the back-edge must be appended to the LAST side block (the inner expression's merge/exit
@@ -2983,7 +3058,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some headerLabel
                 Args  = []
-                Body  = condOps @ [ CfCondBrOp(condVal, bodyLabel, [], exitLabel, [unitConst]) ] }
+                Body  = condOps @ coerceCondOps @ [ CfCondBrOp(i1CondVal, bodyLabel, [], exitLabel, [unitConst]) ] }
               { Label = Some bodyLabel
                 Args  = []
                 Body  = bodyBlockBody }
