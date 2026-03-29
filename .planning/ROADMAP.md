@@ -91,8 +91,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 33-01-PLAN.md — StringBuilder + HashSet (C runtime, Elaboration, E2E tests)
-- [ ] 33-02-PLAN.md — Queue + MutableList (C runtime, Elaboration, E2E tests)
+- [x] 33-01-PLAN.md — StringBuilder + HashSet (C runtime, Elaboration, E2E tests)
+- [x] 33-02-PLAN.md — Queue + MutableList (C runtime, Elaboration, E2E tests)
 
 ---
 
@@ -144,6 +144,6 @@ Plans:
 | 1–30. v1.0–v8.0 | v1.0–v8.0 | 58/58 | Complete | 2026-03-28 |
 | 31. String/Char/IO Builtins | v9.0 | 3/3 | Complete | 2026-03-29 |
 | 32. Hashtable & List/Array Builtins | v9.0 | 3/3 | Complete | 2026-03-29 |
-| 33. Collection Types | v9.0 | 0/4 | Not started | - |
+| 33. Collection Types | v9.0 | 2/2 | Complete | 2026-03-30 |
 | 34. Language Constructs | v9.0 | 0/3 | Not started | - |
 | 35. Prelude Modules | v9.0 | 0/3 | Not started | - |

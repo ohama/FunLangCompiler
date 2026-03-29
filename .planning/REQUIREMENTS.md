@@ -39,10 +39,10 @@
 
 ### Collection Types
 
-- [ ] **COL-01**: StringBuilder — 생성, add, toString (C runtime struct + 3 함수)
-- [ ] **COL-02**: HashSet — 생성, add, contains, count (C runtime struct + 4 함수)
-- [ ] **COL-03**: Queue — 생성, enqueue, dequeue, count (C runtime struct + 4 함수)
-- [ ] **COL-04**: MutableList — 생성, add, index get/set, count (C runtime struct + 5 함수)
+- [x] **COL-01**: StringBuilder — 생성, add, toString (C runtime struct + 3 함수)
+- [x] **COL-02**: HashSet — 생성, add, contains, count (C runtime struct + 4 함수)
+- [x] **COL-03**: Queue — 생성, enqueue, dequeue, count (C runtime struct + 4 함수)
+- [x] **COL-04**: MutableList — 생성, add, index get/set, count (C runtime struct + 5 함수)
 
 ### Language Constructs
 
@@ -92,10 +92,10 @@
 | LA-02 | Phase 32 | Complete |
 | LA-03 | Phase 32 | Complete |
 | LA-04 | Phase 32 | Complete |
-| COL-01 | Phase 33 | Pending |
-| COL-02 | Phase 33 | Pending |
-| COL-03 | Phase 33 | Pending |
-| COL-04 | Phase 33 | Pending |
+| COL-01 | Phase 33 | Complete |
+| COL-02 | Phase 33 | Complete |
+| COL-03 | Phase 33 | Complete |
+| COL-04 | Phase 33 | Complete |
 | LANG-01 | Phase 34 | Pending |
 | LANG-02 | Phase 34 | Pending |
 | LANG-03 | Phase 34 | Pending |
