@@ -1,0 +1,10 @@
+// --- Command: bash -c 'PROJROOT=%S/../.. && TMPLT="$PROJROOT/test_prelude_$$.lt" && OUTBIN=$(mktemp /tmp/langback_XXXXXX) && cp %input "$TMPLT" && dotnet run --project "$PROJROOT/src/LangBackend.Cli/LangBackend.Cli.fsproj" -- "$TMPLT" -o "$OUTBIN" && "$OUTBIN"; echo $?; rm -f "$OUTBIN" "$TMPLT"'
+// --- Input:
+let _ = println (to_string ((String.endsWith "hello.fun" ".fun") <> 0))
+let _ = println (to_string (String.length "test"))
+let _ = println (to_string ((Option.isSome (Some 42)) <> 0))
+// --- Output:
+true
+4
+true
+0
