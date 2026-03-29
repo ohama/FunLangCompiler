@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-03-29)
 
 ## Current Position
 
-Phase: 32 of 35 (Hashtable & List/Array Builtins) — VERIFIED ✓
-Plan: 3 of 3 in current phase (all done)
-Status: Phase 32 verified, ready for Phase 33
-Last activity: 2026-03-29 — Phase 32 verified (5/5 must-haves, 161 E2E tests)
+Phase: 33 of 35 (Collection Types) — In progress
+Plan: 1 of 3 in current phase (plan 01 done)
+Status: Phase 33 plan 01 complete, ready for plan 02
+Last activity: 2026-03-29 — Completed 33-01-PLAN.md (StringBuilder + HashSet — 163 E2E tests)
 
-Progress: [███████████████████░] 91% (32/35 phases complete, 0 plans in Phase 33 started)
+Progress: [███████████████████░] 92% (32/35 phases + 1/3 plans in Phase 33)
 
 ## Performance Metrics
 
@@ -45,6 +45,9 @@ Decisions are logged in PROJECT.md Key Decisions table. Recent decisions:
 - v9.0 Phase 32-03: externalFuncs appears twice in Elaboration.fs (elaborateModule + elaborateProgram) — both must be kept in sync
 - v9.0 Phase 32-02: list_sort_by uses insertion sort with parallel int64_t arrays + LangClosureFn key extractor
 - v9.0 Phase 32-02: list_of_seq is identity void* cast — no C logic, just type coercion at elaboration time
+- v9.0 Phase 33-01: Struct typedefs defined only in lang_runtime.h — never redefined in lang_runtime.c (prevents clang redefinition errors)
+- v9.0 Phase 33-01: hashset_add uses LlvmCallOp returning I64 (not LlvmCallVoidOp) — matches LangThree bool return
+- v9.0 Phase 33-01: StringBuilder buffer growth uses GC_malloc + memcpy (not realloc); HashSet reuses lang_ht_hash murmurhash3
 - v9.0 Phase 32-01: hashtable_count uses inline GEP at LangHashtable field index 2 (size), no C function needed
 - v9.0 Phase 32-01: E2E tests use `println (to_string ...)` — `printfn "%d"` does not exist in elaborator
 - v9.0 Phase 31-03: eprintfn desugars to @lang_eprintln (two-arg %s case); two-arg App(App(...)) arm must appear before one-arg App(...) arm
@@ -69,6 +72,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-29T14:46:38Z
-Stopped at: Completed 32-03-PLAN.md (array_sort + array_of_seq — 161 tests pass)
+Last session: 2026-03-29T15:20:39Z
+Stopped at: Completed 33-01-PLAN.md (StringBuilder + HashSet — 163 tests pass)
 Resume file: None
