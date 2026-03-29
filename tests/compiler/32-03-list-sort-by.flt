@@ -1,0 +1,8 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let xs = 3 :: 1 :: 2 :: [] in
+let sorted = list_sort_by (fun x -> x) xs in
+match sorted with | a :: b :: c :: [] -> println (to_string (a + b * 10 + c * 100)) | _ -> println (to_string 0)
+// --- Output:
+321
+0

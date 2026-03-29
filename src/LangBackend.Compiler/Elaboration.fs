@@ -1188,6 +1188,27 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, nOps @ nCoerce @ fOps @ closureOps @ [LlvmCallOp(result, "@lang_array_init", [nV; closurePtrVal])])
 
+    // list_sort_by — two-arg curried with closure coercion (mirrors array_map pattern)
+    | App (App (Var ("list_sort_by", _), closureExpr, _), listExpr, _) ->
+        let (fVal,    fOps)    = elaborateExpr env closureExpr
+        let (listVal, listOps) = elaborateExpr env listExpr
+        let closurePtrVal =
+            if fVal.Type = I64
+            then { Name = freshName env; Type = Ptr }
+            else fVal
+        let closureOps =
+            if fVal.Type = I64
+            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
+            else []
+        let result = { Name = freshName env; Type = Ptr }
+        (result, fOps @ closureOps @ listOps @ [LlvmCallOp(result, "@lang_list_sort_by", [closurePtrVal; listVal])])
+
+    // list_of_seq — one-arg identity pass-through
+    | App (Var ("list_of_seq", _), seqExpr, _) ->
+        let (seqVal, seqOps) = elaborateExpr env seqExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, seqOps @ [LlvmCallOp(result, "@lang_list_of_seq", [seqVal])])
+
     // write_file — two-arg, void return
     | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
         let (pathVal,    pathOps)    = elaborateExpr env pathExpr
@@ -2880,6 +2901,8 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_char_is_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_char_to_upper";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_char_to_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_list_sort_by";      ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_list_of_seq";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -3081,5 +3104,7 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_char_is_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_char_to_upper";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_char_to_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_list_sort_by";      ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_list_of_seq";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
