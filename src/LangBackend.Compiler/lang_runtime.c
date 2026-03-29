@@ -515,6 +515,49 @@ void lang_for_in(void* closure, void* collection) {
     lang_for_in_list(closure, collection);
 }
 
+/* Phase 34-03: LANG-03/04 — for-in loop over Phase 33 collection types */
+
+void lang_for_in_hashset(void* closure, LangHashSet* hs) {
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    for (int64_t i = 0; i < hs->capacity; i++) {
+        LangHashSetEntry* e = hs->buckets[i];
+        while (e != NULL) {
+            fn(closure, e->key);
+            e = e->next;
+        }
+    }
+}
+
+void lang_for_in_queue(void* closure, LangQueue* q) {
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    LangQueueNode* node = q->head;
+    while (node != NULL) {
+        fn(closure, node->value);
+        node = node->next;
+    }
+}
+
+void lang_for_in_mlist(void* closure, LangMutableList* ml) {
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    for (int64_t i = 0; i < ml->len; i++) {
+        fn(closure, ml->data[i]);
+    }
+}
+
+void lang_for_in_hashtable(void* closure, LangHashtable* ht) {
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    for (int64_t i = 0; i < ht->capacity; i++) {
+        LangHashEntry* e = ht->buckets[i];
+        while (e != NULL) {
+            int64_t* tup = (int64_t*)GC_malloc(2 * sizeof(int64_t));
+            tup[0] = e->key;
+            tup[1] = e->val;
+            fn(closure, (int64_t)(uintptr_t)tup);
+            e = e->next;
+        }
+    }
+}
+
 /* Phase 34: list comprehension — applies closure to each element of a LangCons* list,
  * accumulates results into a new LangCons* list preserving element order. */
 LangCons* lang_list_comp(void* closure, void* collection) {

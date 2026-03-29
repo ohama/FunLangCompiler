@@ -162,4 +162,10 @@ int64_t          lang_mlist_get(LangMutableList* ml, int64_t index);
 void             lang_mlist_set(LangMutableList* ml, int64_t index, int64_t value);
 int64_t          lang_mlist_count(LangMutableList* ml);
 
+/* Phase 34-03: LANG-03/04 — for-in loop over Phase 33 collection types */
+void lang_for_in_hashset(void* closure, LangHashSet* hs);
+void lang_for_in_queue(void* closure, LangQueue* q);
+void lang_for_in_mlist(void* closure, LangMutableList* ml);
+void lang_for_in_hashtable(void* closure, LangHashtable* ht);
+
 #endif
