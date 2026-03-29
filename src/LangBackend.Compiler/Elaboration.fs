@@ -1209,6 +1209,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, seqOps @ [LlvmCallOp(result, "@lang_list_of_seq", [seqVal])])
 
+    // Phase 32-03: array_sort — one-arg, void return (mirrors array_iter pattern)
+    | App (Var ("array_sort", _), arrExpr, _) ->
+        let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        (unitVal, arrOps @ [LlvmCallVoidOp("@lang_array_sort", [arrVal]); ArithConstantOp(unitVal, 0L)])
+
+    // Phase 32-03: array_of_seq — one-arg returning Ptr
+    | App (Var ("array_of_seq", _), seqExpr, _) ->
+        let (seqVal, seqOps) = elaborateExpr env seqExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, seqOps @ [LlvmCallOp(result, "@lang_array_of_seq", [seqVal])])
+
     // write_file — two-arg, void return
     | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
         let (pathVal,    pathOps)    = elaborateExpr env pathExpr
@@ -2903,6 +2915,8 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_char_to_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_list_sort_by";      ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_list_of_seq";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_sort";        ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_of_seq";      ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -3106,5 +3120,7 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_char_to_lower";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_list_sort_by";      ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_list_of_seq";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_sort";        ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_of_seq";      ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
