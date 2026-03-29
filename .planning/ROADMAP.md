@@ -72,9 +72,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 32-01-PLAN.md — Hashtable builtins: hashtable_trygetvalue (tuple return) + hashtable_count (inline GEP) + 2 E2E tests
-- [ ] 32-02-PLAN.md — List builtins: list_sort_by (closure key extractor) + list_of_seq (identity) + 2 E2E tests
-- [ ] 32-03-PLAN.md — Array builtins: array_sort (qsort in-place) + array_of_seq (delegates to array_of_list) + 2 E2E tests
+- [x] 32-01-PLAN.md — Hashtable builtins: hashtable_trygetvalue (tuple return) + hashtable_count (inline GEP) + 2 E2E tests
+- [x] 32-02-PLAN.md — List builtins: list_sort_by (closure key extractor) + list_of_seq (identity) + 2 E2E tests
+- [x] 32-03-PLAN.md — Array builtins: array_sort (qsort in-place) + array_of_seq (delegates to array_of_list) + 2 E2E tests
 
 ---
 
@@ -145,7 +145,7 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1–30. v1.0–v8.0 | v1.0–v8.0 | 58/58 | Complete | 2026-03-28 |
 | 31. String/Char/IO Builtins | v9.0 | 3/3 | Complete | 2026-03-29 |
-| 32. Hashtable & List/Array Builtins | v9.0 | 0/3 | Not started | - |
+| 32. Hashtable & List/Array Builtins | v9.0 | 3/3 | Complete | 2026-03-29 |
 | 33. Collection Types | v9.0 | 0/4 | Not started | - |
 | 34. Language Constructs | v9.0 | 0/3 | Not started | - |
 | 35. Prelude Modules | v9.0 | 0/3 | Not started | - |

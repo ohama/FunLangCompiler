@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-03-29)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v9.0 — Phase 32: Hashtable & List/Array Builtins (in progress)
+**Current focus:** v9.0 — Phase 33: Collection Types (next)
 
 ## Current Position
 
-Phase: 32 of 35 (Hashtable & List/Array Builtins) — In Progress
-Plan: 3 of N in current phase (plans 01, 02, and 03 done)
-Status: Plan 32-03 complete (161 E2E tests)
-Last activity: 2026-03-29 — Completed 32-03-PLAN.md (array_sort + array_of_seq, 2 new E2E tests)
+Phase: 32 of 35 (Hashtable & List/Array Builtins) — VERIFIED ✓
+Plan: 3 of 3 in current phase (all done)
+Status: Phase 32 verified, ready for Phase 33
+Last activity: 2026-03-29 — Phase 32 verified (5/5 must-haves, 161 E2E tests)
 
-Progress: [██████████████████░░] 89% (31/35 phases complete, 2 plans in Phase 32 done)
+Progress: [███████████████████░] 91% (32/35 phases complete, 0 plans in Phase 33 started)
 
 ## Performance Metrics
 

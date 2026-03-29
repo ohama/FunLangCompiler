@@ -23,15 +23,15 @@
 
 ### Hashtable Builtins
 
-- [ ] **HT-01**: `hashtable_trygetvalue` — (bool, value) 튜플 반환 (C runtime)
-- [ ] **HT-02**: `hashtable_count` — 해시테이블 요소 수 반환 (C runtime)
+- [x] **HT-01**: `hashtable_trygetvalue` — (bool, value) 튜플 반환 (C runtime)
+- [x] **HT-02**: `hashtable_count` — 해시테이블 요소 수 반환 (C runtime)
 
 ### List/Array Builtins
 
-- [ ] **LA-01**: `list_sort_by` — 비교 함수로 리스트 정렬 (C runtime, closure callback)
-- [ ] **LA-02**: `list_of_seq` — 컬렉션을 리스트로 변환 (C runtime)
-- [ ] **LA-03**: `array_sort` — 배열 정렬 (C runtime)
-- [ ] **LA-04**: `array_of_seq` — 컬렉션을 배열로 변환 (C runtime)
+- [x] **LA-01**: `list_sort_by` — 비교 함수로 리스트 정렬 (C runtime, closure callback)
+- [x] **LA-02**: `list_of_seq` — 컬렉션을 리스트로 변환 (C runtime)
+- [x] **LA-03**: `array_sort` — 배열 정렬 (C runtime)
+- [x] **LA-04**: `array_of_seq` — 컬렉션을 배열로 변환 (C runtime)
 
 ### IO Builtins
 
@@ -86,12 +86,12 @@
 | CHR-05 | Phase 31 | Complete |
 | CHR-06 | Phase 31 | Complete |
 | IO-01 | Phase 31 | Complete |
-| HT-01 | Phase 32 | Pending |
-| HT-02 | Phase 32 | Pending |
-| LA-01 | Phase 32 | Pending |
-| LA-02 | Phase 32 | Pending |
-| LA-03 | Phase 32 | Pending |
-| LA-04 | Phase 32 | Pending |
+| HT-01 | Phase 32 | Complete |
+| HT-02 | Phase 32 | Complete |
+| LA-01 | Phase 32 | Complete |
+| LA-02 | Phase 32 | Complete |
+| LA-03 | Phase 32 | Complete |
+| LA-04 | Phase 32 | Complete |
 | COL-01 | Phase 33 | Pending |
 | COL-02 | Phase 33 | Pending |
 | COL-03 | Phase 33 | Pending |
