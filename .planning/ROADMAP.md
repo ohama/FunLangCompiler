@@ -69,12 +69,12 @@ Plans:
   3. A program calling `list_sort_by` with a comparison closure produces a correctly ordered list.
   4. A program calling `list_of_seq` and `array_of_seq` on a collection returns an equivalent list/array.
   5. A program calling `array_sort` produces a sorted array in place.
-**Plans:** TBD
+**Plans:** 3 plans
 
 Plans:
-- [ ] 32-01: Hashtable builtins — lang_hashtable_trygetvalue (tuple return), lang_hashtable_count (C runtime + Elaboration)
-- [ ] 32-02: List sort/of_seq — lang_list_sort_by (closure callback), lang_list_of_seq (C runtime + Elaboration)
-- [ ] 32-03: Array sort/of_seq — lang_array_sort, lang_array_of_seq (C runtime + Elaboration + E2E tests)
+- [ ] 32-01-PLAN.md — Hashtable builtins: hashtable_trygetvalue (tuple return) + hashtable_count (inline GEP) + 2 E2E tests
+- [ ] 32-02-PLAN.md — List builtins: list_sort_by (closure key extractor) + list_of_seq (identity) + 2 E2E tests
+- [ ] 32-03-PLAN.md — Array builtins: array_sort (qsort in-place) + array_of_seq (delegates to array_of_list) + 2 E2E tests
 
 ---
 
