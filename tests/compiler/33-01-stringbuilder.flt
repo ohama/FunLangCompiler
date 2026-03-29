@@ -1,0 +1,9 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let sb = stringbuilder_create () in
+let _ = stringbuilder_append sb "hello" in
+let _ = stringbuilder_append sb " world" in
+println (stringbuilder_tostring sb)
+// --- Output:
+hello world
+0

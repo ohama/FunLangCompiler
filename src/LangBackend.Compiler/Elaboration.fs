@@ -1221,6 +1221,46 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, seqOps @ [LlvmCallOp(result, "@lang_array_of_seq", [seqVal])])
 
+    // Phase 33-01: COL-01 StringBuilder
+    | App (Var ("stringbuilder_create", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_sb_create", [])])
+
+    | App (App (Var ("stringbuilder_append", _), sbExpr, _), strExpr, _) ->
+        let (sbVal,  sbOps)  = elaborateExpr env sbExpr
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, sbOps @ strOps @ [LlvmCallOp(result, "@lang_sb_append", [sbVal; strVal])])
+
+    | App (Var ("stringbuilder_tostring", _), sbExpr, _) ->
+        let (sbVal, sbOps) = elaborateExpr env sbExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, sbOps @ [LlvmCallOp(result, "@lang_sb_tostring", [sbVal])])
+
+    // Phase 33-01: COL-02 HashSet
+    | App (Var ("hashset_create", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_hashset_create", [])])
+
+    | App (App (Var ("hashset_add", _), hsExpr, _), valExpr, _) ->
+        let (hsVal,  hsOps)  = elaborateExpr env hsExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, hsOps @ valOps @ [LlvmCallOp(result, "@lang_hashset_add", [hsVal; valVal])])
+
+    | App (App (Var ("hashset_contains", _), hsExpr, _), valExpr, _) ->
+        let (hsVal,  hsOps)  = elaborateExpr env hsExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, hsOps @ valOps @ [LlvmCallOp(result, "@lang_hashset_contains", [hsVal; valVal])])
+
+    | App (Var ("hashset_count", _), hsExpr, _) ->
+        let (hsVal, hsOps) = elaborateExpr env hsExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, hsOps @ [LlvmCallOp(result, "@lang_hashset_count", [hsVal])])
+
     // write_file — two-arg, void return
     | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
         let (pathVal,    pathOps)    = elaborateExpr env pathExpr
@@ -2917,6 +2957,15 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_list_of_seq";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_sort";        ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_of_seq";      ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 33-01: COL-01 StringBuilder
+        { ExtName = "@lang_sb_create";         ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sb_append";         ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sb_tostring";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 33-01: COL-02 HashSet
+        { ExtName = "@lang_hashset_create";    ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashset_add";       ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashset_contains";  ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashset_count";     ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -3122,5 +3171,14 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_list_of_seq";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_sort";        ExtParams = [Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_of_seq";      ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 33-01: COL-01 StringBuilder
+        { ExtName = "@lang_sb_create";         ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sb_append";         ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_sb_tostring";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 33-01: COL-02 HashSet
+        { ExtName = "@lang_hashset_create";    ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashset_add";       ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashset_contains";  ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashset_count";     ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
