@@ -45,6 +45,44 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
         let expr = parseExpr src filename
         Ast.Module([Ast.Decl.LetDecl("_", expr, Ast.unknownSpan)], Ast.unknownSpan)
 
+/// Resolve import path: relative to importing file's directory, absolute as-is.
+let private resolveImportPath (importPath: string) (importingFile: string) : string =
+    if System.IO.Path.IsPathRooted importPath then importPath
+    else
+        let dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(importingFile))
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(dir, importPath))
+
+/// Recursively expand FileImportDecl nodes into inline declarations.
+/// visitedFiles: absolute paths currently on the import stack (cycle detection).
+/// Returns the expanded Decl list with FileImportDecl nodes replaced.
+let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<string>)
+                               (currentFile: string)
+                               (decls: Ast.Decl list) : Ast.Decl list =
+    decls |> List.collect (fun decl ->
+        match decl with
+        | Ast.Decl.FileImportDecl(importPath, _span) ->
+            let resolvedPath = resolveImportPath importPath currentFile
+            if visitedFiles.Contains resolvedPath then
+                failwithf "Circular import detected: %s is already being imported" resolvedPath
+            if not (System.IO.File.Exists resolvedPath) then
+                failwithf "Import not found: %s (resolved to %s from %s)" importPath resolvedPath currentFile
+            visitedFiles.Add resolvedPath |> ignore
+            try
+                let src = System.IO.File.ReadAllText resolvedPath
+                let importedModule = parseProgram src resolvedPath
+                let importedDecls =
+                    match importedModule with
+                    | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) | Ast.NamespacedModule(_, ds, _) -> ds
+                    | Ast.EmptyModule _ -> []
+                expandImports visitedFiles resolvedPath importedDecls
+            finally
+                visitedFiles.Remove resolvedPath |> ignore
+        | Ast.Decl.ModuleDecl(name, innerDecls, s) ->
+            [Ast.Decl.ModuleDecl(name, expandImports visitedFiles currentFile innerDecls, s)]
+        | Ast.Decl.NamespaceDecl(name, innerDecls, s) ->
+            [Ast.Decl.NamespaceDecl(name, expandImports visitedFiles currentFile innerDecls, s)]
+        | other -> [other])
+
 [<EntryPoint>]
 let main argv =
     let args = argv |> Array.toList
@@ -122,7 +160,22 @@ let main argv =
 
             let combinedSrc = if preludeSrc = "" then src else preludeSrc + "\n" + src
             let ast = parseProgram combinedSrc inputPath
-            let mlirMod = Elaboration.elaborateProgram ast
+            let expandedAst =
+                match ast with
+                | Ast.Module(ds, s) ->
+                    let visited = System.Collections.Generic.HashSet<string>()
+                    visited.Add(System.IO.Path.GetFullPath(inputPath)) |> ignore
+                    Ast.Module(expandImports visited inputPath ds, s)
+                | Ast.NamedModule(nm, ds, s) ->
+                    let visited = System.Collections.Generic.HashSet<string>()
+                    visited.Add(System.IO.Path.GetFullPath(inputPath)) |> ignore
+                    Ast.NamedModule(nm, expandImports visited inputPath ds, s)
+                | Ast.NamespacedModule(nm, ds, s) ->
+                    let visited = System.Collections.Generic.HashSet<string>()
+                    visited.Add(System.IO.Path.GetFullPath(inputPath)) |> ignore
+                    Ast.NamespacedModule(nm, expandImports visited inputPath ds, s)
+                | other -> other
+            let mlirMod = Elaboration.elaborateProgram expandedAst
             match Pipeline.compile mlirMod outputPath with
             | Ok () ->
                 0
