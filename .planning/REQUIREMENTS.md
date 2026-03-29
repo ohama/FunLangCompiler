@@ -20,10 +20,10 @@ Requirements for FunLexYacc 네이티브 컴파일 지원. Each maps to roadmap 
 
 ### 컴파일러 기능
 
-- [ ] **COMP-01**: `open "file.fun"` 이 임포트 파일의 모든 top-level 바인딩을 현재 스코프에 가져온다
-- [ ] **COMP-02**: 멀티파일 import가 재귀적으로 동작한다 (A가 B를 open, B가 C를 open)
-- [ ] **COMP-03**: 순환 import 시 명확한 에러 메시지를 출력한다
-- [ ] **COMP-04**: 상대 경로 import가 현재 파일 기준으로 resolve 된다
+- [x] **COMP-01**: `open "file.fun"` 이 임포트 파일의 모든 top-level 바인딩을 현재 스코프에 가져온다
+- [x] **COMP-02**: 멀티파일 import가 재귀적으로 동작한다 (A가 B를 open, B가 C를 open)
+- [x] **COMP-03**: 순환 import 시 명확한 에러 메시지를 출력한다
+- [x] **COMP-04**: 상대 경로 import가 현재 파일 기준으로 resolve 된다
 
 ### 버그 수정
 
@@ -66,10 +66,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RT-06 | Phase 39 | Complete |
 | RT-07 | Phase 39 | Complete |
 | RT-08 | Phase 39 | Complete |
-| COMP-01 | Phase 40 | Pending |
-| COMP-02 | Phase 40 | Pending |
-| COMP-03 | Phase 40 | Pending |
-| COMP-04 | Phase 40 | Pending |
+| COMP-01 | Phase 40 | Complete |
+| COMP-02 | Phase 40 | Complete |
+| COMP-03 | Phase 40 | Complete |
+| COMP-04 | Phase 40 | Complete |
 
 **Coverage:**
 - v10 requirements: 15 total
