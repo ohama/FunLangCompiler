@@ -1,0 +1,14 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let ml = mutablelist_create () in
+let _ = mutablelist_add ml 100 in
+let _ = mutablelist_add ml 200 in
+let _ = mutablelist_set ml 0 999 in
+println (to_string (mutablelist_count ml));
+println (to_string (mutablelist_get ml 0));
+println (to_string (mutablelist_get ml 1))
+// --- Output:
+2
+999
+200
+0

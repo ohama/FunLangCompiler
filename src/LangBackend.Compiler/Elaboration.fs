@@ -1261,6 +1261,66 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = I64 }
         (result, hsOps @ [LlvmCallOp(result, "@lang_hashset_count", [hsVal])])
 
+    // Phase 33-02: COL-03 Queue
+    | App (Var ("queue_create", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_queue_create", [])])
+
+    | App (App (Var ("queue_enqueue", _), qExpr, _), valExpr, _) ->
+        let (qVal,   qOps)   = elaborateExpr env qExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        (unitVal, qOps @ valOps @ [LlvmCallVoidOp("@lang_queue_enqueue", [qVal; valVal]); ArithConstantOp(unitVal, 0L)])
+
+    | App (App (Var ("queue_dequeue", _), qExpr, _), unitExpr, _) ->
+        let (qVal,  qOps) = elaborateExpr env qExpr
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, qOps @ uOps @ [LlvmCallOp(result, "@lang_queue_dequeue", [qVal])])
+
+    | App (Var ("queue_count", _), qExpr, _) ->
+        let (qVal, qOps) = elaborateExpr env qExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, qOps @ [LlvmCallOp(result, "@lang_queue_count", [qVal])])
+
+    // Phase 33-02: COL-04 MutableList
+    // NOTE: mutablelist_set (three-arg) MUST appear BEFORE mutablelist_get (two-arg)
+    | App (App (App (Var ("mutablelist_set", _), mlExpr, _), idxExpr, _), valExpr, _) ->
+        let (mlVal,  mlOps)  = elaborateExpr env mlExpr
+        let (idxVal, idxOps) = elaborateExpr env idxExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let (idxV, idxCoerce) =
+            if idxVal.Type = I64 then (idxVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
+        let unitVal = { Name = freshName env; Type = I64 }
+        (unitVal, mlOps @ idxOps @ idxCoerce @ valOps @ [LlvmCallVoidOp("@lang_mlist_set", [mlVal; idxV; valVal]); ArithConstantOp(unitVal, 0L)])
+
+    | App (App (Var ("mutablelist_get", _), mlExpr, _), idxExpr, _) ->
+        let (mlVal,  mlOps)  = elaborateExpr env mlExpr
+        let (idxVal, idxOps) = elaborateExpr env idxExpr
+        let (idxV, idxCoerce) =
+            if idxVal.Type = I64 then (idxVal, [])
+            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
+        let result = { Name = freshName env; Type = I64 }
+        (result, mlOps @ idxOps @ idxCoerce @ [LlvmCallOp(result, "@lang_mlist_get", [mlVal; idxV])])
+
+    | App (Var ("mutablelist_create", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_mlist_create", [])])
+
+    | App (App (Var ("mutablelist_add", _), mlExpr, _), valExpr, _) ->
+        let (mlVal,  mlOps)  = elaborateExpr env mlExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let unitVal = { Name = freshName env; Type = I64 }
+        (unitVal, mlOps @ valOps @ [LlvmCallVoidOp("@lang_mlist_add", [mlVal; valVal]); ArithConstantOp(unitVal, 0L)])
+
+    | App (Var ("mutablelist_count", _), mlExpr, _) ->
+        let (mlVal, mlOps) = elaborateExpr env mlExpr
+        let result = { Name = freshName env; Type = I64 }
+        (result, mlOps @ [LlvmCallOp(result, "@lang_mlist_count", [mlVal])])
+
     // write_file — two-arg, void return
     | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
         let (pathVal,    pathOps)    = elaborateExpr env pathExpr
@@ -2966,6 +3026,17 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_hashset_add";       ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashset_contains";  ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashset_count";     ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        // Phase 33-02: COL-03 Queue
+        { ExtName = "@lang_queue_create";      ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_queue_enqueue";     ExtParams = [Ptr; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_queue_dequeue";     ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_queue_count";       ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        // Phase 33-02: COL-04 MutableList
+        { ExtName = "@lang_mlist_create";      ExtParams = [];              ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_add";         ExtParams = [Ptr; I64];      ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_get";         ExtParams = [Ptr; I64];      ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_set";         ExtParams = [Ptr; I64; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_count";       ExtParams = [Ptr];           ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -3180,5 +3251,16 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_hashset_add";       ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashset_contains";  ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashset_count";     ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        // Phase 33-02: COL-03 Queue
+        { ExtName = "@lang_queue_create";      ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_queue_enqueue";     ExtParams = [Ptr; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_queue_dequeue";     ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_queue_count";       ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        // Phase 33-02: COL-04 MutableList
+        { ExtName = "@lang_mlist_create";      ExtParams = [];              ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_add";         ExtParams = [Ptr; I64];      ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_get";         ExtParams = [Ptr; I64];      ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_set";         ExtParams = [Ptr; I64; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_count";       ExtParams = [Ptr];           ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
