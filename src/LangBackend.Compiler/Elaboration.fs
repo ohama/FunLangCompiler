@@ -195,7 +195,8 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
             freeVars (Set.add var boundVars) body   // var is bound inside body
         ]
     | ForInExpr (var, collExpr, body, _) ->
-        Set.union (freeVars boundVars collExpr) (freeVars (Set.add var boundVars) body)
+        let varName = match var with Ast.VarPat(n, _) -> n | _ -> "_"
+        Set.union (freeVars boundVars collExpr) (freeVars (Set.add varName boundVars) body)
     | Annot (expr, _, _) -> freeVars boundVars expr
     | LambdaAnnot (param, _, body, _) -> freeVars (Set.add param boundVars) body
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
@@ -2606,7 +2607,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // The loop variable var becomes the lambda parameter — a fresh immutable binding per iteration (FIN-03).
     | ForInExpr (var, collExpr, bodyExpr, span) ->
         // Wrap body as a lambda: fun var -> bodyExpr
-        let closureLambda = Lambda(var, bodyExpr, span)
+        let varName = match var with Ast.VarPat(n, _) -> n | _ -> freshName env
+        let closureLambda = Lambda(varName, bodyExpr, span)
         let (closureVal, closureOps) = elaborateExpr env closureLambda
         // Elaborate collection
         let (collVal, collOps) = elaborateExpr env collExpr

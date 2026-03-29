@@ -81,4 +81,9 @@ LangString* lang_get_cwd(void);
 LangString* lang_path_combine(LangString* dir, LangString* file);
 LangCons*   lang_dir_files(LangString* path);
 
+int64_t     lang_string_endswith(LangString* s, LangString* suffix);
+int64_t     lang_string_startswith(LangString* s, LangString* prefix);
+LangString* lang_string_trim(LangString* s);
+LangString* lang_string_concat_list(LangString* sep, LangCons* list);
+
 #endif

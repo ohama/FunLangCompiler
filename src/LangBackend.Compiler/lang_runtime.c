@@ -76,6 +76,68 @@ int64_t lang_string_contains(LangString* s, LangString* sub) {
     return strstr(s->data, sub->data) != NULL ? 1 : 0;
 }
 
+int64_t lang_string_endswith(LangString* s, LangString* suffix) {
+    if (suffix->length > s->length) return 0;
+    int64_t offset = s->length - suffix->length;
+    return memcmp(s->data + offset, suffix->data, (size_t)suffix->length) == 0 ? 1 : 0;
+}
+
+int64_t lang_string_startswith(LangString* s, LangString* prefix) {
+    if (prefix->length > s->length) return 0;
+    return memcmp(s->data, prefix->data, (size_t)prefix->length) == 0 ? 1 : 0;
+}
+
+LangString* lang_string_trim(LangString* s) {
+    int64_t start = 0;
+    int64_t end = s->length - 1;
+    while (start <= end && (s->data[start] == ' ' || s->data[start] == '\t' ||
+           s->data[start] == '\n' || s->data[start] == '\r')) start++;
+    while (end >= start && (s->data[end] == ' ' || s->data[end] == '\t' ||
+           s->data[end] == '\n' || s->data[end] == '\r')) end--;
+    int64_t len = end - start + 1;
+    if (len < 0) len = 0;
+    char* buf = (char*)GC_malloc((size_t)(len + 1));
+    memcpy(buf, s->data + start, (size_t)len);
+    buf[len] = '\0';
+    LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->length = len;
+    r->data = buf;
+    return r;
+}
+
+LangString* lang_string_concat_list(LangString* sep, LangCons* list) {
+    int64_t total = 0;
+    int64_t count = 0;
+    LangCons* cur = list;
+    while (cur != NULL) {
+        LangString* item = (LangString*)(uintptr_t)cur->head;
+        total += item->length;
+        count++;
+        cur = cur->tail;
+    }
+    if (count > 1) total += sep->length * (count - 1);
+    char* buf = (char*)GC_malloc((size_t)(total + 1));
+    int64_t pos = 0;
+    cur = list;
+    int64_t i = 0;
+    while (cur != NULL) {
+        if (i > 0 && sep->length > 0) {
+            memcpy(buf + pos, sep->data, (size_t)sep->length);
+            pos += sep->length;
+        }
+        LangString* item = (LangString*)(uintptr_t)cur->head;
+        memcpy(buf + pos, item->data, (size_t)item->length);
+        pos += item->length;
+        cur = cur->tail;
+        i++;
+    }
+    buf[total] = '\0';
+    LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->length = total;
+    r->data = buf;
+    return r;
+}
+
 int64_t lang_string_to_int(LangString* s) {
     return (int64_t)strtol(s->data, NULL, 10);
 }
