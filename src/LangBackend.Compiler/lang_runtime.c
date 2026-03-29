@@ -444,6 +444,153 @@ LangCons* lang_hashtable_keys(LangHashtable* ht) {
     return result;
 }
 
+/* Phase 37: String-key hashtable — FNV-1a hash, memcmp equality, Boehm GC alloc */
+
+/* FNV-1a hash over LangString content */
+static uint64_t lang_ht_str_hash(LangString* key) {
+    uint64_t h = UINT64_C(14695981039346656037);
+    for (int64_t i = 0; i < key->length; i++) {
+        h ^= (uint8_t)key->data[i];
+        h *= UINT64_C(1099511628211);
+    }
+    return h;
+}
+
+/* Find entry by content equality; returns NULL if not present */
+static LangHashEntryStr* lang_ht_str_find(LangHashtableStr* ht, LangString* key) {
+    uint64_t bucket = lang_ht_str_hash(key) % (uint64_t)ht->capacity;
+    LangHashEntryStr* e = ht->buckets[bucket];
+    while (e != NULL) {
+        if (e->key->length == key->length &&
+            memcmp(e->key->data, key->data, (size_t)key->length) == 0)
+            return e;
+        e = e->next;
+    }
+    return NULL;
+}
+
+/* Rehash string-key table into newCapacity buckets */
+static void lang_ht_str_rehash(LangHashtableStr* ht, int64_t newCapacity) {
+    LangHashEntryStr** new_buckets =
+        (LangHashEntryStr**)GC_malloc((size_t)(newCapacity * (int64_t)sizeof(LangHashEntryStr*)));
+    for (int64_t i = 0; i < newCapacity; i++) new_buckets[i] = NULL;
+    for (int64_t i = 0; i < ht->capacity; i++) {
+        LangHashEntryStr* e = ht->buckets[i];
+        while (e != NULL) {
+            LangHashEntryStr* next = e->next;
+            uint64_t b = lang_ht_str_hash(e->key) % (uint64_t)newCapacity;
+            e->next = new_buckets[b];
+            new_buckets[b] = e;
+            e = next;
+        }
+    }
+    ht->buckets = new_buckets;
+    ht->capacity = newCapacity;
+}
+
+LangHashtableStr* lang_hashtable_create_str(void) {
+    LangHashtableStr* ht = (LangHashtableStr*)GC_malloc(sizeof(LangHashtableStr));
+    ht->tag = -2;
+    ht->capacity = 16;
+    ht->size = 0;
+    ht->buckets = (LangHashEntryStr**)GC_malloc(
+        (size_t)(ht->capacity * (int64_t)sizeof(LangHashEntryStr*)));
+    for (int64_t i = 0; i < ht->capacity; i++) ht->buckets[i] = NULL;
+    return ht;
+}
+
+int64_t lang_hashtable_get_str(LangHashtableStr* ht, LangString* key) {
+    LangHashEntryStr* e = lang_ht_str_find(ht, key);
+    if (e != NULL) return e->val;
+    const char* msg_str = "hashtable key not found";
+    int64_t msg_len = (int64_t)strlen(msg_str);
+    char* buf = (char*)GC_malloc((size_t)(msg_len + 1));
+    memcpy(buf, msg_str, (size_t)(msg_len + 1));
+    LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+    msg->length = msg_len;
+    msg->data = buf;
+    lang_throw((void*)msg);
+    return 0; /* unreachable */
+}
+
+void lang_hashtable_set_str(LangHashtableStr* ht, LangString* key, int64_t val) {
+    if (ht->size * 4 > ht->capacity * 3) {
+        lang_ht_str_rehash(ht, ht->capacity * 2);
+    }
+    LangHashEntryStr* e = lang_ht_str_find(ht, key);
+    if (e != NULL) {
+        e->val = val;
+        return;
+    }
+    uint64_t bucket = lang_ht_str_hash(key) % (uint64_t)ht->capacity;
+    LangHashEntryStr* entry = (LangHashEntryStr*)GC_malloc(sizeof(LangHashEntryStr));
+    entry->key = key;
+    entry->val = val;
+    entry->next = ht->buckets[bucket];
+    ht->buckets[bucket] = entry;
+    ht->size++;
+}
+
+int64_t lang_hashtable_containsKey_str(LangHashtableStr* ht, LangString* key) {
+    return lang_ht_str_find(ht, key) != NULL ? 1 : 0;
+}
+
+void lang_hashtable_remove_str(LangHashtableStr* ht, LangString* key) {
+    uint64_t bucket = lang_ht_str_hash(key) % (uint64_t)ht->capacity;
+    LangHashEntryStr* prev = NULL;
+    LangHashEntryStr* e = ht->buckets[bucket];
+    while (e != NULL) {
+        if (e->key->length == key->length &&
+            memcmp(e->key->data, key->data, (size_t)key->length) == 0) {
+            if (prev == NULL) {
+                ht->buckets[bucket] = e->next;
+            } else {
+                prev->next = e->next;
+            }
+            ht->size--;
+            return;
+        }
+        prev = e;
+        e = e->next;
+    }
+}
+
+LangCons* lang_hashtable_keys_str(LangHashtableStr* ht) {
+    LangCons* result = NULL;
+    for (int64_t i = 0; i < ht->capacity; i++) {
+        LangHashEntryStr* e = ht->buckets[i];
+        while (e != NULL) {
+            LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+            cell->head = (int64_t)(uintptr_t)e->key;  /* LangString* as i64 */
+            cell->tail = result;
+            result = cell;
+            e = e->next;
+        }
+    }
+    return result;
+}
+
+int64_t* lang_hashtable_trygetvalue_str(LangHashtableStr* ht, LangString* key) {
+    int64_t* tup = (int64_t*)GC_malloc(16);  /* 2 slots x 8 bytes */
+    LangHashEntryStr* e = lang_ht_str_find(ht, key);
+    if (e != NULL) {
+        tup[0] = 1;
+        tup[1] = e->val;
+    } else {
+        tup[0] = 0;
+        tup[1] = 0;
+    }
+    return tup;
+}
+
+int64_t lang_index_get_str(void* collection, LangString* key) {
+    return lang_hashtable_get_str((LangHashtableStr*)collection, key);
+}
+
+void lang_index_set_str(void* collection, LangString* key, int64_t value) {
+    lang_hashtable_set_str((LangHashtableStr*)collection, key, value);
+}
+
 /* Phase 28: Runtime dispatch for .[...] indexing syntax.
  * Dispatch on first word: arrays store length (>= 0) at offset 0;
  * hashtables store tag = -1 at offset 0. */
