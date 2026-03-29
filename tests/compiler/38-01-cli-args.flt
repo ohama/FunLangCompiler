@@ -1,0 +1,15 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN foo bar baz; echo $?; rm -f $OUTBIN'
+// --- Input:
+let args = get_args ()
+let rec printList lst =
+  match lst with
+  | [] -> ()
+  | h :: t ->
+    let _ = println h
+    printList t
+let _ = printList args
+// --- Output:
+foo
+bar
+baz
+0
