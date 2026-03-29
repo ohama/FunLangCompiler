@@ -233,6 +233,12 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
                 Set.union guardFree (freeVars armBound armBody)
             ) |> Set.unionMany
         Set.union scrutFree clauseFree
+    | Cons (headExpr, tailExpr, _) ->
+        Set.union (freeVars boundVars headExpr) (freeVars boundVars tailExpr)
+    | List (elems, _) ->
+        elems |> List.map (freeVars boundVars) |> Set.unionMany
+    | EmptyList _ -> Set.empty
+    | Char _ -> Set.empty
     | _ -> Set.empty  // conservative: other exprs (Char, etc.) have no free vars
 
 /// Phase 35: Coerce a value to I64 for uniform closure return type.
@@ -246,6 +252,7 @@ let private coerceToI64 (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list
     | Ptr ->
         let r = { Name = freshName env; Type = I64 }
         (r, [LlvmPtrToIntOp(r, v)])
+    | _ -> (v, [])  // I32 or other — pass through unchanged
 
 /// Phase 35: Coerce a value to Ptr for builtin functions that expect pointer arguments.
 /// I64 → inttoptr; Ptr → no-op.
@@ -793,11 +800,17 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let mergeLabel = freshLabel env "merge"
         let (thenVal, thenOps) = elaborateExpr env thenExpr
         let (elseVal, elseOps) = elaborateExpr env elseExpr
-        let mergeArg = { Name = freshName env; Type = thenVal.Type }
+        // If branch types differ, coerce both to I64 for uniform merge block type.
+        // This handles cases like: then = Ptr (cons cell), else = I64 (closure result).
+        let (finalThenVal, thenCoerceOps) =
+            if thenVal.Type <> elseVal.Type then coerceToI64 env thenVal else (thenVal, [])
+        let (finalElseVal, elseCoerceOps) =
+            if thenVal.Type <> elseVal.Type then coerceToI64 env elseVal else (elseVal, [])
+        let mergeArg = { Name = freshName env; Type = finalThenVal.Type }
         env.Blocks.Value <- env.Blocks.Value @
-            [ { Label = Some thenLabel; Args = []; Body = thenOps @ [CfBrOp(mergeLabel, [thenVal])] } ]
+            [ { Label = Some thenLabel; Args = []; Body = thenOps @ thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
-            [ { Label = Some elseLabel; Args = []; Body = elseOps @ [CfBrOp(mergeLabel, [elseVal])] } ]
+            [ { Label = Some elseLabel; Args = []; Body = elseOps @ elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         (mergeArg, condOps @ coerceCondOps @ [CfCondBrOp(i1CondVal, thenLabel, [], elseLabel, [])])
@@ -825,12 +838,17 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (mergeArg, leftOps @ [CfCondBrOp(leftVal, mergeLabel, [leftVal], evalRightLabel, [])])
     | LetRec (name, param, body, inExpr, _) ->
         let paramType = if isListParamBody param body then Ptr else I64
+        // Pre-determine return type: Lambda body returns Ptr (closure struct).
+        // This is needed so recursive calls inside the body use the correct return type.
+        let preReturnType = match body with | Lambda _ -> Ptr | _ -> I64
         let sig_ : FuncSignature =
-            { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = I64; ClosureInfo = None }
+            { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None }
         let bodyEnv : ElabEnv =
             { Vars = Map.ofList [(param, { Name = "%arg0"; Type = paramType })]
               Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
-              KnownFuncs = Map.ofList [(name, sig_)]
+              // Include outer KnownFuncs so inner closures can call other top-level functions,
+              // plus the function itself for recursive calls.
+              KnownFuncs = Map.add name sig_ env.KnownFuncs
               Funcs = env.Funcs
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
@@ -998,37 +1016,39 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (arrVal, arrOps) = elaborateExpr env arrExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (valVal, valOps) = elaborateExpr env valExpr
+        let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let oneVal    = { Name = freshName env; Type = I64 }
         let slotVal   = { Name = freshName env; Type = I64 }
         let elemPtr   = { Name = freshName env; Type = Ptr }
         let unitVal   = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmCallVoidOp("@lang_array_bounds_check", [arrVal; idxVal])
+            LlvmCallVoidOp("@lang_array_bounds_check", [arrPtrVal; idxVal])
             ArithConstantOp(oneVal, 1L)
             ArithAddIOp(slotVal, idxVal, oneVal)
-            LlvmGEPDynamicOp(elemPtr, arrVal, slotVal)
+            LlvmGEPDynamicOp(elemPtr, arrPtrVal, slotVal)
             LlvmStoreOp(valVal, elemPtr)
             ArithConstantOp(unitVal, 0L)
         ]
-        (unitVal, arrOps @ idxOps @ valOps @ ops)
+        (unitVal, arrOps @ arrCoerceOps @ idxOps @ valOps @ ops)
 
     // Phase 22: array_get — two-arg
     // array_get arr idx: bounds check, compute slot idx+1, GEP, load
     | App (App (Var ("array_get", _), arrExpr, _), idxExpr, _) ->
         let (arrVal, arrOps) = elaborateExpr env arrExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
+        let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let oneVal  = { Name = freshName env; Type = I64 }
         let slotVal = { Name = freshName env; Type = I64 }
         let elemPtr = { Name = freshName env; Type = Ptr }
         let result  = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmCallVoidOp("@lang_array_bounds_check", [arrVal; idxVal])
+            LlvmCallVoidOp("@lang_array_bounds_check", [arrPtrVal; idxVal])
             ArithConstantOp(oneVal, 1L)
             ArithAddIOp(slotVal, idxVal, oneVal)
-            LlvmGEPDynamicOp(elemPtr, arrVal, slotVal)
+            LlvmGEPDynamicOp(elemPtr, arrPtrVal, slotVal)
             LlvmLoadOp(result, elemPtr)
         ]
-        (result, arrOps @ idxOps @ ops)
+        (result, arrOps @ arrCoerceOps @ idxOps @ ops)
 
     // Phase 22: array_create — two-arg
     // array_create n defVal: call lang_array_create(n, defVal)
@@ -1051,25 +1071,28 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // array_length arr: GEP slot 0 (length slot), load
     | App (Var ("array_length", _), arrExpr, _) ->
         let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let lenPtr = { Name = freshName env; Type = Ptr }
         let result = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPLinearOp(lenPtr, arrVal, 0)
+            LlvmGEPLinearOp(lenPtr, arrPtrVal, 0)
             LlvmLoadOp(result, lenPtr)
         ]
-        (result, arrOps @ ops)
+        (result, arrOps @ arrCoerceOps @ ops)
 
     // Phase 22: array_of_list — one-arg
     | App (Var ("array_of_list", _), lstExpr, _) ->
         let (lstVal, lstOps) = elaborateExpr env lstExpr
+        let (lstPtrVal, lstCoerceOps) = coerceToPtrArg env lstVal
         let result = { Name = freshName env; Type = Ptr }
-        (result, lstOps @ [LlvmCallOp(result, "@lang_array_of_list", [lstVal])])
+        (result, lstOps @ lstCoerceOps @ [LlvmCallOp(result, "@lang_array_of_list", [lstPtrVal])])
 
     // Phase 22: array_to_list — one-arg
     | App (Var ("array_to_list", _), arrExpr, _) ->
         let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let result = { Name = freshName env; Type = Ptr }
-        (result, arrOps @ [LlvmCallOp(result, "@lang_array_to_list", [arrVal])])
+        (result, arrOps @ arrCoerceOps @ [LlvmCallOp(result, "@lang_array_to_list", [arrPtrVal])])
 
     // Phase 23: hashtable builtins
     // coerceToI64: converts a MlirValue to I64 if it isn't already (Ptr→I64, I1→I64)
@@ -1238,8 +1261,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if initVal.Type = I64 then (initVal, [])
             else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, initVal)])
         let (initV, initCoerce) = initI64
+        let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let result = { Name = freshName env; Type = I64 }
-        (result, fOps @ closureOps @ initOps @ initCoerce @ arrOps @ [LlvmCallOp(result, "@lang_array_fold", [closurePtrVal; initV; arrVal])])
+        (result, fOps @ closureOps @ initOps @ initCoerce @ arrOps @ arrCoerceOps @ [LlvmCallOp(result, "@lang_array_fold", [closurePtrVal; initV; arrPtrVal])])
 
     // array_iter — two-arg
     // array_iter closure arr: coerce closure to Ptr, call lang_array_iter (void), return unit
@@ -1254,8 +1278,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if fVal.Type = I64
             then [LlvmIntToPtrOp(closurePtrVal, fVal)]
             else []
+        let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, fOps @ closureOps @ arrOps @ [LlvmCallVoidOp("@lang_array_iter", [closurePtrVal; arrVal]); ArithConstantOp(unitVal, 0L)])
+        (unitVal, fOps @ closureOps @ arrOps @ arrCoerceOps @ [LlvmCallVoidOp("@lang_array_iter", [closurePtrVal; arrPtrVal]); ArithConstantOp(unitVal, 0L)])
 
     // array_map — two-arg
     // array_map closure arr: coerce closure to Ptr, call lang_array_map → Ptr
@@ -1270,8 +1295,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if fVal.Type = I64
             then [LlvmIntToPtrOp(closurePtrVal, fVal)]
             else []
+        let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let result = { Name = freshName env; Type = Ptr }
-        (result, fOps @ closureOps @ arrOps @ [LlvmCallOp(result, "@lang_array_map", [closurePtrVal; arrVal])])
+        (result, fOps @ closureOps @ arrOps @ arrCoerceOps @ [LlvmCallOp(result, "@lang_array_map", [closurePtrVal; arrPtrVal])])
 
     // array_init — two-arg
     // array_init n closure: coerce n to I64, coerce closure to Ptr, call lang_array_init → Ptr
@@ -1305,26 +1331,30 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if fVal.Type = I64
             then [LlvmIntToPtrOp(closurePtrVal, fVal)]
             else []
+        let (listPtrVal, listCoerceOps) = coerceToPtrArg env listVal
         let result = { Name = freshName env; Type = Ptr }
-        (result, fOps @ closureOps @ listOps @ [LlvmCallOp(result, "@lang_list_sort_by", [closurePtrVal; listVal])])
+        (result, fOps @ closureOps @ listOps @ listCoerceOps @ [LlvmCallOp(result, "@lang_list_sort_by", [closurePtrVal; listPtrVal])])
 
     // list_of_seq — one-arg identity pass-through
     | App (Var ("list_of_seq", _), seqExpr, _) ->
         let (seqVal, seqOps) = elaborateExpr env seqExpr
+        let (seqPtr, coerceOps) = coerceToPtrArg env seqVal
         let result = { Name = freshName env; Type = Ptr }
-        (result, seqOps @ [LlvmCallOp(result, "@lang_list_of_seq", [seqVal])])
+        (result, seqOps @ coerceOps @ [LlvmCallOp(result, "@lang_list_of_seq", [seqPtr])])
 
     // Phase 32-03: array_sort — one-arg, void return (mirrors array_iter pattern)
     | App (Var ("array_sort", _), arrExpr, _) ->
         let (arrVal, arrOps) = elaborateExpr env arrExpr
+        let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, arrOps @ [LlvmCallVoidOp("@lang_array_sort", [arrVal]); ArithConstantOp(unitVal, 0L)])
+        (unitVal, arrOps @ arrCoerceOps @ [LlvmCallVoidOp("@lang_array_sort", [arrPtrVal]); ArithConstantOp(unitVal, 0L)])
 
     // Phase 32-03: array_of_seq — one-arg returning Ptr
     | App (Var ("array_of_seq", _), seqExpr, _) ->
         let (seqVal, seqOps) = elaborateExpr env seqExpr
+        let (seqPtrVal, seqCoerceOps) = coerceToPtrArg env seqVal
         let result = { Name = freshName env; Type = Ptr }
-        (result, seqOps @ [LlvmCallOp(result, "@lang_array_of_seq", [seqVal])])
+        (result, seqOps @ seqCoerceOps @ [LlvmCallOp(result, "@lang_array_of_seq", [seqPtrVal])])
 
     // Phase 33-01: COL-01 StringBuilder
     | App (Var ("stringbuilder_create", _), unitExpr, _) ->
@@ -1699,8 +1729,19 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | Some sig_ when sig_.ClosureInfo.IsNone ->
                 // DIRECT CALL (Phase 4 behavior) — known non-closure function
                 let (argVal, argOps) = elaborateExpr env argExpr
+                // Coerce argument type to match function signature (e.g., Ptr→I64 for closure args).
+                // This handles calls like `map closure_arg` where map expects I64 but closure is Ptr.
+                let (coercedArgVal, coerceArgOps) =
+                    match sig_.ParamTypes with
+                    | [I64] when argVal.Type = Ptr ->
+                        let coerced = { Name = freshName env; Type = I64 }
+                        (coerced, [LlvmPtrToIntOp(coerced, argVal)])
+                    | [Ptr] when argVal.Type = I64 ->
+                        let coerced = { Name = freshName env; Type = Ptr }
+                        (coerced, [LlvmIntToPtrOp(coerced, argVal)])
+                    | _ -> (argVal, [])
                 let result = { Name = freshName env; Type = sig_.ReturnType }
-                (result, argOps @ [DirectCallOp(result, sig_.MlirName, [argVal])])
+                (result, argOps @ coerceArgOps @ [DirectCallOp(result, sig_.MlirName, [coercedArgVal])])
             | Some sig_ ->
                 // CLOSURE-MAKING CALL — allocate env on GC heap, then call
                 let ci = sig_.ClosureInfo.Value

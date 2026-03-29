@@ -1,0 +1,32 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+type Option 'a = None | Some of 'a
+module List =
+    let rec tryFind pred xs =
+        match xs with
+        | [] -> None
+        | h :: t -> if pred h then Some h else tryFind pred t
+    let rec choose f xs =
+        match xs with
+        | [] -> []
+        | h :: t ->
+            match f h with
+            | Some v -> v :: choose f t
+            | None -> choose f t
+let optGet opt = match opt with | Some v -> v | None -> -1
+let optIsNone opt = match opt with | None -> true | _ -> false
+let found = List.tryFind (fun x -> x > 2) [1; 2; 3; 4] in
+let notfound = List.tryFind (fun x -> x > 10) [1; 2; 3] in
+let chosen = List.choose (fun x -> if x > 2 then Some x else None) [1; 2; 3; 4] in
+let fv = optGet found in
+let nf_is_none = (optIsNone notfound) <> 0 in
+let _ = println (to_string fv) in
+let _ = println (to_string nf_is_none) in
+let _ = (for x in chosen do println (to_string x)) in
+0
+// --- Output:
+3
+true
+3
+4
+0

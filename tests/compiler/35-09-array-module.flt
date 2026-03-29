@@ -1,0 +1,26 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+module Array =
+    let create n def = array_create n def
+    let get arr i    = array_get arr i
+    let set arr i v  = array_set arr i v
+    let length arr   = array_length arr
+    let ofList xs    = array_of_list xs
+    let toList arr   = array_to_list arr
+    let iter f arr       = array_iter f arr
+    let map f arr        = array_map f arr
+    let fold f init arr  = array_fold f init arr
+    let init n f         = array_init n f
+    let sort arr         = array_sort arr
+    let ofSeq coll       = array_of_seq coll
+let arr = Array.ofList [3; 1; 2] in
+let _ = Array.sort arr in
+let lst = Array.toList arr in
+let _ = (for x in lst do println (to_string x)) in
+println (to_string (Array.length (Array.ofList [1; 2; 3])))
+// --- Output:
+1
+2
+3
+3
+0

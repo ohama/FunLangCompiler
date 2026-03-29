@@ -1,0 +1,33 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+type Option 'a = None | Some of 'a
+module Result =
+    type Result 'a 'b = Ok of 'a | Error of 'b
+    let map f r = match r with | Ok x -> Ok (f x) | Error e -> Error e
+    let bind f r = match r with | Ok x -> f x | Error e -> Error e
+    let mapError f r = match r with | Ok x -> Ok x | Error e -> Error (f e)
+    let defaultValue def r = match r with | Ok x -> x | Error _ -> def
+    let toOption r = match r with | Ok x -> Some x | Error _ -> None
+let okGet r = match r with | Ok v -> v | Error _ -> -1
+let optGet opt = match opt with | Some v -> v | None -> -1
+let mapped = Result.map (fun x -> x + 1) (Ok 10) in
+let bound = Result.bind (fun x -> Ok (x * 2)) (Ok 5) in
+let def42 = Result.defaultValue 0 (Ok 42) in
+let def0 = Result.defaultValue 0 (Error "fail") in
+let opt = Result.toOption (Ok 99) in
+let mv = okGet mapped in
+let bv = okGet bound in
+let ov = optGet opt in
+let _ = println (to_string mv) in
+let _ = println (to_string bv) in
+let _ = println (to_string def42) in
+let _ = println (to_string def0) in
+let _ = println (to_string ov) in
+0
+// --- Output:
+11
+10
+42
+0
+99
+0
