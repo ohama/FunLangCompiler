@@ -185,6 +185,32 @@
 
 ---
 
+### v9.0 — Collections & Builtins Parity (2026-03-30)
+
+**Goal:** LangThree v7.0/v7.1 기능을 컴파일러에 구현하여 Phase 62까지 패리티 달성
+
+**Phases:** 31–35 (14 plans, all verified)
+**Requirements:** 33/33 complete
+**Tests:** 183 FsLit E2E tests (39 new)
+**LOC:** 3,564 F# + 1,100 C + 8 Prelude .fun files
+
+**What shipped:**
+- 16 new builtin functions (string, char, hashtable, list, array, io)
+- 4 new collection types (StringBuilder, HashSet, Queue, MutableList) with C runtime
+- 4 new language constructs (string slicing, list comprehension, TuplePat for-in, collection for-in)
+- 8 Prelude modules (String, Hashtable, StringBuilder, Char, List, Array, Option, Result)
+- CLI prelude auto-loading with module-qualified naming
+- 11 compiler bug fixes (closures, accessor cache, LetRec, type coercions)
+
+**Key decisions validated:**
+- Struct typedefs in header only (prevents clang redefinition) ✓
+- GC_malloc+memcpy for buffer growth (never realloc) ✓
+- CollectionVars: Map<string, CollectionKind> for compile-time for-in dispatch ✓
+- Module-qualified naming (Option_map) eliminates MLIR symbol collisions ✓
+- CLI prelude loading via input-file directory walk-up ✓
+
+---
+
 ## Current
 
 Planning next milestone

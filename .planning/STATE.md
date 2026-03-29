@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-29)
+See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v9.0 — MILESTONE COMPLETE
+**Current focus:** Planning next milestone
 
 ## Current Position
 
-Phase: 35 of 35 (Prelude Modules) — COMPLETE ✓
-Plan: 3 of 3 in current phase (all done)
-Status: All phases complete, 183 E2E tests pass
-Last activity: 2026-03-30 — Phase 35 complete (all 3 plans done)
+Phase: Not started
+Plan: Not started
+Status: v9.0 milestone archived, ready to plan next milestone
+Last activity: 2026-03-30 — v9.0 milestone complete (183 E2E tests, 33 requirements)
 
-Progress: [████████████████████] 100% (35/35 phases complete)
+Progress: v1.0–v9.0 shipped
 
 ## Performance Metrics
 
