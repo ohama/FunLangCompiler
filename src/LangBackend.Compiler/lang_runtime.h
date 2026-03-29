@@ -192,4 +192,8 @@ void lang_for_in_queue(void* closure, LangQueue* q);
 void lang_for_in_mlist(void* closure, LangMutableList* ml);
 void lang_for_in_hashtable(void* closure, LangHashtable* ht);
 
+/* Phase 38: CLI argument support */
+void      lang_init_args(int64_t argc, char** argv);
+LangCons* lang_get_args(void);
+
 #endif

@@ -1245,3 +1245,32 @@ LangCons* lang_dir_files(LangString* path) {
     closedir(d);
     return head;
 }
+
+/* Phase 38: CLI argument support */
+static int64_t  s_argc = 0;
+static char**   s_argv = NULL;
+
+void lang_init_args(int64_t argc, char** argv) {
+    s_argc = argc;
+    s_argv = argv;
+}
+
+LangCons* lang_get_args(void) {
+    LangCons* head = NULL;
+    LangCons** cursor = &head;
+    /* Start from i=1 to skip argv[0] (program name) */
+    for (int64_t i = 1; i < s_argc; i++) {
+        int64_t len = (int64_t)strlen(s_argv[i]);
+        char* buf = (char*)GC_malloc((size_t)(len + 1));
+        memcpy(buf, s_argv[i], (size_t)(len + 1));
+        LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+        s->length = len;
+        s->data = buf;
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->head = (int64_t)(uintptr_t)s;
+        cell->tail = NULL;
+        *cursor = cell;
+        cursor = &cell->tail;
+    }
+    return head;
+}

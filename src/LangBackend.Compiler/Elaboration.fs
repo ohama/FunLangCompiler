@@ -1709,6 +1709,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, uOps @ [LlvmCallOp(result, "@lang_get_cwd", [])])
 
+    // Phase 38: get_args — unit-arg, returns Ptr (LangCons* list of CLI arguments starting from argv[1])
+    | App (Var ("get_args", _), unitExpr, _) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        (result, uOps @ [LlvmCallOp(result, "@lang_get_args", [])])
+
     // Phase 14: char_to_int — identity (char is already i64)
     | App (Var ("char_to_int", _), charExpr, _) ->
         elaborateExpr env charExpr
@@ -3331,15 +3337,19 @@ let elaborateModule (expr: Expr) : MlirModule =
             let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded lastBlock.Body resultVal }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
+    // Phase 38: %arg0/%arg1 match Printer's func param naming convention
+    let argcVal    = { Name = "%arg0"; Type = I64 }
+    let argvVal    = { Name = "%arg1"; Type = Ptr }
+    let initArgsOp = LlvmCallVoidOp("@lang_init_args", [argcVal; argvVal])
     let gcInitOp = LlvmCallVoidOp("@GC_init", [])
     let allBlocksWithGC =
         match allBlocks with
         | [] -> allBlocks
         | entryBlock :: rest ->
-            { entryBlock with Body = gcInitOp :: entryBlock.Body } :: rest
+            { entryBlock with Body = initArgsOp :: gcInitOp :: entryBlock.Body } :: rest
     let mainFunc : FuncOp =
         { Name        = "@main"
-          InputTypes  = []
+          InputTypes  = [I64; Ptr]
           ReturnType  = Some resultVal.Type
           Body        = { Blocks = allBlocksWithGC }
           IsLlvmFunc  = false }
@@ -3449,6 +3459,9 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_for_in_queue";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_for_in_mlist";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_for_in_hashtable"; ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+        // Phase 38: CLI argument support
+        { ExtName = "@lang_init_args"; ExtParams = [I64; Ptr]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_get_args";  ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
 
@@ -3582,15 +3595,19 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
             let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded lastBlock.Body resultVal }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
+    // Phase 38: %arg0/%arg1 match Printer's func param naming convention
+    let argcVal    = { Name = "%arg0"; Type = I64 }
+    let argvVal    = { Name = "%arg1"; Type = Ptr }
+    let initArgsOp = LlvmCallVoidOp("@lang_init_args", [argcVal; argvVal])
     let gcInitOp = LlvmCallVoidOp("@GC_init", [])
     let allBlocksWithGC =
         match allBlocks with
         | [] -> allBlocks
         | entryBlock :: rest ->
-            { entryBlock with Body = gcInitOp :: entryBlock.Body } :: rest
+            { entryBlock with Body = initArgsOp :: gcInitOp :: entryBlock.Body } :: rest
     let mainFunc : FuncOp =
         { Name        = "@main"
-          InputTypes  = []
+          InputTypes  = [I64; Ptr]
           ReturnType  = Some resultVal.Type
           Body        = { Blocks = allBlocksWithGC }
           IsLlvmFunc  = false }
@@ -3700,5 +3717,8 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_for_in_queue";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_for_in_mlist";     ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_for_in_hashtable"; ExtParams = [Ptr; Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }
+        // Phase 38: CLI argument support
+        { ExtName = "@lang_init_args"; ExtParams = [I64; Ptr]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_get_args";  ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
