@@ -129,9 +129,9 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 35-01-PLAN.md — String + Hashtable + StringBuilder + Char prelude .fun files + E2E tests
-- [ ] 35-02-PLAN.md — Option + Result + List + Array prelude .fun files + E2E tests
-- [ ] 35-03-PLAN.md — CLI prelude auto-loading in Program.fs + integration test
+- [x] 35-01-PLAN.md — String + Hashtable + StringBuilder + Char prelude .fun files + E2E tests
+- [x] 35-02-PLAN.md — Option + Result + List + Array prelude .fun files + E2E tests
+- [x] 35-03-PLAN.md — CLI prelude auto-loading in Program.fs + integration test
 
 ---
 
@@ -146,4 +146,4 @@ Plans:
 | 32. Hashtable & List/Array Builtins | v9.0 | 3/3 | Complete | 2026-03-29 |
 | 33. Collection Types | v9.0 | 2/2 | Complete | 2026-03-30 |
 | 34. Language Constructs | v9.0 | 3/3 | Complete | 2026-03-30 |
-| 35. Prelude Modules | v9.0 | 0/3 | Not started | - |
+| 35. Prelude Modules | v9.0 | 3/3 | Complete | 2026-03-30 |

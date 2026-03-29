@@ -53,14 +53,14 @@
 
 ### Prelude Modules
 
-- [ ] **PRE-01**: String 모듈 — endsWith, startsWith, trim, length, contains 함수
-- [ ] **PRE-02**: Hashtable 모듈 — tryGetValue, count 함수
-- [ ] **PRE-03**: StringBuilder 모듈 — add, toString 함수
-- [ ] **PRE-04**: Char 모듈 — IsDigit, ToUpper, IsLetter, IsUpper, IsLower, ToLower 함수
-- [ ] **PRE-05**: List 확장 — sort, sortBy, tryFind, choose, distinctBy, exists, mapi, item, isEmpty, head, tail, ofSeq
-- [ ] **PRE-06**: Array 확장 — sort, ofSeq
-- [ ] **PRE-07**: Option 유틸리티 — map, bind, defaultValue, iter, filter, isSome, isNone
-- [ ] **PRE-08**: Result 유틸리티 — map, bind, defaultValue, mapError, toOption
+- [x] **PRE-01**: String 모듈 — endsWith, startsWith, trim, length, contains 함수
+- [x] **PRE-02**: Hashtable 모듈 — tryGetValue, count 함수
+- [x] **PRE-03**: StringBuilder 모듈 — add, toString 함수
+- [x] **PRE-04**: Char 모듈 — IsDigit, ToUpper, IsLetter, IsUpper, IsLower, ToLower 함수
+- [x] **PRE-05**: List 확장 — sort, sortBy, tryFind, choose, distinctBy, exists, mapi, item, isEmpty, head, tail, ofSeq
+- [x] **PRE-06**: Array 확장 — sort, ofSeq
+- [x] **PRE-07**: Option 유틸리티 — map, bind, defaultValue, iter, filter, isSome, isNone
+- [x] **PRE-08**: Result 유틸리티 — map, bind, defaultValue, mapError, toOption
 
 ## Out of Scope
 
@@ -100,14 +100,14 @@
 | LANG-02 | Phase 34 | Complete |
 | LANG-03 | Phase 34 | Complete |
 | LANG-04 | Phase 34 | Complete |
-| PRE-01 | Phase 35 | Pending |
-| PRE-02 | Phase 35 | Pending |
-| PRE-03 | Phase 35 | Pending |
-| PRE-04 | Phase 35 | Pending |
-| PRE-05 | Phase 35 | Pending |
-| PRE-06 | Phase 35 | Pending |
-| PRE-07 | Phase 35 | Pending |
-| PRE-08 | Phase 35 | Pending |
+| PRE-01 | Phase 35 | Complete |
+| PRE-02 | Phase 35 | Complete |
+| PRE-03 | Phase 35 | Complete |
+| PRE-04 | Phase 35 | Complete |
+| PRE-05 | Phase 35 | Complete |
+| PRE-06 | Phase 35 | Complete |
+| PRE-07 | Phase 35 | Complete |
+| PRE-08 | Phase 35 | Complete |
 
 **Coverage:**
 - v9.0 requirements: 33 total (4 STR + 6 CHR + 1 IO + 2 HT + 4 LA + 4 COL + 4 LANG + 8 PRE)
