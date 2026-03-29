@@ -515,6 +515,31 @@ void lang_for_in(void* closure, void* collection) {
     lang_for_in_list(closure, collection);
 }
 
+/* Phase 34: list comprehension — applies closure to each element of a LangCons* list,
+ * accumulates results into a new LangCons* list preserving element order. */
+LangCons* lang_list_comp(void* closure, void* collection) {
+    LangClosureFn fn = *(LangClosureFn*)closure;
+    LangCons* cur = (LangCons*)collection;
+    /* Reverse-accumulate, then reverse to preserve order */
+    LangCons* result = NULL;
+    while (cur != NULL) {
+        int64_t val = fn(closure, cur->head);
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->head = val;
+        cell->tail = result;
+        result = cell;
+        cur = cur->tail;
+    }
+    LangCons* reversed = NULL;
+    while (result != NULL) {
+        LangCons* next = result->tail;
+        result->tail = reversed;
+        reversed = result;
+        result = next;
+    }
+    return reversed;
+}
+
 int64_t* lang_array_map(void* closure, int64_t* arr) {
     LangClosureFn fn = *(LangClosureFn*)closure;
     int64_t n = arr[0];

@@ -59,6 +59,7 @@ void lang_array_iter(void* closure, int64_t* arr);
 void lang_for_in(void* closure, void* collection);
 void lang_for_in_list(void* closure, void* collection);
 void lang_for_in_array(void* closure, void* collection);
+LangCons* lang_list_comp(void* closure, void* collection);
 int64_t* lang_array_map(void* closure, int64_t* arr);
 int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr);
 int64_t* lang_array_init(int64_t n, void* closure);
