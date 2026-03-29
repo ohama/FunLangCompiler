@@ -97,4 +97,7 @@ int64_t lang_char_to_lower(int64_t c);
 LangCons* lang_list_sort_by(void* closure, LangCons* list);
 LangCons* lang_list_of_seq(void* collection);
 
+void lang_array_sort(int64_t* arr);
+int64_t* lang_array_of_seq(void* collection);
+
 #endif

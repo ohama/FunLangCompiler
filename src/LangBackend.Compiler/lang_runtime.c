@@ -591,6 +591,26 @@ LangCons* lang_list_of_seq(void* collection) {
     return (LangCons*)collection;
 }
 
+/* Phase 32-03: array_sort — in-place ascending sort of int64_t array */
+static int lang_compare_i64(const void* a, const void* b) {
+    int64_t x = *(const int64_t*)a;
+    int64_t y = *(const int64_t*)b;
+    if (x < y) return -1;
+    if (x > y) return  1;
+    return 0;
+}
+
+void lang_array_sort(int64_t* arr) {
+    int64_t n = arr[0];
+    if (n <= 1) return;
+    qsort(&arr[1], (size_t)n, sizeof(int64_t), lang_compare_i64);
+}
+
+/* Phase 32-03: array_of_seq — delegates to lang_array_of_list */
+int64_t* lang_array_of_seq(void* collection) {
+    return lang_array_of_list((LangCons*)collection);
+}
+
 /* File I/O runtime functions */
 
 LangString* lang_file_read(LangString* path) {
