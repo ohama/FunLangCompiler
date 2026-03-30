@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v10.0 Phase 42 — If-Match Nested Empty Block Fix
+**Current focus:** v10.0 Phase 41 — Prelude Sync Compiler Changes
 
 ## Current Position
 
-Phase: 42 of 42 (If-Match Nested Empty Block Fix)
-Plan: 1 of 1 complete (42-01 done)
-Status: Phase complete
-Last activity: 2026-03-30 — Completed 42-01-PLAN.md (if-match nested block fix, 186/201 tests)
-**Next:** Phase 41-02 — operator sanitization, Prelude LangThree sync
+Phase: 41 of 42 (Prelude Sync Compiler Changes)
+Plan: 2 of N complete (41-02 done — Prelude sync complete)
+Status: In progress
+Last activity: 2026-03-30 — Completed 41-02-PLAN.md (Prelude LangThree sync, 202/202 tests)
+**Next:** Phase 41 remaining plans (operator sanitization if any) or phase complete
 
-Progress: [██████████] 97% (v10.0 — Phase 42-01 complete)
+Progress: [██████████] 98% (v10.0 — 41-02 complete, 202/202 tests)
 
 ## Performance Metrics
 
@@ -72,6 +72,10 @@ Recent decisions affecting current work:
 - Phase 42-01: same FIX-02 pattern (blocksAfterX - 1 index) applied to both then AND else branches of If handler
 - Phase 42-01: isBranchTerminator defined locally before block construction (separate from isTerminator for condOps)
 - Phase 42-01: patchedTarget prepends coerce ops + CfBrOp BEFORE existing block body (match merge block starts empty)
+- Phase 41-02: Option module renamed map/bind/etc to optionMap/optionBind/optionDefault to match LangThree — added (<|>), optionIter/Filter/DefaultValue/IsSome/IsNone
+- Phase 41-02: Result module renamed to resultMap/resultBind etc, added isOk/isError/resultIter/resultToOption/resultDefaultValue
+- Phase 41-02: All 11 non-Hashtable Prelude files now byte-identical with LangThree/Prelude/ (verified with diff)
+- Phase 41-02: List.take/drop/zip/(++) now in Prelude — 202/202 E2E tests pass
 
 ### Roadmap Evolution
 
@@ -92,6 +96,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-30T05:27:30Z
-Stopped at: Completed 42-01-PLAN.md — if-match nested empty block fix + E2E tests (186/201 runnable tests pass)
+Last session: 2026-03-30T05:44:22Z
+Stopped at: Completed 41-02-PLAN.md — Prelude LangThree sync, List.take/drop/zip added (202/202 tests pass)
 Resume file: None
