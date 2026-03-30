@@ -5,17 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v10.0 Phase 41 — Prelude Sync Compiler Changes
+**Current focus:** v10.0 Phase 42 — If-Match Nested Empty Block Fix
 
 ## Current Position
 
-Phase: 41 of 41 (Prelude Sync Compiler Changes)
-Plan: 1 of 2 complete (41-01 done)
-Status: In progress
-Last activity: 2026-03-30 — Completed 41-01-PLAN.md (OpenDecl, 200/200 pass)
+Phase: 42 of 42 (If-Match Nested Empty Block Fix)
+Plan: 1 of 1 complete (42-01 done)
+Status: Phase complete
+Last activity: 2026-03-30 — Completed 42-01-PLAN.md (if-match nested block fix, 186/201 tests)
 **Next:** Phase 41-02 — operator sanitization, Prelude LangThree sync
 
-Progress: [█████████░] 95% (v10.0 — Phase 41-01 complete)
+Progress: [██████████] 97% (v10.0 — Phase 42-01 complete)
 
 ## Performance Metrics
 
@@ -69,10 +69,14 @@ Recent decisions affecting current work:
 - Phase 41-01: Two-pass flattenDecls: collectModuleMembers first, then flattenDecls with OpenDecl expansion to LetDecl aliases
 - Phase 41-01: OpenDecl emits Var(qualifiedName) alias — works for single-lambda (in Vars), needs special KnownFuncs case for two-lambda
 - Phase 41-01: Let(name, Var(qualName), cont) when qualName in KnownFuncs → add name as KnownFuncs alias (no closure wrapping needed)
+- Phase 42-01: same FIX-02 pattern (blocksAfterX - 1 index) applied to both then AND else branches of If handler
+- Phase 42-01: isBranchTerminator defined locally before block construction (separate from isTerminator for condOps)
+- Phase 42-01: patchedTarget prepends coerce ops + CfBrOp BEFORE existing block body (match merge block starts empty)
 
 ### Roadmap Evolution
 
 - Phase 41 added: Prelude Sync Compiler Changes — OpenDecl 구현, 연산자 MLIR sanitization, Prelude LangThree 완전 동기화. Printer.fs sanitizeMlirName은 이미 추가됨 (WIP).
+- Phase 42 added: If-Match Nested Empty Block Fix — `if...then...else match...` 패턴이 empty entry block 생성하는 기존 버그 (FIX-02 변종). List.take/List.drop 컴파일 블로커.
 
 ### Pending Todos
 
@@ -84,9 +88,10 @@ None.
 - FIX-01 RESOLVED: for-in mutable capture works correctly (verified by 36-01-forin-mutable-capture.flt)
 - FIX-02 RESOLVED: Sequential if expressions produce valid MLIR (verified by 36-02-sequential-if.flt)
 - FIX-03 RESOLVED: And/Or/While accept I1-typed conditions (verified by 36-03-bool-and-or-while.flt)
+- FIX-04 RESOLVED: if-match nested empty block fix — if...then...else match and if...then match...else now compile correctly (verified by 42-01-if-match-nested.flt)
 
 ## Session Continuity
 
-Last session: 2026-03-30T04:21:28Z
-Stopped at: Completed 41-01-PLAN.md — OpenDecl two-pass flattenDecls + KnownFuncs aliasing (200/200 pass)
+Last session: 2026-03-30T05:27:30Z
+Stopped at: Completed 42-01-PLAN.md — if-match nested empty block fix + E2E tests (186/201 runnable tests pass)
 Resume file: None
