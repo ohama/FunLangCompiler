@@ -5,16 +5,17 @@
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v10.0 COMPLETE — Multi-file Import shipped
+**Current focus:** v10.0 Phase 41 — Prelude Sync Compiler Changes
 
 ## Current Position
 
-Phase: 40 of 40 (Multi-file Import)
-Plan: 01 of 01
-Status: COMPLETE — v10.0 milestone achieved
-Last activity: 2026-03-30 — Completed 40-01-PLAN.md — expandImports with cycle detection (197/197 pass)
+Phase: 41 of 41 (Prelude Sync Compiler Changes)
+Plan: 1 of 2 complete (41-01 done)
+Status: In progress
+Last activity: 2026-03-30 — Completed 41-01-PLAN.md (OpenDecl, 200/200 pass)
+**Next:** Phase 41-02 — operator sanitization, Prelude LangThree sync
 
-Progress: [██████████] 100% (v10.0 COMPLETE — all phases done)
+Progress: [█████████░] 95% (v10.0 — Phase 41-01 complete)
 
 ## Performance Metrics
 
@@ -65,6 +66,13 @@ Recent decisions affecting current work:
 - Phase 40-01: HashSet push/pop (not global visited set) — diamond imports correctly handled, pop after subtree allows sibling imports
 - Phase 40-01: Imported files parsed standalone (no prelude prefix) — prelude already injected in outer combinedSrc
 - Phase 40-01: printf \x22 hex escape for double quotes in flt test commands inside single-quoted bash -c strings
+- Phase 41-01: Two-pass flattenDecls: collectModuleMembers first, then flattenDecls with OpenDecl expansion to LetDecl aliases
+- Phase 41-01: OpenDecl emits Var(qualifiedName) alias — works for single-lambda (in Vars), needs special KnownFuncs case for two-lambda
+- Phase 41-01: Let(name, Var(qualName), cont) when qualName in KnownFuncs → add name as KnownFuncs alias (no closure wrapping needed)
+
+### Roadmap Evolution
+
+- Phase 41 added: Prelude Sync Compiler Changes — OpenDecl 구현, 연산자 MLIR sanitization, Prelude LangThree 완전 동기화. Printer.fs sanitizeMlirName은 이미 추가됨 (WIP).
 
 ### Pending Todos
 
@@ -79,6 +87,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-30
-Stopped at: Completed 40-01-PLAN.md — v10.0 COMPLETE (multi-file import, 197/197 pass)
+Last session: 2026-03-30T04:21:28Z
+Stopped at: Completed 41-01-PLAN.md — OpenDecl two-pass flattenDecls + KnownFuncs aliasing (200/200 pass)
 Resume file: None
