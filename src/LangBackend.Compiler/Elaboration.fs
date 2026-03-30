@@ -884,8 +884,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let thenLabel  = freshLabel env "then"
         let elseLabel  = freshLabel env "else"
         let mergeLabel = freshLabel env "merge"
+        let blocksBeforeThen = env.Blocks.Value.Length
         let (thenVal, thenOps) = elaborateExpr env thenExpr
+        let blocksAfterThen = env.Blocks.Value.Length
+        let blocksBeforeElse = env.Blocks.Value.Length
         let (elseVal, elseOps) = elaborateExpr env elseExpr
+        let blocksAfterElse = env.Blocks.Value.Length
         // If branch types differ, coerce both to I64 for uniform merge block type.
         // This handles cases like: then = Ptr (cons cell), else = I64 (closure result).
         let (finalThenVal, thenCoerceOps) =
@@ -893,10 +897,46 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (finalElseVal, elseCoerceOps) =
             if thenVal.Type <> elseVal.Type then coerceToI64 env elseVal else (elseVal, [])
         let mergeArg = { Name = freshName env; Type = finalThenVal.Type }
+        // Phase 42 FIX: When branch expr is a Match/If, its ops end with a terminator and
+        // side blocks (match arms, match merge) are created in env.Blocks. The continuation
+        // CfBrOp(mergeLabel) must go into the LAST side block (match's merge block), not
+        // appended inline after the terminator (which would be unreachable).
+        let isBranchTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        // Then block
+        let thenBlockBody =
+            match List.tryLast thenOps with
+            | Some op when isBranchTerminator op && blocksAfterThen > blocksBeforeThen ->
+                // thenExpr created side blocks (e.g. nested match).
+                // Patch CfBrOp(mergeLabel) into the last side block (match's merge block).
+                let allBlocks = env.Blocks.Value
+                let targetIdx = blocksAfterThen - 1
+                let targetBlock = allBlocks.[targetIdx]
+                let patchedTarget = { targetBlock with Body = thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])] @ targetBlock.Body }
+                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+                thenOps  // dispatch ops only (terminator ends block)
+            | _ ->
+                thenOps @ thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])]
         env.Blocks.Value <- env.Blocks.Value @
-            [ { Label = Some thenLabel; Args = []; Body = thenOps @ thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])] } ]
+            [ { Label = Some thenLabel; Args = []; Body = thenBlockBody } ]
+        // Else block
+        let elseBlockBody =
+            match List.tryLast elseOps with
+            | Some op when isBranchTerminator op && blocksAfterElse > blocksBeforeElse ->
+                // elseExpr created side blocks (e.g. nested match).
+                // Patch CfBrOp(mergeLabel) into the last side block (match's merge block).
+                let allBlocks = env.Blocks.Value
+                let targetIdx = blocksAfterElse - 1
+                let targetBlock = allBlocks.[targetIdx]
+                let patchedTarget = { targetBlock with Body = elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])] @ targetBlock.Body }
+                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+                elseOps  // dispatch ops only
+            | _ ->
+                elseOps @ elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])]
         env.Blocks.Value <- env.Blocks.Value @
-            [ { Label = Some elseLabel; Args = []; Body = elseOps @ elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])] } ]
+            [ { Label = Some elseLabel; Args = []; Body = elseBlockBody } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         // Phase 36 FIX-03: If condOps ends with a terminator (e.g. And/Or produced a CfCondBrOp),
