@@ -3675,21 +3675,57 @@ let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
         | _ -> ()
     (typeEnv, recordEnv, exnTags)
 
+// Phase 41: collectModuleMembers — first pass scan of decls to build a map from module name
+// to list of qualified member names (e.g., "Core" -> ["Core_id"; "Core_not"]).
+// Used by flattenDecls to resolve OpenDecl at compile time.
+let private collectModuleMembers (decls: Ast.Decl list) : Map<string, string list> =
+    let mutable result = Map.empty<string, string list>
+    let rec scan (modName: string) (ds: Ast.Decl list) =
+        for d in ds do
+            match d with
+            | Ast.Decl.ModuleDecl(name, innerDecls, _) ->
+                scan name innerDecls
+            | Ast.Decl.LetDecl(name, _, _) when modName <> "" && name <> "_" ->
+                let qualifiedName = modName + "_" + name
+                let existing = match Map.tryFind modName result with Some xs -> xs | None -> []
+                result <- Map.add modName (existing @ [qualifiedName]) result
+            | Ast.Decl.LetRecDecl(bindings, _) when modName <> "" ->
+                for (name, _, _, _) in bindings do
+                    let qualifiedName = modName + "_" + name
+                    let existing = match Map.tryFind modName result with Some xs -> xs | None -> []
+                    result <- Map.add modName (existing @ [qualifiedName]) result
+            | _ -> ()
+    scan "" decls
+    result
+
 // Phase 25: flattenDecls — recursively flatten ModuleDecl/NamespaceDecl into a single Decl list.
 // This allows extractMainExpr to see all let bindings regardless of nesting depth.
 // Phase 35: Module-qualified naming — when flattening a ModuleDecl, prefix all LetDecl/LetRecDecl
 // names with the module name (e.g., `module Option = let map f opt = ...` → `let Option_map f opt = ...`).
 // This prevents name collisions when multiple modules define functions with the same name (e.g., map, bind).
-let rec private flattenDecls (modName: string) (decls: Ast.Decl list) : Ast.Decl list =
+// Phase 41: OpenDecl handling — when `open ModuleName` is encountered, emit LetDecl aliases for each
+// member of the module, making them available as unqualified names. Uses moduleMembers map from first pass.
+let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName: string) (decls: Ast.Decl list) : Ast.Decl list =
     decls |> List.collect (fun d ->
         match d with
-        | Ast.Decl.ModuleDecl(name, innerDecls, _) -> flattenDecls name innerDecls
-        | Ast.Decl.NamespaceDecl(_, innerDecls, _) -> flattenDecls modName innerDecls
+        | Ast.Decl.ModuleDecl(name, innerDecls, _) -> flattenDecls moduleMembers name innerDecls
+        | Ast.Decl.NamespaceDecl(_, innerDecls, _) -> flattenDecls moduleMembers modName innerDecls
         | Ast.Decl.LetDecl(name, body, s) when modName <> "" && name <> "_" ->
             [Ast.Decl.LetDecl(modName + "_" + name, body, s)]
         | Ast.Decl.LetRecDecl(bindings, s) when modName <> "" ->
             let prefixed = bindings |> List.map (fun (name, param, body, s2) -> (modName + "_" + name, param, body, s2))
             [Ast.Decl.LetRecDecl(prefixed, s)]
+        | Ast.Decl.OpenDecl([openedMod], s) ->
+            // Single-segment open: emit short-name aliases for each member of the opened module
+            match Map.tryFind openedMod moduleMembers with
+            | Some qualifiedNames ->
+                qualifiedNames |> List.map (fun qualifiedName ->
+                    let shortName = qualifiedName.Substring(openedMod.Length + 1)
+                    Ast.Decl.LetDecl(shortName, Ast.Var(qualifiedName, s), s))
+            | None -> []
+        | Ast.Decl.OpenDecl(_, _) ->
+            // Multi-segment open paths: no-op (not supported)
+            []
         | _ -> [d])
 
 // Phase 16: Extract the main expression from a Decl list.
@@ -3698,10 +3734,11 @@ let rec private flattenDecls (modName: string) (decls: Ast.Decl list) : Ast.Decl
 // Non-expression decls (TypeDecl, RecordTypeDecl, ExceptionDecl) are skipped.
 // LetRecDecl bindings are wrapped in LetRec expressions.
 // Phase 25: Flattens ModuleDecl/NamespaceDecl before processing; handles LetPatDecl;
-// OpenDecl is a no-op (filtered out by the wildcard in build).
+// Phase 41: OpenDecl is handled by flattenDecls (two-pass: collect members first, then flatten).
 let private extractMainExpr (decls: Ast.Decl list) : Expr =
     let s = unknownSpan
-    let flatDecls = flattenDecls "" decls
+    let moduleMembers = collectModuleMembers decls
+    let flatDecls = flattenDecls moduleMembers "" decls
     let exprDecls =
         flatDecls |> List.filter (fun d ->
             match d with
