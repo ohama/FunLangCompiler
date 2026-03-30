@@ -16,7 +16,7 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
 - [x] **Phase 38: CLI Arguments** — @main signature change + get_args runtime helper
 - [x] **Phase 39: Format Strings** — sprintf/printfn via C runtime snprintf delegation
 - [x] **Phase 40: Multi-file Import** — AST flattening for `open "file.fun"` before elaboration
-- [ ] **Phase 41: Prelude Sync Compiler Changes** — OpenDecl 구현 + 연산자 MLIR 이름 sanitization + Prelude LangThree 완전 동기화
+- [x] **Phase 41: Prelude Sync Compiler Changes** — OpenDecl 구현 + 연산자 MLIR 이름 sanitization + Prelude LangThree 완전 동기화
 - [x] **Phase 42: If-Match Nested Empty Block Fix** — if 브랜치 안 match 중첩 시 empty entry block 버그 수정 (FIX-02 변종)
 
 ## Phase Details
@@ -101,8 +101,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 41-01-PLAN.md — OpenDecl implementation in flattenDecls + 3 E2E tests
-- [ ] 41-02-PLAN.md — Prelude file sync to LangThree + List.take/drop E2E test
+- [x] 41-01-PLAN.md — OpenDecl implementation in flattenDecls + 3 E2E tests
+- [x] 41-02-PLAN.md — Prelude file sync to LangThree + List.take/drop E2E test
 
 **Details:**
 Three compiler changes required:
@@ -138,5 +138,5 @@ FIX-02 변종 버그. `if` 브랜치 안에 `match`가 중첩될 때 Elaboration
 | 38. CLI Arguments | 1/1 | Complete | 2026-03-30 |
 | 39. Format Strings | 1/1 | Complete | 2026-03-30 |
 | 40. Multi-file Import | 1/1 | Complete | 2026-03-30 |
-| 41. Prelude Sync Compiler Changes | 1/2 | In Progress | - |
+| 41. Prelude Sync Compiler Changes | 2/2 | Complete | 2026-03-30 |
 | 42. If-Match Nested Empty Block Fix | 1/1 | Complete | 2026-03-30 |
