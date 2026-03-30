@@ -1,0 +1,15 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+module Core =
+    let id x = x
+    let not b = if b then 0 else 1
+
+open Core
+let _ = println (to_string (id 42))
+let _ = println (to_string (not 1))
+let _ = println (to_string (not 0))
+// --- Output:
+42
+0
+1
+0
