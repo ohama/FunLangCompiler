@@ -673,6 +673,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Step 7: Elaborate inExpr with updated env
         elaborateExpr env' inExpr
 
+    // Phase 41: OpenDecl alias — Let(shortName, Var(qualifiedName), cont) where qualifiedName is in
+    // KnownFuncs (two-lambda direct-call function) but not Vars. Add shortName as KnownFuncs alias.
+    | Let (name, Var (qualName, _), bodyExpr, _) when
+        not (Map.containsKey qualName env.Vars) && Map.containsKey qualName env.KnownFuncs ->
+        let sig_ = Map.find qualName env.KnownFuncs
+        let env' = { env with KnownFuncs = Map.add name sig_ env.KnownFuncs }
+        elaborateExpr env' bodyExpr
     | Let (name, bindExpr, bodyExpr, _) ->
         let blocksBeforeBind = env.Blocks.Value.Length
         let (bv, bops) = elaborateExpr env bindExpr
