@@ -17,6 +17,7 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
 - [x] **Phase 39: Format Strings** — sprintf/printfn via C runtime snprintf delegation
 - [x] **Phase 40: Multi-file Import** — AST flattening for `open "file.fun"` before elaboration
 - [ ] **Phase 41: Prelude Sync Compiler Changes** — OpenDecl 구현 + 연산자 MLIR 이름 sanitization + Prelude LangThree 완전 동기화
+- [ ] **Phase 42: If-Match Nested Empty Block Fix** — if 브랜치 안 match 중첩 시 empty entry block 버그 수정 (FIX-02 변종)
 
 ## Phase Details
 
@@ -109,6 +110,23 @@ Three compiler changes required:
 2. **Operator MLIR name sanitization** — Module-prefixed operators like `Core_^^` or `List_++` are invalid MLIR symbol names. `sanitizeMlirName` already added to Printer.fs; needs integration testing. Char mapping: `^→_caret_`, `+→_plus_`, `|→_pipe_`, `>→_gt_`, `<→_lt_`.
 3. **Prelude file sync** — Match LangThree exactly: Core.fun (module wrapper + `(^^)` + `open Core`), List.fun (+zip/take/drop/`(++)` + `open List`), Option.fun (optionMap naming + `(<|>)` + `open Option`), Result.fun (resultMap naming + missing functions + `open Result`). Hashtable.fun keeps backend-specific `createStr`/`keysStr`.
 
+### Phase 42: If-Match Nested Empty Block Fix
+**Goal**: `if ... then ... else match ...` and `if ... then match ... else ...` patterns compile to valid MLIR without empty entry blocks
+**Depends on**: Phase 41 (independent bug fix, but numbered after for ordering)
+**Requirements**: FIX-04
+**Success Criteria** (what must be TRUE):
+  1. `if n = 0 then [] else match xs with | [] -> [] | h :: t -> [h]` compiles and runs correctly
+  2. `if n = 0 then match xs with | _ -> [] else [xs]` compiles and runs correctly
+  3. `let rec take n = fun xs -> if n = 0 then [] else match xs with | [] -> [] | h :: t -> h :: take (n - 1) t` compiles and runs correctly
+  4. All existing 200+ E2E tests still pass
+**Plans**: 1 plan
+
+Plans:
+- [ ] 42-01-PLAN.md — Fix If handler terminator detection + E2E tests
+
+**Details:**
+FIX-02 변종 버그. `if` 브랜치 안에 `match`가 중첩될 때 Elaboration.fs가 생성하는 MLIR의 entry block이 비어있어 mlir-opt가 "empty block: expect at least a terminator" 에러를 발생시킴. If 브랜치의 Match 처리 시 블록 패칭 로직이 entry block ops를 올바른 위치에 배치하지 못하는 것이 원인. List.take/List.drop 등 if+match 중첩 패턴을 사용하는 모든 함수의 컴파일 블로커.
+
 ## Progress
 
 **Execution Order:** 36 -> 37 -> 38 -> 39 -> 40 -> 41
@@ -120,4 +138,5 @@ Three compiler changes required:
 | 38. CLI Arguments | 1/1 | Complete | 2026-03-30 |
 | 39. Format Strings | 1/1 | Complete | 2026-03-30 |
 | 40. Multi-file Import | 1/1 | Complete | 2026-03-30 |
-| 41. Prelude Sync Compiler Changes | 0/2 | Not Started | - |
+| 41. Prelude Sync Compiler Changes | 1/2 | In Progress | - |
+| 42. If-Match Nested Empty Block Fix | 0/1 | Not Started | - |
