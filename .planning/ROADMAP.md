@@ -7,7 +7,7 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
 ## Milestones
 
 - ✅ **v1.0–v9.0** — Phases 1–35 (shipped, see MILESTONES.md)
-- 🚧 **v10.0 FunLexYacc 네이티브 컴파일 지원** — Phases 36–40 (in progress)
+- 🚧 **v10.0 FunLexYacc 네이티브 컴파일 지원** — Phases 36–41 (in progress)
 
 ## Phases
 
@@ -16,6 +16,7 @@ v10.0 resolves the remaining blockers for FunLexYacc self-hosting: compiler bug 
 - [x] **Phase 38: CLI Arguments** — @main signature change + get_args runtime helper
 - [x] **Phase 39: Format Strings** — sprintf/printfn via C runtime snprintf delegation
 - [x] **Phase 40: Multi-file Import** — AST flattening for `open "file.fun"` before elaboration
+- [ ] **Phase 41: Prelude Sync Compiler Changes** — OpenDecl 구현 + 연산자 MLIR 이름 sanitization + Prelude LangThree 완전 동기화
 
 ## Phase Details
 
@@ -87,9 +88,30 @@ Plans:
 Plans:
 - [x] 40-01-PLAN.md — expandImports in Program.fs + 5 E2E tests
 
+### Phase 41: Prelude Sync Compiler Changes
+**Goal**: `open Module` brings module members into scope, custom operators compile inside modules, and all Prelude files match LangThree exactly
+**Depends on**: Phase 40 (all v10.0 features complete; this extends the module system)
+**Requirements**: OPEN-01, OPEN-02, OPEN-03
+**Success Criteria** (what must be TRUE):
+  1. `open Core` after `module Core = let id x = x` makes `id` available without `Core.` prefix
+  2. `let (^^) a b = string_concat a b` inside a module compiles to valid MLIR (no invalid symbol names)
+  3. All 12 Prelude .fun files are byte-identical to ../LangThree/Prelude/ and existing E2E tests pass
+  4. `List.take 2 [1;2;3]` and `List.drop 1 [1;2;3]` work in compiled programs
+**Plans**: 2 plans
+
+Plans:
+- [ ] 41-01-PLAN.md — OpenDecl implementation in flattenDecls + 3 E2E tests
+- [ ] 41-02-PLAN.md — Prelude file sync to LangThree + List.take/drop E2E test
+
+**Details:**
+Three compiler changes required:
+1. **OpenDecl implementation** — `flattenDecls` currently discards `OpenDecl`. Must emit alias `LetDecl`s that re-bind module members at top level (e.g., `module Core = let id x = x` + `open Core` → additional `let id = Core_id`). Affects `Elaboration.fs` flattenDecls/extractMainExpr.
+2. **Operator MLIR name sanitization** — Module-prefixed operators like `Core_^^` or `List_++` are invalid MLIR symbol names. `sanitizeMlirName` already added to Printer.fs; needs integration testing. Char mapping: `^→_caret_`, `+→_plus_`, `|→_pipe_`, `>→_gt_`, `<→_lt_`.
+3. **Prelude file sync** — Match LangThree exactly: Core.fun (module wrapper + `(^^)` + `open Core`), List.fun (+zip/take/drop/`(++)` + `open List`), Option.fun (optionMap naming + `(<|>)` + `open Option`), Result.fun (resultMap naming + missing functions + `open Result`). Hashtable.fun keeps backend-specific `createStr`/`keysStr`.
+
 ## Progress
 
-**Execution Order:** 36 -> 37 -> 38 -> 39 -> 40
+**Execution Order:** 36 -> 37 -> 38 -> 39 -> 40 -> 41
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -98,3 +120,4 @@ Plans:
 | 38. CLI Arguments | 1/1 | Complete | 2026-03-30 |
 | 39. Format Strings | 1/1 | Complete | 2026-03-30 |
 | 40. Multi-file Import | 1/1 | Complete | 2026-03-30 |
+| 41. Prelude Sync Compiler Changes | 0/2 | Not Started | - |
