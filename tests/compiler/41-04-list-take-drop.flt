@@ -1,0 +1,26 @@
+// --- Command: bash -c 'PROJROOT=%S/../.. && TMPLT="$PROJROOT/test_takedrop_$$.lt" && OUTBIN=$(mktemp /tmp/langback_XXXXXX) && cp %input "$TMPLT" && dotnet run --project "$PROJROOT/src/LangBackend.Cli/LangBackend.Cli.fsproj" -- "$TMPLT" -o "$OUTBIN" && "$OUTBIN"; echo $?; rm -f "$OUTBIN" "$TMPLT"'
+// --- Input:
+let xs = [1; 2; 3; 4; 5]
+let taken = List.take 3 xs
+let dropped = List.drop 2 xs
+let _ = for x in taken do println (to_string x)
+let _ = for x in dropped do println (to_string x)
+let _ = println (to_string (List.length (List.take 0 [1; 2; 3])))
+let _ = println (to_string (List.length (List.drop 5 [1; 2; 3])))
+let zipped = List.zip [1; 2; 3] [4; 5; 6]
+let _ = for p in zipped do
+    match p with
+    | (a, b) -> println (string_concat (to_string a) (string_concat "," (to_string b)))
+// --- Output:
+1
+2
+3
+3
+4
+5
+0
+0
+1,4
+2,5
+3,6
+0
