@@ -5,32 +5,29 @@
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v11.0 Compiler Error Messages — Phase 44 (Error Location Foundation)
+**Current focus:** v11.0 Compiler Error Messages — Phase 44 complete, Phase 45 next
 
 ## Current Position
 
-Phase: 44 (1 of 3 in v11.0) — Error Location Foundation
-Plan: 02 of 02 complete
-Status: Phase complete
-Last activity: 2026-03-31 — Completed 44-02-PLAN.md
+Phase: 44 complete (1 of 3 in v11.0) — Error Location Foundation
+Plan: 2/2 complete
+Status: Phase complete (infrastructure accepted, upstream span zeroing documented)
+Last activity: 2026-03-31 — Phase 44 execution complete
 
-Progress: v1.0-v10.0 complete (42 phases, 81 plans). v11.0: [██████████] 100% (3/3 plans)
+Progress: v1.0-v10.0 complete (42 phases). v11.0: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 83 (v1.0-v10.0 + 44-01 + 44-02)
+- Total plans completed: 83 (v1.0-v10.0: 81 + Phase 44: 2)
 - Average duration: ~10 min/plan
-- Total execution time: ~13.6 hours
 
 ## Accumulated Context
 
 ### Decisions
 
-All v10.0 decisions archived to `.planning/milestones/v10.0-ROADMAP.md`.
-Phase 43 (uncommitted): stripAnnot, BoolVars, mutual recursion, sanitizeMlirName.
-Phase 44-01: inline failWithSpan for polymorphic return; Ast.unknownSpan for closure capture.
-Phase 44-02: spans currently :0:0: (parser filtered tokenizer doesn't propagate positions); pattern test uses LetPat TuplePat path.
+- Phase 44: failWithSpan 인프라 완성으로 수락. Span 값이 0인 것은 LangThree 파서 upstream 이슈 (survey/langthree-span-zeroing-fix.md에 기록).
+- Phase 44: `Ast.unknownSpan` fallback — 1곳(closure capture) 사용.
 
 ### Pending Todos
 
@@ -38,10 +35,10 @@ None.
 
 ### Blockers/Concerns
 
-None.
+- LangThree 파서가 Span에 위치를 채우지 않음 → 에러 메시지가 `:0:0:` 표시. survey/에 수정 가이드 작성 완료.
 
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Completed 44-02-PLAN.md (Phase 44 complete)
+Stopped at: Phase 44 complete, ready for Phase 45
 Resume file: None

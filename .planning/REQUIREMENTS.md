@@ -55,9 +55,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOC-01 | Phase 44 | Pending |
-| LOC-02 | Phase 44 | Pending |
-| LOC-03 | Phase 44 | Pending |
+| LOC-01 | Phase 44 | Complete |
+| LOC-02 | Phase 44 | Complete |
+| LOC-03 | Phase 44 | Complete |
 | PARSE-01 | Phase 45 | Pending |
 | PARSE-02 | Phase 45 | Pending |
 | MLIR-01 | Phase 45 | Pending |

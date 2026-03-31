@@ -12,7 +12,7 @@ Transform compiler error messages from opaque failures into actionable diagnosti
 
 ## Phases
 
-- [ ] **Phase 44: Error Location Foundation** - failWithSpan helper + source locations in all Elaboration/pattern errors
+- [x] **Phase 44: Error Location Foundation** - failWithSpan helper + source locations in all Elaboration/pattern errors
 - [ ] **Phase 45: Error Preservation** - Parser fallback error retention + MLIR debug file preservation
 - [ ] **Phase 46: Context Hints & Unified Format** - Record/field/function hints + categorized error output
 
@@ -68,6 +68,6 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 44. Error Location Foundation | 0/2 | Not started | - |
+| 44. Error Location Foundation | 2/2 | Complete | 2026-03-31 |
 | 45. Error Preservation | 0/2 | Not started | - |
 | 46. Context Hints & Unified Format | 0/2 | Not started | - |
