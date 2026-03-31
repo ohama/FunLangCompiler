@@ -1,0 +1,6 @@
+// Test: Record type error shows available record types as hint
+// --- Command: bash -c 'dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %S/46-01-record-type-hint.fun 2>&1; echo $?'
+// --- Input:
+// --- Output:
+[Elaboration] :0:0: RecordExpr: cannot resolve record type for fields ["a"; "b"]. Available record types: Point
+1
