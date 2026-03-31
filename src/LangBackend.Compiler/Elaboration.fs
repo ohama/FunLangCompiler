@@ -58,6 +58,14 @@ let emptyEnv () : ElabEnv =
       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
       BoolVars = Set.empty }
 
+/// Phase 44: Raise an error with source location in "file:line:col: message" format.
+/// Uses Printf.ksprintf to support format strings like failwithf.
+let private failWithSpan (span: Ast.Span) (fmt: Printf.StringFormat<'a, string>) : 'a =
+    Printf.ksprintf (fun msg ->
+        let loc = sprintf "%s:%d:%d" span.FileName span.StartLine span.StartColumn
+        failwith (sprintf "%s: %s" loc msg)
+    ) fmt
+
 /// Phase 30: Determine if an expression is statically known to produce an array (not a list).
 /// Used by ForInExpr to select lang_for_in_array vs lang_for_in_list at compile time.
 /// Conservative: returns false (assume list) for variables or unknown expressions.
