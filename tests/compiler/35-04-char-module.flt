@@ -12,8 +12,8 @@ let _ = println (to_string (Char.IsLetter 'a'))
 let _ = println (to_string (Char.IsUpper 'A'))
 let _ = println (to_string (Char.IsLower 'a'))
 // --- Output:
-1
-1
-1
-1
+true
+true
+true
+true
 0

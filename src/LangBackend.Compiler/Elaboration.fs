@@ -8,6 +8,7 @@ open MatchCompiler
 type ClosureInfo = {
     InnerLambdaFn: string    // MLIR name of the llvm.func body, e.g. "@closure_fn_0"
     NumCaptures:   int       // number of captured variables
+    InnerReturnIsBool: bool  // Phase 43: inner closure returns bool (for to_string dispatch)
 }
 
 type FuncSignature = {
@@ -15,6 +16,8 @@ type FuncSignature = {
     ParamTypes:  MlirType list
     ReturnType:  MlirType
     ClosureInfo: ClosureInfo option  // None = direct-call func; Some = closure-maker
+    ReturnIsBool: bool       // Phase 43: direct return is bool (for to_string dispatch)
+    InnerReturnIsBool: bool  // Phase 43: 2-param func's inner closure returns bool
 }
 
 // Phase 16: TypeInfo for ADT constructor entries in TypeEnv
@@ -43,6 +46,8 @@ type ElabEnv = {
     ArrayVars:      Set<string>
     // Phase 34-03: Collection variable tracking — names bound to Phase 33 collection types
     CollectionVars: Map<string, CollectionKind>
+    // Phase 43: Bool variable tracking — names bound to boolean-producing expressions
+    BoolVars: Set<string>
 }
 
 let emptyEnv () : ElabEnv =
@@ -50,7 +55,8 @@ let emptyEnv () : ElabEnv =
       KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0
       Globals = ref []; GlobalCounter = ref 0
       TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty
-      MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty }
+      MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
+      BoolVars = Set.empty }
 
 /// Phase 30: Determine if an expression is statically known to produce an array (not a list).
 /// Used by ForInExpr to select lang_for_in_array vs lang_for_in_list at compile time.
@@ -142,9 +148,12 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         freeVars (Set.add param boundVars) body
     | App (f, a, _) ->
         Set.union (freeVars boundVars f) (freeVars boundVars a)
-    | LetRec (name, param, body, inExpr, _) ->
-        let innerBound = Set.add name (Set.add param boundVars)
-        Set.union (freeVars innerBound body) (freeVars (Set.add name boundVars) inExpr)
+    | LetRec (bindings, inExpr, _) ->
+        let names = bindings |> List.map (fun (n, _, _, _, _) -> n) |> Set.ofList
+        let innerBound = bindings |> List.fold (fun s (n, p, _, _, _) -> Set.add n (Set.add p s)) boundVars
+        let bodyFree = bindings |> List.map (fun (_, _, _, body, _) -> freeVars innerBound body) |> Set.unionMany
+        let inFree = freeVars (Set.union boundVars names) inExpr
+        Set.union bodyFree inFree
     | String _ -> Set.empty
     | Tuple (exprs, _) ->
         exprs |> List.map (freeVars boundVars) |> Set.unionMany
@@ -314,15 +323,105 @@ let private coerceToI64Arg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp l
     | I32 ->
         (v, [])  // treat as I64 (should not normally arise)
 
-/// Detect whether a LetRec body uses list patterns on the parameter,
+/// Phase 43: Strip Annot/LambdaAnnot wrappers from the outermost position of an expression.
+/// Converts LambdaAnnot to Lambda, removing type annotations.
+/// Used for pattern matching that needs to see through type annotation wrappers.
+let rec private stripAnnot (expr: Expr) : Expr =
+    match expr with
+    | Annot (inner, _, _) -> stripAnnot inner
+    | LambdaAnnot (param, _, body, span) -> Lambda(param, stripAnnot body, span)
+    | _ -> expr
+
+/// Phase 43: Active pattern for stripAnnot — use in match expressions to see through annotations.
+let private (|StripAnnot|) (expr: Expr) = stripAnnot expr
+
+/// Detect whether a LetRec/Lambda body uses list patterns on the parameter,
 /// indicating the parameter should be typed Ptr (list pointer) rather than I64.
 let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
-    match bodyExpr with
+    match stripAnnot bodyExpr with
     | Match(Var(scrutinee, _), clauses, _) when scrutinee = paramName ->
         clauses |> List.exists (fun (pat, _, _) ->
             match pat with
             | EmptyListPat _ | ConsPat _ -> true
             | _ -> false)
+    | _ -> false
+
+/// Phase 43-fix: Detect whether a param needs Ptr type (list OR record OR string access in body).
+/// Used to correctly type function parameters in the single-arg Lambda case.
+let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
+    // First check the existing list-pattern detection
+    if isListParamBody paramName bodyExpr then true
+    else
+    // Also check if body accesses param as a record or uses it in string ops (needs Ptr)
+    let rec hasParamPtrUse (expr: Expr) : bool =
+        match stripAnnot expr with
+        // Record field access on param directly → param must be Ptr
+        | FieldAccess(Var(v, _), _, _) when v = paramName -> true
+        // String builtins that expect Ptr (string concat, etc.) applied to param
+        | App(App(Var("string_concat", _), Var(v, _), _), _, _) when v = paramName -> true
+        | App(App(Var("string_concat", _), _, _), Var(v, _), _) when v = paramName -> true
+        | App(Var("string_length", _), Var(v, _), _) when v = paramName -> true
+        | App(Var("to_string", _), Var(v, _), _) when v = paramName -> false  // to_string works on I64 too
+        // Passing param to eprintfn/eprintln/println/printfn → param is likely a string (Ptr)
+        | App(Var("eprintln", _), Var(v, _), _) when v = paramName -> true
+        | App(Var("eprint", _), Var(v, _), _) when v = paramName -> true
+        | App(Var("println", _), Var(v, _), _) when v = paramName -> true
+        | App(App(Var("eprintfn", _), _, _), Var(v, _), _) when v = paramName -> true
+        | App(App(Var("printfn", _), _, _), Var(v, _), _) when v = paramName -> true
+        // Note: Add(Var(v), _) is NOT treated as Ptr — Add is integer arith (arith.addi).
+        // String concat uses string_concat builtin, not Add.
+        // Check match arms on param (for string or non-list param)
+        | Match(Var(scrutinee, _), clauses, _) when scrutinee = paramName ->
+            clauses |> List.exists (fun (pat, _, arm) ->
+                match pat with
+                | WildcardPat _ | VarPat _ -> false  // neutral patterns
+                | _ -> false)  // don't recurse here to avoid over-detection
+        // Recurse through let/match/if bodies
+        | Let(_, bindE, bodyE, _) -> hasParamPtrUse bindE || hasParamPtrUse bodyE
+        | Match(scrut, clauses, _) ->
+            hasParamPtrUse scrut || clauses |> List.exists (fun (_, _, arm) -> hasParamPtrUse arm)
+        | If(c, t, e, _) -> hasParamPtrUse c || hasParamPtrUse t || hasParamPtrUse e
+        | App(f, a, _) -> hasParamPtrUse f || hasParamPtrUse a
+        | Lambda(p, b, _) when p <> paramName -> hasParamPtrUse b
+        | Annot(inner, _, _) -> hasParamPtrUse inner
+        | _ -> false
+    hasParamPtrUse bodyExpr
+
+/// Phase 43: Detect whether an expression statically produces a boolean value.
+/// Used to populate BoolVars for correct to_string dispatch.
+let rec private isBoolExpr (boolVars: Set<string>) (knownFuncs: Map<string, FuncSignature>) (expr: Ast.Expr) : bool =
+    match expr with
+    | Ast.Bool _ -> true
+    | Ast.Equal _ | Ast.NotEqual _ | Ast.LessThan _ | Ast.GreaterThan _
+    | Ast.LessEqual _ | Ast.GreaterEqual _ -> true
+    | Ast.And _ | Ast.Or _ -> true
+    | Ast.Var (name, _) -> Set.contains name boolVars
+    | Ast.App (Ast.Var (name, _), _, _) ->
+        match Map.tryFind name knownFuncs with
+        | Some sig_ -> sig_.ReturnIsBool
+        | None -> Set.contains name boolVars
+    // Phase 43: curried 2-lambda call — App(App(Var(f), arg1), arg2) returns inner closure's result
+    | Ast.App (Ast.App (Ast.Var (name, _), _, _), _, _) ->
+        match Map.tryFind name knownFuncs with
+        | Some sig_ -> sig_.InnerReturnIsBool
+        | None -> false
+    | Ast.Annot (inner, _, _) -> isBoolExpr boolVars knownFuncs inner
+    | Ast.LambdaAnnot _ -> false
+    | _ -> false
+
+/// Phase 43: Detect whether a function body's final expression returns bool.
+/// Traverses through let bindings to find the tail expression.
+let rec private bodyReturnsBool (expr: Expr) : bool =
+    match stripAnnot expr with
+    | Bool _ -> true
+    | Equal _ | NotEqual _ | LessThan _ | GreaterThan _
+    | LessEqual _ | GreaterEqual _ -> true
+    | And _ | Or _ -> true
+    | If (_, thenE, elseE, _) -> bodyReturnsBool thenE || bodyReturnsBool elseE
+    | Let (_, _, cont, _) | LetMut (_, _, cont, _) -> bodyReturnsBool cont
+    | LetRec (_, cont, _) -> bodyReturnsBool cont
+    | LetPat (_, _, cont, _) -> bodyReturnsBool cont
+    | Match (_, clauses, _) -> clauses |> List.exists (fun (_, _, arm) -> bodyReturnsBool arm)
     | _ -> false
 
 /// Phase 11: Test a pattern against a scrutinee value.
@@ -528,7 +627,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (unitVal, valOps @ [LlvmStoreOp(newVal, cellPtr); ArithConstantOp(unitVal, 0L)])
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
-    | Let (name, Lambda (outerParam, Lambda (innerParam, innerBody, _), _), inExpr, _) ->
+    // Phase 43: StripAnnot sees through Annot/LambdaAnnot wrappers from type annotations
+    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, _)), _)), inExpr, _) ->
         // Step 1: Compute free variables of the inner lambda body relative to innerParam only.
         // These are variables that need to come from the closure environment struct.
         // outerParam IS one such variable — it's passed to the closure-maker and stored at env[1+i].
@@ -558,7 +658,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty }
+              MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
+              BoolVars = Set.empty }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -653,12 +754,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         env.Funcs.Value <- env.Funcs.Value @ [innerFuncOp; makerFuncOp]
 
         // Step 6: Add to KnownFuncs
-        let closureInfo = { InnerLambdaFn = closureFnName; NumCaptures = numCaptures }
+        let closureInfo = { InnerLambdaFn = closureFnName; NumCaptures = numCaptures
+                            InnerReturnIsBool = bodyReturnsBool innerBody }
         let sig_ : FuncSignature =
             { MlirName    = "@" + name
               ParamTypes  = [I64]
               ReturnType  = Ptr
-              ClosureInfo = Some closureInfo }
+              ClosureInfo = Some closureInfo
+              ReturnIsBool = false
+              InnerReturnIsBool = bodyReturnsBool innerBody }
         // Phase 35: Module-qualified naming — also register short name alias in KnownFuncs
         // so that references within the same module body resolve correctly.
         let twoLambdaShortAlias =
@@ -680,6 +784,62 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let sig_ = Map.find qualName env.KnownFuncs
         let env' = { env with KnownFuncs = Map.add name sig_ env.KnownFuncs }
         elaborateExpr env' bodyExpr
+    // Single-arg Let-Lambda: compile as named func.func and add to KnownFuncs (not Vars).
+    // This prevents the function value being captured as a closure in nested two-arg functions,
+    // which would cause MLIR "value defined outside region" errors.
+    | Let (name, StripAnnot (Lambda (param, body, _)), inExpr, _)
+        when (match stripAnnot body with Lambda _ -> false | _ -> true)
+          && (freeVars (Set.singleton param) body
+              |> Set.filter (fun v -> Map.containsKey v env.Vars)
+              |> Set.isEmpty) ->
+        let paramType = if isPtrParamBody param body then Ptr else I64
+        let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
+        let retIsBool = preReturnType = I64 && bodyReturnsBool body
+        let innerRetIsBool = match stripAnnot body with Lambda(_, innerBody, _) -> bodyReturnsBool innerBody | _ -> false
+        let sig_ : FuncSignature =
+            { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
+              ReturnIsBool = retIsBool; InnerReturnIsBool = innerRetIsBool }
+        let shortNameAlias =
+            let idx = name.IndexOf('_')
+            if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
+            else None
+        let bodyEnv : ElabEnv =
+            { Vars = Map.ofList [(param, { Name = "%arg0"; Type = paramType })]
+              Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
+              KnownFuncs =
+                let kf = env.KnownFuncs
+                match shortNameAlias with Some sn -> Map.add sn sig_ kf | None -> kf
+              Funcs = env.Funcs
+              ClosureCounter = env.ClosureCounter
+              Globals = env.Globals
+              GlobalCounter = env.GlobalCounter
+              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
+              MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
+              BoolVars = Set.empty }
+        let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
+        let bodySideBlocks = bodyEnv.Blocks.Value
+        let allBodyBlocks =
+            if bodySideBlocks.IsEmpty then
+                [ { Label = None; Args = []; Body = bodyEntryOps @ [ReturnOp [bodyVal]] } ]
+            else
+                let entryBlock = { Label = None; Args = []; Body = bodyEntryOps }
+                let lastBlock = List.last bodySideBlocks
+                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [bodyVal]] }
+                let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
+                entryBlock :: sideBlocksPatched
+        let funcOp : FuncOp =
+            { Name = "@" + name
+              InputTypes = [paramType]
+              ReturnType = Some bodyVal.Type
+              Body = { Blocks = allBodyBlocks }
+              IsLlvmFunc = false }
+        env.Funcs.Value <- env.Funcs.Value @ [funcOp]
+        let finalSig = { sig_ with ReturnType = bodyVal.Type }
+        let env' =
+            let kf = Map.add name finalSig env.KnownFuncs
+            let kf' = match shortNameAlias with Some sn -> Map.add sn finalSig kf | None -> kf
+            { env with KnownFuncs = kf' }
+        elaborateExpr env' inExpr
     | Let (name, bindExpr, bodyExpr, _) ->
         let blocksBeforeBind = env.Blocks.Value.Length
         let (bv, bops) = elaborateExpr env bindExpr
@@ -698,9 +858,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let idx = name.IndexOf('_')
             if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
             else None
+        // Phase 43: Track bool-producing bindings for to_string dispatch
+        // Phase 43: Track bool-producing bindings AND bool-returning closures for to_string dispatch
+        let boolVars' =
+            if bv.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs bindExpr
+               || (match stripAnnot bindExpr with Lambda(_, body, _) -> bodyReturnsBool body | _ -> false)
+            then Set.add name env.BoolVars
+            else env.BoolVars
         let baseVars = Map.add name bv env.Vars
         let varsWithAlias = match moduleShortName with Some sn -> Map.add sn bv baseVars | None -> baseVars
-        let env' = { env with Vars = varsWithAlias; ArrayVars = arrayVars'; CollectionVars = collVars' }
+        let env' = { env with Vars = varsWithAlias; ArrayVars = arrayVars'; CollectionVars = collVars'; BoolVars = boolVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
         // If bops ends with a block terminator (from nested Match/TryWith/If), the
         // continuation code (rops) must go into the outer if's merge block (at blocksAfterBind - 1),
@@ -735,13 +902,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             match op with
             | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
             | _ -> false
-        match List.tryLast bops with
+        let lastOp = List.tryLast bops
+        eprintfn "DEBUG LetPat WildcardPat: bops.Length=%d lastOp=%A isterm=%A blocksAfterBind=%d blocksBeforeBind=%d rops.Length=%d" bops.Length lastOp (lastOp |> Option.map isTerminator) blocksAfterBind blocksBeforeBind rops.Length
+        match lastOp with
         | Some op when isTerminator op && blocksAfterBind > blocksBeforeBind ->
             // Place rops in the OUTER merge block (captured BEFORE bodyExpr elaboration)
             let innerBlocks = env.Blocks.Value
             let targetIdx = blocksAfterBind - 1
             let targetBlock = innerBlocks.[targetIdx]
             let patchedTarget = { targetBlock with Body = rops @ targetBlock.Body }
+            eprintfn "DEBUG: patching block at idx=%d label=%A with %d ops" targetIdx targetBlock.Label rops.Length
             env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (rv, bops)
         | _ ->
@@ -911,10 +1081,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | Some op when isBranchTerminator op && blocksAfterThen > blocksBeforeThen ->
                 // thenExpr created side blocks (e.g. nested match).
                 // Patch CfBrOp(mergeLabel) into the last side block (match's merge block).
+                // IMPORTANT: append AFTER targetBlock.Body (which may contain ops computing thenVal).
                 let allBlocks = env.Blocks.Value
                 let targetIdx = blocksAfterThen - 1
                 let targetBlock = allBlocks.[targetIdx]
-                let patchedTarget = { targetBlock with Body = thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])] @ targetBlock.Body }
+                let patchedTarget = { targetBlock with Body = targetBlock.Body @ thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])] }
                 env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
                 thenOps  // dispatch ops only (terminator ends block)
             | _ ->
@@ -927,10 +1098,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | Some op when isBranchTerminator op && blocksAfterElse > blocksBeforeElse ->
                 // elseExpr created side blocks (e.g. nested match).
                 // Patch CfBrOp(mergeLabel) into the last side block (match's merge block).
+                // IMPORTANT: append AFTER targetBlock.Body (which may contain ops computing elseVal).
                 let allBlocks = env.Blocks.Value
                 let targetIdx = blocksAfterElse - 1
                 let targetBlock = allBlocks.[targetIdx]
-                let patchedTarget = { targetBlock with Body = elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])] @ targetBlock.Body }
+                let patchedTarget = { targetBlock with Body = targetBlock.Body @ elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])] }
                 env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
                 elseOps  // dispatch ops only
             | _ ->
@@ -959,7 +1131,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         | _ ->
             (mergeArg, condOps @ coerceCondOps @ [ifBranchOp])
     | And (lhsExpr, rhsExpr, _) ->
+        let blocksBeforeAnd = List.length env.Blocks.Value
         let (leftVal, leftOps) = elaborateExpr env lhsExpr
+        let blocksAfterLeft = List.length env.Blocks.Value
         // Phase 36 FIX-03: If leftVal is I64 (e.g. module Bool function returning I64),
         // coerce to I1 via != 0 comparison before use in cf.cond_br.
         let (i1LeftVal, coerceLeftOps) =
@@ -983,9 +1157,26 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
-        (mergeArg, leftOps @ coerceLeftOps @ [CfCondBrOp(i1LeftVal, evalRightLabel, [], mergeLabel, [i1LeftVal])])
+        let andBranchOp = CfCondBrOp(i1LeftVal, evalRightLabel, [], mergeLabel, [i1LeftVal])
+        // Phase 36 FIX-03: If leftOps ends with a terminator (nested And/Or), patch into merge block.
+        let isTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        match List.tryLast leftOps with
+        | Some op when isTerminator op && blocksAfterLeft > blocksBeforeAnd ->
+            let allBlocks = env.Blocks.Value
+            let targetIdx = blocksAfterLeft - 1
+            let targetBlock = allBlocks.[targetIdx]
+            let patchedTarget = { targetBlock with Body = coerceLeftOps @ [andBranchOp] @ targetBlock.Body }
+            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+            (mergeArg, leftOps)
+        | _ ->
+            (mergeArg, leftOps @ coerceLeftOps @ [andBranchOp])
     | Or (lhsExpr, rhsExpr, _) ->
+        let blocksBeforeOr = List.length env.Blocks.Value
         let (leftVal, leftOps) = elaborateExpr env lhsExpr
+        let blocksAfterLeft = List.length env.Blocks.Value
         // Phase 36 FIX-03: If leftVal is I64 (e.g. module Bool function returning I64),
         // coerce to I1 via != 0 comparison before use in cf.cond_br.
         // Note: Or is short-circuit: true → merge (with left), false → eval right.
@@ -1010,58 +1201,83 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
-        (mergeArg, leftOps @ coerceLeftOps @ [CfCondBrOp(i1LeftVal, mergeLabel, [i1LeftVal], evalRightLabel, [])])
-    | LetRec (name, param, body, inExpr, _) ->
-        let paramType = if isListParamBody param body then Ptr else I64
-        // Pre-determine return type: Lambda body returns Ptr (closure struct).
-        // This is needed so recursive calls inside the body use the correct return type.
-        let preReturnType = match body with | Lambda _ -> Ptr | _ -> I64
-        let sig_ : FuncSignature =
-            { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None }
-        // Phase 35: Module-qualified naming — if name is module-prefixed (e.g., "List_sort"),
-        // also register the short name ("sort") as an alias so internal recursive calls work.
-        // A module-prefixed name starts with a capital letter followed by underscore+lowercase.
-        let shortNameAlias =
-            let idx = name.IndexOf('_')
-            if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
-            else None
-        let bodyEnv : ElabEnv =
-            { Vars = Map.ofList [(param, { Name = "%arg0"; Type = paramType })]
-              Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
-              // Include outer KnownFuncs so inner closures can call other top-level functions,
-              // plus the function itself for recursive calls (both qualified and short-name alias).
-              KnownFuncs =
-                let kf = Map.add name sig_ env.KnownFuncs
-                match shortNameAlias with Some sn -> Map.add sn sig_ kf | None -> kf
-              Funcs = env.Funcs
-              ClosureCounter = env.ClosureCounter
-              Globals = env.Globals
-              GlobalCounter = env.GlobalCounter
-              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty }
-        let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
-        let bodySideBlocks = bodyEnv.Blocks.Value
-        let allBodyBlocks =
-            if bodySideBlocks.IsEmpty then
-                [ { Label = None; Args = []; Body = bodyEntryOps @ [ReturnOp [bodyVal]] } ]
-            else
-                let entryBlock = { Label = None; Args = []; Body = bodyEntryOps }
-                let lastBlock = List.last bodySideBlocks
-                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [bodyVal]] }
-                let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
-                entryBlock :: sideBlocksPatched
-        let funcOp : FuncOp =
-            { Name = "@" + name
-              InputTypes = [paramType]
-              ReturnType = Some bodyVal.Type
-              Body = { Blocks = allBodyBlocks }
-              IsLlvmFunc = false }
-        env.Funcs.Value <- env.Funcs.Value @ [funcOp]
-        let finalSig = { sig_ with ReturnType = bodyVal.Type }
-        let env' =
-            let kf = Map.add name finalSig env.KnownFuncs
-            let kf' = match shortNameAlias with Some sn -> Map.add sn finalSig kf | None -> kf
-            { env with KnownFuncs = kf' }
+        let orBranchOp = CfCondBrOp(i1LeftVal, mergeLabel, [i1LeftVal], evalRightLabel, [])
+        // Phase 36 FIX-03: If leftOps ends with a terminator (nested Or/And), patch into merge block.
+        let isTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        match List.tryLast leftOps with
+        | Some op when isTerminator op && blocksAfterLeft > blocksBeforeOr ->
+            let allBlocks = env.Blocks.Value
+            let targetIdx = blocksAfterLeft - 1
+            let targetBlock = allBlocks.[targetIdx]
+            let patchedTarget = { targetBlock with Body = coerceLeftOps @ [orBranchOp] @ targetBlock.Body }
+            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+            (mergeArg, leftOps)
+        | _ ->
+            (mergeArg, leftOps @ coerceLeftOps @ [orBranchOp])
+    | LetRec (bindings, inExpr, _) ->
+        // Phase 66: Two-pass elaboration for mutual recursion (let rec ... and ...).
+        // Pass 1: Pre-register ALL binding signatures in KnownFuncs so every body can call every sibling.
+        // Pass 2: Elaborate each body with the full KnownFuncs, then update with actual return types.
+        let bindingInfos =
+            bindings |> List.map (fun (name, param, _paramTypeAnnot, body, _) ->
+                let paramType = if isPtrParamBody param body then Ptr else I64
+                let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
+                let retIsBool = preReturnType = I64 && bodyReturnsBool body
+                let innerRetIsBool = match stripAnnot body with Lambda(_, ib, _) -> bodyReturnsBool ib | _ -> false
+                let shortNameAlias =
+                    let idx = name.IndexOf('_')
+                    if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
+                    else None
+                let sig_ : FuncSignature =
+                    { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
+                      ReturnIsBool = retIsBool; InnerReturnIsBool = innerRetIsBool }
+                (name, param, body, paramType, sig_, shortNameAlias))
+        // Pass 1: Add all signatures to KnownFuncs (pre-return types)
+        let allKnownFuncs =
+            bindingInfos |> List.fold (fun kf (name, _, _, _, sig_, shortAlias) ->
+                let kf' = Map.add name sig_ kf
+                match shortAlias with Some sn -> Map.add sn sig_ kf' | None -> kf'
+            ) env.KnownFuncs
+        // Pass 2: Elaborate each body with full KnownFuncs, emit func.func, collect final sigs
+        let finalKnownFuncs =
+            bindingInfos |> List.fold (fun kfAcc (name, param, body, paramType, sig_, shortAlias) ->
+                let bodyEnv : ElabEnv =
+                    { Vars = Map.ofList [(param, { Name = "%arg0"; Type = paramType })]
+                      Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
+                      KnownFuncs = allKnownFuncs
+                      Funcs = env.Funcs
+                      ClosureCounter = env.ClosureCounter
+                      Globals = env.Globals
+                      GlobalCounter = env.GlobalCounter
+                      TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
+                      MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
+                      BoolVars = Set.empty }
+                let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
+                let bodySideBlocks = bodyEnv.Blocks.Value
+                let allBodyBlocks =
+                    if bodySideBlocks.IsEmpty then
+                        [ { Label = None; Args = []; Body = bodyEntryOps @ [ReturnOp [bodyVal]] } ]
+                    else
+                        let entryBlock = { Label = None; Args = []; Body = bodyEntryOps }
+                        let lastBlock = List.last bodySideBlocks
+                        let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [bodyVal]] }
+                        let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
+                        entryBlock :: sideBlocksPatched
+                let funcOp : FuncOp =
+                    { Name = "@" + name
+                      InputTypes = [paramType]
+                      ReturnType = Some bodyVal.Type
+                      Body = { Blocks = allBodyBlocks }
+                      IsLlvmFunc = false }
+                env.Funcs.Value <- env.Funcs.Value @ [funcOp]
+                let finalSig = { sig_ with ReturnType = bodyVal.Type }
+                let kfAcc' = Map.add name finalSig kfAcc
+                match shortAlias with Some sn -> Map.add sn finalSig kfAcc' | None -> kfAcc'
+            ) env.KnownFuncs
+        let env' = { env with KnownFuncs = finalKnownFuncs }
         elaborateExpr env' inExpr
     // Phase 8: String literal → GC_malloc'd header struct
     | String (s, _) ->
@@ -1152,15 +1368,20 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (result, aOps @ bOps @ aCoerce @ bCoerce @ [LlvmCallOp(result, "@lang_string_concat", [aPtr; bPtr])])
 
     // Phase 8: to_string builtin — dispatch on elaborated arg type
+    // Phase 43: also check BoolVars/KnownFuncs for bool-returning function calls
     | App (Var ("to_string", _), argExpr, _) ->
         let (argVal, argOps) = elaborateExpr env argExpr
         let result = { Name = freshName env; Type = Ptr }
-        match argVal.Type with
-        | I1 ->
-            // Zero-extend I1 to I64 for C ABI compatibility (lang_to_string_bool takes int64_t)
-            let extVal = { Name = freshName env; Type = I64 }
-            (result, argOps @ [ArithExtuIOp(extVal, argVal); LlvmCallOp(result, "@lang_to_string_bool", [extVal])])
-        | _ ->
+        let isBool = argVal.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs argExpr
+        if isBool then
+            if argVal.Type = I1 then
+                // Zero-extend I1 to I64 for C ABI compatibility (lang_to_string_bool takes int64_t)
+                let extVal = { Name = freshName env; Type = I64 }
+                (result, argOps @ [ArithExtuIOp(extVal, argVal); LlvmCallOp(result, "@lang_to_string_bool", [extVal])])
+            else
+                // I64 value known to be bool — call lang_to_string_bool directly
+                (result, argOps @ [LlvmCallOp(result, "@lang_to_string_bool", [argVal])])
+        else
             // I64 and other numeric types — call lang_to_string_int directly
             (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
 
@@ -1337,14 +1558,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (collVal, collOps) = elaborateExpr env collExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let result = { Name = freshName env; Type = I64 }
+        // Coerce collection to Ptr if it was loaded from a record slot (I64 → Ptr)
+        let (collPtr, collCoerce) =
+            if collVal.Type = Ptr then (collVal, [])
+            else let v = { Name = freshName env; Type = Ptr } in (v, [LlvmIntToPtrOp(v, collVal)])
         match idxVal.Type with
         | Ptr ->
-            (result, collOps @ idxOps @ [LlvmCallOp(result, "@lang_index_get_str", [collVal; idxVal])])
+            (result, collOps @ collCoerce @ idxOps @ [LlvmCallOp(result, "@lang_index_get_str", [collPtr; idxVal])])
         | _ ->
             let (idxV, idxCoerce) =
                 if idxVal.Type = I64 then (idxVal, [])
                 else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
-            (result, collOps @ idxOps @ idxCoerce @ [LlvmCallOp(result, "@lang_index_get", [collVal; idxV])])
+            (result, collOps @ collCoerce @ idxOps @ idxCoerce @ [LlvmCallOp(result, "@lang_index_get", [collPtr; idxV])])
 
     // Phase 28: IndexSet — arr.[i] <- v or ht.[key] <- v via runtime dispatch
     // Phase 37: dispatch to _str variant when index is Ptr (string key); also handle Ptr-typed values via LlvmPtrToIntOp
@@ -2638,7 +2863,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty }
+              MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
+              BoolVars = Set.empty }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
@@ -2798,13 +3024,17 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
             |> Option.defaultWith (fun () ->
                 failwithf "FieldAccess: unknown field '%s'" fieldName)
+        // Coerce record to Ptr if it came in as I64 (e.g., through a closure argument)
+        let (recPtr, recCoerce) =
+            if recVal.Type = Ptr then (recVal, [])
+            else let v = { Name = freshName env; Type = Ptr } in (v, [LlvmIntToPtrOp(v, recVal)])
         let slotPtr  = { Name = freshName env; Type = Ptr }
         let fieldVal = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPLinearOp(slotPtr, recVal, slotIdx)
+            LlvmGEPLinearOp(slotPtr, recPtr, slotIdx)
             LlvmLoadOp(fieldVal, slotPtr)
         ]
-        (fieldVal, recOps @ ops)
+        (fieldVal, recOps @ recCoerce @ ops)
 
     // Phase 18: RecordUpdate — allocate new block, copy non-overridden fields, write overridden fields
     | RecordUpdate(sourceExpr, overrides, _) ->
@@ -2854,14 +3084,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
             |> Option.defaultWith (fun () ->
                 failwithf "SetField: unknown field '%s'" fieldName)
+        // Coerce record to Ptr if it came in as I64 (e.g., through a closure argument)
+        let (recPtr, recCoerce) =
+            if recVal.Type = Ptr then (recVal, [])
+            else let v = { Name = freshName env; Type = Ptr } in (v, [LlvmIntToPtrOp(v, recVal)])
         let slotPtr = { Name = freshName env; Type = Ptr }
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPLinearOp(slotPtr, recVal, slotIdx)
+            LlvmGEPLinearOp(slotPtr, recPtr, slotIdx)
             LlvmStoreOp(newVal, slotPtr)
             ArithConstantOp(unitVal, 0L)
         ]
-        (unitVal, recOps @ newValOps @ ops)
+        (unitVal, recOps @ recCoerce @ newValOps @ ops)
 
     // Phase 19: Raise — construct exception value, call @lang_throw, terminate block
     | Raise(exnExpr, _) ->
@@ -3267,6 +3501,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     //   ^while_body — elaborate body (discard value), re-elaborate cond, cf.cond_br back or exit
     //   ^while_exit(%exitArg : i64) — empty body, patched by LetPat/Let continuation
     | WhileExpr (condExpr, bodyExpr, _) ->
+        eprintfn "DEBUG WhileExpr: entry, blocks=%d" env.Blocks.Value.Length
         let headerLabel = freshLabel env "while_header"
         let bodyLabel   = freshLabel env "while_body"
         let exitLabel   = freshLabel env "while_exit"
@@ -3274,8 +3509,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let unitConst = { Name = freshName env; Type = I64 }
         // Exit block argument carries the unit result out
         let exitArg = { Name = freshName env; Type = I64 }
+        // Track blocks before elaborating the header condition (to detect short-circuit side blocks)
+        let blocksBeforeCond = env.Blocks.Value.Length
         // Elaborate condition for the header block
         let (condVal, condOps)    = elaborateExpr env condExpr
+        let condSideBlocks = env.Blocks.Value.Length - blocksBeforeCond
         // Phase 36 FIX-03: Coerce condVal to I1 if it is I64 (e.g. module Bool function).
         let (i1CondVal, coerceCondOps) =
             if condVal.Type = I64 then
@@ -3283,12 +3521,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let boolVal = { Name = freshName env; Type = I1  }
                 (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", condVal, zeroVal)])
             else (condVal, [])
+        let condBrOp = CfCondBrOp(i1CondVal, bodyLabel, [], exitLabel, [unitConst])
         // Track how many side blocks exist before elaborating body (for detecting inner blocks)
         let blocksBeforeBody = env.Blocks.Value.Length
         // Elaborate body for the body block
         let (_bodyVal, bodyOps)   = elaborateExpr env bodyExpr
+        // Track blocks before elaborating back-edge condition
+        let blocksBeforeBackCond = env.Blocks.Value.Length
         // Re-elaborate condition for mutable-safe back-edge evaluation
         let (condVal2, condOps2)  = elaborateExpr env condExpr
+        let backCondSideBlocks = env.Blocks.Value.Length - blocksBeforeBackCond
         // Phase 36 FIX-03: Coerce condVal2 to I1 if it is I64 (same pattern as header cond).
         let (i1CondVal2, coerceCondOps2) =
             if condVal2.Type = I64 then
@@ -3296,9 +3538,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let boolVal = { Name = freshName env; Type = I1  }
                 (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", condVal2, zeroVal)])
             else (condVal2, [])
-        // Back-edge ops: re-evaluated condition + branch back to header or to exit
-        let backEdgeOps = condOps2 @ coerceCondOps2 @ [ CfCondBrOp(i1CondVal2, bodyLabel, [], exitLabel, [unitConst]) ]
-        // Determine where to place the back-edge ops.
+        let backEdgeBrOp = CfCondBrOp(i1CondVal2, bodyLabel, [], exitLabel, [unitConst])
+        // Determine where to place the back-edge branch op.
         // If bodyOps ends with a block terminator (from a nested while/if/match inside the body),
         // the back-edge must be appended to the LAST side block (the inner expression's merge/exit
         // block, which was left empty for patching), NOT inline in bodyOps.
@@ -3306,26 +3547,68 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             match op with
             | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
             | _ -> false
-        let bodyBlockBody, needPatchLast =
-            match List.tryLast bodyOps with
-            | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
-                // Body itself has side blocks. Back-edge goes into the inner last block.
-                (bodyOps, true)
-            | _ ->
-                // Simple body or no new side blocks — append back-edge inline.
-                (bodyOps @ backEdgeOps, false)
+        // Build the back-edge ops depending on whether back-cond created side blocks
+        // If backCondSideBlocks > 0, condOps2 ends with a cf.br to its first side block,
+        // and the back-edge branch must go into the last back-cond side block.
+        let bodyBlockBody, needPatchLast, backEdgeForBody =
+            if backCondSideBlocks > 0 then
+                // Back-cond has side blocks; backEdgeBrOp goes into the last of those blocks.
+                // The "back-edge ops for body" are just condOps2 (entry fragment going to first side block).
+                // After body block, we push back-cond side blocks (already in env.Blocks.Value).
+                match List.tryLast bodyOps with
+                | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
+                    // Body has side blocks too; back-cond entry fragment goes into inner last block.
+                    (bodyOps, true, condOps2 @ coerceCondOps2)
+                | _ ->
+                    (bodyOps @ condOps2 @ coerceCondOps2, false, [])
+            else
+                // Simple back-cond: no side blocks.
+                let backEdgeOps = condOps2 @ coerceCondOps2 @ [backEdgeBrOp]
+                match List.tryLast bodyOps with
+                | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
+                    (bodyOps, true, backEdgeOps)
+                | _ ->
+                    (bodyOps @ backEdgeOps, false, [])
+        // Build the while_header block.
+        // If condOps created side blocks (short-circuit &&/||), the CfCondBrOp must go into
+        // the last of those side blocks, not the header block body.
+        let headerBody = condOps @ coerceCondOps
         // Push the three while blocks AFTER elaborating both cond and body
         // (so any inner side blocks from nested expressions come first)
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some headerLabel
                 Args  = []
-                Body  = condOps @ coerceCondOps @ [ CfCondBrOp(i1CondVal, bodyLabel, [], exitLabel, [unitConst]) ] }
+                Body  = if condSideBlocks > 0 then headerBody
+                        else headerBody @ [condBrOp] }
               { Label = Some bodyLabel
                 Args  = []
                 Body  = bodyBlockBody }
               { Label = Some exitLabel
                 Args  = [exitArg]
                 Body  = [] } ]
+        // Patch the condBrOp into the last header-cond side block (if any)
+        if condSideBlocks > 0 then
+            // The last header-cond side block is at position
+            // (env.Blocks.Value.Length - 3 - condSideBlocks) = blocksBeforeCond + condSideBlocks - 1
+            // We need its index after the 3 while blocks were appended.
+            // Before appending: it was at env.Blocks.Value.Length - 3 - condSideBlocks
+            // But condSideBlocks blocks were pushed between blocksBeforeCond and blocksBeforeBody.
+            // The last header-cond side block index (before the 3 while blocks) = blocksBeforeBody - 1
+            let allBlocks = env.Blocks.Value
+            let condLastIdx = blocksBeforeBody - 1  // last block pushed by cond elaboration
+            if condLastIdx >= 0 then
+                let condLast = allBlocks.[condLastIdx]
+                let patched = { condLast with Body = condLast.Body @ coerceCondOps @ [condBrOp] }
+                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = condLastIdx then patched else b)
+        // Patch back-cond side blocks if needed
+        if backCondSideBlocks > 0 then
+            // The last back-cond side block is just before the 3 while blocks we appended.
+            let allBlocks = env.Blocks.Value
+            let backCondLastIdx = allBlocks.Length - 4  // 4th from end = just before header/body/exit
+            if backCondLastIdx >= 0 then
+                let backCondLast = allBlocks.[backCondLastIdx]
+                let patched = { backCondLast with Body = backCondLast.Body @ coerceCondOps2 @ [backEdgeBrOp] }
+                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = backCondLastIdx then patched else b)
         // If the body had inner side blocks, patch the back-edge into what is now the last
         // side block among the while's blocks (which is while_body itself — no, we need the
         // last block pushed before while_body that is the inner merge block).
@@ -3333,16 +3616,19 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // We need to patch the last block that was present AFTER elaborating body but BEFORE
         // we appended the three while blocks — i.e., the inner merge/exit block.
         if needPatchLast then
-            // The inner merge block is at position (env.Blocks.Value.Length - 4) i.e. right before
-            // the three while blocks we just pushed (header, body, exit = last 3).
-            // Patch the back-edge ops into that inner last block.
+            // The inner merge block is at position (env.Blocks.Value.Length - 4 - backCondSideBlocks)
             let allBlocks = env.Blocks.Value
-            let innerLastIdx = allBlocks.Length - 4  // 4th from end = just before header/body/exit
+            let innerLastIdx = allBlocks.Length - 4 - backCondSideBlocks
             if innerLastIdx >= 0 then
                 let innerLast = allBlocks.[innerLastIdx]
-                let patched = { innerLast with Body = innerLast.Body @ backEdgeOps }
+                let patched = { innerLast with Body = innerLast.Body @ backEdgeForBody }
                 env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerLastIdx then patched else b)
+            // If backCondSideBlocks > 0, also patch back-cond branch into the body's inner-last block
+            // (This case: body has inner blocks AND back-cond has side blocks)
+            // The back-cond side blocks are at indices (allBlocks.Length - 4 - backCondSideBlocks) to (allBlocks.Length - 4 - 1)
+            // backEdgeBrOp should be in the last of those (already patched above in the backCondSideBlocks > 0 branch)
         // Entry fragment: define unit constant (dominates all loop blocks), then branch to header
+        eprintfn "DEBUG WhileExpr: exit, blocks=%d" env.Blocks.Value.Length
         (exitArg, [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, []) ])
 
     // Phase 29: ForExpr — block-argument CFG pattern for loop counter
@@ -3737,7 +4023,7 @@ let private collectModuleMembers (decls: Ast.Decl list) : Map<string, string lis
                 let existing = match Map.tryFind modName result with Some xs -> xs | None -> []
                 result <- Map.add modName (existing @ [qualifiedName]) result
             | Ast.Decl.LetRecDecl(bindings, _) when modName <> "" ->
-                for (name, _, _, _) in bindings do
+                for (name, _, _, _, _) in bindings do
                     let qualifiedName = modName + "_" + name
                     let existing = match Map.tryFind modName result with Some xs -> xs | None -> []
                     result <- Map.add modName (existing @ [qualifiedName]) result
@@ -3760,7 +4046,7 @@ let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName:
         | Ast.Decl.LetDecl(name, body, s) when modName <> "" && name <> "_" ->
             [Ast.Decl.LetDecl(modName + "_" + name, body, s)]
         | Ast.Decl.LetRecDecl(bindings, s) when modName <> "" ->
-            let prefixed = bindings |> List.map (fun (name, param, body, s2) -> (modName + "_" + name, param, body, s2))
+            let prefixed = bindings |> List.map (fun (name, param, pt, body, s2) -> (modName + "_" + name, param, pt, body, s2))
             [Ast.Decl.LetRecDecl(prefixed, s)]
         | Ast.Decl.OpenDecl([openedMod], s) ->
             // Single-segment open: emit short-name aliases for each member of the opened module
@@ -3802,11 +4088,9 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
             | [Ast.Decl.LetDecl("_", body, _)] -> body
             | [Ast.Decl.LetDecl(name, body, _)] -> Let(name, body, Var(name, s), s)
             | [Ast.Decl.LetRecDecl(bindings, _)] ->
-                // Single let rec with no continuation: wrap body in (fun _ -> body) 0 sentinel
-                // Just return 0 as the program's exit value; Phase 17 will need real support
-                match bindings with
-                | (name, param, body, _) :: _ -> LetRec(name, param, body, Number(0, s), s)
-                | [] -> Number(0, s)
+                // Single let rec with no continuation: return 0 as program exit sentinel
+                if bindings.IsEmpty then Number(0, s)
+                else LetRec(bindings, Number(0, s), s)
             | [Ast.Decl.LetPatDecl(pat, body, sp)] ->
                 LetPat(pat, body, Number(0, s), sp)
             | Ast.Decl.LetDecl("_", body, _) :: rest ->
@@ -3816,9 +4100,8 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
             | Ast.Decl.LetDecl(name, body, _) :: rest ->
                 Let(name, body, build rest, s)
             | Ast.Decl.LetRecDecl(bindings, _) :: rest ->
-                match bindings with
-                | (name, param, body, _) :: _ -> LetRec(name, param, body, build rest, s)
-                | [] -> build rest
+                if bindings.IsEmpty then build rest
+                else LetRec(bindings, build rest, s)
             | Ast.Decl.LetMutDecl(name, body, _) :: rest ->
                 LetMut(name, body, build rest, s)
             | Ast.Decl.LetPatDecl(pat, body, sp) :: rest ->

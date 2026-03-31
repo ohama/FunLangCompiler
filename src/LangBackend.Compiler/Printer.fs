@@ -2,6 +2,36 @@ module Printer
 
 open MlirIR
 
+/// Sanitize operator characters in MLIR symbol names (e.g., @List_++ → @List_op_pp).
+/// Only affects the part after '@'; leaves names without operator chars unchanged.
+let private sanitizeMlirName (name: string) : string =
+    if not (name.StartsWith("@")) then name
+    else
+        let body = name.Substring(1)
+        let hasOpChar = body |> Seq.exists (fun c -> not (System.Char.IsLetterOrDigit c) && c <> '_' && c <> '.')
+        if not hasOpChar then name
+        else
+            let sb = System.Text.StringBuilder("@")
+            for c in body do
+                match c with
+                | '+' -> sb.Append("_plus_") |> ignore
+                | '^' -> sb.Append("_caret_") |> ignore
+                | '|' -> sb.Append("_pipe_") |> ignore
+                | '>' -> sb.Append("_gt_") |> ignore
+                | '<' -> sb.Append("_lt_") |> ignore
+                | '=' -> sb.Append("_eq_") |> ignore
+                | '!' -> sb.Append("_bang_") |> ignore
+                | '&' -> sb.Append("_amp_") |> ignore
+                | '$' -> sb.Append("_dollar_") |> ignore
+                | '@' -> sb.Append("_at_") |> ignore
+                | '*' -> sb.Append("_star_") |> ignore
+                | '/' -> sb.Append("_slash_") |> ignore
+                | '%' -> sb.Append("_pct_") |> ignore
+                | '-' -> sb.Append("_minus_") |> ignore
+                | '.' -> sb.Append("_dot_") |> ignore
+                | _ -> sb.Append(c) |> ignore
+            sb.ToString()
+
 let private printType = function
     | I64 -> "i64"
     | I32 -> "i32"
@@ -11,7 +41,7 @@ let private printType = function
 let private printGlobal (g: MlirGlobal) : string =
     match g with
     | StringConstant(name, value) ->
-        let escaped = value.Replace("\n", "\\0A") + "\\00"
+        let escaped = value.Replace("\\", "\\5C").Replace("\n", "\\0A").Replace("\"", "\\22") + "\\00"
         sprintf "  llvm.mlir.global internal constant %s(\"%s\") {addr_space = 0 : i32}" name escaped
 
 let private printExternalDecl (d: ExternalFuncDecl) : string =
@@ -71,7 +101,7 @@ let private printOp (indent: string) (op: MlirOp) : string =
         let argNames = args |> List.map (fun (v: MlirValue) -> v.Name) |> String.concat ", "
         let argTypes = args |> List.map (fun (v: MlirValue) -> printType v.Type) |> String.concat ", "
         sprintf "%s%s = func.call %s(%s) : (%s) -> %s"
-            indent result.Name callee argNames argTypes (printType result.Type)
+            indent result.Name (sanitizeMlirName callee) argNames argTypes (printType result.Type)
     // Phase 5: LLVM-level ops for closure mechanics
     | LlvmAllocaOp(result, count, numCaptures) ->
         let fields =
@@ -87,7 +117,7 @@ let private printOp (indent: string) (op: MlirOp) : string =
             indent result.Name ptr.Name (printType result.Type)
     | LlvmAddressOfOp(result, fnName) ->
         sprintf "%s%s = llvm.mlir.addressof %s : !llvm.ptr"
-            indent result.Name fnName
+            indent result.Name (sanitizeMlirName fnName)
     | LlvmGEPLinearOp(result, ptr, index) ->
         sprintf "%s%s = llvm.getelementptr %s[%d] : (!llvm.ptr) -> !llvm.ptr, i64"
             indent result.Name ptr.Name index
@@ -112,19 +142,21 @@ let private printOp (indent: string) (op: MlirOp) : string =
     | LlvmCallOp(result, callee, args) ->
         let argList = args |> List.map (fun v -> v.Name) |> String.concat ", "
         let argTypes = args |> List.map (fun v -> printType v.Type) |> String.concat ", "
+        let sc = sanitizeMlirName callee
         if callee = "@printf" then
             sprintf "%s%s = llvm.call %s(%s) vararg(!llvm.func<i32 (ptr, ...)>) : (%s) -> %s"
-                indent result.Name callee argList argTypes (printType result.Type)
+                indent result.Name sc argList argTypes (printType result.Type)
         else
             sprintf "%s%s = llvm.call %s(%s) : (%s) -> %s"
-                indent result.Name callee argList argTypes (printType result.Type)
+                indent result.Name sc argList argTypes (printType result.Type)
     | LlvmCallVoidOp(callee, args) ->
+        let sc = sanitizeMlirName callee
         if args.IsEmpty then
-            sprintf "%sllvm.call %s() : () -> ()" indent callee
+            sprintf "%sllvm.call %s() : () -> ()" indent sc
         else
             let argList = args |> List.map (fun v -> v.Name) |> String.concat ", "
             let argTypes = args |> List.map (fun v -> printType v.Type) |> String.concat ", "
-            sprintf "%sllvm.call %s(%s) : (%s) -> ()" indent callee argList argTypes
+            sprintf "%sllvm.call %s(%s) : (%s) -> ()" indent sc argList argTypes
     // Phase 10: list null pointer and null checks
     | LlvmNullOp(result) ->
         sprintf "%s%s = llvm.mlir.zero : !llvm.ptr" indent result.Name
@@ -174,7 +206,7 @@ let private printFuncOp (func: FuncOp) : string =
             let ps = func.InputTypes |> List.mapi (fun i t -> sprintf "%%arg%d: %s" i (printType t)) |> String.concat ", "
             sprintf "(%s)" ps
     let bodyLines = func.Body.Blocks |> List.map (printBlock "    ") |> String.concat "\n"
-    sprintf "  %s %s%s%s {\n%s\n  }" keyword func.Name paramStr retStr bodyLines
+    sprintf "  %s %s%s%s {\n%s\n  }" keyword (sanitizeMlirName func.Name) paramStr retStr bodyLines
 
 /// Serialize an MlirModule to valid MLIR 20 text.
 /// Pure function — no I/O. Caller is responsible for writing to disk.

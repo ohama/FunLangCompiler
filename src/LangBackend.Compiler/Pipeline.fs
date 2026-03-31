@@ -108,5 +108,7 @@ let compile (m: MlirModule) (outputPath: string) : Result<unit, CompileError> =
         | Error (code, err) -> Error (ClangFailed (code, err))
         | Ok () -> Ok ()
     finally
+        // DEBUG: copy mlir to /tmp/debug_last.mlir before deleting
+        if File.Exists mlirFile then File.Copy(mlirFile, "/tmp/debug_last.mlir", true)
         for f in [ mlirFile; lowered; llFile ] do
             if File.Exists f then File.Delete f

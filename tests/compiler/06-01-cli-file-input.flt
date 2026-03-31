@@ -1,4 +1,4 @@
-// --- Command: bash -c 'cd /tmp && OUTNAME=langback_cli_$$_out && cp %input ${OUTNAME}.lt && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- ${OUTNAME}.lt && ./${OUTNAME}; echo $?; rm -f ${OUTNAME} ${OUTNAME}.lt'
+// --- Command: bash -c 'D=$(mktemp -d /tmp/langtest_XXXXXX) && cp %input "$D/test.lt" && OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- "$D/test.lt" -o $OUTBIN && $OUTBIN; echo $?; rm -rf "$D" $OUTBIN'
 // --- Input:
 let x = 10 in let y = x + 5 in y
 // --- Output:

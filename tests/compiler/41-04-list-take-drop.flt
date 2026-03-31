@@ -1,4 +1,4 @@
-// --- Command: bash -c 'PROJROOT=%S/../.. && TMPLT="$PROJROOT/test_takedrop_$$.lt" && OUTBIN=$(mktemp /tmp/langback_XXXXXX) && cp %input "$TMPLT" && dotnet run --project "$PROJROOT/src/LangBackend.Cli/LangBackend.Cli.fsproj" -- "$TMPLT" -o "$OUTBIN" && "$OUTBIN"; echo $?; rm -f "$OUTBIN" "$TMPLT"'
+// --- Command: bash -c 'PROJROOT=%S/../.. && D=$(mktemp -d /tmp/langtest_XXXXXX) && ln -s "$PROJROOT/Prelude" "$D/Prelude" && cp %input "$D/test.lt" && OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project "$PROJROOT/src/LangBackend.Cli/LangBackend.Cli.fsproj" -- "$D/test.lt" -o "$OUTBIN" && "$OUTBIN"; echo $?; rm -rf "$D" "$OUTBIN"'
 // --- Input:
 let xs = [1; 2; 3; 4; 5]
 let taken = List.take 3 xs
