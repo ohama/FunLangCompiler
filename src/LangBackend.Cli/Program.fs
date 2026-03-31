@@ -30,6 +30,7 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
     let filteredTokens = lexAndFilter src filename
     let arr = filteredTokens |> Array.ofList
     let mutable idx = 0
+    let mutable lastParsedPos = FSharp.Text.Lexing.Position.Empty
     try
         let lexbuf2 = LexBuffer<char>.FromString src
         Lexer.setInitialPos lexbuf2 filename
@@ -39,6 +40,7 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
                 idx <- idx + 1
                 lb.StartPos <- pt.StartPos
                 lb.EndPos <- pt.EndPos
+                lastParsedPos <- pt.StartPos
                 pt.Token
             else Parser.EOF
         Parser.parseModule tokenizer lexbuf2
@@ -49,8 +51,13 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
             Ast.Module([Ast.Decl.LetDecl("_", expr, Ast.unknownSpan)], Ast.unknownSpan)
         with _ ->
             // Both parseModule and parseExpr failed — surface the original error
-            // which is more informative (near token N of M)
-            raise firstEx
+            // with position information from the last consumed token
+            let posMsg =
+                if lastParsedPos = FSharp.Text.Lexing.Position.Empty then
+                    firstEx.Message
+                else
+                    sprintf "%s:%d:%d: parse error" lastParsedPos.FileName lastParsedPos.Line lastParsedPos.Column
+            failwith posMsg
 
 /// Resolve import path: relative to importing file's directory, absolute as-is.
 let private resolveImportPath (importPath: string) (importingFile: string) : string =
