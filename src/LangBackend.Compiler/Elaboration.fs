@@ -63,7 +63,7 @@ let emptyEnv () : ElabEnv =
 let inline private failWithSpan (span: Ast.Span) fmt =
     Printf.ksprintf (fun msg ->
         let loc = sprintf "%s:%d:%d" span.FileName span.StartLine span.StartColumn
-        failwith (sprintf "%s: %s" loc msg)
+        failwith (sprintf "[Elaboration] %s: %s" loc msg)
     ) fmt
 
 /// Phase 30: Determine if an expression is statically known to produce an array (not a list).
@@ -2371,7 +2371,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let callOp = IndirectCallOp(result, fnPtrVal, closurePtrVal, argVal)
                     (result, argOps @ [castOp; loadOp; callOp])
                 | _ ->
-                    failWithSpan appSpan "Elaboration: unsupported App — '%s' is not a known function or closure value" name
+                    let knownNames =
+                        (env.KnownFuncs |> Map.toList |> List.map fst) @
+                        (env.Vars |> Map.toList |> List.map fst)
+                        |> List.filter (fun n -> not (n.StartsWith("%")) && not (n.StartsWith("@")))
+                        |> List.truncate 10
+                        |> String.concat ", "
+                    failWithSpan appSpan "Elaboration: unsupported App — '%s' is not a known function or closure value. In scope: %s" name knownNames
         | Lambda(param, body, _) ->
             // Inline lambda application: (fun x -> body) arg  ≡  let x = arg in body
             let (argVal, argOps) = elaborateExpr env argExpr
@@ -2696,7 +2702,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     if fieldSet |> Set.forall (fun f -> Set.contains f fmFields) then Some fm
                     else None)
                 |> Option.defaultWith (fun () ->
-                    failWithSpan matchSpan "ensureRecordFieldTypes: cannot resolve record type for fields %A" fields)
+                    let availableTypes = env.RecordEnv |> Map.toList |> List.map fst |> String.concat ", "
+                    failWithSpan matchSpan "ensureRecordFieldTypes: cannot resolve record type for fields %A. Available record types: %s" fields availableTypes)
             let mutable ops = []
             fields |> List.iteri (fun i fieldName ->
                 if i < argAccs.Length then
@@ -2991,7 +2998,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 |> Map.tryFindKey (fun _ fmap ->
                     Set.ofSeq (fmap |> Map.toSeq |> Seq.map fst) = fieldNames)
                 |> Option.defaultWith (fun () ->
-                    failWithSpan recSpan "RecordExpr: cannot resolve record type for fields %A" (Set.toList fieldNames))
+                    let availableTypes = env.RecordEnv |> Map.toList |> List.map fst |> String.concat ", "
+                    failWithSpan recSpan "RecordExpr: cannot resolve record type for fields %A. Available record types: %s" (Set.toList fieldNames) availableTypes)
         let fieldMap = Map.find typeName env.RecordEnv
         let n = Map.count fieldMap
         let fieldResults = fields |> List.map (fun (_, e) -> elaborateExpr env e)
@@ -3031,7 +3039,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             |> Map.toSeq
             |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
             |> Option.defaultWith (fun () ->
-                failWithSpan faSpan "FieldAccess: unknown field '%s'" fieldName)
+                let hint =
+                    env.RecordEnv |> Map.toList
+                    |> List.map (fun (name, fields) -> sprintf "%s: {%s}" name (fields |> Map.toList |> List.map fst |> String.concat "; "))
+                    |> String.concat " | "
+                failWithSpan faSpan "FieldAccess: unknown field '%s'. Known records: %s" fieldName hint)
         // Coerce record to Ptr if it came in as I64 (e.g., through a closure argument)
         let (recPtr, recCoerce) =
             if recVal.Type = Ptr then (recVal, [])
@@ -3054,7 +3066,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 overrideNames |> Set.forall (fun fn -> Map.containsKey fn fmap))
             |> Option.map (fun tn -> (tn, Map.find tn env.RecordEnv))
             |> Option.defaultWith (fun () ->
-                failWithSpan ruSpan "RecordUpdate: cannot resolve record type for fields %A" (Set.toList overrideNames))
+                let availableTypes = env.RecordEnv |> Map.toList |> List.map fst |> String.concat ", "
+                failWithSpan ruSpan "RecordUpdate: cannot resolve record type for fields %A. Available record types: %s" (Set.toList overrideNames) availableTypes)
         let n = Map.count fieldMap
         let overrideResults = overrides |> List.map (fun (fn, e) -> (fn, elaborateExpr env e))
         let overrideOps     = overrideResults |> List.collect (fun (_, (_, ops)) -> ops)
@@ -3091,7 +3104,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             |> Map.toSeq
             |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
             |> Option.defaultWith (fun () ->
-                failWithSpan sfSpan "SetField: unknown field '%s'" fieldName)
+                let hint =
+                    env.RecordEnv |> Map.toList
+                    |> List.map (fun (name, fields) -> sprintf "%s: {%s}" name (fields |> Map.toList |> List.map fst |> String.concat "; "))
+                    |> String.concat " | "
+                failWithSpan sfSpan "SetField: unknown field '%s'. Known records: %s" fieldName hint)
         // Coerce record to Ptr if it came in as I64 (e.g., through a closure argument)
         let (recPtr, recCoerce) =
             if recVal.Type = Ptr then (recVal, [])
@@ -3387,7 +3404,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     if fieldSet |> Set.forall (fun f -> Set.contains f fmFields) then Some fm
                     else None)
                 |> Option.defaultWith (fun () ->
-                    failWithSpan trySpan "ensureRecordFieldTypes2: cannot resolve record type for fields %A" fields)
+                    let availableTypes = env.RecordEnv |> Map.toList |> List.map fst |> String.concat ", "
+                    failWithSpan trySpan "ensureRecordFieldTypes2: cannot resolve record type for fields %A. Available record types: %s" fields availableTypes)
             let mutable ops = []
             fields |> List.iteri (fun i fieldName ->
                 if i < argAccs.Length then

@@ -186,14 +186,20 @@ let main argv =
             | Ok () ->
                 0
             | Error (Pipeline.MlirOptFailed (code, err, mlirFile)) ->
-                eprintfn "mlir-opt failed (exit %d):\n%s\nMLIR file preserved: %s" code err mlirFile
+                eprintfn "[Compile] mlir-opt failed (exit %d):\n%s\nMLIR file preserved: %s" code err mlirFile
                 1
             | Error (Pipeline.TranslateFailed (code, err, mlirFile)) ->
-                eprintfn "mlir-translate failed (exit %d):\n%s\nMLIR file preserved: %s" code err mlirFile
+                eprintfn "[Compile] mlir-translate failed (exit %d):\n%s\nMLIR file preserved: %s" code err mlirFile
                 1
             | Error (Pipeline.ClangFailed (code, err)) ->
-                eprintfn "clang failed (exit %d):\n%s" code err
+                eprintfn "[Compile] clang failed (exit %d):\n%s" code err
                 1
         with ex ->
-            eprintfn "Error: %s" ex.Message
+            let msg = ex.Message
+            if msg.StartsWith("[Elaboration]") then
+                eprintfn "%s" msg
+            elif msg.Contains("parse error") || msg.Contains("Parse error") then
+                eprintfn "[Parse] %s" msg
+            else
+                eprintfn "[Elaboration] %s" msg
             1

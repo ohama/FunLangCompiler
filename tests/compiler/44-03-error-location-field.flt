@@ -2,5 +2,5 @@
 // --- Command: bash -c 'dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %S/44-03-error-location-field.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
-Error: :0:0: FieldAccess: unknown field 'z'
+[Elaboration] :0:0: FieldAccess: unknown field 'z'. Known records: Point: {x; y}
 1
