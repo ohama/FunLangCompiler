@@ -37,6 +37,9 @@ Plans:
 **Goal**: 파서 에러 메시지에 file:line:col 위치 정보가 포함됨
 **Depends on**: Phase 47 (줄 번호 정확성 확보 후)
 **Requirements**: PARSE-POS-01 (파서 에러에 위치 포함)
+**Plans:** 1 plan
+Plans:
+- [ ] 48-01-PLAN.md — Add lastParsedPos tracking + update 3 parse error test expectations
 **Success Criteria** (what must be TRUE):
   1. 문법 오류 시 `[Parse] file:line:col: parse error` 형태로 출력
   2. 마지막으로 처리된 토큰의 위치가 에러에 포함됨
@@ -66,6 +69,6 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 47. Prelude Separate Parsing | 1/1 | ✓ Complete | 2026-04-01 |
-| 48. Parse Error Position | 0/? | Not started | - |
+| 48. Parse Error Position | 0/1 | Planning complete | - |
 | 49. Error Tests CHECK-RE | 0/? | Not started | - |
 | 50. Unboxing Comparison Bug | 0/? | Not started | - |
