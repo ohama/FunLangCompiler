@@ -13,7 +13,7 @@
 
 ## Phases
 
-- [ ] **Phase 47: Prelude Separate Parsing** - Prelude와 유저 코드를 별도 파싱 후 AST merge로 줄 번호 정확성 확보
+- [x] **Phase 47: Prelude Separate Parsing** - Prelude와 유저 코드를 별도 파싱 후 AST merge로 줄 번호 정확성 확보
 - [ ] **Phase 48: Parse Error Position** - 파서 에러 메시지에 마지막 토큰 위치(file:line:col) 포함
 - [ ] **Phase 49: Error Tests CHECK-RE** - 에러 테스트를 CHECK-RE 정규식 매칭으로 전환하여 Prelude 변경에 독립적
 - [ ] **Phase 50: Unboxing Comparison Bug** - boxed ptr에 arith.cmpi 적용되는 비교 람다 unboxing 버그 수정
@@ -65,7 +65,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 47. Prelude Separate Parsing | 0/1 | Planned | - |
+| 47. Prelude Separate Parsing | 1/1 | ✓ Complete | 2026-04-01 |
 | 48. Parse Error Position | 0/? | Not started | - |
 | 49. Error Tests CHECK-RE | 0/? | Not started | - |
 | 50. Unboxing Comparison Bug | 0/? | Not started | - |
