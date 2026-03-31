@@ -62,11 +62,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PARSE-02 | Phase 45 | Complete |
 | MLIR-01 | Phase 45 | Complete |
 | MLIR-02 | Phase 45 | Complete |
-| CTX-01 | Phase 46 | Pending |
-| CTX-02 | Phase 46 | Pending |
-| CTX-03 | Phase 46 | Pending |
-| CAT-01 | Phase 46 | Pending |
-| CAT-02 | Phase 46 | Pending |
+| CTX-01 | Phase 46 | Complete |
+| CTX-02 | Phase 46 | Complete |
+| CTX-03 | Phase 46 | Complete |
+| CAT-01 | Phase 46 | Complete |
+| CAT-02 | Phase 46 | Complete |
 
 **Coverage:**
 - v11 requirements: 12 total
