@@ -58,10 +58,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOC-01 | Phase 44 | Complete |
 | LOC-02 | Phase 44 | Complete |
 | LOC-03 | Phase 44 | Complete |
-| PARSE-01 | Phase 45 | Pending |
-| PARSE-02 | Phase 45 | Pending |
-| MLIR-01 | Phase 45 | Pending |
-| MLIR-02 | Phase 45 | Pending |
+| PARSE-01 | Phase 45 | Complete |
+| PARSE-02 | Phase 45 | Complete |
+| MLIR-01 | Phase 45 | Complete |
+| MLIR-02 | Phase 45 | Complete |
 | CTX-01 | Phase 46 | Pending |
 | CTX-02 | Phase 46 | Pending |
 | CTX-03 | Phase 46 | Pending |
