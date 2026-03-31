@@ -26,12 +26,12 @@ Transform compiler error messages from opaque failures into actionable diagnosti
   1. `failWithSpan` helper exists and converts Span to "file:line:col: message" format
   2. Unbound variable error shows the file name, line number, and column where it occurred
   3. Pattern matching errors (unsupported pattern, ConsPat) show source location
-  4. All ~15 failwithf sites in Elaboration.fs use failWithSpan instead of bare failwithf
-**Plans**: TBD
+  4. All ~18 failwithf sites in Elaboration.fs use failWithSpan instead of bare failwithf
+**Plans**: 2 plans
 
 Plans:
-- [ ] 44-01: failWithSpan helper + Elaboration error site migration
-- [ ] 44-02: Pattern matching error locations
+- [ ] 44-01-PLAN.md — failWithSpan helper + convert all 18 user-facing error sites
+- [ ] 44-02-PLAN.md — E2E tests verifying file:line:col in error output
 
 ### Phase 45: Error Preservation
 **Goal**: Error information that is currently lost (parser fallback, MLIR temp files) is preserved and surfaced
