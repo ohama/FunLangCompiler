@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-03-31)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Planning next milestone
+**Current focus:** v11.0 Compiler Error Messages
 
 ## Current Position
 
-Phase: N/A — between milestones
-Plan: N/A
-Status: v10.0 shipped, ready for next milestone
-Last activity: 2026-03-31 — v10.0 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-31 — Milestone v11.0 started
 
 Progress: v1.0–v10.0 complete (42 phases, 81 plans total)
 
@@ -28,10 +28,7 @@ Progress: v1.0–v10.0 complete (42 phases, 81 plans total)
 ### Decisions
 
 All v10.0 decisions archived to `.planning/milestones/v10.0-ROADMAP.md`.
-
-### Roadmap Evolution
-
-v10.0 complete. Phases 41-42 were added during milestone execution for OpenDecl, Prelude sync, and if-match bug fix.
+Phase 43 (uncommitted milestone): stripAnnot, BoolVars, mutual recursion, sanitizeMlirName.
 
 ### Pending Todos
 
@@ -39,10 +36,10 @@ None.
 
 ### Blockers/Concerns
 
-None — all known blockers resolved through v10.0.
+None.
 
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: v10.0 milestone archived, ready for /gsd:new-milestone
+Stopped at: Defining v11.0 requirements
 Resume file: None
