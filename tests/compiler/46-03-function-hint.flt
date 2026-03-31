@@ -1,6 +1,6 @@
 // Test: Unknown function error shows in-scope function names
-// --- Command: bash -c 'dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %S/46-03-function-hint.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-03-function-hint.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
-[Elaboration] :0:0: Elaboration: unsupported App — 'sub' is not a known function or closure value. In scope: ++, <|>, Array_create, Array_fold, Array_get, Array_init, Array_iter, Array_length, Array_map, Array_ofList
+[Elaboration] 46-03-function-hint.fun:2:27: Elaboration: unsupported App — 'sub' is not a known function or closure value. In scope: ++, <|>, Array_create, Array_fold, Array_get, Array_init, Array_iter, Array_length, Array_map, Array_ofList
 1
