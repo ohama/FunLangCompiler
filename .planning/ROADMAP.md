@@ -30,8 +30,8 @@ Transform compiler error messages from opaque failures into actionable diagnosti
 **Plans**: 2 plans
 
 Plans:
-- [ ] 44-01-PLAN.md — failWithSpan helper + convert all 18 user-facing error sites
-- [ ] 44-02-PLAN.md — E2E tests verifying file:line:col in error output
+- [x] 44-01-PLAN.md — failWithSpan helper + convert all 18 user-facing error sites
+- [x] 44-02-PLAN.md — E2E tests verifying file:line:col in error output
 
 ### Phase 45: Error Preservation
 **Goal**: Error information that is currently lost (parser fallback, MLIR temp files) is preserved and surfaced
@@ -42,11 +42,10 @@ Plans:
   2. Parser error messages include line:col position information
   3. When mlir-opt or mlir-translate fails, the .mlir temp file is NOT deleted
   4. The error message includes the path to the preserved .mlir file so the user can inspect it
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 45-01: Parser error preservation with position
-- [ ] 45-02: MLIR debug file preservation
+- [ ] 45-01-PLAN.md — Parser error preservation + MLIR debug file preservation + E2E tests
 
 ### Phase 46: Context Hints & Unified Format
 **Goal**: Error messages include actionable hints (available types/fields/functions) and follow a consistent categorized format
@@ -69,5 +68,5 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 44. Error Location Foundation | 2/2 | Complete | 2026-03-31 |
-| 45. Error Preservation | 0/2 | Not started | - |
+| 45. Error Preservation | 0/1 | Not started | - |
 | 46. Context Hints & Unified Format | 0/2 | Not started | - |
