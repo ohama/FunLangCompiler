@@ -1,71 +1,71 @@
-# Roadmap: LangBackend v11.0 — Compiler Error Messages
+# Roadmap: LangBackend v12.0 — Error Message Accuracy
 
 ## Overview
 
-Transform compiler error messages from opaque failures into actionable diagnostics with source locations, preserved parser/MLIR errors, contextual hints, and categorized output. Three phases: build the location infrastructure, preserve currently-lost error information, then enrich messages with context and unified formatting.
+에러 메시지의 줄 번호 정확성, 파서 에러 위치 추가, 테스트 안정성, 비교 연산 unboxing 버그 수정. Prelude 별도 파싱으로 줄 번호를 유저 소스 기준으로 정확하게 만들고, 파서 에러에 토큰 위치를 포함하며, fslit의 CHECK-RE로 테스트를 Prelude 변경에 독립적으로 만들고, List.choose 등에서 발생하는 비교 람다 unboxing 버그를 수정한다.
 
 ## Milestones
 
 - v1.0-v10.0: Shipped (Phases 1-42, archived)
 - Phase 43: Uncommitted work (stripAnnot, BoolVars, mutual recursion, sanitizeMlirName)
-- v11.0 Compiler Error Messages: Phases 44-46 (current)
+- v11.0 Compiler Error Messages: Phases 44-46 (archived)
+- v12.0 Error Message Accuracy: Phases 47-50 (current)
 
 ## Phases
 
-- [x] **Phase 44: Error Location Foundation** - failWithSpan helper + source locations in all Elaboration/pattern errors
-- [x] **Phase 45: Error Preservation** - Parser fallback error retention + MLIR debug file preservation
-- [x] **Phase 46: Context Hints & Unified Format** - Record/field/function hints + categorized error output
+- [ ] **Phase 47: Prelude Separate Parsing** - Prelude와 유저 코드를 별도 파싱 후 AST merge로 줄 번호 정확성 확보
+- [ ] **Phase 48: Parse Error Position** - 파서 에러 메시지에 마지막 토큰 위치(file:line:col) 포함
+- [ ] **Phase 49: Error Tests CHECK-RE** - 에러 테스트를 CHECK-RE 정규식 매칭으로 전환하여 Prelude 변경에 독립적
+- [ ] **Phase 50: Unboxing Comparison Bug** - boxed ptr에 arith.cmpi 적용되는 비교 람다 unboxing 버그 수정
 
 ## Phase Details
 
-### Phase 44: Error Location Foundation
-**Goal**: Every Elaboration error message includes file:line:col source location
-**Depends on**: Nothing (first phase of v11.0)
-**Requirements**: LOC-01, LOC-02, LOC-03
-**Success Criteria** (what must be TRUE):
-  1. `failWithSpan` helper exists and converts Span to "file:line:col: message" format
-  2. Unbound variable error shows the file name, line number, and column where it occurred
-  3. Pattern matching errors (unsupported pattern, ConsPat) show source location
-  4. All ~18 failwithf sites in Elaboration.fs use failWithSpan instead of bare failwithf
-**Plans**: 2 plans
-
+### Phase 47: Prelude Separate Parsing
+**Goal**: 에러 메시지의 줄 번호가 유저 소스 파일 기준으로 정확하게 표시됨
+**Depends on**: Nothing (first phase of v12.0)
+**Requirements**: LINE-01 (유저 코드 1행 → 에러 1행), LINE-02 (Prelude 내부 에러 구분)
+**Plans:** 1 plan
 Plans:
-- [x] 44-01-PLAN.md — failWithSpan helper + convert all 18 user-facing error sites
-- [x] 44-02-PLAN.md — E2E tests verifying file:line:col in error output
-
-### Phase 45: Error Preservation
-**Goal**: Error information that is currently lost (parser fallback, MLIR temp files) is preserved and surfaced
-**Depends on**: Phase 44
-**Requirements**: PARSE-01, PARSE-02, MLIR-01, MLIR-02
+- [ ] 47-01-PLAN.md — Separate Prelude/user parsing + update 7 error test line numbers
 **Success Criteria** (what must be TRUE):
-  1. When parser falls back from one grammar to another, the original parse error message is shown (not swallowed)
-  2. Parser error messages include position information (token index; true line:col requires upstream LangThree fix)
-  3. When mlir-opt or mlir-translate fails, the .mlir temp file is NOT deleted
-  4. The error message includes the path to the preserved .mlir file so the user can inspect it
-**Plans**: 1 plan
+  1. Prelude와 유저 코드가 별도로 파싱되어 AST가 merge됨
+  2. 유저 코드 1행의 에러가 `file:1:col`로 표시됨 (현재 `file:174:col`)
+  3. Prelude 내부 에러 발생 시 `<prelude>` 경로로 구분됨
+  4. 기존 217개 E2E 테스트 모두 통과
 
-Plans:
-- [ ] 45-01-PLAN.md — Parser error preservation + MLIR debug file preservation + E2E tests
-
-### Phase 46: Context Hints & Unified Format
-**Goal**: Error messages include actionable hints (available types/fields/functions) and follow a consistent categorized format
-**Depends on**: Phase 44, Phase 45
-**Requirements**: CTX-01, CTX-02, CTX-03, CAT-01, CAT-02
+### Phase 48: Parse Error Position
+**Goal**: 파서 에러 메시지에 file:line:col 위치 정보가 포함됨
+**Depends on**: Phase 47 (줄 번호 정확성 확보 후)
+**Requirements**: PARSE-POS-01 (파서 에러에 위치 포함)
 **Success Criteria** (what must be TRUE):
-  1. Record type resolution failure lists all available record types in the error message
-  2. Field access error on a record lists the valid fields for that record type
-  3. Unresolved function call error lists in-scope functions as hints
-  4. Every error message is prefixed with its phase: [Parse], [Elaboration], or [Compile]
-  5. All error messages follow the format `[phase] file:line:col: message`
-**Plans**: 1 plan
+  1. 문법 오류 시 `[Parse] file:line:col: parse error` 형태로 출력
+  2. 마지막으로 처리된 토큰의 위치가 에러에 포함됨
+  3. 기존 parse error 테스트 업데이트
 
-Plans:
-- [ ] 46-01-PLAN.md — Context hints + error categorization + E2E tests
+### Phase 49: Error Tests CHECK-RE
+**Goal**: 에러 테스트가 Prelude 줄 수 변경에 독립적
+**Depends on**: Phase 47, Phase 48 (최종 에러 포맷 확정 후)
+**Requirements**: TEST-01 (CHECK-RE 전환), TEST-02 (안정성)
+**Success Criteria** (what must be TRUE):
+  1. 44-*, 45-*, 46-* 에러 테스트가 CHECK-RE 정규식 매칭 사용
+  2. Prelude에 줄을 추가/삭제해도 에러 테스트 통과
+  3. 에러 메시지의 핵심 내용(카테고리, 메시지)은 정확히 검증
+
+### Phase 50: Unboxing Comparison Bug
+**Goal**: boxed 리스트 원소에 대한 비교 연산이 올바르게 동작
+**Depends on**: Phase 47 (테스트를 위해 정확한 줄 번호 필요)
+**Requirements**: UNBOX-01 (비교 unboxing), UNBOX-02 (테스트)
+**Success Criteria** (what must be TRUE):
+  1. `List.choose (fun x -> if x > 2 then Some x else None) [1;2;3;4]`가 `[3;4]` 반환
+  2. `List.filter (fun x -> x > 2) [1;2;3;4]`가 `[3;4]` 반환
+  3. 비교 연산자(>, <, >=, <=, =, <>)가 boxed ptr 피연산자를 자동 unboxing
+  4. 기존 E2E 테스트 모두 통과
 
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 44. Error Location Foundation | 2/2 | Complete | 2026-03-31 |
-| 45. Error Preservation | 1/1 | Complete | 2026-03-31 |
-| 46. Context Hints & Unified Format | 1/1 | Complete | 2026-03-31 |
+| 47. Prelude Separate Parsing | 0/1 | Planned | - |
+| 48. Parse Error Position | 0/? | Not started | - |
+| 49. Error Tests CHECK-RE | 0/? | Not started | - |
+| 50. Unboxing Comparison Bug | 0/? | Not started | - |
