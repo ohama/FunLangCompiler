@@ -55,23 +55,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LOC-01 | — | Pending |
-| LOC-02 | — | Pending |
-| LOC-03 | — | Pending |
-| PARSE-01 | — | Pending |
-| PARSE-02 | — | Pending |
-| MLIR-01 | — | Pending |
-| MLIR-02 | — | Pending |
-| CTX-01 | — | Pending |
-| CTX-02 | — | Pending |
-| CTX-03 | — | Pending |
-| CAT-01 | — | Pending |
-| CAT-02 | — | Pending |
+| LOC-01 | Phase 44 | Pending |
+| LOC-02 | Phase 44 | Pending |
+| LOC-03 | Phase 44 | Pending |
+| PARSE-01 | Phase 45 | Pending |
+| PARSE-02 | Phase 45 | Pending |
+| MLIR-01 | Phase 45 | Pending |
+| MLIR-02 | Phase 45 | Pending |
+| CTX-01 | Phase 46 | Pending |
+| CTX-02 | Phase 46 | Pending |
+| CTX-03 | Phase 46 | Pending |
+| CAT-01 | Phase 46 | Pending |
+| CAT-02 | Phase 46 | Pending |
 
 **Coverage:**
 - v11 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12
+- Mapped to phases: 12
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-31*
