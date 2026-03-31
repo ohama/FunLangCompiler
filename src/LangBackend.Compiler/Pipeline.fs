@@ -49,8 +49,8 @@ let private gcIncludeFlag =
         ""
 
 type CompileError =
-    | MlirOptFailed   of exitCode: int * stderr: string
-    | TranslateFailed of exitCode: int * stderr: string
+    | MlirOptFailed   of exitCode: int * stderr: string * mlirFile: string
+    | TranslateFailed of exitCode: int * stderr: string * mlirFile: string
     | ClangFailed     of exitCode: int * stderr: string
 
 /// Run an external tool and wait for completion.
@@ -78,37 +78,49 @@ let compile (m: MlirModule) (outputPath: string) : Result<unit, CompileError> =
     let mlirFile  = Path.GetTempFileName() + ".mlir"
     let lowered   = Path.GetTempFileName() + ".mlir"
     let llFile    = Path.GetTempFileName() + ".ll"
-    try
-        // Step 1: Serialize MlirModule to .mlir text
-        let mlirText = Printer.printModule m
-        File.WriteAllText(mlirFile, mlirText)
 
-        // Step 2: Lower with mlir-opt (arith→cf→func→llvm + reconcile)
-        let optArgs = sprintf "%s %s -o %s" loweringPasses mlirFile lowered
-        match runTool MlirOpt optArgs with
-        | Error (code, err) -> Error (MlirOptFailed (code, err))
-        | Ok () ->
+    // Step 1: Serialize MlirModule to .mlir text
+    let mlirText = Printer.printModule m
+    File.WriteAllText(mlirFile, mlirText)
 
-        // Step 3: Translate to LLVM IR
-        let translateArgs = sprintf "--mlir-to-llvmir %s -o %s" lowered llFile
-        match runTool MlirTranslate translateArgs with
-        | Error (code, err) -> Error (TranslateFailed (code, err))
-        | Ok () ->
-
-        // Step 4: Compile lang_runtime.c to a temp object file
-        let runtimeObj = Path.ChangeExtension(llFile, ".runtime.o")
-        let compileRuntimeArgs = sprintf "-c %s %s -o %s" runtimeSrc gcIncludeFlag runtimeObj
-        match runTool Clang compileRuntimeArgs with
-        | Error (code, err) -> Error (ClangFailed (code, err))
-        | Ok () ->
-
-        // Step 5: Compile to native binary (link Boehm GC and runtime object)
-        let clangArgs = sprintf "-Wno-override-module %s %s %s -o %s" llFile runtimeObj gcLinkFlags outputPath
-        match runTool Clang clangArgs with
-        | Error (code, err) -> Error (ClangFailed (code, err))
-        | Ok () -> Ok ()
-    finally
-        // DEBUG: copy mlir to /tmp/debug_last.mlir before deleting
-        if File.Exists mlirFile then File.Copy(mlirFile, "/tmp/debug_last.mlir", true)
-        for f in [ mlirFile; lowered; llFile ] do
+    let cleanup keepMlir =
+        // On failure, preserve mlirFile for debugging
+        if not keepMlir then
+            if File.Exists mlirFile then File.Delete mlirFile
+        for f in [ lowered; llFile ] do
             if File.Exists f then File.Delete f
+
+    // Step 2: Lower with mlir-opt (arith→cf→func→llvm + reconcile)
+    let optArgs = sprintf "%s %s -o %s" loweringPasses mlirFile lowered
+    match runTool MlirOpt optArgs with
+    | Error (code, err) ->
+        cleanup true
+        Error (MlirOptFailed (code, err, mlirFile))
+    | Ok () ->
+
+    // Step 3: Translate to LLVM IR
+    let translateArgs = sprintf "--mlir-to-llvmir %s -o %s" lowered llFile
+    match runTool MlirTranslate translateArgs with
+    | Error (code, err) ->
+        cleanup true
+        Error (TranslateFailed (code, err, mlirFile))
+    | Ok () ->
+
+    // Step 4: Compile lang_runtime.c to a temp object file
+    let runtimeObj = Path.ChangeExtension(llFile, ".runtime.o")
+    let compileRuntimeArgs = sprintf "-c %s %s -o %s" runtimeSrc gcIncludeFlag runtimeObj
+    match runTool Clang compileRuntimeArgs with
+    | Error (code, err) ->
+        cleanup false
+        Error (ClangFailed (code, err))
+    | Ok () ->
+
+    // Step 5: Compile to native binary (link Boehm GC and runtime object)
+    let clangArgs = sprintf "-Wno-override-module %s %s %s -o %s" llFile runtimeObj gcLinkFlags outputPath
+    match runTool Clang clangArgs with
+    | Error (code, err) ->
+        cleanup false
+        Error (ClangFailed (code, err))
+    | Ok () ->
+        cleanup false
+        Ok ()

@@ -40,16 +40,15 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
                 tok
             else Parser.EOF
         Parser.parseModule tokenizer lexbuf2
-    with ex ->
-        // Show context around the failing token
-        eprintfn "DEBUG parseModule failed at token ~%d/%d: %s" idx arr.Length ex.Message
-        let start = max 0 (idx - 10)
-        let stop  = min (arr.Length - 1) (idx + 5)
-        for i in start..stop do
-            let marker = if i = idx || i = idx-1 then " <<<" else ""
-            eprintfn "DEBUG [%d] %A%s" i arr.[i] marker
-        let expr = parseExpr src filename
-        Ast.Module([Ast.Decl.LetDecl("_", expr, Ast.unknownSpan)], Ast.unknownSpan)
+    with firstEx ->
+        // parseModule failed — try falling back to single-expression mode
+        try
+            let expr = parseExpr src filename
+            Ast.Module([Ast.Decl.LetDecl("_", expr, Ast.unknownSpan)], Ast.unknownSpan)
+        with _ ->
+            // Both parseModule and parseExpr failed — surface the original error
+            // which is more informative (near token N of M)
+            raise firstEx
 
 /// Resolve import path: relative to importing file's directory, absolute as-is.
 let private resolveImportPath (importPath: string) (importingFile: string) : string =
@@ -186,11 +185,11 @@ let main argv =
             match Pipeline.compile mlirMod outputPath with
             | Ok () ->
                 0
-            | Error (Pipeline.MlirOptFailed (code, err)) ->
-                eprintfn "mlir-opt failed (exit %d):\n%s" code err
+            | Error (Pipeline.MlirOptFailed (code, err, mlirFile)) ->
+                eprintfn "mlir-opt failed (exit %d):\n%s\nMLIR file preserved: %s" code err mlirFile
                 1
-            | Error (Pipeline.TranslateFailed (code, err)) ->
-                eprintfn "mlir-translate failed (exit %d):\n%s" code err
+            | Error (Pipeline.TranslateFailed (code, err, mlirFile)) ->
+                eprintfn "mlir-translate failed (exit %d):\n%s\nMLIR file preserved: %s" code err mlirFile
                 1
             | Error (Pipeline.ClangFailed (code, err)) ->
                 eprintfn "clang failed (exit %d):\n%s" code err
