@@ -57,11 +57,10 @@ Plans:
   3. Unresolved function call error lists in-scope functions as hints
   4. Every error message is prefixed with its phase: [Parse], [Elaboration], or [Compile]
   5. All error messages follow the format `[phase] file:line:col: message`
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 46-01: Record/field/function context hints
-- [ ] 46-02: Error categorization and unified format
+- [ ] 46-01-PLAN.md — Context hints + error categorization + E2E tests
 
 ## Progress
 
@@ -69,4 +68,4 @@ Plans:
 |-------|----------------|--------|-----------|
 | 44. Error Location Foundation | 2/2 | Complete | 2026-03-31 |
 | 45. Error Preservation | 1/1 | Complete | 2026-03-31 |
-| 46. Context Hints & Unified Format | 0/2 | Not started | - |
+| 46. Context Hints & Unified Format | 0/1 | Not started | - |
