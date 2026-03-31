@@ -27,21 +27,27 @@ let private lexAndFilter (src: string) (filename: string) : Parser.token list =
 // is handled correctly. Falls back to parseExpr and wraps in a synthetic Module for
 // backward compatibility with bare-expression inputs (e.g. "42", "true").
 let parseProgram (src: string) (filename: string) : Ast.Module =
+    let filteredTokens = lexAndFilter src filename
+    let arr = filteredTokens |> Array.ofList
+    let mutable idx = 0
     try
-        let filteredTokens = lexAndFilter src filename
         let lexbuf2 = LexBuffer<char>.FromString src
         Lexer.setInitialPos lexbuf2 filename
-        let mutable idx = 0
         let tokenizer (_: LexBuffer<char>) =
-            if idx < filteredTokens.Length then
-                let tok = filteredTokens.[idx]
+            if idx < arr.Length then
+                let tok = arr.[idx]
                 idx <- idx + 1
                 tok
             else Parser.EOF
         Parser.parseModule tokenizer lexbuf2
-    with _ ->
-        // Bare expression input (not a valid top-level declaration): parse as Expr
-        // and wrap in a synthetic Module so elaborateProgram can process it uniformly.
+    with ex ->
+        // Show context around the failing token
+        eprintfn "DEBUG parseModule failed at token ~%d/%d: %s" idx arr.Length ex.Message
+        let start = max 0 (idx - 10)
+        let stop  = min (arr.Length - 1) (idx + 5)
+        for i in start..stop do
+            let marker = if i = idx || i = idx-1 then " <<<" else ""
+            eprintfn "DEBUG [%d] %A%s" i arr.[i] marker
         let expr = parseExpr src filename
         Ast.Module([Ast.Decl.LetDecl("_", expr, Ast.unknownSpan)], Ast.unknownSpan)
 
