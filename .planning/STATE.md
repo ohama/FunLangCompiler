@@ -2,37 +2,35 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-31)
+See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v11.0 Compiler Error Messages — COMPLETE
+**Current focus:** v12.0 Error Message Accuracy
 
 ## Current Position
 
-Phase: 46 (3 of 3 in v11.0) — Context Hints & Unified Format
+Phase: 47 (1 of 4 in v12.0) — Prelude Separate Parsing
 Plan: 1/1 complete
-Status: v11.0 complete
-Last activity: 2026-03-31 — Completed 46-01-PLAN.md
+Status: Phase 47 Plan 01 complete
+Last activity: 2026-04-01 — Completed 47-01-PLAN.md
 
-Progress: v1.0-v10.0 complete (42 phases). v11.0: [██████████] 100%
+Progress: v1.0-v11.0 complete (46 phases). v12.0: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 85 (v1.0-v10.0: 81 + Phase 44: 2 + Phase 45: 1 + Phase 46: 1)
+- Total plans completed: 85 (v1.0-v10.0: 81 + v11.0: 4)
 - Average duration: ~10 min/plan
 
 ## Accumulated Context
 
 ### Decisions
 
-- Phase 44: failWithSpan 인프라 완성으로 수락. Span 값이 0인 것은 LangThree 파서 upstream 이슈 (survey/langthree-span-zeroing-fix.md에 기록).
-- Phase 44: `Ast.unknownSpan` fallback — 1곳(closure capture) 사용.
-- Phase 45: parseProgram에서 firstEx 보존 — 양쪽 파서 실패 시 원래 parseModule 에러 표시.
-- Phase 45: MLIR 파일 실패 시 보존 — MlirOpt/Translate 실패 시 .mlir 임시 파일 삭제하지 않고 경로 표시.
-- Phase 45: catch-all 핸들러 "Error:" 접두사 유지 — 파싱 외 에러도 잡으므로 "Parse error:" 불가.
-- Phase 46: failWithSpan에 [Elaboration] 접두사 추가. Program.fs에서 [Parse]/[Elaboration]/[Compile] 카테고리 분류.
-- Phase 46: Record/field/function 에러에 context hint 추가 (available types, known records, in-scope names).
+- v11.0: failWithSpan 인프라 완성, [Elaboration]/[Parse]/[Compile] 카테고리 분류
+- v11.0: LangThree PositionedToken/filterPositioned 적용 → 실제 file:line:col 표시
+- v12.0: Prelude 별도 파싱 방식 채택 (문자열 concat → 별도 파싱 후 AST merge)
+- v12.0: fslit CHECK-RE 사용으로 에러 테스트 안정화
+- v12.0 Phase 47: two-phase parsing 구현 — preludeDecls @ userDecls, userSpan 사용, "<prelude>" 파일명으로 Prelude 오류 식별 가능
 
 ### Pending Todos
 
@@ -40,10 +38,10 @@ None.
 
 ### Blockers/Concerns
 
-- LangThree 파서가 Span에 위치를 채우지 않음 → 에러 메시지가 `:0:0:` 표시. survey/에 수정 가이드 작성 완료.
+- List.choose 비교 람다에서 arith.cmpi + !llvm.ptr 타입 불일치 (Phase 50에서 해결 예정)
 
 ## Session Continuity
 
-Last session: 2026-03-31
-Stopped at: v11.0 complete (all 3 phases: 44, 45, 46)
+Last session: 2026-04-01T22:55:10Z
+Stopped at: Completed 47-01-PLAN.md (Prelude Separate Parsing)
 Resume file: None
