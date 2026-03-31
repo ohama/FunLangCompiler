@@ -211,6 +211,31 @@
 
 ---
 
+### v10.0 — FunLexYacc 네이티브 컴파일 지원 (2026-03-30)
+
+**Goal:** FunLexYacc 셀프호스팅을 위한 잔여 블로커 해소
+
+**Phases:** 36–42 (9 plans, all verified)
+**Requirements:** 19/19 complete (15 original + 4 added during execution)
+**Tests:** 202 FsLit E2E tests (19 new)
+
+**What shipped:**
+- Bug fixes: for-in mutable capture, sequential if, bool I1 coercion, if-match nested empty block
+- Hashtable string keys: C runtime hash/compare extension + Elaboration dispatch
+- CLI arguments: @main (argc, argv) + get_args runtime helper
+- Format strings: sprintf/printfn via C runtime snprintf delegation
+- Multi-file import: AST flattening for `open "file.fun"` in Program.fs
+- OpenDecl implementation: `open Module` brings members into scope via alias LetDecls
+- Prelude sync: 11/12 files byte-identical to LangThree/Prelude/
+
+**Key decisions validated:**
+- IDX dispatch: LangHashtableStr tag=-2 ✓
+- expandImports: HashSet push/pop for diamond imports ✓
+- sprintf: format-specific C wrappers with elaboration dispatch ✓
+- OpenDecl: two-pass collectModuleMembers + alias LetDecls ✓
+
+---
+
 ## Current
 
 Planning next milestone
