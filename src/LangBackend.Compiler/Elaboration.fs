@@ -60,7 +60,7 @@ let emptyEnv () : ElabEnv =
 
 /// Phase 44: Raise an error with source location in "file:line:col: message" format.
 /// Uses Printf.ksprintf to support format strings like failwithf.
-let private failWithSpan (span: Ast.Span) (fmt: Printf.StringFormat<'a, string>) : 'a =
+let inline private failWithSpan (span: Ast.Span) fmt =
     Printf.ksprintf (fun msg ->
         let loc = sprintf "%s:%d:%d" span.FileName span.StartLine span.StartColumn
         failwith (sprintf "%s: %s" loc msg)
@@ -479,8 +479,8 @@ let rec private testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
             LlvmLoadOp(tailVal, tailSlot)
         ]
         // Bind head and tail names
-        let headName = match hPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failwithf "Elaboration: ConsPat head must be VarPat or WildcardPat"
-        let tailName = match tPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failwithf "Elaboration: ConsPat tail must be VarPat or WildcardPat"
+        let headName = match hPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failWithSpan (Ast.patternSpanOf hPat) "Elaboration: ConsPat head must be VarPat or WildcardPat"
+        let tailName = match tPat with VarPat(n, _) -> Some n | WildcardPat _ -> None | _ -> failWithSpan (Ast.patternSpanOf tPat) "Elaboration: ConsPat tail must be VarPat or WildcardPat"
         let env' =
             env
             |> (fun e -> match headName with Some n -> { e with Vars = Map.add n headVal e.Vars } | None -> e)
@@ -536,12 +536,12 @@ let rec private testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
                     let (_, innerTestOps, innerSetupOps, innerEnv) = testPattern eAcc fieldVal subPat
                     (opsAcc @ [gepOp; loadOp] @ innerTestOps @ innerSetupOps, innerEnv)
                 | _ ->
-                    failwithf "testPattern: TuplePat sub-pattern %A not supported" subPat
+                    failWithSpan (Ast.patternSpanOf subPat) "testPattern: TuplePat sub-pattern %A not supported" subPat
             ) ([], env)
         (None, [], setupOps, bindEnv)
 
     | _ ->
-        failwithf "testPattern: pattern %A not supported in v2" pat
+        failWithSpan (Ast.patternSpanOf pat) "testPattern: pattern %A not supported in v2" pat
 
 let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     match expr with
@@ -600,7 +600,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let zero = { Name = freshName env; Type = I64 }
         let result = { Name = freshName env; Type = I64 }
         (result, iops @ [ArithConstantOp(zero, 0L); ArithSubIOp(result, zero, iv)])
-    | Var (name, _) ->
+    | Var (name, span) ->
         match Map.tryFind name env.Vars with
         | Some v ->
             if Set.contains name env.MutableVars then
@@ -608,7 +608,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (loaded, [LlvmLoadOp(loaded, v)])
             else
                 (v, [])
-        | None -> failwithf "Elaboration: unbound variable '%s'" name
+        | None -> failWithSpan span "Elaboration: unbound variable '%s'" name
     // Phase 21: Mutable variable allocation
     | LetMut (name, initExpr, bodyExpr, _) ->
         let (initVal, initOps) = elaborateExpr env initExpr
@@ -625,12 +625,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (bodyVal, bodyOps) = elaborateExpr env' bodyExpr
         (bodyVal, initOps @ allocOps @ bodyOps)
     // Phase 21: Mutable variable assignment
-    | Assign (name, valExpr, _) ->
+    | Assign (name, valExpr, span) ->
         let (newVal, valOps) = elaborateExpr env valExpr
         let cellPtr =
             match Map.tryFind name env.Vars with
             | Some v -> v
-            | None -> failwithf "Elaboration: unbound mutable variable '%s' in Assign" name
+            | None -> failWithSpan span "Elaboration: unbound mutable variable '%s' in Assign" name
         let unitVal = { Name = freshName env; Type = I64 }
         (unitVal, valOps @ [LlvmStoreOp(newVal, cellPtr); ArithConstantOp(unitVal, 0L)])
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
@@ -744,7 +744,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     else
                         match Map.tryFind capName env.Vars with
                         | Some v -> v
-                        | None -> failwithf "Elaboration: closure capture '%s' not found in outer scope" capName
+                        | None -> failWithSpan Ast.unknownSpan "Elaboration: closure capture '%s' not found in outer scope" capName
                 let storeOp = LlvmStoreOp(captureVal, slotVal)
                 [gepOp; storeOp]
             ) |> List.concat
@@ -968,7 +968,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let (innerOps, innerEnv) = bindTuplePat eAcc fieldVal innerPats
                     (opsAcc @ [gepOp; loadOp] @ innerOps, innerEnv)
                 | _ ->
-                    failwithf "Elaboration: unsupported sub-pattern in TuplePat: %A" pat
+                    failWithSpan (Ast.patternSpanOf pat) "Elaboration: unsupported sub-pattern in TuplePat: %A" pat
             ) ([], envAcc)
         let (extractOps, env') = bindTuplePat env tupPtrVal pats
         let (bodyVal, bodyOps) = elaborateExpr env' bodyExpr
@@ -2003,7 +2003,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         elaborateExpr env (App(Var("println", s), String(fmt, s), s))
 
     // Phase 39: sprintf — 2-arg case (MUST come BEFORE 1-arg cases — see Pitfall 1)
-    | App (App (App (Var ("sprintf", _), String (fmt, _), _), arg1Expr, _), arg2Expr, _)
+    | App (App (App (Var ("sprintf", _), String (fmt, _), _), arg1Expr, _), arg2Expr, sprintfSpan)
         when (let specs = fmtSpecTypes fmt in specs.Length = 2) ->
         let specs = fmtSpecTypes fmt
         let fmtGlobal  = addStringGlobal env fmt
@@ -2053,7 +2053,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 LlvmCallOp(result, "@lang_sprintf_2ss", [fmtPtrVal; da1; da2])
             ]
             (result, arg1Ops @ arg2Ops @ c1 @ c2 @ ops)
-        | _ -> failwithf "sprintf: unsupported 2-arg specifier combo in '%s'" fmt
+        | _ -> failWithSpan sprintfSpan "sprintf: unsupported 2-arg specifier combo in '%s'" fmt
 
     // Phase 39: sprintf — 1-arg integer case (%d, %x, %02x, %c, etc.)
     | App (App (Var ("sprintf", _), String (fmt, _), _), argExpr, _)
@@ -2308,7 +2308,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         when not (Map.containsKey memberName env.TypeEnv) ->
         elaborateExpr env (App (Var (modName + "_" + memberName, fspan), argExpr, span))
 
-    | App (funcExpr, argExpr, _) ->
+    | App (funcExpr, argExpr, appSpan) ->
         match funcExpr with
         | Var (name, _) ->
             match Map.tryFind name env.KnownFuncs with
@@ -2371,7 +2371,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let callOp = IndirectCallOp(result, fnPtrVal, closurePtrVal, argVal)
                     (result, argOps @ [castOp; loadOp; callOp])
                 | _ ->
-                    failwithf "Elaboration: unsupported App — '%s' is not a known function or closure value" name
+                    failWithSpan appSpan "Elaboration: unsupported App — '%s' is not a known function or closure value" name
         | Lambda(param, body, _) ->
             // Inline lambda application: (fun x -> body) arg  ≡  let x = arg in body
             let (argVal, argOps) = elaborateExpr env argExpr
@@ -2399,7 +2399,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let callOp = IndirectCallOp(result, fnPtrVal, closurePtrVal, argVal)
                 (result, funcOps @ argOps @ [castOp; loadOp; callOp])
             else
-                failwithf "Elaboration: unsupported App — function expression elaborated to unsupported type %A" funcVal.Type
+                failWithSpan appSpan "Elaboration: unsupported App — function expression elaborated to unsupported type %A" funcVal.Type
     // Phase 9: Tuple construction — GC_malloc(n*8) + sequential GEP + store
     // Phase 28: Tuple([]) = unit — return I64 0 (matches print/println unit convention; avoids type mismatch in if-then-without-else)
     | Tuple (exprs, _) ->
@@ -2479,7 +2479,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Compiles pattern matching to a binary decision tree, then emits MLIR from the tree.
     // Handles: VarPat, WildcardPat, ConstPat(Int/Bool/String), EmptyListPat, ConsPat, TuplePat.
     // Phase 13: adds OrPat expansion (PAT-07), when-guard (PAT-06), CharConst (PAT-08).
-    | Match(scrutineeExpr, clauses, _) ->
+    | Match(scrutineeExpr, clauses, matchSpan) ->
         let (scrutVal, scrutOps) = elaborateExpr env scrutineeExpr
         let mergeLabel = freshLabel env "match_merge"
         let failLabel  = freshLabel env "match_fail"
@@ -2696,7 +2696,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     if fieldSet |> Set.forall (fun f -> Set.contains f fmFields) then Some fm
                     else None)
                 |> Option.defaultWith (fun () ->
-                    failwithf "ensureRecordFieldTypes: cannot resolve record type for fields %A" fields)
+                    failWithSpan matchSpan "ensureRecordFieldTypes: cannot resolve record type for fields %A" fields)
             let mutable ops = []
             fields |> List.iteri (fun i fieldName ->
                 if i < argAccs.Length then
@@ -2981,7 +2981,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (blockPtr, argOps @ allocOps)
 
     // Phase 18: RecordExpr construction — allocate n-slot GC_malloc block, store fields in declaration order
-    | RecordExpr(typeNameOpt, fields, _) ->
+    | RecordExpr(typeNameOpt, fields, recSpan) ->
         let fieldNames = fields |> List.map fst |> Set.ofList
         let typeName =
             match typeNameOpt with
@@ -2991,7 +2991,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 |> Map.tryFindKey (fun _ fmap ->
                     Set.ofSeq (fmap |> Map.toSeq |> Seq.map fst) = fieldNames)
                 |> Option.defaultWith (fun () ->
-                    failwithf "RecordExpr: cannot resolve record type for fields %A" (Set.toList fieldNames))
+                    failWithSpan recSpan "RecordExpr: cannot resolve record type for fields %A" (Set.toList fieldNames))
         let fieldMap = Map.find typeName env.RecordEnv
         let n = Map.count fieldMap
         let fieldResults = fields |> List.map (fun (_, e) -> elaborateExpr env e)
@@ -3024,14 +3024,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             elaborateExpr env (Var(modName + "_" + memberName, span))
 
     // Phase 18: FieldAccess — GEP into record block at declaration-order slot, load value
-    | FieldAccess(recExpr, fieldName, _) ->
+    | FieldAccess(recExpr, fieldName, faSpan) ->
         let (recVal, recOps) = elaborateExpr env recExpr
         let slotIdx =
             env.RecordEnv
             |> Map.toSeq
             |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
             |> Option.defaultWith (fun () ->
-                failwithf "FieldAccess: unknown field '%s'" fieldName)
+                failWithSpan faSpan "FieldAccess: unknown field '%s'" fieldName)
         // Coerce record to Ptr if it came in as I64 (e.g., through a closure argument)
         let (recPtr, recCoerce) =
             if recVal.Type = Ptr then (recVal, [])
@@ -3045,7 +3045,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (fieldVal, recOps @ recCoerce @ ops)
 
     // Phase 18: RecordUpdate — allocate new block, copy non-overridden fields, write overridden fields
-    | RecordUpdate(sourceExpr, overrides, _) ->
+    | RecordUpdate(sourceExpr, overrides, ruSpan) ->
         let (srcVal, srcOps) = elaborateExpr env sourceExpr
         let overrideNames = overrides |> List.map fst |> Set.ofList
         let (typeName, fieldMap) =
@@ -3054,7 +3054,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 overrideNames |> Set.forall (fun fn -> Map.containsKey fn fmap))
             |> Option.map (fun tn -> (tn, Map.find tn env.RecordEnv))
             |> Option.defaultWith (fun () ->
-                failwithf "RecordUpdate: cannot resolve record type for fields %A" (Set.toList overrideNames))
+                failWithSpan ruSpan "RecordUpdate: cannot resolve record type for fields %A" (Set.toList overrideNames))
         let n = Map.count fieldMap
         let overrideResults = overrides |> List.map (fun (fn, e) -> (fn, elaborateExpr env e))
         let overrideOps     = overrideResults |> List.collect (fun (_, (_, ops)) -> ops)
@@ -3083,7 +3083,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (newPtrVal, srcOps @ overrideOps @ allocOps @ copyOps)
 
     // Phase 18: SetField — store in-place at field slot, return unit (i64=0)
-    | SetField(recExpr, fieldName, valueExpr, _) ->
+    | SetField(recExpr, fieldName, valueExpr, sfSpan) ->
         let (recVal, recOps)    = elaborateExpr env recExpr
         let (newVal, newValOps) = elaborateExpr env valueExpr
         let slotIdx =
@@ -3091,7 +3091,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             |> Map.toSeq
             |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
             |> Option.defaultWith (fun () ->
-                failwithf "SetField: unknown field '%s'" fieldName)
+                failWithSpan sfSpan "SetField: unknown field '%s'" fieldName)
         // Coerce record to Ptr if it came in as I64 (e.g., through a closure argument)
         let (recPtr, recCoerce) =
             if recVal.Type = Ptr then (recVal, [])
@@ -3123,7 +3123,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     //   ^exn_caught — pop handler (C-16), get exception, dispatch via MatchCompiler
     //   ^exn_fail — re-raise unmatched exception via @lang_throw
     //   ^merge(%result) — join point
-    | TryWith(bodyExpr, clauses, _) ->
+    | TryWith(bodyExpr, clauses, trySpan) ->
         let mergeLabel     = freshLabel env "try_merge"
         let tryBodyLabel   = freshLabel env "try_body"
         let exnCaughtLabel = freshLabel env "exn_caught"
@@ -3387,7 +3387,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     if fieldSet |> Set.forall (fun f -> Set.contains f fmFields) then Some fm
                     else None)
                 |> Option.defaultWith (fun () ->
-                    failwithf "ensureRecordFieldTypes2: cannot resolve record type for fields %A" fields)
+                    failWithSpan trySpan "ensureRecordFieldTypes2: cannot resolve record type for fields %A" fields)
             let mutable ops = []
             fields |> List.iteri (fun i fieldName ->
                 if i < argAccs.Length then
@@ -3816,7 +3816,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                  @ [LlvmCallOp(result, "@lang_list_comp", [closurePtrVal; collPtrVal])])
 
     | _ ->
-        failwithf "Elaboration: unsupported expression %A" expr
+        failWithSpan (Ast.spanOf expr) "Elaboration: unsupported expression %A" expr
 
 /// Append ReturnOp to a block body only if the block does not already end with
 /// a terminator (llvm.unreachable).  This allows Raise at the end of a function
