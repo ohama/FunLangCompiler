@@ -2,30 +2,30 @@ module Program
 
 open System
 open FSharp.Text.Lexing
+open LangThree.IndentFilter
 
 let parseExpr (src: string) (filename: string) : Ast.Expr =
     let lexbuf = LexBuffer<char>.FromString src
     Lexer.setInitialPos lexbuf filename
     Parser.start Lexer.tokenize lexbuf
 
-// Tokenize and apply IndentFilter, returning a filtered token list.
-// Required for parseModule: the raw Lexer emits NEWLINE tokens that the
-// parser grammar expects to be converted to INDENT/DEDENT by IndentFilter.
-let private lexAndFilter (src: string) (filename: string) : Parser.token list =
+// Tokenize and apply IndentFilter, capturing lexbuf positions per token.
+let private lexAndFilter (src: string) (filename: string) : PositionedToken list =
     let lexbuf = LexBuffer<char>.FromString src
     Lexer.setInitialPos lexbuf filename
     let rec collect () =
+        let startPos = lexbuf.StartPos
         let tok = Lexer.tokenize lexbuf
-        if tok = Parser.EOF then [Parser.EOF]
-        else tok :: collect ()
+        let endPos = lexbuf.EndPos
+        if tok = Parser.EOF then
+            [{ Token = Parser.EOF; StartPos = startPos; EndPos = endPos }]
+        else
+            { Token = tok; StartPos = startPos; EndPos = endPos } :: collect ()
     let rawTokens = collect ()
-    LangThree.IndentFilter.filter LangThree.IndentFilter.defaultConfig rawTokens
-    |> Seq.toList
+    filterPositioned defaultConfig rawTokens
 
-// Phase 16: Parse a source file as a module (Ast.Module).
-// Uses IndentFilter so that multi-line indented source (with NEWLINE/INDENT/DEDENT)
-// is handled correctly. Falls back to parseExpr and wraps in a synthetic Module for
-// backward compatibility with bare-expression inputs (e.g. "42", "true").
+// Parse a source file as a module with position-preserving IndentFilter.
+// Falls back to parseExpr for bare-expression inputs.
 let parseProgram (src: string) (filename: string) : Ast.Module =
     let filteredTokens = lexAndFilter src filename
     let arr = filteredTokens |> Array.ofList
@@ -33,11 +33,13 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
     try
         let lexbuf2 = LexBuffer<char>.FromString src
         Lexer.setInitialPos lexbuf2 filename
-        let tokenizer (_: LexBuffer<char>) =
+        let tokenizer (lb: LexBuffer<char>) =
             if idx < arr.Length then
-                let tok = arr.[idx]
+                let pt = arr.[idx]
                 idx <- idx + 1
-                tok
+                lb.StartPos <- pt.StartPos
+                lb.EndPos <- pt.EndPos
+                pt.Token
             else Parser.EOF
         Parser.parseModule tokenizer lexbuf2
     with firstEx ->
@@ -164,8 +166,21 @@ let main argv =
                         if System.IO.File.Exists path then Some (System.IO.File.ReadAllText path) else None)
                     |> String.concat "\n"
 
-            let combinedSrc = if preludeSrc = "" then src else preludeSrc + "\n" + src
-            let ast = parseProgram combinedSrc inputPath
+            let ast =
+                if preludeSrc = "" then
+                    parseProgram src inputPath
+                else
+                    let preludeAst = parseProgram preludeSrc "<prelude>"
+                    let preludeDecls =
+                        match preludeAst with
+                        | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) | Ast.NamespacedModule(_, ds, _) -> ds
+                        | Ast.EmptyModule _ -> []
+                    let userAst = parseProgram src inputPath
+                    let (userDecls, userSpan) =
+                        match userAst with
+                        | Ast.Module(ds, s) | Ast.NamedModule(_, ds, s) | Ast.NamespacedModule(_, ds, s) -> (ds, s)
+                        | Ast.EmptyModule s -> ([], s)
+                    Ast.Module(preludeDecls @ userDecls, userSpan)
             let expandedAst =
                 match ast with
                 | Ast.Module(ds, s) ->
