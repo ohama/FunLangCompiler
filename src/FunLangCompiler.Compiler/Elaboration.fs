@@ -1078,6 +1078,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Equal (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
+        // Phase 62: Coerce mismatched types before comparison (e.g., I64 vs Ptr from null list)
+        let (lv, lops, rv, rops) =
+            if lv.Type = Ptr && rv.Type = I64 then
+                let c = { Name = freshName env; Type = I64 }
+                (c, lops @ [LlvmPtrToIntOp(c, lv)], rv, rops)
+            elif lv.Type = I64 && rv.Type = Ptr then
+                let c = { Name = freshName env; Type = I64 }
+                (lv, lops, c, rops @ [LlvmPtrToIntOp(c, rv)])
+            else (lv, lops, rv, rops)
         if lv.Type = Ptr then
             // String equality via strcmp
             let lDataPtr   = { Name = freshName env; Type = Ptr }
@@ -1103,6 +1112,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | NotEqual (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
+        // Phase 62: Coerce mismatched types before comparison
+        let (lv, lops, rv, rops) =
+            if lv.Type = Ptr && rv.Type = I64 then
+                let c = { Name = freshName env; Type = I64 }
+                (c, lops @ [LlvmPtrToIntOp(c, lv)], rv, rops)
+            elif lv.Type = I64 && rv.Type = Ptr then
+                let c = { Name = freshName env; Type = I64 }
+                (lv, lops, c, rops @ [LlvmPtrToIntOp(c, rv)])
+            else (lv, lops, rv, rops)
         if lv.Type = Ptr then
             // String inequality via strcmp != 0
             let lDataPtr   = { Name = freshName env; Type = Ptr }
