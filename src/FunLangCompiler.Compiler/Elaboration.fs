@@ -892,8 +892,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // This prevents the function value being captured as a closure in nested two-arg functions,
     // which would cause MLIR "value defined outside region" errors.
     | Let (name, StripAnnot (Lambda (param, body, _)), inExpr, _)
-        when (match stripAnnot body with Lambda _ -> false | _ -> true)
-          && (freeVars (Set.singleton param) body
+        when (freeVars (Set.singleton param) body
               |> Set.filter (fun v -> Map.containsKey v env.Vars)
               |> Set.isEmpty) ->
         let paramType = if isPtrParamBody param body then Ptr else I64
