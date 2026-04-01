@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 ## Current Position
 
 Phase: 57 of 57 — unknownSpan 제거
-Plan: Not started (defining requirements)
-Status: Defining requirements
-Last activity: 2026-04-01 — Milestone v15.0 started
+Plan: 1 of 2 complete
+Status: In progress
+Last activity: 2026-04-01 — Completed 57-01-PLAN.md
 
-Progress: v1.0-v14.0 complete [████████████████████] 56/56 phases + v15.0 planning
+Progress: v1.0-v15.0 [████████████████████░] 57-01/57 complete
 
 ## Performance Metrics
 
@@ -36,7 +36,11 @@ Progress: v1.0-v14.0 complete [████████████████�
 
 ### Decisions
 
-(Cleared — full history in PROJECT.md Key Decisions table and milestones/ archives)
+| Phase | Decision |
+|-------|----------|
+| 57-01 | Bind outer App/Constructor/Let span field to named var; remove `let s = unknownSpan` line |
+| 57-01 | extractMainExpr gains explicit moduleSpan parameter; call site uses Ast.moduleSpanOf ast |
+| 57-01 | Program.fs parseExpr fallback uses Ast.spanOf expr for both LetDecl and Module spans |
 
 ### Pending Todos
 
@@ -48,6 +52,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-01
-Stopped at: v15.0 milestone started, requirements definition
+Last session: 2026-04-01T09:48:21Z
+Stopped at: Completed 57-01-PLAN.md (unknownSpan removal in Elaboration.fs + Program.fs)
 Resume file: None
