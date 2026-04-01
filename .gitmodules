@@ -1,0 +1,6 @@
+[submodule "deps/FunLang"]
+	path = deps/FunLang
+	url = https://github.com/ohama/FunLang.git
+[submodule "deps/fslit"]
+	path = deps/fslit
+	url = https://github.com/ohama/fslit.git
