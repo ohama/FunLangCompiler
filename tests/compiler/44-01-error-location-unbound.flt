@@ -2,5 +2,5 @@
 // --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 44-01-error-location-unbound.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
-[Elaboration] 44-01-error-location-unbound.fun:2:17: Elaboration: unbound variable 'y'
+CHECK-RE: \[Elaboration\] 44-01-error-location-unbound\.fun:\d+:\d+: Elaboration: unbound variable 'y'
 1

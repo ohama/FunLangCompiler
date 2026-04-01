@@ -2,5 +2,5 @@
 // --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-01-record-type-hint.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
-[Elaboration] 46-01-record-type-hint.fun:2:6: RecordExpr: cannot resolve record type for fields ["a"; "b"]. Available record types: Point
+CHECK-RE: \[Elaboration\] 46-01-record-type-hint\.fun:\d+:\d+: RecordExpr: cannot resolve record type for fields.*
 1

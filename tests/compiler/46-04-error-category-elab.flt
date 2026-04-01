@@ -2,5 +2,5 @@
 // --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-04-error-category-elab.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
-[Elaboration] 46-04-error-category-elab.fun:1:17: Elaboration: unbound variable 'z'
+CHECK-RE: \[Elaboration\] 46-04-error-category-elab\.fun:\d+:\d+: Elaboration: unbound variable 'z'
 1

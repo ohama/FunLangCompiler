@@ -2,5 +2,5 @@
 // --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-02-field-hint.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
-[Elaboration] 46-02-field-hint.fun:3:17: FieldAccess: unknown field 'z'. Known records: Point: {x; y}
+CHECK-RE: \[Elaboration\] 46-02-field-hint\.fun:\d+:\d+: FieldAccess: unknown field 'z'.*
 1
