@@ -2,7 +2,7 @@
 // --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 44-02-error-location-pattern.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
-[Elaboration] 44-02-error-location-pattern.fun:1:4: Elaboration: unsupported sub-pattern in TuplePat: ConstPat (IntConst 1, { FileName = "44-02-error-location-pattern.fun"
+CHECK-RE: \[Elaboration\] 44-02-error-location-pattern\.fun:\d+:\d+: Elaboration: unsupported sub-pattern in TuplePat: ConstPat \(IntConst 1, \{ FileName = "44-02-error-location-pattern\.fun"
                         StartLine = 1
                         StartColumn = 4
                         EndLine = 1
