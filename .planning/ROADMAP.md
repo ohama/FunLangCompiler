@@ -9,8 +9,8 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 57-01-PLAN.md -- Replace all 11 unknownSpan with real AST spans
-- [ ] 57-02-PLAN.md -- E2E tests for span accuracy verification
+- [x] 57-01-PLAN.md -- Replace all 11 unknownSpan with real AST spans
+- [x] 57-02-PLAN.md -- E2E tests for span accuracy verification
 
 **Success Criteria:**
 1. `grep -r "unknownSpan" src/` 결과가 0건
