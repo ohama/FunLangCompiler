@@ -1,0 +1,6 @@
+// Test: Issue #4 — 3-arg curried function SSA scope fix
+// --- Command: bash %S/63-04-3lambda-curried.sh
+// --- Input:
+// --- Output:
+60
+160
