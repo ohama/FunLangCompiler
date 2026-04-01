@@ -203,7 +203,14 @@ let main argv =
                     visited.Add(System.IO.Path.GetFullPath(inputPath)) |> ignore
                     Ast.NamespacedModule(nm, expandImports visited inputPath ds, s)
                 | other -> other
-            let mlirMod = Elaboration.elaborateProgram expandedAst
+            // Phase 52: Transform typeclass declarations before elaboration
+            let tcAst =
+                match expandedAst with
+                | Ast.Module(ds, s) -> Ast.Module(Elaboration.elaborateTypeclasses ds, s)
+                | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, Elaboration.elaborateTypeclasses ds, s)
+                | Ast.NamespacedModule(p, ds, s) -> Ast.NamespacedModule(p, Elaboration.elaborateTypeclasses ds, s)
+                | Ast.EmptyModule s -> Ast.EmptyModule s
+            let mlirMod = Elaboration.elaborateProgram tcAst
             match Pipeline.compile mlirMod outputPath with
             | Ok () ->
                 0
