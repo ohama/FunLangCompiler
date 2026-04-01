@@ -1,0 +1,34 @@
+// Test: Issue #1 reproducer — mutable record + string curried function closure
+// Previously failed with: error: use of value '%arg1' expects different type than prior uses: '!llvm.ptr' vs 'i64'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+type State = { mutable pos : int; mutable line : int; mutable col : int; input : string }
+
+let readIdent (s : State) : string =
+    let p = s.pos
+    s.pos <- p + 1
+    "ident"
+
+let skipWS (s : State) : unit =
+    ()
+
+let peekKeyword (ps : State) (kw : string) : bool =
+    let savedPos  = ps.pos
+    let savedLine = ps.line
+    let savedCol  = ps.col
+    skipWS ps
+    let ident = readIdent ps
+    ps.pos  <- savedPos
+    ps.line <- savedLine
+    ps.col  <- savedCol
+    ident = kw
+
+let main =
+    let s = { pos = 0; line = 1; col = 0; input = "hello world" }
+    if peekKeyword s "ident" then
+        println "PASS"
+    else
+        println "FAIL"
+// --- Output:
+PASS
+0
