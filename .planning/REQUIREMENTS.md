@@ -7,11 +7,11 @@
 
 ### TOML 파서
 
-- [ ] **TOML-01**: funproj.toml 파싱 — [project], [[executable]], [[test]] 섹션 지원
-- [ ] **TOML-02**: [project].name, [project].prelude 필드 파싱
-- [ ] **TOML-03**: [[executable]].name, [[executable]].main 필드 파싱 (복수 타겟)
-- [ ] **TOML-04**: [[test]].name, [[test]].main 필드 파싱 (복수 타겟)
-- [ ] **TOML-05**: 경로 해석 — funproj.toml 위치 기준 상대 경로
+- [x] **TOML-01**: funproj.toml 파싱 — [project], [[executable]], [[test]] 섹션 지원
+- [x] **TOML-02**: [project].name, [project].prelude 필드 파싱
+- [x] **TOML-03**: [[executable]].name, [[executable]].main 필드 파싱 (복수 타겟)
+- [x] **TOML-04**: [[test]].name, [[test]].main 필드 파싱 (복수 타겟)
+- [x] **TOML-05**: 경로 해석 — funproj.toml 위치 기준 상대 경로
 
 ### CLI 서브커맨드
 
@@ -36,7 +36,7 @@
 
 ### 테스트
 
-- [ ] **TEST-01**: funproj.toml 파싱 E2E 테스트
+- [x] **TEST-01**: funproj.toml 파싱 E2E 테스트
 - [ ] **TEST-02**: fnc build E2E 테스트 (프로젝트 컴파일 + 바이너리 실행)
 - [ ] **TEST-03**: fnc test E2E 테스트
 
@@ -55,11 +55,11 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| TOML-01 | Phase 60 | Pending |
-| TOML-02 | Phase 60 | Pending |
-| TOML-03 | Phase 60 | Pending |
-| TOML-04 | Phase 60 | Pending |
-| TOML-05 | Phase 60 | Pending |
+| TOML-01 | Phase 60 | Complete |
+| TOML-02 | Phase 60 | Complete |
+| TOML-03 | Phase 60 | Complete |
+| TOML-04 | Phase 60 | Complete |
+| TOML-05 | Phase 60 | Complete |
 | CLI-01 | Phase 61 | Pending |
 | CLI-02 | Phase 61 | Pending |
 | CLI-03 | Phase 61 | Pending |
@@ -72,7 +72,7 @@
 | ERR-01 | Phase 61 | Pending |
 | ERR-02 | Phase 61 | Pending |
 | ERR-03 | Phase 61 | Pending |
-| TEST-01 | Phase 60 | Pending |
+| TEST-01 | Phase 60 | Complete |
 | TEST-02 | Phase 61 | Pending |
 | TEST-03 | Phase 61 | Pending |
 

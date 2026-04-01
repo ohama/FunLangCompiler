@@ -9,7 +9,7 @@
 **Plans:** 1 plans
 
 Plans:
-- [ ] 60-01-PLAN.md — TOML subset parser (ProjectFile.fs) + E2E test
+- [x] 60-01-PLAN.md — TOML subset parser (ProjectFile.fs) + E2E test
 
 **Success Criteria:**
 1. funproj.toml을 읽어 FunProjConfig 구조체로 파싱
