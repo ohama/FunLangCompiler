@@ -19,6 +19,15 @@ v18.0: Closure ABI 통일 — %arg1 항상 !llvm.ptr, Issue #1 해결. 240 E2E t
 
 v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 
+## Current Milestone: v20.0 Caller-Side Closure Env Population
+
+**Goal:** 3+ arg curried function + outer capture 조합에서 scope loss 문제를 근본 해결 (Issue #5)
+
+**Target features:**
+- 2-lambda 패턴의 maker body가 outer SSA를 참조하지 않도록 caller-side env population
+- 3+ arg curried function이 outer variable을 캡처하면서 LetRec body에서도 호출 가능
+- 기존 2-arg curried function (KnownFuncs 최적화) 유지
+
 ## Requirements
 
 ### Validated (v1.0)
