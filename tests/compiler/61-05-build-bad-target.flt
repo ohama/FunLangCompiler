@@ -1,0 +1,5 @@
+// --- Command: bash -c 'PROJROOT=%S/../.. && D=$(mktemp -d /tmp/fncbuild_XXXXXX) && printf "[project]\nname = \"test\"\n\n[[executable]]\nname = \"hello\"\nmain = \"hello.fun\"\n" > "$D/funproj.toml" && printf "let _ = println \"hello\"\n" > "$D/hello.fun" && cd "$D" && dotnet run --project "$PROJROOT/src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj" -- build nonexistent 2>&1; EC=$?; rm -rf "$D"; exit $EC'
+// --- Input:
+// --- Output:
+CONTAINS: nonexistent
+// --- ExitCode: 1

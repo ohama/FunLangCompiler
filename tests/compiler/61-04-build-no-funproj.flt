@@ -1,0 +1,5 @@
+// --- Command: bash -c 'PROJROOT=%S/../.. && D=$(mktemp -d /tmp/fncbuild_XXXXXX) && cd "$D" && dotnet run --project "$PROJROOT/src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj" -- build 2>&1; EC=$?; rm -rf "$D"; exit $EC'
+// --- Input:
+// --- Output:
+CONTAINS: funproj.toml not found
+// --- ExitCode: 1
