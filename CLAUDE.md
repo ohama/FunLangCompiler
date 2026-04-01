@@ -12,9 +12,10 @@ dotnet run --project deps/fslit/FsLit/FsLit.fsproj -- tests/compiler/
 # Run a specific test
 dotnet run --project deps/fslit/FsLit/FsLit.fsproj -- tests/compiler/04-01-fact.flt
 
-# Compile a FunLang source file
+# Compile a FunLang source file (default -O2)
 dotnet run --project src/FunLangCompiler.Cli -- hello.fun -o hello
 # Or after install: fnc hello.fun -o hello
+# Optimization: fnc hello.fun -O0 (none) / -O2 (default) / -O3 (aggressive)
 ```
 
 ## Binary Names

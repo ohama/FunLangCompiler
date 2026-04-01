@@ -17,11 +17,16 @@ git submodule update --init
 # Build
 dotnet build src/FunLangCompiler.Cli
 
-# Compile a source file
+# Compile a source file (default -O2 optimization)
 fnc hello.fun
 
 # With explicit output name
 fnc hello.fun -o hello
+
+# Optimization levels
+fnc hello.fun -O0    # no optimization
+fnc hello.fun -O2    # default
+fnc hello.fun -O3    # aggressive
 
 # Run the compiled binary
 ./hello

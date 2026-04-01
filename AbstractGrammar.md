@@ -6,7 +6,7 @@
 FunLangCompiler는 FunLang의 파서/AST를 재사용하며, `Elaboration.fs`에서 AST를 MLIR IR로 변환한다.
 따라서 **파싱 가능한 문법은 FunLang와 동일**하며, 이 문서는 컴파일러가 실제로 코드 생성하는 범위를 기술한다.
 
-**CLI:** `fnc <file.fun> [-o <output>]` — FunLang 소스를 네이티브 바이너리로 컴파일
+**CLI:** `fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3]` — FunLang 소스를 네이티브 바이너리로 컴파일 (기본 `-O2`)
 
 ---
 
