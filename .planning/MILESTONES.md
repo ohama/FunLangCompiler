@@ -297,4 +297,15 @@
 
 ## Current
 
-Planning next milestone
+### v14.0 — FunLang Standard Library Sync (In Progress)
+
+**Goal:** FunLang Prelude/String.fun과 Prelude/List.fun에 추가된 함수들을 컴파일러에 반영
+
+**Phases:** 54–56
+**Requirements:** 16 requirements (STR-01~07, RT-01~06, LIST-01, TEST-01~02)
+
+**Planned deliverables:**
+- String: split, indexOf, replace, toUpper, toLower (신규 C 런타임 + Elaboration 디스패치), join/substring (별칭)
+- List: 17개 순수 FunLang 함수 Prelude 동기화
+- E2E 테스트: 모든 신규 String/List 함수 검증
+
