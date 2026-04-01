@@ -584,6 +584,19 @@ let rec private testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
     | _ ->
         failWithSpan (Ast.patternSpanOf pat) "testPattern: pattern %A not supported in v2" pat
 
+// Phase 59: Decode a nested module path expression into a segment list.
+// FieldAccess(FieldAccess(Constructor("Outer"), "Inner"), "foo") → Some ["Outer"; "Inner"; "foo"]
+// Returns None if innermost expression is not a no-arg Constructor (i.e., it's a real record access).
+// The Constructor(name, None, _) guard is critical — excludes data constructors with arguments.
+let rec private tryDecodeModulePath (expr: Expr) : string list option =
+    match expr with
+    | Constructor(name, None, _) -> Some [name]
+    | FieldAccess(inner, field, _) ->
+        match tryDecodeModulePath inner with
+        | Some segments -> Some (segments @ [field])
+        | None -> None
+    | _ -> None
+
 let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     match expr with
     | Number (n, _) ->
@@ -2496,6 +2509,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         ]
         (unitVal, strOps @ castOps @ ops)
 
+    // Phase 59: Nested qualified function call — Outer.Inner.f arg → App(Var("Outer_Inner_f"), arg)
+    // Handles chains of any depth. Must come BEFORE the single-level Constructor arm below.
+    | App(FieldAccess(FieldAccess(_, _, _) as innerExpr, memberName, fspan), argExpr, span)
+        when (tryDecodeModulePath innerExpr).IsSome
+          && not (Map.containsKey memberName env.TypeEnv) ->
+        let segments = (tryDecodeModulePath innerExpr).Value @ [memberName]
+        let varName = segments |> String.concat "_"
+        elaborateExpr env (App(Var(varName, fspan), argExpr, span))
+
     // Phase 25: Qualified function call desugar — M.f arg → App(Var("f"), arg)
     // Only for non-constructor members (constructors are handled by the FieldAccess arm → Constructor node).
     // Phase 35: Use module-qualified name (modName + "_" + memberName) — matches flattenDecls prefixing.
@@ -3224,6 +3246,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                   LlvmStoreOp(fieldVal, slotPtr) ]
             )
         (recPtrVal, allFieldOps @ allocOps @ storeOps)
+
+    // Phase 59: Nested qualified value access — Outer.Inner.foo → Var("Outer_Inner_foo")
+    // Handles chains of any depth. Must come BEFORE the single-level Constructor arm below.
+    | FieldAccess(FieldAccess(_, _, _) as innerExpr, memberName, span)
+        when (tryDecodeModulePath innerExpr).IsSome ->
+        let segments = (tryDecodeModulePath innerExpr).Value @ [memberName]
+        if Map.containsKey memberName env.TypeEnv then
+            elaborateExpr env (Constructor(memberName, None, span))
+        else
+            elaborateExpr env (Var(segments |> String.concat "_", span))
 
     // Phase 25: Qualified name desugar — M.x → Var(M_x), M.Ctor → Constructor(Ctor)
     // Phase 35: Use module-qualified name (modName + "_" + memberName) to avoid collisions
@@ -4245,27 +4277,31 @@ let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
         | _ -> ()
     (typeEnv, recordEnv, exnTags)
 
-// Phase 41: collectModuleMembers — first pass scan of decls to build a map from module name
-// to list of qualified member names (e.g., "Core" -> ["Core_id"; "Core_not"]).
+// Phase 41/59: collectModuleMembers — first pass scan to build a map from dot-path module key
+// to list of underscore-qualified member names.
+// e.g., "Outer.Inner" -> ["Outer_Inner_foo"; "Outer_Inner_bar"]
+//        "List"        -> ["List_map"; "List_filter"; ...]
 // Used by flattenDecls to resolve OpenDecl at compile time.
 let private collectModuleMembers (decls: Ast.Decl list) : Map<string, string list> =
     let mutable result = Map.empty<string, string list>
-    let rec scan (modName: string) (ds: Ast.Decl list) =
+    let rec scan (dotPath: string) (underPath: string) (ds: Ast.Decl list) =
         for d in ds do
             match d with
             | Ast.Decl.ModuleDecl(name, innerDecls, _) ->
-                scan name innerDecls
-            | Ast.Decl.LetDecl(name, _, _) when modName <> "" && name <> "_" ->
-                let qualifiedName = modName + "_" + name
-                let existing = match Map.tryFind modName result with Some xs -> xs | None -> []
-                result <- Map.add modName (existing @ [qualifiedName]) result
-            | Ast.Decl.LetRecDecl(bindings, _) when modName <> "" ->
+                let childDot   = if dotPath   = "" then name else dotPath   + "." + name
+                let childUnder = if underPath = "" then name else underPath + "_" + name
+                scan childDot childUnder innerDecls
+            | Ast.Decl.LetDecl(name, _, _) when underPath <> "" && name <> "_" ->
+                let qualifiedName = underPath + "_" + name
+                let existing = match Map.tryFind dotPath result with Some xs -> xs | None -> []
+                result <- Map.add dotPath (existing @ [qualifiedName]) result
+            | Ast.Decl.LetRecDecl(bindings, _) when underPath <> "" ->
                 for (name, _, _, _, _) in bindings do
-                    let qualifiedName = modName + "_" + name
-                    let existing = match Map.tryFind modName result with Some xs -> xs | None -> []
-                    result <- Map.add modName (existing @ [qualifiedName]) result
+                    let qualifiedName = underPath + "_" + name
+                    let existing = match Map.tryFind dotPath result with Some xs -> xs | None -> []
+                    result <- Map.add dotPath (existing @ [qualifiedName]) result
             | _ -> ()
-    scan "" decls
+    scan "" "" decls
     result
 
 // Phase 25: flattenDecls — recursively flatten ModuleDecl into a single Decl list.
@@ -4278,19 +4314,23 @@ let private collectModuleMembers (decls: Ast.Decl list) : Map<string, string lis
 let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName: string) (decls: Ast.Decl list) : Ast.Decl list =
     decls |> List.collect (fun d ->
         match d with
-        | Ast.Decl.ModuleDecl(name, innerDecls, _) -> flattenDecls moduleMembers name innerDecls
+        | Ast.Decl.ModuleDecl(name, innerDecls, _) ->
+            let childPrefix = if modName = "" then name else modName + "_" + name
+            flattenDecls moduleMembers childPrefix innerDecls
         | Ast.Decl.LetDecl(name, body, s) when modName <> "" && name <> "_" ->
             [Ast.Decl.LetDecl(modName + "_" + name, body, s)]
         | Ast.Decl.LetRecDecl(bindings, s) when modName <> "" ->
             let prefixed = bindings |> List.map (fun (name, param, pt, body, s2) -> (modName + "_" + name, param, pt, body, s2))
             [Ast.Decl.LetRecDecl(prefixed, s)]
         | Ast.Decl.OpenDecl(path, s) when not (List.isEmpty path) ->
-            // open A or open A.B — resolve using last segment (module names are registered by innermost name)
-            let openedMod = path |> List.last
-            match Map.tryFind openedMod moduleMembers with
+            // Phase 59: Join ALL path segments with "." for the map key (e.g., "Outer.Inner").
+            // Previously used List.last which only worked for single-level open.
+            let openedKey = path |> String.concat "."
+            match Map.tryFind openedKey moduleMembers with
             | Some qualifiedNames ->
+                let underscorePrefix = openedKey.Replace(".", "_")
                 qualifiedNames |> List.map (fun qualifiedName ->
-                    let shortName = qualifiedName.Substring(openedMod.Length + 1)
+                    let shortName = qualifiedName.Substring(underscorePrefix.Length + 1)
                     Ast.Decl.LetDecl(shortName, Ast.Var(qualifiedName, s), s))
             | None -> []
         | Ast.Decl.OpenDecl(_, _) -> []
