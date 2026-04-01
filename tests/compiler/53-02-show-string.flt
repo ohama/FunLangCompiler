@@ -1,0 +1,6 @@
+// Test: show on string from Prelude
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %S/53-02-show-string.fun -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+// --- Output:
+hello
+0
