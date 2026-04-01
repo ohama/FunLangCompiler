@@ -1,0 +1,10 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let rec any pred = fun xs -> match xs with | [] -> false | h :: t -> if pred h then true else any pred t in let rec _findIndex_helper pred i xs = match xs with | [] -> 0 - 1 | h :: t -> if pred h then i else _findIndex_helper pred (i + 1) t in let findIndex pred xs = _findIndex_helper pred 0 xs in let contains x xs = any (fun y -> y = x) xs in let rec fold f = fun acc -> fun xs -> match xs with | [] -> acc | h :: t -> fold f (f acc h) t in let rec all pred = fun xs -> match xs with | [] -> true | h :: t -> if pred h then all pred t else false in let forall pred xs = all pred xs in let _ = println (to_string (findIndex (fun x -> x > 3) [1; 2; 3; 4; 5])) in let _ = println (to_string (contains 3 [1; 2; 3])) in let _ = println (to_string (contains 5 [1; 2; 3])) in let _ = println (to_string (forall (fun x -> x > 0) [1; 2; 3])) in let _ = println (to_string (forall (fun x -> x > 2) [1; 2; 3])) in 0
+// --- Output:
+3
+1
+0
+1
+0
+0

@@ -1,0 +1,13 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let rec _init_helper n f i = if i = n then [] else f i :: _init_helper n f (i + 1) in let init n f = _init_helper n f 0 in let replicate n x = init n (fun _i -> x) in let rec printList xs = match xs with | [] -> 0 | h :: t -> let _ = println (to_string h) in printList t in let _ = printList (init 5 (fun i -> i * i)) in let _ = printList (replicate 3 42) in 0
+// --- Output:
+0
+1
+4
+9
+16
+42
+42
+42
+0
