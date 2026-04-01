@@ -1,18 +1,18 @@
 # Phase 52: Typeclass Elaboration - Research
 
 **Researched:** 2026-04-01
-**Domain:** F# AST transformation — LangThree typeclass/instance declarations → LetDecl bindings
+**Domain:** F# AST transformation — FunLang typeclass/instance declarations → LetDecl bindings
 **Confidence:** HIGH
 
 ## Summary
 
-Phase 52 implements `elaborateTypeclasses` in FunLangCompiler, which is a pre-processing step that transforms typeclass-related AST nodes into plain `LetDecl` bindings before `elaborateProgram` sees the AST. The canonical reference implementation already exists in LangThree's `Elaborate.fs` (lines 243–273). The transformation is a direct structural traversal with no type inference or name resolution — it is a purely syntactic rewrite.
+Phase 52 implements `elaborateTypeclasses` in FunLangCompiler, which is a pre-processing step that transforms typeclass-related AST nodes into plain `LetDecl` bindings before `elaborateProgram` sees the AST. The canonical reference implementation already exists in FunLang's `Elaborate.fs` (lines 243–273). The transformation is a direct structural traversal with no type inference or name resolution — it is a purely syntactic rewrite.
 
-The LangThree implementation handles four cases: `TypeClassDecl` → `[]` (removed), `InstanceDecl` → one `LetDecl` per method, `ModuleDecl` → recurse + hoist instance bindings to outer scope, `NamespaceDecl` → recurse in-place, `DerivingDecl` → `[]` (removed). FunLangCompiler's `Elaboration.fs` already has stub comments at lines 4101–4103 noting that TypeClassDecl/InstanceDecl/DerivingDecl will be handled here. The `elaborateProgram` function in `Program.fs` (line 206) calls `Elaboration.elaborateProgram expandedAst` — the new `elaborateTypeclasses` call must be inserted between `expandImports` and `elaborateProgram`.
+The FunLang implementation handles four cases: `TypeClassDecl` → `[]` (removed), `InstanceDecl` → one `LetDecl` per method, `ModuleDecl` → recurse + hoist instance bindings to outer scope, `NamespaceDecl` → recurse in-place, `DerivingDecl` → `[]` (removed). FunLangCompiler's `Elaboration.fs` already has stub comments at lines 4101–4103 noting that TypeClassDecl/InstanceDecl/DerivingDecl will be handled here. The `elaborateProgram` function in `Program.fs` (line 206) calls `Elaboration.elaborateProgram expandedAst` — the new `elaborateTypeclasses` call must be inserted between `expandImports` and `elaborateProgram`.
 
-The FunLangCompiler uses LangThree's `Ast` module directly (via project reference), so all AST types — `Ast.Decl.TypeClassDecl`, `Ast.Decl.InstanceDecl`, `Ast.Decl.DerivingDecl`, `Ast.Decl.LetDecl`, `Ast.Decl.ModuleDecl`, `Ast.Decl.NamespaceDecl` — are shared. No new type definitions are needed.
+The FunLangCompiler uses FunLang's `Ast` module directly (via project reference), so all AST types — `Ast.Decl.TypeClassDecl`, `Ast.Decl.InstanceDecl`, `Ast.Decl.DerivingDecl`, `Ast.Decl.LetDecl`, `Ast.Decl.ModuleDecl`, `Ast.Decl.NamespaceDecl` — are shared. No new type definitions are needed.
 
-**Primary recommendation:** Add `elaborateTypeclasses` to `Elaboration.fs` as a public function (verbatim copy of LangThree's logic adapted for the `Ast.Decl.` prefix style), then wire it in `Program.fs` between `expandImports` and `elaborateProgram`.
+**Primary recommendation:** Add `elaborateTypeclasses` to `Elaboration.fs` as a public function (verbatim copy of FunLang's logic adapted for the `Ast.Decl.` prefix style), then wire it in `Program.fs` between `expandImports` and `elaborateProgram`.
 
 ## Standard Stack
 
@@ -50,15 +50,15 @@ src/FunLangCompiler.Cli/
 └── Program.fs          # Wire elaborateTypeclasses between expandImports and elaborateProgram
 ```
 
-### Pattern 1: elaborateTypeclasses — Direct Port from LangThree
+### Pattern 1: elaborateTypeclasses — Direct Port from FunLang
 
 **What:** A `List.collect` traversal that filters/transforms Decl nodes before `elaborateProgram`.
 **When to use:** Called once in `Program.fs` on the `Ast.Module` after import expansion, before `elaborateProgram`.
 
-The LangThree implementation (verbatim, `Elaborate.fs` lines 248–273):
+The FunLang implementation (verbatim, `Elaborate.fs` lines 248–273):
 
 ```fsharp
-// Source: /Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs:248
+// Source: deps/FunLang/src/FunLang/Elaborate.fs:248
 let rec elaborateTypeclasses (decls: Decl list) : Decl list =
     decls |> List.collect (fun decl ->
         match decl with
@@ -86,7 +86,7 @@ let rec elaborateTypeclasses (decls: Decl list) : Decl list =
 In FunLangCompiler's `Elaboration.fs`, use the `Ast.Decl.` prefix:
 
 ```fsharp
-// Source: adapated from /Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs
+// Source: adapated from deps/FunLang/src/FunLang/Elaborate.fs
 let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
     decls |> List.collect (fun decl ->
         match decl with
@@ -134,9 +134,9 @@ let mlirMod = Elaboration.elaborateProgram tcExpandedAst
 
 ### Pattern 3: InstanceDecl Method Name — No Mangling
 
-**What:** In LangThree's `elaborateTypeclasses`, method names are used **as-is** from the instance declaration. There is NO name mangling in the elaboration step. The method name in `InstanceDecl.methods` (e.g., `"show"` in `instance Show int = let show x = ...`) becomes `LetDecl("show", ...)`.
+**What:** In FunLang's `elaborateTypeclasses`, method names are used **as-is** from the instance declaration. There is NO name mangling in the elaboration step. The method name in `InstanceDecl.methods` (e.g., `"show"` in `instance Show int = let show x = ...`) becomes `LetDecl("show", ...)`.
 
-**Key insight:** The method names are already mangled at the **parser/typecheck** level in LangThree — the instance method name is literally what the programmer wrote. `elaborateTypeclasses` is a pure desugaring step that does not rename anything.
+**Key insight:** The method names are already mangled at the **parser/typecheck** level in FunLang — the instance method name is literally what the programmer wrote. `elaborateTypeclasses` is a pure desugaring step that does not rename anything.
 
 Example:
 ```
@@ -147,7 +147,7 @@ Becomes: `LetDecl("show", Lambda("x", App(Var "to_string", Var "x")), span)`
 
 ### Anti-Patterns to Avoid
 
-- **Name mangling in elaborateTypeclasses:** Do NOT add `className + "_" + typeName` prefixes. LangThree's implementation uses raw method names. Mangling happens elsewhere (if at all).
+- **Name mangling in elaborateTypeclasses:** Do NOT add `className + "_" + typeName` prefixes. FunLang's implementation uses raw method names. Mangling happens elsewhere (if at all).
 - **Modifying NamespacedModule (Module variant):** `NamespacedModule` is a `Module` variant (top-level container), not a `Decl`. `elaborateTypeclasses` operates on `Decl list`. The Module variant unwrapping happens in `Program.fs` when extracting `ds`, not inside `elaborateTypeclasses`.
 - **Putting elaborateTypeclasses logic in Program.fs:** The function belongs in `Elaboration.fs` for consistency with `elaborateProgram`. Program.fs should only call it.
 
@@ -155,10 +155,10 @@ Becomes: `LetDecl("show", Lambda("x", App(Var "to_string", Var "x")), span)`
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| TypeClass → LetDecl transformation | Custom name-mangling logic | Direct port of LangThree's elaborateTypeclasses | LangThree's version is tested; same Ast types are shared |
-| Module recursion | Ad-hoc recursive descent | `List.collect` with pattern match | Matches the LangThree pattern exactly |
+| TypeClass → LetDecl transformation | Custom name-mangling logic | Direct port of FunLang's elaborateTypeclasses | FunLang's version is tested; same Ast types are shared |
+| Module recursion | Ad-hoc recursive descent | `List.collect` with pattern match | Matches the FunLang pattern exactly |
 
-**Key insight:** This transformation is already solved in LangThree. Port it directly; do not invent a new approach.
+**Key insight:** This transformation is already solved in FunLang. Port it directly; do not invent a new approach.
 
 ## Common Pitfalls
 
@@ -169,25 +169,25 @@ Becomes: `LetDecl("show", Lambda("x", App(Var "to_string", Var "x")), span)`
 **Warning signs:** TypeClassDecl stub comments at lines 4101–4103 in `Elaboration.fs` would never be hit.
 
 ### Pitfall 2: Forgetting the Module-Level Instance Hoist
-**What goes wrong:** Instances declared inside `ModuleDecl` bodies would not be accessible at the outer scope. LangThree's logic explicitly hoists instance bindings out of the module:
+**What goes wrong:** Instances declared inside `ModuleDecl` bodies would not be accessible at the outer scope. FunLang's logic explicitly hoists instance bindings out of the module:
 ```fsharp
 [ModuleDecl(name, elaborateTypeclasses innerDecls, span)] @ instanceBindings
 ```
 If only recursing (without hoisting), `let result = show Red` at top scope fails to find `show`.
 **Why it happens:** Forgetting the `@ instanceBindings` suffix.
-**How to avoid:** Copy the `instanceBindings` extraction pattern exactly from LangThree (lines 262–267).
-**Warning signs:** Test `typeclass-module-instance.flt` fails (LangThree test: module-scoped instance accessible globally).
+**How to avoid:** Copy the `instanceBindings` extraction pattern exactly from FunLang (lines 262–267).
+**Warning signs:** Test `typeclass-module-instance.flt` fails (FunLang test: module-scoped instance accessible globally).
 
 ### Pitfall 3: Ast.Decl. Qualification
-**What goes wrong:** LangThree's `Elaborate.fs` uses `open Ast` and thus writes bare names like `LetDecl(...)`. In FunLangCompiler's `Elaboration.fs`, the module opens `Ast` at line 3 — so bare names like `LetDecl` refer to the expression-level `Ast.LetDecl`, NOT to `Ast.Decl.LetDecl`. Using the wrong qualifier will cause a compile error or wrong DU case.
-**Why it happens:** LangThree's `Decl` type has both an `Ast.Expr` and `Ast.Decl` (the module-level DU). In LangThree `Elaborate.fs`, `open Ast` imports both. In FunLangCompiler `Elaboration.fs`, `open Ast` brings `Expr` cases into scope, but `Decl` cases require `Ast.Decl.` prefix (or `open Ast.Decl`).
+**What goes wrong:** FunLang's `Elaborate.fs` uses `open Ast` and thus writes bare names like `LetDecl(...)`. In FunLangCompiler's `Elaboration.fs`, the module opens `Ast` at line 3 — so bare names like `LetDecl` refer to the expression-level `Ast.LetDecl`, NOT to `Ast.Decl.LetDecl`. Using the wrong qualifier will cause a compile error or wrong DU case.
+**Why it happens:** FunLang's `Decl` type has both an `Ast.Expr` and `Ast.Decl` (the module-level DU). In FunLang `Elaborate.fs`, `open Ast` imports both. In FunLangCompiler `Elaboration.fs`, `open Ast` brings `Expr` cases into scope, but `Decl` cases require `Ast.Decl.` prefix (or `open Ast.Decl`).
 **How to avoid:** Use `Ast.Decl.TypeClassDecl`, `Ast.Decl.InstanceDecl`, `Ast.Decl.LetDecl`, etc. throughout the implementation. Verify by checking existing patterns at lines 4095–4103 in `Elaboration.fs` (they already use `Ast.Decl.` prefix).
 **Warning signs:** F# compile error "This expression was expected to have type 'Expr' but here has type 'Decl'".
 
 ### Pitfall 4: Forgetting the `NamespaceDecl` Recursion Case
 **What goes wrong:** Without the `NamespaceDecl` recursion case, instances nested inside a namespace block are not elaborated.
 **Why it happens:** `NamespaceDecl` is easy to overlook since it's a less common construct than `ModuleDecl`.
-**How to avoid:** Include both `ModuleDecl` and `NamespaceDecl` cases in `elaborateTypeclasses` — exactly as LangThree does.
+**How to avoid:** Include both `ModuleDecl` and `NamespaceDecl` cases in `elaborateTypeclasses` — exactly as FunLang does.
 **Warning signs:** TC-04 test fails.
 
 ## Code Examples
@@ -195,7 +195,7 @@ If only recursing (without hoisting), `let result = show Red` at top scope fails
 ### elaborateTypeclasses — Complete Implementation for FunLangCompiler
 
 ```fsharp
-// Source: adapted from /Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs:248
+// Source: adapted from deps/FunLang/src/FunLang/Elaborate.fs:248
 // Phase 52: Elaborate typeclass declarations into ordinary let-bindings.
 // - TypeClassDecl: removed (not needed by elaborateProgram)
 // - InstanceDecl(cls, ty, methods, constraints, span): each method → LetDecl(methodName, methodBody, span)
@@ -296,7 +296,7 @@ Expected output: `rendered:42`
 
 **Not needed (deferred to Phase 53):**
 - Prelude typeclass definitions (Show, Eq, etc.) — Phase 53 syncs Prelude/Typeclass.fun
-- Type inference for typeclass constraints — LangThree handles this; FunLangCompiler is compilation only
+- Type inference for typeclass constraints — FunLang handles this; FunLangCompiler is compilation only
 
 ## Open Questions
 
@@ -313,14 +313,14 @@ Expected output: `rendered:42`
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs` lines 243–273 — exact `elaborateTypeclasses` implementation
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` lines 368–371 — `TypeClassDecl`, `InstanceDecl`, `DerivingDecl` field layouts
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` lines 191–206 — current pipeline structure
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` lines 4095–4103, 4208–4218 — existing stub comments and `elaborateProgram` entry point
+- `deps/FunLang/src/FunLang/Elaborate.fs` lines 243–273 — exact `elaborateTypeclasses` implementation
+- `deps/FunLang/src/FunLang/Ast.fs` lines 368–371 — `TypeClassDecl`, `InstanceDecl`, `DerivingDecl` field layouts
+- `src/FunLangCompiler.Cli/Program.fs` lines 191–206 — current pipeline structure
+- `src/FunLangCompiler.Compiler/Elaboration.fs` lines 4095–4103, 4208–4218 — existing stub comments and `elaborateProgram` entry point
 
 ### Secondary (MEDIUM confidence)
-- LangThree typeclass test files in `/Users/ohama/vibe-coding/LangThree/tests/flt/file/typeclass/` — verified transformation behavior and expected outputs for test design
-- Phase 51 RESEARCH.md (`.planning/phases/51-ast-structure-sync/51-RESEARCH.md`) — confirmed AST field layouts match LangThree exactly
+- FunLang typeclass test files in `deps/FunLang/tests/flt/file/typeclass/` — verified transformation behavior and expected outputs for test design
+- Phase 51 RESEARCH.md (`.planning/phases/51-ast-structure-sync/51-RESEARCH.md`) — confirmed AST field layouts match FunLang exactly
 
 ## Metadata
 

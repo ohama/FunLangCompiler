@@ -11,7 +11,7 @@
 Phase 29 implements `while cond do body` and `for i = start to/downto stop do body` loop
 constructs, compiling them to native code through the existing MLIR codegen pipeline.
 
-The AST nodes `WhileExpr` and `ForExpr` already exist in `LangThree/Ast.fs` (Phase 46
+The AST nodes `WhileExpr` and `ForExpr` already exist in `FunLang/Ast.fs` (Phase 46
 annotation in that file), and the interpreter handles them in `Eval.fs`. The compiler
 (`Elaboration.fs`) has no cases for either node yet — every path hits the final
 `| _ -> Set.empty` fallback in `freeVars` and would fail at elaboration time.
@@ -495,15 +495,15 @@ tests that don't require mutable vars, use a simple bounded loop or print loop.)
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` —
+- `src/FunLangCompiler.Compiler/Elaboration.fs` —
   complete `elaborateExpr` function, `freeVars`, `If`/`And`/`Or`/`TryWith` block patterns
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` —
+- `src/FunLangCompiler.Compiler/MlirIR.fs` —
   complete `MlirOp` DU, `MlirBlock` with `Args`, `CfBrOp`/`CfCondBrOp` signatures
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` —
+- `src/FunLangCompiler.Compiler/Printer.fs` —
   `printBlock` showing block argument formatting already implemented
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` —
+- `deps/FunLang/src/FunLang/Ast.fs` —
   `WhileExpr`/`ForExpr` AST shapes confirmed (lines 116-117)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` —
+- `deps/FunLang/src/FunLang/Eval.fs` —
   interpreter semantics for `WhileExpr`/`ForExpr` (lines 755-776)
 
 ### Secondary (MEDIUM confidence)

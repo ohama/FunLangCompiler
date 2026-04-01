@@ -110,7 +110,7 @@ Each task was committed atomically:
 
 ## Next Phase Readiness
 - OpenDecl works correctly: single-open, multi-open with shadowing, operator names, both single and two-lambda functions
-- Ready for Phase 41-02: operator sanitization in MLIR names, Prelude LangThree sync
+- Ready for Phase 41-02: operator sanitization in MLIR names, Prelude FunLang sync
 - No blockers
 
 ---

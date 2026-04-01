@@ -402,10 +402,10 @@ required for BLT-07.
 
 ### Primary (HIGH confidence)
 
-- Direct code inspection of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — confirmed existing builtin patterns (print, println, string_length, string_concat, to_string), confirmed Char has no elaboration case, confirmed externalFuncs list structure
-- Direct code inspection of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed LangString struct, existing helper functions (lang_string_concat, lang_to_string_int, lang_to_string_bool, lang_match_failure)
-- Direct code inspection of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed available MlirOp cases (LlvmCallOp, LlvmCallVoidOp, LlvmGEPStructOp, ArithConstantOp, ArithCmpIOp)
-- Direct code inspection of `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — confirmed `Char of char * span: Span` AST node, `App of func: Expr * arg: Expr * span: Span` structure
+- Direct code inspection of `src/FunLangCompiler.Compiler/Elaboration.fs` — confirmed existing builtin patterns (print, println, string_length, string_concat, to_string), confirmed Char has no elaboration case, confirmed externalFuncs list structure
+- Direct code inspection of `src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed LangString struct, existing helper functions (lang_string_concat, lang_to_string_int, lang_to_string_bool, lang_match_failure)
+- Direct code inspection of `src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed available MlirOp cases (LlvmCallOp, LlvmCallVoidOp, LlvmGEPStructOp, ArithConstantOp, ArithCmpIOp)
+- Direct code inspection of `deps/FunLang/src/FunLang/Ast.fs` — confirmed `Char of char * span: Span` AST node, `App of func: Expr * arg: Expr * span: Span` structure
 - Direct code inspection of `.planning/REQUIREMENTS.md` — confirmed BLT-01..07 scope
 
 ### Secondary (MEDIUM confidence)

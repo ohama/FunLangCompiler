@@ -83,7 +83,7 @@ None - plan executed exactly as written.
 
 ## Issues Encountered
 
-None. The fix was surgical and the coerceToI64 helper already existed in the codebase. The 2 pre-existing E2E failures (17-04, 32-02) are LangThree-related and unrelated to this phase; they were already failing before this change.
+None. The fix was surgical and the coerceToI64 helper already existed in the codebase. The 2 pre-existing E2E failures (17-04, 32-02) are FunLang-related and unrelated to this phase; they were already failing before this change.
 
 ## User Setup Required
 

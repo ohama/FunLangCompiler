@@ -3,8 +3,8 @@
 ## 소개
 
 이 문서는 FunLangCompiler 컴파일러가 지원하는 추상 문법을 정의한다.
-FunLangCompiler는 LangThree의 파서/AST를 재사용하며, `Elaboration.fs`에서 AST를 MLIR IR로 변환한다.
-따라서 **파싱 가능한 문법은 LangThree와 동일**하며, 이 문서는 컴파일러가 실제로 코드 생성하는 범위를 기술한다.
+FunLangCompiler는 FunLang의 파서/AST를 재사용하며, `Elaboration.fs`에서 AST를 MLIR IR로 변환한다.
+따라서 **파싱 가능한 문법은 FunLang와 동일**하며, 이 문서는 컴파일러가 실제로 코드 생성하는 범위를 기술한다.
 
 ---
 
@@ -448,23 +448,23 @@ FunLangCompiler는 89개의 내장 함수를 `elaborateExpr`에서 직접 패턴
 
 ---
 
-## 9. LangThree와의 비교 (Comparison with LangThree)
+## 9. FunLang와의 비교 (Comparison with FunLang)
 
 ### 동일한 부분 (Identical)
 
 | 영역 | 상세 |
 |------|------|
-| 파서/렉서 | LangThree의 `Parser.fsy` / `Lexer.fsl` / `IndentFilter.fs`를 그대로 재사용 |
-| AST | LangThree의 `Ast.fs` 타입 정의를 그대로 사용 |
+| 파서/렉서 | FunLang의 `Parser.fsy` / `Lexer.fsl` / `IndentFilter.fs`를 그대로 재사용 |
+| AST | FunLang의 `Ast.fs` 타입 정의를 그대로 사용 |
 | 모든 표현식 문법 | 47개 Expr 변형 전부 지원 |
 | 모든 패턴 문법 | 9개 Pattern 타입 전부 지원 |
 | 모든 선언 문법 | `module`, `open`, `type`, `exception`, `let rec`, `let mut` 등 |
-| Prelude 내용 | 11/12 파일이 LangThree와 바이트 동일 |
+| Prelude 내용 | 11/12 파일이 FunLang와 바이트 동일 |
 | 연산자 우선순위 | 13단계 전부 동일 |
 
 ### 다른 부분 (Differences)
 
-| 영역 | LangThree | FunLangCompiler | 이유 |
+| 영역 | FunLang | FunLangCompiler | 이유 |
 |------|-----------|-------------|------|
 | 실행 방식 | 트리-워킹 인터프리터 | MLIR → LLVM → 네이티브 바이너리 | 핵심 아키텍처 차이 |
 | 타입 검사 | HM 타입 추론 (`Infer.fs`, `Bidir.fs`) | 없음 (균일 표현 I64/Ptr) | 코드 생성에 불필요 |
@@ -491,7 +491,7 @@ FunLangCompiler는 89개의 내장 함수를 `elaborateExpr`에서 직접 패턴
 
 ## 10. 들여쓰기 규칙 (Indentation Rules)
 
-LangThree와 동일. `IndentFilter`가 raw 토큰에서 `INDENT`/`DEDENT`를 생성한다.
+FunLang와 동일. `IndentFilter`가 raw 토큰에서 `INDENT`/`DEDENT`를 생성한다.
 
 - 탭 문자 사용 금지 (스페이스만)
 - 표현식 컨텍스트의 `let`은 오프사이드 규칙으로 암묵적 `in` 삽입

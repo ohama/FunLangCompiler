@@ -6,7 +6,7 @@
 
 ## Summary
 
-This phase adds source location (file:line:col) to all Elaboration error messages in FunLangCompiler. The codebase already has all the infrastructure needed -- the `Span` type is defined in LangThree's `Ast.fs`, every AST node carries a span, and helper functions `formatSpan`, `spanOf`, and `patternSpanOf` already exist. The work is purely mechanical: create a `failWithSpan` helper and convert each `failwithf` site to use it, changing wildcard `_` span matches to named bindings.
+This phase adds source location (file:line:col) to all Elaboration error messages in FunLangCompiler. The codebase already has all the infrastructure needed -- the `Span` type is defined in FunLang's `Ast.fs`, every AST node carries a span, and helper functions `formatSpan`, `spanOf`, and `patternSpanOf` already exist. The work is purely mechanical: create a `failWithSpan` helper and convert each `failwithf` site to use it, changing wildcard `_` span matches to named bindings.
 
 There are exactly 22 `failwithf`/`failwith` sites in Elaboration.fs. Of these, 4 are internal-only errors in `resolveAccessor`/`resolveAccessorTyped` variants ("Root not in cache") that indicate compiler bugs rather than user-facing errors -- these can be left as-is or converted at low priority. The remaining 18 are user-facing errors that should use `failWithSpan`.
 
@@ -18,15 +18,15 @@ There are exactly 22 `failwithf`/`failwith` sites in Elaboration.fs. Of these, 4
 
 | Component | Location | Purpose | Status |
 |-----------|----------|---------|--------|
-| `Ast.Span` | LangThree/Ast.fs:6 | Source location record (FileName, StartLine, StartColumn, EndLine, EndColumn) | Already defined |
-| `Ast.formatSpan` | LangThree/Ast.fs:35 | Format span as `file:line:col-col` string | Already defined |
-| `Ast.spanOf` | LangThree/Ast.fs:307 | Extract span from any `Expr` node | Already defined |
-| `Ast.patternSpanOf` | LangThree/Ast.fs:336 | Extract span from any `Pattern` node | Already defined |
-| `Ast.unknownSpan` | LangThree/Ast.fs:24 | Sentinel for synthetic/builtin definitions | Already defined |
+| `Ast.Span` | FunLang/Ast.fs:6 | Source location record (FileName, StartLine, StartColumn, EndLine, EndColumn) | Already defined |
+| `Ast.formatSpan` | FunLang/Ast.fs:35 | Format span as `file:line:col-col` string | Already defined |
+| `Ast.spanOf` | FunLang/Ast.fs:307 | Extract span from any `Expr` node | Already defined |
+| `Ast.patternSpanOf` | FunLang/Ast.fs:336 | Extract span from any `Pattern` node | Already defined |
+| `Ast.unknownSpan` | FunLang/Ast.fs:24 | Sentinel for synthetic/builtin definitions | Already defined |
 
 ### Nothing New Required
 
-No new libraries or dependencies are needed. Everything is in LangThree's `Ast` module, already referenced by `FunLangCompiler.Compiler.fsproj`.
+No new libraries or dependencies are needed. Everything is in FunLang's `Ast` module, already referenced by `FunLangCompiler.Compiler.fsproj`.
 
 ## Architecture Patterns
 
@@ -260,9 +260,9 @@ x
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` -- Span type definition, formatSpan, spanOf, patternSpanOf
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` -- All 22 failwithf/failwith sites examined
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Diagnostic.fs` -- Reference for how LangThree handles error formatting (more complex than needed here)
+- `deps/FunLang/src/FunLang/Ast.fs` -- Span type definition, formatSpan, spanOf, patternSpanOf
+- `src/FunLangCompiler.Compiler/Elaboration.fs` -- All 22 failwithf/failwith sites examined
+- `deps/FunLang/src/FunLang/Diagnostic.fs` -- Reference for how FunLang handles error formatting (more complex than needed here)
 
 ### Secondary (MEDIUM confidence)
 - F# Printf module documentation -- `Printf.ksprintf` signature and usage

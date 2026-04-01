@@ -8,7 +8,7 @@
 
 Phase 32 adds 6 new builtins: HT-01 (`hashtable_trygetvalue`), HT-02 (`hashtable_count`), LA-01 (`list_sort_by`), LA-02 (`list_of_seq`), LA-03 (`array_sort`), LA-04 (`array_of_seq`). Each follows the established three-layer pattern: C runtime function in `lang_runtime.c`, elaboration pattern match in `Elaboration.fs`, and external function declarations in both `externalFuncs` lists (lines 2796 and 2996).
 
-The LangThree interpreter in `../LangThree/src/LangThree/Eval.fs` confirms the exact semantics. The most complex builtin is `hashtable_trygetvalue` which must return a heap-allocated tuple `(bool, value)`. The second-most complex is `list_sort_by` which requires merge sort in C (key extractor closure, no `qsort` because `qsort`'s callback lacks a user-data parameter). The hashtable struct uses field `size` (not `count`) at index 2, so `hashtable_count` can be implemented as a GEP field-load without a C function. For `list_of_seq` and `array_of_seq`, Phase 32 tests should only exercise list-input cases to avoid the runtime ambiguity between list and array pointers.
+The FunLang interpreter in `../FunLang/src/FunLang/Eval.fs` confirms the exact semantics. The most complex builtin is `hashtable_trygetvalue` which must return a heap-allocated tuple `(bool, value)`. The second-most complex is `list_sort_by` which requires merge sort in C (key extractor closure, no `qsort` because `qsort`'s callback lacks a user-data parameter). The hashtable struct uses field `size` (not `count`) at index 2, so `hashtable_count` can be implemented as a GEP field-load without a C function. For `list_of_seq` and `array_of_seq`, Phase 32 tests should only exercise list-input cases to avoid the runtime ambiguity between list and array pointers.
 
 **Primary recommendation:** Implement `hashtable_trygetvalue` as a C function returning a Ptr to a 16-byte GC_malloc tuple; implement `hashtable_count` as inline GEP+load at offset 2; implement `list_sort_by` as a C merge-sort with LangClosureFn key extractor; implement `array_sort` as qsort on `&arr[1]`; implement `list_of_seq` and `array_of_seq` as simple C pass-throughs that only handle the list-input case in Phase 32 tests.
 
@@ -327,7 +327,7 @@ int64_t* lang_array_of_seq(void* collection) {
 
 ### Pitfall 4: list_sort_by closure — key extractor, not comparator
 **What goes wrong:** `list_sort_by` takes a KEY EXTRACTOR `'a -> 'b`, not a comparator `'a -> 'a -> int`. The sort is ascending by extracted key (int64_t comparison).
-**Why it happens:** The LangThree reference shows `List.sortWith` uses `valueCompare k1 k2` after extracting keys. The key extractor is called once per element, not once per comparison pair.
+**Why it happens:** The FunLang reference shows `List.sortWith` uses `valueCompare k1 k2` after extracting keys. The key extractor is called once per element, not once per comparison pair.
 **How to avoid:** In `lang_list_sort_by`, call `fn(closure, elem)` for each element to get its key. Then sort elements by their keys. Do NOT call the closure with two arguments (it's a single-arg closure).
 **Warning signs:** Wrong sort order; or crash if the closure is called with two elements directly.
 
@@ -489,7 +489,7 @@ match ys with | a :: b :: [] -> a + b | _ -> 0
    - Recommendation: Phase 32 implements as pure pass-through (list_of_seq = identity, array_of_seq = array_of_list). Comment clearly that future phases need runtime dispatch. Tests must document the list-input-only constraint.
 
 3. **list_sort_by sort stability**
-   - What we know: LangThree uses `List.sortWith` which is stable in .NET.
+   - What we know: FunLang uses `List.sortWith` which is stable in .NET.
    - What's unclear: Whether the insertion-sort-based C implementation needs to be stable (equal-key elements maintain original order).
    - Recommendation: Insertion sort is inherently stable (equal elements are never swapped). So stability is maintained naturally. No special handling needed.
 
@@ -499,8 +499,8 @@ match ys with | a :: b :: [] -> a + b | _ -> 0
 - `src/FunLangCompiler.Compiler/lang_runtime.c` — all existing runtime patterns (hashtable CRUD, array layout, LangCons, array_of_list, array_to_list, array_map closure ABI). Lines 134-535 examined in detail.
 - `src/FunLangCompiler.Compiler/lang_runtime.h` — LangHashtable struct layout confirmed (tag=0, capacity=1, size=2), LangClosureFn typedef
 - `src/FunLangCompiler.Compiler/Elaboration.fs` — array_length (line 954), array_map closure pattern (line 1133), array_iter void pattern (line 1117), Tuple construction (line 1513), LetPat TuplePat (line 601), externalFuncs both lists (lines 2796 and 2996)
-- `../LangThree/src/LangThree/Eval.fs` — reference implementations confirmed: hashtable_trygetvalue returns TupleValue [BoolValue; val], list_sort_by uses key extractor (not comparator), array_sort is in-place
-- `../LangThree/src/LangThree/Ast.fs` — valueCompare is integer comparison for int values
+- `../FunLang/src/FunLang/Eval.fs` — reference implementations confirmed: hashtable_trygetvalue returns TupleValue [BoolValue; val], list_sort_by uses key extractor (not comparator), array_sort is in-place
+- `../FunLang/src/FunLang/Ast.fs` — valueCompare is integer comparison for int values
 
 ### Secondary (MEDIUM confidence)
 - `langbackend-feature-requests.md` — C function signatures for lang_array_sort (`qsort(&arr[1], n, 8, compare_i64)`) and lang_list_sort_by

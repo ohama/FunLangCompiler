@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 13 extends the FunLangCompiler pattern matching compiler with three features that are already represented in the LangThree AST but not yet handled in the backend: `when` guards (PAT-06), `OrPat` (PAT-07), and `ConstPat(CharConst)` (PAT-08).
+Phase 13 extends the FunLangCompiler pattern matching compiler with three features that are already represented in the FunLang AST but not yet handled in the backend: `when` guards (PAT-06), `OrPat` (PAT-07), and `ConstPat(CharConst)` (PAT-08).
 
 The AST type `MatchClause = Pattern * Expr option * Expr` already includes the guard as the second element (`Expr option`). The current `Elaboration.fs` Match handler extracts `_guard` but ignores it (line 783). Similarly, `MatchCompiler.desugarPattern` raises `failwith` for both `OrPat` and `ConstPat(CharConst)` (lines 92–93, 120–121). All three features have clear, minimal implementation paths within the existing Jacobs decision tree infrastructure.
 
@@ -240,7 +240,7 @@ The `Guard` case mirrors this with an added conditional branch before the body b
 ### Pitfall 1: OrPat variable binding inconsistency
 **What goes wrong:** If two alternatives of an OrPat bind different variable names, the body expression may reference an unbound variable in one branch.
 **Why it happens:** F# requires all alternatives in an OrPat to bind exactly the same variable names with the same types.
-**How to avoid:** LangThree presumably enforces this in its type checker. The backend can trust the input is well-typed.
+**How to avoid:** FunLang presumably enforces this in its type checker. The backend can trust the input is well-typed.
 
 ### Pitfall 2: Guard fall-through loses bindings from next arm
 **What goes wrong:** When a guard fails, we fall through to the next arm. The next arm's pattern has not yet been matched, so we must NOT re-use the binding environment from the failed arm.

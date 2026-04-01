@@ -2,7 +2,7 @@
 phase: 34-language-constructs
 plan: 01
 subsystem: compiler
-tags: [string-slice, elaboration, C-runtime, MLIR, LangThree]
+tags: [string-slice, elaboration, C-runtime, MLIR, FunLang]
 
 # Dependency graph
 requires:

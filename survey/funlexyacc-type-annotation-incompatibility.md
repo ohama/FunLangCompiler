@@ -3,7 +3,7 @@
 **Date:** 2026-03-30 (updated 2026-03-31)
 **Context:** Phase 8 (08-07) compilation verification — `make funlex` fails with "parse error"
 **Original Root Cause:** ~~FunLangCompiler 문법이 함수 파라미터/반환값 타입 어노테이션을 지원하지 않음~~
-**Revised Root Cause (Section 8):** LangThree 파서는 모든 타입 어노테이션을 이미 지원함. 실제 문제는 Elaboration.fs의 패턴 매칭이 `Annot`/`LambdaAnnot` AST 래퍼를 투과하지 못하는 것임.
+**Revised Root Cause (Section 8):** FunLang 파서는 모든 타입 어노테이션을 이미 지원함. 실제 문제는 Elaboration.fs의 패턴 매칭이 `Annot`/`LambdaAnnot` AST 래퍼를 투과하지 못하는 것임.
 
 ---
 
@@ -225,7 +225,7 @@ decl ::= 'let' IDENT param+ ':' type_expr '=' expr    // 반환 타입 포함
 
 **이 문서의 전제 — "FunLangCompiler 문법이 타입 어노테이션을 지원하지 않음" — 는 틀렸다.**
 
-FunLangCompiler는 LangThree의 파서(`Parser.fsy`)를 그대로 재사용하며, LangThree 파서는 이미 아래 구문을 **완전히** 지원한다:
+FunLangCompiler는 FunLang의 파서(`Parser.fsy`)를 그대로 재사용하며, FunLang 파서는 이미 아래 구문을 **완전히** 지원한다:
 
 | 구문 | Parser.fsy 위치 | AST 노드 | 지원 여부 |
 |------|----------------|----------|----------|
@@ -366,13 +366,13 @@ let rec stripAnnot (expr: Expr) : Expr =
 | Elaboration.fs 수정 | (고려되지 않음) | **필요** — `stripAnnot` 추가 + 6~8곳 적용 |
 | 예상 작업량 | 18개 파일 수동 수정 | **Elaboration.fs 1개 파일, ~30줄 수정** |
 | named DU fields | 수동 변환 필요 | 별도 확인 필요 (Elaboration.fs ADT 핸들러 점검) |
-| `let private` | 확인 필요 | LangThree 파서가 지원하면 문제 없음 (별도 확인) |
+| `let private` | 확인 필요 | FunLang 파서가 지원하면 문제 없음 (별도 확인) |
 
 ### 8.6 결론
 
 **이 문서의 Section 2 (문법 근거) 와 Section 5 (마이그레이션 전략) 는 더 이상 유효하지 않다.**
 
-1. LangThree 파서는 파라미터 타입, 반환 타입, 앵글 브래킷 제네릭을 **이미 완전히 지원**한다.
+1. FunLang 파서는 파라미터 타입, 반환 타입, 앵글 브래킷 제네릭을 **이미 완전히 지원**한다.
 2. FunLangCompiler의 `Annot`/`LambdaAnnot` 핸들러도 존재하지만 (Phase 30, v8.0에서 추가), **단순 pass-through만 하고 주변 패턴 매칭과의 상호작용은 처리하지 않는다.**
 3. 수정은 Elaboration.fs에 `stripAnnot` 헬퍼를 추가하고 핵심 패턴 매칭 6~8곳에 적용하는 것으로 충분하다.
 4. 이 수정이 완료되면 FunLexYacc 소스 코드의 656개 타입 어노테이션을 **그대로 유지**한 채 컴파일할 수 있다.

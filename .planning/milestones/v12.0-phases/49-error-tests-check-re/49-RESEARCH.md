@@ -45,7 +45,7 @@ and verbose AST dumps.
 | CHECK-RE | CONTAINS | CONTAINS scans forward for substring but doesn't anchor to a line; CHECK-RE is cleaner for structured output |
 | CHECK-RE | exact match | Exact match breaks on any message wording change; CHECK-RE survives |
 
-**Installation:** Already installed at `/Users/ohama/.local/bin/fslit`
+**Installation:** Already installed at `dotnet run --project deps/fslit/FsLit --`
 
 ## Architecture Patterns
 
@@ -210,13 +210,13 @@ CHECK-RE: \[Elaboration\] 44-02-error-location-pattern\.fun:\d+:\d+: Elaboration
 ### Running a Single Test (for verification)
 
 ```bash
-/Users/ohama/.local/bin/fslit --verbose tests/compiler/44-01-error-location-unbound.flt
+dotnet run --project deps/fslit/FsLit -- --verbose tests/compiler/44-01-error-location-unbound.flt
 ```
 
 ### Running All Error Tests
 
 ```bash
-/Users/ohama/.local/bin/fslit tests/compiler/44-01-error-location-unbound.flt \
+dotnet run --project deps/fslit/FsLit -- tests/compiler/44-01-error-location-unbound.flt \
   tests/compiler/44-02-error-location-pattern.flt \
   tests/compiler/44-03-error-location-field.flt \
   tests/compiler/45-01-parse-error-preserved.flt \
@@ -283,7 +283,7 @@ CHECK-RE: \[Elaboration\] 44-02-error-location-pattern\.fun:\d+:\d+: Elaboration
 
 ### Primary (HIGH confidence)
 
-- `/Users/ohama/.local/bin/fslit --help` — authoritative CHECK-RE semantics, directive list
+- `dotnet run --project deps/fslit/FsLit -- --help` — authoritative CHECK-RE semantics, directive list
 - Direct test execution `fslit --verbose` on all 10 test files — confirmed current pass state
 - `src/FunLangCompiler.Cli/Program.fs` — actual error formatting code, confirms output format
 - `.planning/phases/47-prelude-separate-parsing/47-VERIFICATION.md` — confirms Phase 47 outcome (user line numbers correct)

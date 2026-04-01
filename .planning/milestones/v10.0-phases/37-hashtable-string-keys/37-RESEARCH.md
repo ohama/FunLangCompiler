@@ -390,12 +390,12 @@ let _ = println (to_string (hashtable_get ht s1))
 
 ### Primary (HIGH confidence)
 
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — Complete hashtable implementation, struct layouts, hashing, for-in
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — All struct and function declarations
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — All hashtable builtin elaboration arms and ExternalFuncDecl lists
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — Available MlirOp cases
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/milestones/v9.0-phases/35-prelude-modules/35-01-SUMMARY.md` — Documents the original crash and root cause
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/STATE.md` — Confirms RT-01/RT-02 still open
+- `src/FunLangCompiler.Compiler/lang_runtime.c` — Complete hashtable implementation, struct layouts, hashing, for-in
+- `src/FunLangCompiler.Compiler/lang_runtime.h` — All struct and function declarations
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — All hashtable builtin elaboration arms and ExternalFuncDecl lists
+- `src/FunLangCompiler.Compiler/MlirIR.fs` — Available MlirOp cases
+- `.planning/milestones/v9.0-phases/35-prelude-modules/35-01-SUMMARY.md` — Documents the original crash and root cause
+- `.planning/STATE.md` — Confirms RT-01/RT-02 still open
 
 ### Secondary (MEDIUM confidence)
 

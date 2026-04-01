@@ -299,7 +299,7 @@ func.func @length(%arg0: !llvm.ptr) -> i64 {
 
 ## AST Analysis
 
-### List-related AST nodes (from LangThree/src/LangThree/Ast.fs)
+### List-related AST nodes (from FunLang/src/FunLang/Ast.fs)
 
 ```fsharp
 // Expression nodes
@@ -378,7 +378,7 @@ Alternatively: Always elaborate `LetRec` parameters as `Ptr` when the function b
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct codebase analysis: MlirIR.fs, Elaboration.fs, Printer.fs, Ast.fs (LangThree) — all read
+- Direct codebase analysis: MlirIR.fs, Elaboration.fs, Printer.fs, Ast.fs (FunLang) — all read
 - MLIR 20 LLVM dialect: `llvm.mlir.zero`, `llvm.icmp`, `llvm.getelementptr` — same toolchain used in Phase 7
 - Phase 7 patterns: cons cell layout identical to closure env layout (GEP by slot index)
 - .planning/ROADMAP.md Phase 10 goal and success criteria — verified all four requirements

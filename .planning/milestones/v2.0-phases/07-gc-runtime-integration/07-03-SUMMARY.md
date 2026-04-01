@@ -39,7 +39,7 @@ key-files:
 
 key-decisions:
   - "print/println cases placed BEFORE general App arm — F# pattern matching is top-to-bottom, must match first"
-  - "LetPat(WildcardPat) added as deviation — let _ = expr in body is the natural sequencing idiom in LangThree"
+  - "LetPat(WildcardPat) added as deviation — let _ = expr in body is the natural sequencing idiom in FunLang"
   - "@printf always declared unconditionally (same pattern as GC_init/GC_malloc from 07-02)"
   - "Content-based dedup: same string literal reuses same global (List.tryFind on rawValue)"
 
@@ -90,7 +90,7 @@ Each task was committed atomically:
 
 ## Decisions Made
 
-- `LetPat(WildcardPat)` added as auto-fix (Rule 2 deviation) because `let _ = expr in body` is the primary sequencing idiom in LangThree — without it, no print/println test would compile
+- `LetPat(WildcardPat)` added as auto-fix (Rule 2 deviation) because `let _ = expr in body` is the primary sequencing idiom in FunLang — without it, no print/println test would compile
 - `@printf` declared unconditionally in ExternalFuncs (same pattern as GC_init/GC_malloc from 07-02) — dead forward declarations are harmless in MLIR/LLVM
 - Content-based deduplication in `addStringGlobal` prevents duplicate string globals when the same string literal appears multiple times
 - `println` bakes `\n` into the global string value (not into a format string) — simple and matches the verified MLIR pattern from research
@@ -109,7 +109,7 @@ Each task was committed atomically:
 
 ## Issues Encountered
 
-- Initial manual test used shell `echo '...'` which adds trailing newline — LangThree lexer emits NEWLINE token before EOF causing parse failure. Fixed by using `printf '...'` (no trailing newline). FsLit strips trailing newlines from Input sections automatically, so tests work correctly.
+- Initial manual test used shell `echo '...'` which adds trailing newline — FunLang lexer emits NEWLINE token before EOF causing parse failure. Fixed by using `printf '...'` (no trailing newline). FsLit strips trailing newlines from Input sections automatically, so tests work correctly.
 
 ## Next Phase Readiness
 

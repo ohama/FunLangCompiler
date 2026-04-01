@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 34 adds four language constructs that are already parsed by LangThree and fully evaluated by `Eval.fs`, but have no elaboration arm in `Elaboration.fs`. The AST node types `StringSliceExpr`, `ListCompExpr`, and the extended `ForInExpr` (with `TuplePat`) all exist in `LangThree/src/LangThree/Ast.fs`. The compiler's `Elaboration.fs` currently falls through to `failwithf "Elaboration: unsupported expression %A"` for all four constructs.
+Phase 34 adds four language constructs that are already parsed by FunLang and fully evaluated by `Eval.fs`, but have no elaboration arm in `Elaboration.fs`. The AST node types `StringSliceExpr`, `ListCompExpr`, and the extended `ForInExpr` (with `TuplePat`) all exist in `FunLang/src/FunLang/Ast.fs`. The compiler's `Elaboration.fs` currently falls through to `failwithf "Elaboration: unsupported expression %A"` for all four constructs.
 
 The three sub-plans map cleanly to existing compiler patterns. Plan 34-01 (string slicing) uses the existing `lang_string_sub(s, start, len)` C function — a new thin wrapper `lang_string_slice(s, start, stop)` that converts inclusive `stop` to `len` is the right approach. Plan 34-02 (list comprehension) desugars `ListCompExpr` to a lambda + runtime `lang_list_comp_*` calls; the range form `[for i in 0..n -> expr]` is already parsed as `ListCompExpr(var, Range(start, stop, None, ...), body, ...)` — the `Range` node evaluates to a list via `@lang_range`, so elaboration can just use `lang_for_in_list` internally. Plan 34-03 (ForInExpr tuple destructuring + new collection for-in) is the most complex: `TuplePat` in the loop variable requires the closure to receive a heap-allocated tuple pointer, and HashSet/Queue/MutableList/Hashtable each need a dedicated `lang_for_in_*` C function.
 
@@ -445,17 +445,17 @@ world
 3. **ListCompExpr for arrays — `lang_list_comp_array` needed?**
    - What we know: `ListCompExpr` takes a collection. If the collection is an array (result of `array_of_list`, etc.), `lang_list_comp` won't work (it casts to `LangCons*`).
    - What's unclear: Whether the requirements include `[for x in arr -> expr]` for array inputs.
-   - Recommendation: LANG-02 says "list, array, or native collection" in LangThree Eval.fs. Add `lang_list_comp_array` if required, or add a runtime check in `lang_list_comp` similar to `lang_index_get`. For minimum viable, handle the collection type using the same `isArrayExpr` dispatch from ForInExpr.
+   - Recommendation: LANG-02 says "list, array, or native collection" in FunLang Eval.fs. Add `lang_list_comp_array` if required, or add a runtime check in `lang_list_comp` similar to `lang_index_get`. For minimum viable, handle the collection type using the same `isArrayExpr` dispatch from ForInExpr.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `StringSliceExpr`, `ListCompExpr`, `ForInExpr` AST node definitions
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` — Reference semantics for all four constructs
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fsy` — Parse rules confirming `ListCompExpr` range form desugars to `Range` node
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — All existing elaboration patterns (ForInExpr, LetPat TuplePat, Range, Tuple)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — All existing C runtime functions
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — All struct definitions and prototypes
+- `deps/FunLang/src/FunLang/Ast.fs` — `StringSliceExpr`, `ListCompExpr`, `ForInExpr` AST node definitions
+- `deps/FunLang/src/FunLang/Eval.fs` — Reference semantics for all four constructs
+- `deps/FunLang/src/FunLang/Parser.fsy` — Parse rules confirming `ListCompExpr` range form desugars to `Range` node
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — All existing elaboration patterns (ForInExpr, LetPat TuplePat, Range, Tuple)
+- `src/FunLangCompiler.Compiler/lang_runtime.c` — All existing C runtime functions
+- `src/FunLangCompiler.Compiler/lang_runtime.h` — All struct definitions and prototypes
 - `.planning/phases/33-collection-types/33-RESEARCH.md` — Patterns and pitfalls from immediately preceding phase
 
 ## Metadata

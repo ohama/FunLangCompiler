@@ -7,7 +7,7 @@ score: 4/4 must-haves verified
 
 # Phase 3: Booleans, Comparisons, and Control Flow — Verification Report
 
-**Phase Goal:** LangThree programs using boolean literals, comparison operators, logical short-circuit operators, and if-else expressions are elaborated into MlirIR and execute correctly
+**Phase Goal:** FunLang programs using boolean literals, comparison operators, logical short-circuit operators, and if-else expressions are elaborated into MlirIR and execute correctly
 **Verified:** 2026-03-26T02:50:27Z
 **Status:** passed
 **Re-verification:** No — initial verification

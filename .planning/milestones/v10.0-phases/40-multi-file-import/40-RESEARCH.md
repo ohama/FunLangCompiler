@@ -6,9 +6,9 @@
 
 ## Summary
 
-Phase 40 adds `open "file.fun"` support to the FunLangCompiler compiler (no C runtime changes). The AST node `Ast.Decl.FileImportDecl of path: string * Span` already exists in the shared `LangThree/src/LangThree/Ast.fs` and the parser already emits it. The backend's `Elaboration.fs` currently silently drops `FileImportDecl` in both `prePassDecls` and `extractMainExpr`. The fix is entirely in the compiler pipeline: before elaboration, recursively expand each `FileImportDecl` into the declarations of the imported file, tracking a visited-file set to detect cycles.
+Phase 40 adds `open "file.fun"` support to the FunLangCompiler compiler (no C runtime changes). The AST node `Ast.Decl.FileImportDecl of path: string * Span` already exists in the shared `FunLang/src/FunLang/Ast.fs` and the parser already emits it. The backend's `Elaboration.fs` currently silently drops `FileImportDecl` in both `prePassDecls` and `extractMainExpr`. The fix is entirely in the compiler pipeline: before elaboration, recursively expand each `FileImportDecl` into the declarations of the imported file, tracking a visited-file set to detect cycles.
 
-The LangThree interpreter (`Prelude.fs`) already implements the complete reference pattern: a `HashSet<string>` loading stack for cycle detection, relative path resolution via `Path.GetFullPath(Path.Combine(dir, importPath))`, recursive parse-and-merge, and a `finally`-block to pop the stack on exit. The backend can follow the same pattern but at the Decl-list level (not at evaluation time) — expanding `FileImportDecl` nodes into inline `Decl list` before `elaborateProgram` runs.
+The FunLang interpreter (`Prelude.fs`) already implements the complete reference pattern: a `HashSet<string>` loading stack for cycle detection, relative path resolution via `Path.GetFullPath(Path.Combine(dir, importPath))`, recursive parse-and-merge, and a `finally`-block to pop the stack on exit. The backend can follow the same pattern but at the Decl-list level (not at evaluation time) — expanding `FileImportDecl` nodes into inline `Decl list` before `elaborateProgram` runs.
 
 The implementation is a single new function (`expandImports`) that walks a `Decl list`, replaces each `FileImportDecl` with the recursively-expanded declarations of the target file, and errors clearly on cycles. Because the expansion happens before `prePassDecls` and `extractMainExpr`, no other part of Elaboration.fs needs changes.
 
@@ -22,7 +22,7 @@ This phase uses no new libraries. All tools are already in the project.
 | Tool | Version | Purpose | Why Standard |
 |------|---------|---------|--------------|
 | `System.IO.Path` | .NET 10 | Absolute path resolution, `GetFullPath`, `Combine`, `GetDirectoryName` | Already used in Program.fs prelude loader |
-| `System.Collections.Generic.HashSet<string>` | .NET 10 | O(1) visited-file set for cycle detection | Same as LangThree Prelude.fs `fileLoadingStack` |
+| `System.Collections.Generic.HashSet<string>` | .NET 10 | O(1) visited-file set for cycle detection | Same as FunLang Prelude.fs `fileLoadingStack` |
 | `System.IO.File.Exists` / `File.ReadAllText` | .NET 10 | File presence check and source load | Already used in Program.fs |
 | `parseProgram` (existing CLI function) | — | Parse a .fun source string into `Ast.Module` | Already exists in Program.fs |
 
@@ -120,7 +120,7 @@ let mlirMod = Elaboration.elaborateProgram expandedAst
 
 **Example:**
 ```fsharp
-// Source: LangThree/src/LangThree/Prelude.fs lines 79-114
+// Source: FunLang/src/FunLang/Prelude.fs lines 79-114
 let private fileLoadingStack = System.Collections.Generic.HashSet<string>()
 
 // At entry:
@@ -184,9 +184,9 @@ finally
 
 ## Code Examples
 
-### Resolve Import Path (from LangThree reference)
+### Resolve Import Path (from FunLang reference)
 ```fsharp
-// Source: LangThree/src/LangThree/TypeCheck.fs lines 727-732
+// Source: FunLang/src/FunLang/TypeCheck.fs lines 727-732
 let resolveImportPath (importPath: string) (importingFile: string) : string =
     if Path.IsPathRooted importPath then
         importPath
@@ -195,9 +195,9 @@ let resolveImportPath (importPath: string) (importingFile: string) : string =
         Path.GetFullPath(Path.Combine(dir, importPath))
 ```
 
-### Cycle Detection (from LangThree reference)
+### Cycle Detection (from FunLang reference)
 ```fsharp
-// Source: LangThree/src/LangThree/Prelude.fs lines 79-114
+// Source: FunLang/src/FunLang/Prelude.fs lines 79-114
 let private fileLoadingStack = System.Collections.Generic.HashSet<string>()
 
 let rec loadAndTypeCheckFileImpl resolvedPath ... =
@@ -253,20 +253,20 @@ For multi-file tests, use a temp directory + write both files before compiling:
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Prelude.fs` — Full reference implementation of file import loading, cycle detection, path resolution
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/TypeCheck.fs` lines 725-733 — `resolveImportPath` function
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` lines 362-365 — `FileImportDecl` AST node definition
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` lines 3630-3733 — `prePassDecls`, `flattenDecls`, `extractMainExpr` — all silently ignore `FileImportDecl`
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` — Current pipeline: string concat prelude → parseProgram → elaborateProgram
+- `deps/FunLang/src/FunLang/Prelude.fs` — Full reference implementation of file import loading, cycle detection, path resolution
+- `deps/FunLang/src/FunLang/TypeCheck.fs` lines 725-733 — `resolveImportPath` function
+- `deps/FunLang/src/FunLang/Ast.fs` lines 362-365 — `FileImportDecl` AST node definition
+- `src/FunLangCompiler.Compiler/Elaboration.fs` lines 3630-3733 — `prePassDecls`, `flattenDecls`, `extractMainExpr` — all silently ignore `FileImportDecl`
+- `src/FunLangCompiler.Cli/Program.fs` — Current pipeline: string concat prelude → parseProgram → elaborateProgram
 
 ### Secondary (MEDIUM confidence)
-- LangThree Parser.fs lines 3301/3313 — confirms parser emits `FileImportDecl` for `open "string"` syntax
+- FunLang Parser.fs lines 3301/3313 — confirms parser emits `FileImportDecl` for `open "string"` syntax
 
 ## Metadata
 
 **Confidence breakdown:**
 - Standard stack: HIGH — no new libraries, all existing .NET 10 APIs already in project
-- Architecture: HIGH — reference implementation exists verbatim in LangThree; pattern is identical
+- Architecture: HIGH — reference implementation exists verbatim in FunLang; pattern is identical
 - Pitfalls: HIGH — all pitfalls sourced from reading actual code paths, not speculation
 
 **Research date:** 2026-03-30

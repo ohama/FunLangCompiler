@@ -8,7 +8,7 @@ gaps: []
 
 # Phase 26: File I/O Core Verification Report
 
-**Phase Goal:** LangThree programs can read files, write files, check file existence, and print to stderr
+**Phase Goal:** FunLang programs can read files, write files, check file existence, and print to stderr
 **Verified:** 2026-03-27T08:00:00Z
 **Status:** passed
 **Re-verification:** No — initial verification
@@ -52,7 +52,7 @@ gaps: []
 | Elaboration.fs elaborateExpr (lines 1046-1091) | lang_runtime.c functions | LlvmCallVoidOp/LlvmCallOp with "@lang_file_*" and "@lang_eprint*" names | WIRED | All 6 arms present; two-arg arms (write_file, append_file) correctly placed before one-arg arms per F# first-match semantics |
 | Elaboration.fs ExternalFuncDecl list 1 (lines 2376-2381) | lang_runtime.c declarations | ExtName strings match C function names exactly | WIRED | All 6 entries present in first list |
 | Elaboration.fs ExternalFuncDecl list 2 (lines 2553-2558) | lang_runtime.c declarations | ExtName strings match C function names exactly | WIRED | All 6 entries present in second list; both lists identical as required |
-| file_exists arm | bool result in LangThree | ArithCmpIOp("ne", rawVal, zeroVal) converts I64 to I1 | WIRED | Pattern at lines 1068-1078: LlvmCallOp(I64) -> ArithConstantOp(0) -> ArithCmpIOp("ne") -> I1 |
+| file_exists arm | bool result in FunLang | ArithCmpIOp("ne", rawVal, zeroVal) converts I64 to I1 | WIRED | Pattern at lines 1068-1078: LlvmCallOp(I64) -> ArithConstantOp(0) -> ArithCmpIOp("ne") -> I1 |
 | lang_file_read on missing file | lang_throw (catchable) | GC_malloc'd LangString* error message passed to lang_throw | WIRED | lang_runtime.c:397-409: constructs "read_file: file not found: {path}" message and calls lang_throw; 26-05 test confirms catch works |
 
 ### Requirements Coverage

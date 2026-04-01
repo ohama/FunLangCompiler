@@ -33,7 +33,7 @@ key-files:
     - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
-  - "LangThree parser does not support multi-param fun (fun x y -> ...); use fun x -> fun y -> ... in test closures"
+  - "FunLang parser does not support multi-param fun (fun x y -> ...); use fun x -> fun y -> ... in test closures"
   - "Closure coerce: check fVal.Type = I64 and emit LlvmIntToPtrOp; Ptr values used directly"
   - "array_fold arm placed before array_iter/array_map/array_init (3-arg before 2-arg)"
   - "ExternalFuncDecl entries added to BOTH externalFuncs lists (elaborateModule + elaborateProgram)"
@@ -79,7 +79,7 @@ Each task was committed atomically:
 - `tests/compiler/24-04-array-init.flt` - array_init E2E: squares 0..4, fold-sum = 30
 
 ## Decisions Made
-- **LangThree multi-param fun not supported:** `fun x y -> ...` causes parse error; test closures use explicit `fun acc -> fun x -> ...` currying
+- **FunLang multi-param fun not supported:** `fun x y -> ...` causes parse error; test closures use explicit `fun acc -> fun x -> ...` currying
 - **Closure coerce pattern:** Inline per-arm (consistent with existing hashtable/array patterns) — check fVal.Type = I64 and emit LlvmIntToPtrOp to convert to Ptr
 - **Arm ordering:** array_fold (3-arg) placed before 2-arg arms to avoid mis-matching during partial application resolution
 - **Both externalFuncs lists:** Both elaborateModule and elaborateProgram lists must be kept in sync (pre-existing project constraint)
@@ -88,9 +88,9 @@ Each task was committed atomically:
 
 ### Auto-fixed Issues
 
-**1. [Rule 1 - Bug] LangThree parser does not support multi-param fun syntax**
+**1. [Rule 1 - Bug] FunLang parser does not support multi-param fun syntax**
 - **Found during:** Task 2 (creating E2E test files)
-- **Issue:** Plan specified `fun acc x -> acc + x` style closures, but LangThree parser only supports single-param fun; `fun acc x ->` causes "parse error"
+- **Issue:** Plan specified `fun acc x -> acc + x` style closures, but FunLang parser only supports single-param fun; `fun acc x ->` causes "parse error"
 - **Fix:** Rewrote all binary closures in test files as explicitly curried `fun acc -> fun x -> acc + x`
 - **Files modified:** 24-02-array-map.flt, 24-03-array-fold.flt, 24-04-array-init.flt
 - **Verification:** All 4 tests pass after fix
@@ -105,7 +105,7 @@ Each task was committed atomically:
 - None beyond the parser syntax issue documented above.
 
 ## Next Phase Readiness
-- Phase 24 complete: all 4 array HOF builtins (iter/map/fold/init) available in compiled LangThree programs
+- Phase 24 complete: all 4 array HOF builtins (iter/map/fold/init) available in compiled FunLang programs
 - 92/92 E2E tests passing, v5.0 milestone complete
 - No blockers or concerns
 

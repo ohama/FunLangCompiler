@@ -88,7 +88,7 @@ completed: 2026-03-26
 
 ## Decisions Made
 - Added ArithExtuIOp rather than changing C runtime to take `_Bool`/`i1` — the C runtime uses `int64_t` for bool parameter, which is the conventional C ABI; zero-extending I1 to I64 in the compiler is the correct approach
-- FsLit tests written in single-line format — the LangThree parser does not accept newlines between sub-expressions; all multi-statement programs must be written on one line
+- FsLit tests written in single-line format — the FunLang parser does not accept newlines between sub-expressions; all multi-statement programs must be written on one line
 
 ## Deviations from Plan
 

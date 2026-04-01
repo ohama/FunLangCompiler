@@ -49,7 +49,7 @@ completed: 2026-03-28
 
 # Phase 28 Plan 01: SEQ and ITE Verification Tests Summary
 
-**5 E2E tests proving expression sequencing (;) and if-then-without-else work via LangThree parser desugaring, with two Elaboration.fs bug fixes enabling ITE to compile correctly**
+**5 E2E tests proving expression sequencing (;) and if-then-without-else work via FunLang parser desugaring, with two Elaboration.fs bug fixes enabling ITE to compile correctly**
 
 ## Performance
 

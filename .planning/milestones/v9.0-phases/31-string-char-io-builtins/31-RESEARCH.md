@@ -8,7 +8,7 @@
 
 Phase 31 adds 13 new builtins: 4 string operations (string_endswith, string_startswith, string_trim, string_concat_list), 6 char predicates/transformers (char_is_digit, char_to_upper, char_is_letter, char_is_upper, char_is_lower, char_to_lower), and 1 IO function (eprintfn). Each builtin follows the same three-layer pattern: C runtime function in lang_runtime.c, elaboration pattern match in Elaboration.fs, and external function declaration in the two `externalFuncs` lists.
 
-The LangThree interpreter (../LangThree/src/LangThree/Eval.fs) is the reference implementation. All 13 builtins are defined there. The string builtins delegate to .NET string methods (EndsWith, StartsWith, Trim, String.Join). Char builtins delegate to System.Char static methods. `eprintfn` is a format-string function like `printfn` but writing to stderr. The backend currently supports `eprint`/`eprintln` (plain string, no format args) but not `eprintfn` (format string with %d/%s/%b specifiers).
+The FunLang interpreter (../FunLang/src/FunLang/Eval.fs) is the reference implementation. All 13 builtins are defined there. The string builtins delegate to .NET string methods (EndsWith, StartsWith, Trim, String.Join). Char builtins delegate to System.Char static methods. `eprintfn` is a format-string function like `printfn` but writing to stderr. The backend currently supports `eprint`/`eprintln` (plain string, no format args) but not `eprintfn` (format string with %d/%s/%b specifiers).
 
 The key implementation decision for `eprintfn` is scope: the interpreter's `eprintfn` is variadic (curried) with format specifiers. For this phase, the simplest correct approach is to implement `eprintfn` as a single-string variant (same as `eprintln` but with format string support for zero-arg case `eprintfn "message"`), or to restrict to the most common usage pattern seen in FunLexYacc: `eprintfn "%s" someString` — one `%s` specifier. The feature request file confirms the only FunLexYacc usage is `eprintfn "%s" (formatError err)` (one `%s` arg).
 
@@ -380,7 +380,7 @@ ok
 - `src/FunLangCompiler.Compiler/lang_runtime.c` — all existing C runtime patterns examined
 - `src/FunLangCompiler.Compiler/lang_runtime.h` — LangString typedef, all declared functions
 - `src/FunLangCompiler.Compiler/Elaboration.fs` — string_contains (line 789), char_to_int (line 1225), eprint (line 1160), eprintln (line 1167), external declarations (lines 2677-2729 and 2867-2919)
-- `../LangThree/src/LangThree/Eval.fs` — reference implementations of all 13 new builtins (lines 237-388)
+- `../FunLang/src/FunLang/Eval.fs` — reference implementations of all 13 new builtins (lines 237-388)
 - `tests/compiler/26-06-eprint.flt`, `26-07-eprintln.flt` — E2E test pattern for stderr builtins
 - `tests/compiler/14-03-string-contains.flt` — E2E test pattern for bool-returning two-arg string builtin
 

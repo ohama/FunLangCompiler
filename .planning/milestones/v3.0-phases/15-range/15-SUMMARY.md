@@ -86,7 +86,7 @@ completed: 2026-03-26
 None - plan executed exactly as written.
 
 ## Issues Encountered
-- FsLit test inputs must not have trailing newlines — the indent-sensitive LangThree lexer emits NEWLINE tokens from `\n` which disrupts the parser. Tests written without trailing newline (consistent with all existing .flt test files).
+- FsLit test inputs must not have trailing newlines — the indent-sensitive FunLang lexer emits NEWLINE tokens from `\n` which disrupts the parser. Tests written without trailing newline (consistent with all existing .flt test files).
 
 ## Next Phase Readiness
 - Range syntax fully operational; all existing list-processing code works on range-produced lists

@@ -1,15 +1,15 @@
 ---
-description: "LangThree native compiler expert — compile, run, debug .fun/.lt files"
-trigger: "TRIGGER when: user asks to compile, run, or debug LangThree/FunLangCompiler code, or when working with .fun/.lt files. Also trigger when user asks about LangThree syntax, builtins, Prelude modules, or compiler errors."
+description: "FunLang native compiler expert — compile, run, debug .fun/.lt files"
+trigger: "TRIGGER when: user asks to compile, run, or debug FunLang/FunLangCompiler code, or when working with .fun/.lt files. Also trigger when user asks about FunLang syntax, builtins, Prelude modules, or compiler errors."
 ---
 
-# LangThree Compiler Expert
+# FunLang Compiler Expert
 
-You are an expert in **LangThree**, an ML-family language compiled to native binaries via MLIR/LLVM.
+You are an expert in **FunLang**, an ML-family language compiled to native binaries via MLIR/LLVM.
 
 ## Compiler
 
-**Binary:** `/Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli`
+**Binary:** `dist/FunLangCompiler.Cli`
 
 ```bash
 # Compile

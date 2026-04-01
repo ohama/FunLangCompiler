@@ -37,7 +37,7 @@ key-files:
 
 key-decisions:
   - "Struct typedefs defined only in lang_runtime.h — the .c file includes the header so no redefinition; same as LangHashtable pattern"
-  - "hashset_add uses LlvmCallOp (returning I64) not LlvmCallVoidOp — matches LangThree bool return for membership tracking"
+  - "hashset_add uses LlvmCallOp (returning I64) not LlvmCallVoidOp — matches FunLang bool return for membership tracking"
   - "StringBuilder uses GC_malloc + memcpy for buffer growth (no realloc); Boehm GC does not track realloc'd pointers"
 
 patterns-established:
@@ -84,7 +84,7 @@ completed: 2026-03-29
 ## Decisions Made
 
 - Struct typedefs defined only in lang_runtime.h — consistent with LangHashtable/LangHashEntry pattern; putting them in .c too causes redefinition errors since the .c file includes the header
-- hashset_add uses LlvmCallOp returning I64 (not LlvmCallVoidOp) — matches LangThree's bool return, needed for callers that check membership changes
+- hashset_add uses LlvmCallOp returning I64 (not LlvmCallVoidOp) — matches FunLang's bool return, needed for callers that check membership changes
 - StringBuilder buffer growth uses GC_malloc(new_cap) + memcpy — Boehm GC doesn't track pointers returned by realloc
 
 ## Deviations from Plan

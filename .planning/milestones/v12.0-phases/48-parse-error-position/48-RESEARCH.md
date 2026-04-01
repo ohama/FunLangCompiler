@@ -26,7 +26,7 @@ All implementation is in-project F# code. No new libraries are needed.
 | `Position.Line` | `FSharp.Text.Lexing.Position` | 1-indexed line number from `pos_lnum` | Computed by FsLexYacc |
 | `Position.Column` | `FSharp.Text.Lexing.Position` | 0-indexed column (pos_cnum - pos_bol) | Computed by FsLexYacc |
 | `lexbuf2` | `Program.fs:parseProgram` | LexBuffer used during `parseModule` | In scope in `with` handler |
-| `Lexer.setInitialPos` | `LangThree/Lexer.fsl` | Sets `pos_fname` and `pos_lnum=1` on lexbuf | Called before parsing |
+| `Lexer.setInitialPos` | `FunLang/Lexer.fsl` | Sets `pos_fname` and `pos_lnum=1` on lexbuf | Called before parsing |
 | custom tokenizer | `Program.fs:36-43` | Sets `lb.StartPos <- pt.StartPos` per token | Injects PositionedToken positions |
 
 ### FsLexYacc Runtime
@@ -160,7 +160,7 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
 
 ### Anti-Patterns to Avoid
 
-- **Modifying FsLexYacc runtime or Parser.fsy:** LangThree is a parallel project (CLAUDE.md: do not touch). All changes are in `Program.fs` only.
+- **Modifying FsLexYacc runtime or Parser.fsy:** FunLang is a parallel project (CLAUDE.md: do not touch). All changes are in `Program.fs` only.
 - **Using `parse_error_rich`:** This would require modifying `Parser.fsy` to shadow the `ParseHelpers.parse_error_rich` value. Not needed — we can capture position from our own tokenizer's mutable variable.
 - **String regex on exception message:** The runtime throws exactly `"parse error"` or `"parse error: unexpected end of file"`. The `msg.Contains("parse error")` check in `main` covers both. No regex needed.
 - **Changing `main`'s error handler:** The existing handler produces `[Parse] msg`. We only need to change what `msg` contains. No changes needed in `main`.
@@ -171,9 +171,9 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
 |---------|-------------|-------------|-----|
 | Position tracking | Custom position accumulator | `lastParsedPos` mutable in tokenizer | The tokenizer already runs sequentially; a simple mutable captures the last position |
 | Error format | Custom error type/exception | String formatting + existing failwith pattern | `main`'s handler already handles "parse error" substring; no new exception types needed |
-| FsLexYacc error hooks | `parse_error_rich` implementation | Mutable position tracking in tokenizer | `parse_error_rich` requires modifying LangThree Parser.fsy which is off-limits |
+| FsLexYacc error hooks | `parse_error_rich` implementation | Mutable position tracking in tokenizer | `parse_error_rich` requires modifying FunLang Parser.fsy which is off-limits |
 
-**Key insight:** The tokenizer closure in `parseProgram` is the ideal interception point. It runs for every token the parser consumes. A single `mutable lastParsedPos` set there gives us the error-site position without any changes to LangThree.
+**Key insight:** The tokenizer closure in `parseProgram` is the ideal interception point. It runs for every token the parser consumes. A single `mutable lastParsedPos` set there gives us the error-site position without any changes to FunLang.
 
 ## Common Pitfalls
 
@@ -336,9 +336,9 @@ cd tests/compiler && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangC
   - `failwith "parse error"` at lines 284, 311, 440
   - `ParseErrorContext` structure at lines 27-49
   - `parse_error_rich` default at line 502
-- `LangThree/IndentFilter.fs` (all 641 lines): `filterPositioned`, `PositionedToken`, `lastRealToken` tracking
-- `LangThree/Lexer.fsl` lines 24-32: `setInitialPos` sets `pos_fname` and `pos_lnum=1`
-- `LangThree/Ast.fs` lines 1-41: `Span`, `mkSpan`, `formatSpan`
+- `FunLang/IndentFilter.fs` (all 641 lines): `filterPositioned`, `PositionedToken`, `lastRealToken` tracking
+- `FunLang/Lexer.fsl` lines 24-32: `setInitialPos` sets `pos_fname` and `pos_lnum=1`
+- `FunLang/Ast.fs` lines 1-41: `Span`, `mkSpan`, `formatSpan`
 - `Elaboration.fs` lines 60-67: `failWithSpan` pattern (reference for format consistency)
 
 ### Secondary (HIGH confidence)
@@ -354,4 +354,4 @@ cd tests/compiler && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangC
 - Exact test expectations: MEDIUM — must run empirically after implementation
 
 **Research date:** 2026-04-01
-**Valid until:** Until `Program.fs:parseProgram` is refactored or LangThree's IndentFilter API changes (stable, 90 days)
+**Valid until:** Until `Program.fs:parseProgram` is refactored or FunLang's IndentFilter API changes (stable, 90 days)

@@ -4,7 +4,7 @@
 
 ### v1.0 — Core Compiler (2026-03-26)
 
-**Goal:** LangThree 소스 코드를 네이티브 실행 바이너리로 컴파일
+**Goal:** FunLang 소스 코드를 네이티브 실행 바이너리로 컴파일
 
 **Phases:** 1–6 (11 plans, all verified)
 **Requirements:** 21/21 complete
@@ -55,7 +55,7 @@
 
 ### v3.0 — Language Completeness (2026-03-26)
 
-**Goal:** 누락 연산자, 빌트인, 패턴 매칭 확장으로 대부분의 LangThree 프로그램 컴파일 가능
+**Goal:** 누락 연산자, 빌트인, 패턴 매칭 확장으로 대부분의 FunLang 프로그램 컴파일 가능
 
 **Phases:** 12–15 (5 plans, all verified)
 **Requirements:** 17/17 complete
@@ -77,7 +77,7 @@
 
 ### v4.0 — Type System & Error Handling (2026-03-27)
 
-**Goal:** ADT/GADT, Records(mutable fields), Exception handling(setjmp/longjmp)으로 LangThree 타입 시스템 기능 대부분 네이티브 코드 지원
+**Goal:** ADT/GADT, Records(mutable fields), Exception handling(setjmp/longjmp)으로 FunLang 타입 시스템 기능 대부분 네이티브 코드 지원
 
 **Phases:** 16–20 (12 plans, all verified)
 **Requirements:** 27/27 complete
@@ -101,7 +101,7 @@
 
 ### v5.0 — Mutable & Collections (2026-03-28)
 
-**Goal:** Mutable variable bindings, Array, Hashtable을 컴파일하여 LangThree imperative programming 패턴 네이티브 코드 지원
+**Goal:** Mutable variable bindings, Array, Hashtable을 컴파일하여 FunLang imperative programming 패턴 네이티브 코드 지원
 
 **Phases:** 21–24 (8 plans, all verified)
 **Requirements:** 26/26 complete
@@ -125,7 +125,7 @@
 
 ### v6.0 — Modules & I/O (2026-03-28)
 
-**Goal:** Module system + File I/O builtins로 LangThree 모듈화 프로그램과 파일 입출력 네이티브 코드 지원
+**Goal:** Module system + File I/O builtins로 FunLang 모듈화 프로그램과 파일 입출력 네이티브 코드 지원
 
 **Phases:** 25–27 (5 plans, all verified)
 **Requirements:** 21/21 complete
@@ -170,7 +170,7 @@
 
 ### v8.0 — Final Parity (2026-03-28)
 
-**Goal:** Type annotations + for-in collection loops로 LangThree 인터프리터와의 기능 차이 해소
+**Goal:** Type annotations + for-in collection loops로 FunLang 인터프리터와의 기능 차이 해소
 
 **Phases:** 30 (2 plans, all verified)
 **Requirements:** 8/8 complete
@@ -187,7 +187,7 @@
 
 ### v9.0 — Collections & Builtins Parity (2026-03-30)
 
-**Goal:** LangThree v7.0/v7.1 기능을 컴파일러에 구현하여 Phase 62까지 패리티 달성
+**Goal:** FunLang v7.0/v7.1 기능을 컴파일러에 구현하여 Phase 62까지 패리티 달성
 
 **Phases:** 31–35 (14 plans, all verified)
 **Requirements:** 33/33 complete
@@ -226,7 +226,7 @@
 - Format strings: sprintf/printfn via C runtime snprintf delegation
 - Multi-file import: AST flattening for `open "file.fun"` in Program.fs
 - OpenDecl implementation: `open Module` brings members into scope via alias LetDecls
-- Prelude sync: 11/12 files byte-identical to LangThree/Prelude/
+- Prelude sync: 11/12 files byte-identical to FunLang/Prelude/
 
 **Key decisions validated:**
 - IDX dispatch: LangHashtableStr tag=-2 ✓
@@ -274,9 +274,9 @@
 
 ---
 
-### v13.0 — LangThree Typeclass Sync (2026-04-01)
+### v13.0 — FunLang Typeclass Sync (2026-04-01)
 
-**Goal:** LangThree v10.0-v12.0에서 추가된 AST 구조 변경과 Typeclass 컴파일 지원을 FunLangCompiler에 반영
+**Goal:** FunLang v10.0-v12.0에서 추가된 AST 구조 변경과 Typeclass 컴파일 지원을 FunLangCompiler에 반영
 
 **Phases:** 51–53 (3 plans, all verified)
 **Tests:** 222+ FsLit E2E tests (5 new typeclass tests)
@@ -288,7 +288,7 @@
 - show/eq/deriving Show E2E 테스트
 
 **Key decisions validated:**
-- elaborateTypeclasses replicated from LangThree (not shared) ✓
+- elaborateTypeclasses replicated from FunLang (not shared) ✓
 - Two-pass ctorMap for DerivingDecl expansion ✓
 - Instance methods use original names (no mangling) ✓
 - Typeclass.fun first in Prelude load order ✓

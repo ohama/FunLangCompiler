@@ -98,7 +98,7 @@ Each task was committed atomically:
 
 **1. [Rule 1 - Bug] Fixed pre-existing ForInExpr Pattern type mismatch**
 - **Found during:** Task 1 (build verification)
-- **Issue:** `ForInExpr (var, ...)` was changed in LangThree AST to use `var: Pattern` (not `string`). Elaboration.fs still used `var` (a `Pattern`) in `Set.add var` and `Lambda(var, ...)` which expect `string`. This broke all builds.
+- **Issue:** `ForInExpr (var, ...)` was changed in FunLang AST to use `var: Pattern` (not `string`). Elaboration.fs still used `var` (a `Pattern`) in `Set.add var` and `Lambda(var, ...)` which expect `string`. This broke all builds.
 - **Fix:** Added `let varName = match var with Ast.VarPat(n, _) -> n | _ -> "_"` in `freeVars` and `let varName = match var with Ast.VarPat(n, _) -> n | _ -> freshName env` in ForInExpr elaboration
 - **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Verification:** Build succeeded; all 30 existing for-in tests pass

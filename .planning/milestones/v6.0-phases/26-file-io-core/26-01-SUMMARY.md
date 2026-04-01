@@ -116,7 +116,7 @@ completed: 2026-03-27
 
 **2. [Rule 1 - Bug] Fixed E2E test format for eprint/eprintln**
 - **Found during:** Task 3 (running fslit test suite)
-- **Issue:** Plan specified `eprint "err msg"; println "ok"` as test input. The LangThree IndentFilter inserts NEWLINE tokens on line breaks, breaking `SeqExpr` parsing when a bare function call (`eprint`) starts a new line without `let`/`in` context. Result: "parse error".
+- **Issue:** Plan specified `eprint "err msg"; println "ok"` as test input. The FunLang IndentFilter inserts NEWLINE tokens on line breaks, breaking `SeqExpr` parsing when a bare function call (`eprint`) starts a new line without `let`/`in` context. Result: "parse error".
 - **Fix:** Rewrote eprint/eprintln tests to use single-line `let _ = eprint "..." in println "ok"` format, consistent with established pattern. Also added `2>/dev/null` to command to suppress stderr from test output.
 - **Files modified:** tests/compiler/26-06-eprint.flt, tests/compiler/26-07-eprintln.flt
 - **Verification:** Both tests now pass with fslit

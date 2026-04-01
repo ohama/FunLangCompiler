@@ -96,7 +96,7 @@ All keys are treated as raw `i64` values. String keys compare by pointer identit
 **Option B (richer): key type tag passed as extra i64**
 The elaboration arm inspects the key expression's elaborated type. If `Ptr`, it passes `key_is_ptr=1`; if `I64`, passes `key_is_ptr=0`. The C runtime then does `strcmp` vs int64 compare accordingly.
 
-**Recommendation: Use Option A (i64-only equality) for Phase 23.** The phase requirements (HT-01 through HT-08) do not specify string key equality by content. The LangThree evaluator uses `.NET Dictionary<Value, Value>` which has value-level equality, but Phase 23 E2E tests will likely use integer keys for simplicity. Document the string-key limitation. This keeps the ABI clean: `(Ptr, I64) -> ...` matches the existing pattern in STACK.md and avoids extra ABI args.
+**Recommendation: Use Option A (i64-only equality) for Phase 23.** The phase requirements (HT-01 through HT-08) do not specify string key equality by content. The FunLang evaluator uses `.NET Dictionary<Value, Value>` which has value-level equality, but Phase 23 E2E tests will likely use integer keys for simplicity. Document the string-key limitation. This keeps the ABI clean: `(Ptr, I64) -> ...` matches the existing pattern in STACK.md and avoids extra ABI args.
 
 ### Pattern 2: C Runtime Implementation
 
@@ -206,7 +206,7 @@ void lang_hashtable_remove(LangHashtable* ht, int64_t key) {
         prev = &e->next;
         e    = e->next;
     }
-    /* Key not present: no-op (consistent with LangThree remove semantics) */
+    /* Key not present: no-op (consistent with FunLang remove semantics) */
 }
 
 LangCons* lang_hashtable_keys(LangHashtable* ht) {
@@ -536,7 +536,7 @@ LangCons* lang_hashtable_keys(LangHashtable* ht) {
    - Recommendation: Start with Option A (i64 identity equality). If a test fails because string content equality is needed, switch to Option B by adding a `key_is_ptr` flag to LangHashEntry and passing it from the elaboration arm. The ABI change is: `ExtParams = [Ptr; I64; I64]` where the extra I64 is the `key_is_ptr` flag. See ARCHITECTURE.md lines 360-374 for the full struct layout.
 
 2. **`hashtable_keys` return order**
-   - What we know: LangThree evaluator iterates Dictionary keys in insertion-undefined order. The compiled runtime returns keys in bucket-traversal order (not insertion order).
+   - What we know: FunLang evaluator iterates Dictionary keys in insertion-undefined order. The compiled runtime returns keys in bucket-traversal order (not insertion order).
    - What's unclear: Do any E2E tests check the exact order of `hashtable_keys` results?
    - Recommendation: Tests should sort the key list before comparing, or use `hashtable_containsKey` to verify membership rather than checking exact key order. If a test requires insertion order, the data structure needs an additional `LangCons*` insertion-order list — defer to a follow-on phase.
 
@@ -548,15 +548,15 @@ LangCons* lang_hashtable_keys(LangHashtable* ht) {
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed `LangString`, `LangCons` layouts; `lang_throw` pattern; `GC_malloc` usage; `lang_array_create` pattern
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — confirmed `App`-chain matching order; ExternalFuncDecl two-list structure at lines ~2115 and ~2252; `lang_string_contains` I64→I1 pattern; `LlvmPtrToIntOp` usage; `elaborateExpr` dispatch shape
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed all needed ops exist: `LlvmCallOp`, `LlvmCallVoidOp`, `ArithCmpIOp`, `LlvmPtrToIntOp`, `ArithConstantOp`
-- Direct code analysis of `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` lines 526-571 — authoritative source for hashtable semantics: `hashtable_create`, `get` (raises on miss), `set`, `containsKey`, `keys`, `remove`
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/STACK.md` sections 3.1-3.5 — chaining rationale; C function signatures; ExternalFuncDecl templates; coerceToI64 helper design
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/ARCHITECTURE.md` lines 325-469 — hashtable memory layout options; key type handling; builtin dispatch patterns
+- Direct code analysis of `src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed `LangString`, `LangCons` layouts; `lang_throw` pattern; `GC_malloc` usage; `lang_array_create` pattern
+- Direct code analysis of `src/FunLangCompiler.Compiler/Elaboration.fs` — confirmed `App`-chain matching order; ExternalFuncDecl two-list structure at lines ~2115 and ~2252; `lang_string_contains` I64→I1 pattern; `LlvmPtrToIntOp` usage; `elaborateExpr` dispatch shape
+- Direct code analysis of `src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed all needed ops exist: `LlvmCallOp`, `LlvmCallVoidOp`, `ArithCmpIOp`, `LlvmPtrToIntOp`, `ArithConstantOp`
+- Direct code analysis of `deps/FunLang/src/FunLang/Eval.fs` lines 526-571 — authoritative source for hashtable semantics: `hashtable_create`, `get` (raises on miss), `set`, `containsKey`, `keys`, `remove`
+- `.planning/research/STACK.md` sections 3.1-3.5 — chaining rationale; C function signatures; ExternalFuncDecl templates; coerceToI64 helper design
+- `.planning/research/ARCHITECTURE.md` lines 325-469 — hashtable memory layout options; key type handling; builtin dispatch patterns
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/22-array-core/22-RESEARCH.md` — direct precedent for the array implementation; hashtable follows same pattern
+- `.planning/phases/22-array-core/22-RESEARCH.md` — direct precedent for the array implementation; hashtable follows same pattern
 
 ### Tertiary (LOW confidence)
 - None

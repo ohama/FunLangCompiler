@@ -7,7 +7,7 @@ score: 4/4 must-haves verified
 
 # Phase 2: Scalar Codegen via MlirIR Verification Report
 
-**Phase Goal:** LangThree integer expressions (literals, arithmetic, let bindings, variable references) are elaborated into MlirIR and compile to native binaries that produce correct results — this phase also introduces the Elaboration pass as the canonical LangThree AST → MlirIR translation layer
+**Phase Goal:** FunLang integer expressions (literals, arithmetic, let bindings, variable references) are elaborated into MlirIR and compile to native binaries that produce correct results — this phase also introduces the Elaboration pass as the canonical FunLang AST → MlirIR translation layer
 **Verified:** 2026-03-26T02:18:51Z
 **Status:** passed
 **Re-verification:** No — initial verification
@@ -20,7 +20,7 @@ score: 4/4 must-haves verified
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Elaboration pass accepts a LangThree AST node and emits MlirIR ops typed as i64 | VERIFIED | `Elaboration.fs:19-59` — `elaborateExpr` matches all Expr cases and returns `MlirValue * MlirOp list`; all values use `Type = I64` |
+| 1 | Elaboration pass accepts a FunLang AST node and emits MlirIR ops typed as i64 | VERIFIED | `Elaboration.fs:19-59` — `elaborateExpr` matches all Expr cases and returns `MlirValue * MlirOp list`; all values use `Type = I64` |
 | 2 | An integer literal `.lt` file compiles end-to-end and the binary exits with that value | VERIFIED | `02-01-literal.flt` passes — input `7`, binary exits with `7`; `01-return42.flt` regression also passes |
 | 3 | `1 + 2 * 3 - 4 / 2` compiles and the binary exits with 5 | VERIFIED | `02-02-arith.flt` passes — FsLit confirms binary exits with `5` |
 | 4 | `let x = 5 in let y = x + 3 in y` compiles and exits with 8 | VERIFIED | `02-03-let.flt` passes — FsLit confirms binary exits with `8` |

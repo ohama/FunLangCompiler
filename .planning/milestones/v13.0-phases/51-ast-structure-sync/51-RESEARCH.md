@@ -1,12 +1,12 @@
 # Phase 51: AST Structure Sync - Research
 
 **Researched:** 2026-04-01
-**Domain:** F# discriminated union pattern matching — syncing FunLangCompiler.Compiler patterns to updated LangThree AST
+**Domain:** F# discriminated union pattern matching — syncing FunLangCompiler.Compiler patterns to updated FunLang AST
 **Confidence:** HIGH
 
 ## Summary
 
-Phase 51 is a mechanical pattern-match update. The LangThree AST gained three new fields across v12.0 development:
+Phase 51 is a mechanical pattern-match update. The FunLang AST gained three new fields across v12.0 development:
 `TypeDecl` gained a `deriving: string list` field (5th field before Span), `TypeClassDecl` gained a `superclasses: string list` field (4th field before Span), `InstanceDecl` gained a `constraints: (string * TypeExpr) list` field (4th field before Span), and `DerivingDecl` was added as a new `Decl` case.
 
 The build is currently broken with exactly **1 compile error**: `Elaboration.fs(4073,30): FS0727: This union case expects 5 arguments in tupled form, but was given 4`. This is the only blocking error. There are no `TypeClassDecl`, `InstanceDecl`, or `DerivingDecl` references in Elaboration.fs currently — those are entirely absent and thus cause no compile errors (they just need to be handled in the `_ -> ()` catch-all in `prePassDecls`).
@@ -23,7 +23,7 @@ This is an internal codebase change — no external libraries are involved.
 | File | Purpose | What Changes |
 |------|---------|--------------|
 | `src/FunLangCompiler.Compiler/Elaboration.fs` | Main compiler elaboration pass | 1 pattern match site to update |
-| `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` | Source of truth for AST types | Read-only reference |
+| `deps/FunLang/src/FunLang/Ast.fs` | Source of truth for AST types | Read-only reference |
 
 ### Supporting
 | Tool | Purpose |
@@ -36,9 +36,9 @@ N/A — this is a targeted fix with no design choices.
 
 ## Architecture Patterns
 
-### Current LangThree AST (as of 2026-04-01, after v12.0)
+### Current FunLang AST (as of 2026-04-01, after v12.0)
 
-The authoritative definitions in `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs`:
+The authoritative definitions in `deps/FunLang/src/FunLang/Ast.fs`:
 
 ```fsharp
 // TypeDecl — 5 fields (name, typeParams, constructors, deriving, Span)
@@ -90,7 +90,7 @@ Adding explicit arms is optional (the existing `| _ -> ()` already handles them)
 ### Anti-Patterns to Avoid
 
 - **Matching on TypeClassDecl/InstanceDecl fields in prePassDecls:** Phase 51 only skips these nodes. Full elaboration is Phase 52.
-- **Modifying LangThree:** The constraint is absolute — LangThree is under parallel development and must not be touched.
+- **Modifying FunLang:** The constraint is absolute — FunLang is under parallel development and must not be touched.
 - **Using `| _ ->` without explicit new-type arms in extractMainExpr/flattenDecls:** These already correctly fall through to `| _ -> false` and `| _ -> [d]` respectively. TypeClassDecl/InstanceDecl/DerivingDecl nodes will be ignored, which is correct for Phase 51.
 
 ## Don't Hand-Roll
@@ -98,7 +98,7 @@ Adding explicit arms is optional (the existing `| _ -> ()` already handles them)
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
 | Pattern exhaustiveness | Manual tracking of cases | F# compiler warnings (FS0025) | Compiler tells you what's missing |
-| AST field counts | Manual counting | Read Ast.fs directly | Source of truth is in LangThree/src/LangThree/Ast.fs |
+| AST field counts | Manual counting | Read Ast.fs directly | Source of truth is in FunLang/src/FunLang/Ast.fs |
 
 **Key insight:** The F# compiler error FS0727 ("expects N arguments") is the complete specification for what needs changing. There is no guesswork.
 
@@ -122,9 +122,9 @@ Adding explicit arms is optional (the existing `| _ -> ()` already handles them)
 **How to avoid:** `flattenDecls` already uses `| _ -> [d]` — it passes TypeClassDecl/InstanceDecl/DerivingDecl through unchanged. `extractMainExpr` filters to only LetDecl/LetRecDecl/LetMutDecl/LetPatDecl, so typeclass decls are naturally filtered out. No changes needed in either function for Phase 51.
 
 ### Pitfall 4: Verifying against wrong AST
-**What goes wrong:** Looking at `FunLangCompiler.bak/src/FunLang.Compiler/Ast.fs` instead of LangThree.
+**What goes wrong:** Looking at `FunLangCompiler.bak/src/FunLang.Compiler/Ast.fs` instead of FunLang.
 **Why it happens:** Glob finds the backup copy.
-**How to avoid:** Always use `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` as the authoritative source.
+**How to avoid:** Always use `deps/FunLang/src/FunLang/Ast.fs` as the authoritative source.
 
 ## Code Examples
 
@@ -155,13 +155,13 @@ No other changes are needed in Elaboration.fs for the build to succeed.
 
 | Old Shape | New Shape | When Changed | Impact |
 |-----------|-----------|--------------|--------|
-| `TypeDecl(name, typeParams, ctors, span)` | `TypeDecl(name, typeParams, ctors, deriving, span)` | LangThree v12.0 (2026-04-01) | 4-field patterns now fail FS0727 |
-| `TypeClassDecl(className, typeVar, methods, span)` | `TypeClassDecl(className, typeVar, methods, superclasses, span)` | LangThree v12.0 (2026-04-01) | Any pattern would fail if used |
-| `InstanceDecl(className, instanceType, methods, span)` | `InstanceDecl(className, instanceType, methods, constraints, span)` | LangThree v12.0 (2026-04-01) | Any pattern would fail if used |
-| N/A | `DerivingDecl(typeName, classNames, span)` | LangThree v12.0 (2026-04-01) | New case; needs explicit arm or covered by wildcard |
+| `TypeDecl(name, typeParams, ctors, span)` | `TypeDecl(name, typeParams, ctors, deriving, span)` | FunLang v12.0 (2026-04-01) | 4-field patterns now fail FS0727 |
+| `TypeClassDecl(className, typeVar, methods, span)` | `TypeClassDecl(className, typeVar, methods, superclasses, span)` | FunLang v12.0 (2026-04-01) | Any pattern would fail if used |
+| `InstanceDecl(className, instanceType, methods, span)` | `InstanceDecl(className, instanceType, methods, constraints, span)` | FunLang v12.0 (2026-04-01) | Any pattern would fail if used |
+| N/A | `DerivingDecl(typeName, classNames, span)` | FunLang v12.0 (2026-04-01) | New case; needs explicit arm or covered by wildcard |
 
 **Deprecated/outdated:**
-- `TypeDecl(_, _, ctors, _)`: 4-field pattern is invalid after LangThree v12.0
+- `TypeDecl(_, _, ctors, _)`: 4-field pattern is invalid after FunLang v12.0
 
 ## Open Questions
 
@@ -178,12 +178,12 @@ No other changes are needed in Elaboration.fs for the build to succeed.
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — authoritative AST type definitions, read directly
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — all pattern match sites, read directly
+- `deps/FunLang/src/FunLang/Ast.fs` — authoritative AST type definitions, read directly
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — all pattern match sites, read directly
 - `dotnet build` output — confirms exactly 1 error (FS0727 at line 4073) and its cause
 
 ### Secondary (MEDIUM confidence)
-- `git log` on LangThree — confirmed TypeDecl got `deriving` field in v12.0 commit `7c3fc0f`, InstanceDecl got `constraints` field in commit `163929a`
+- `git log` on FunLang — confirmed TypeDecl got `deriving` field in v12.0 commit `7c3fc0f`, InstanceDecl got `constraints` field in commit `163929a`
 
 ## Metadata
 
@@ -193,4 +193,4 @@ No other changes are needed in Elaboration.fs for the build to succeed.
 - TypeClassDecl/InstanceDecl/DerivingDecl currently absent from Elaboration.fs: HIGH — verified by grep
 
 **Research date:** 2026-04-01
-**Valid until:** Valid as long as LangThree AST doesn't change again (stable for Phase 51 scope)
+**Valid until:** Valid as long as FunLang AST doesn't change again (stable for Phase 51 scope)

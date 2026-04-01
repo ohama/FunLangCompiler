@@ -7,7 +7,7 @@ score: 5/5 must-haves verified
 
 # Phase 6: CLI File Input and Error Handling — Verification Report
 
-**Phase Goal:** A usable `langbackend <file.lt>` command reads a LangThree source file, runs the full Elaboration → MlirIR → Printer → shell pipeline, and produces a named native executable that the user can run directly.
+**Phase Goal:** A usable `langbackend <file.lt>` command reads a FunLang source file, runs the full Elaboration → MlirIR → Printer → shell pipeline, and produces a named native executable that the user can run directly.
 **Verified:** 2026-03-26T04:03:27Z
 **Status:** PASSED
 **Re-verification:** No — initial verification
@@ -21,7 +21,7 @@ score: 5/5 must-haves verified
 | 1  | `langbackend hello.lt` produces a `hello` executable in the current directory (strips .lt extension) | VERIFIED | `06-01-cli-file-input.flt` PASS: `cd /tmp && cp %input ${OUTNAME}.lt && dotnet run ... -- ${OUTNAME}.lt && ./${OUTNAME}` produces binary, exits 15 |
 | 2  | `langbackend hello.lt -o custom` produces a `custom` executable (explicit -o overrides default) | VERIFIED | `parseArgs` in Program.fs returns `Some o` for `-o` flag; `outputPath = o` branch confirmed at line 34 |
 | 3  | Missing or nonexistent input file prints a human-readable error and exits non-zero without producing a binary | VERIFIED | `06-02-cli-error.flt` PASS: nonexistent path prints `Error: file not found: /tmp/langback_nonexistent_file.lt` and exits 1 |
-| 4  | A LangThree parse error prints a human-readable error message and exits non-zero | VERIFIED | `try/with ex -> eprintfn "Error: %s" ex.Message; 1` at lines 46-64 of Program.fs wraps entire parse/elaborate/compile pipeline |
+| 4  | A FunLang parse error prints a human-readable error message and exits non-zero | VERIFIED | `try/with ex -> eprintfn "Error: %s" ex.Message; 1` at lines 46-64 of Program.fs wraps entire parse/elaborate/compile pipeline |
 | 5  | All 13 existing FsLit tests still pass (no regression from CLI changes) | VERIFIED | 15/15 FsLit tests pass: all 13 prior tests (01 through 05-02) plus 2 new CLI tests green |
 
 **Score:** 5/5 truths verified
@@ -74,7 +74,7 @@ None. Program.fs has 0 TODO/FIXME/placeholder patterns, 0 empty handlers, builds
 
 All five must-have truths verified. All three required artifacts exist, are substantive, and are wired. All four key links confirmed in source. No anti-patterns found. `dotnet build` exits 0 with 0 warnings. 15/15 FsLit tests pass.
 
-The phase goal — a usable `langbackend <file.lt>` command that reads a LangThree source, runs the full pipeline, and produces a named native executable — is achieved. Two items flagged for human verification are the Linux dynamic library behavior (environment difference, not a code issue) and the readable quality of parse error messages.
+The phase goal — a usable `langbackend <file.lt>` command that reads a FunLang source, runs the full pipeline, and produces a named native executable — is achieved. Two items flagged for human verification are the Linux dynamic library behavior (environment difference, not a code issue) and the readable quality of parse error messages.
 
 ---
 _Verified: 2026-03-26T04:03:27Z_

@@ -22,16 +22,16 @@ All implementation is in-project F# code. No new libraries are needed.
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | `parseProgram` | `Program.fs:29` | Parses a source string as `Ast.Module` with `PositionedToken` IndentFilter |
-| `Lexer.setInitialPos` | `LangThree/Lexer.fs:28` | Sets `pos_fname` and `pos_lnum = 1` on lexbuf before parsing |
-| `Ast.Module` | `LangThree/Ast.fs:374` | `Module of decls list * Span` — top-level container |
-| `Ast.Decl` | `LangThree/Ast.fs:348` | All declaration variants (LetDecl, TypeDecl, ModuleDecl, etc.) |
+| `Lexer.setInitialPos` | `FunLang/Lexer.fs:28` | Sets `pos_fname` and `pos_lnum = 1` on lexbuf before parsing |
+| `Ast.Module` | `FunLang/Ast.fs:374` | `Module of decls list * Span` — top-level container |
+| `Ast.Decl` | `FunLang/Ast.fs:348` | All declaration variants (LetDecl, TypeDecl, ModuleDecl, etc.) |
 | `elaborateProgram` | `Elaboration.fs:4199` | Accepts `Ast.Module`, runs prePass + elaboration |
 | `failWithSpan` | `Elaboration.fs:63` | Formats `[Elaboration] file:line:col: message` using `Span.FileName` |
 
 ### Supporting
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `Ast.unknownSpan` | `LangThree/Ast.fs:26` | Sentinel span with `FileName = "<unknown>"`, used for synthetic nodes |
+| `Ast.unknownSpan` | `FunLang/Ast.fs:26` | Sentinel span with `FileName = "<unknown>"`, used for synthetic nodes |
 | `expandImports` | `Program.fs:65` | Recursively expands `FileImportDecl` — unaffected by this change |
 | `prePassDecls` | `Elaboration.fs:4058` | Collects TypeEnv/RecordEnv/ExnTags — works on merged decl list |
 | `extractMainExpr` | `Elaboration.fs:4156` | Folds decl list into let-chain `Expr` — works on merged decl list |
@@ -229,7 +229,7 @@ let inline private failWithSpan (span: Ast.Span) fmt =
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct codebase inspection — `Program.fs` (all 208 lines), `Elaboration.fs` (lines 1-70, 4058-4256), `Ast.fs` (all 403 lines), `LangThree/Lexer.fs` (lines 1-36), `LangThree/IndentFilter.fs` (lines 1-51), `LangThree/Prelude.fs` (all 317 lines)
+- Direct codebase inspection — `Program.fs` (all 208 lines), `Elaboration.fs` (lines 1-70, 4058-4256), `Ast.fs` (all 403 lines), `FunLang/Lexer.fs` (lines 1-36), `FunLang/IndentFilter.fs` (lines 1-51), `FunLang/Prelude.fs` (all 317 lines)
 - Test files inspected — `44-01`, `44-02`, `44-03`, `46-01`, `46-02`, `46-03`, `46-04`, `46-05` `.flt`/`.fun` pairs
 
 ### Secondary (HIGH confidence)

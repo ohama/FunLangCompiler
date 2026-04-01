@@ -1,4 +1,4 @@
-// Test: Return type annotations — let with return type (LangThree v8.0)
+// Test: Return type annotations — let with return type (FunLang v8.0)
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let add x : int = x + 1

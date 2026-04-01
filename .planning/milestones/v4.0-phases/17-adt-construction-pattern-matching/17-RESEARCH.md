@@ -755,14 +755,14 @@ For field 1 payload extraction in patterns: `resolveAccessor` for `Field(scrutAc
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Full file read; all patterns, stubs, and infrastructure confirmed
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MatchCompiler.fs` — Full file read; AdtCtor placeholder at line 128, ctorArity at 81, desugarPattern at 90
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — Full file read; all available ops confirmed
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/STATE.md` — Design decisions C-11, C-12 confirmed
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/16-environment-infrastructure/16-02-SUMMARY.md` — Phase 16 completion state confirmed
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — Full file read; all patterns, stubs, and infrastructure confirmed
+- `src/FunLangCompiler.Compiler/MatchCompiler.fs` — Full file read; AdtCtor placeholder at line 128, ctorArity at 81, desugarPattern at 90
+- `src/FunLangCompiler.Compiler/MlirIR.fs` — Full file read; all available ops confirmed
+- `.planning/STATE.md` — Design decisions C-11, C-12 confirmed
+- `.planning/phases/16-environment-infrastructure/16-02-SUMMARY.md` — Phase 16 completion state confirmed
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — Constructor and ConstructorPat AST nodes confirmed at lines 91 and 129
+- `deps/FunLang/src/FunLang/Ast.fs` — Constructor and ConstructorPat AST nodes confirmed at lines 91 and 129
 
 ## Metadata
 

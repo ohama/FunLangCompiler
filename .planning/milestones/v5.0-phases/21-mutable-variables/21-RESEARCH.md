@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 21 implements `LetMut`/`Assign`/`LetMutDecl` mutable variable support. The AST nodes already exist in LangThree (confirmed in `Ast.fs`). The elaborator (`Elaboration.fs`) has no cases for them yet — they fall through the catch-all `| _ -> Set.empty` in `freeVars` and would hit `failwithf "unbound variable"` in `elaborateExpr`. The implementation is entirely within `Elaboration.fs`: no new `MlirOp` DU cases, no `Printer.fs` changes, no `Pipeline.fs` changes, no C runtime additions.
+Phase 21 implements `LetMut`/`Assign`/`LetMutDecl` mutable variable support. The AST nodes already exist in FunLang (confirmed in `Ast.fs`). The elaborator (`Elaboration.fs`) has no cases for them yet — they fall through the catch-all `| _ -> Set.empty` in `freeVars` and would hit `failwithf "unbound variable"` in `elaborateExpr`. The implementation is entirely within `Elaboration.fs`: no new `MlirOp` DU cases, no `Printer.fs` changes, no `Pipeline.fs` changes, no C runtime additions.
 
 The core mechanism is a GC heap ref cell: `LetMut(name, initExpr, body)` allocates 8 bytes via `GC_malloc(8)`, stores the initial value, and binds `name` in `env.Vars` to the cell `Ptr`. `Var(name)` for a mutable name emits `LlvmLoadOp` through that pointer. `Assign(name, valExpr)` emits `LlvmStoreOp` to the same pointer. A `MutableVars: Set<string>` field on `ElabEnv` distinguishes ref cell pointers from ordinary `Ptr`-typed values (closures, records, lists) that must not be auto-dereferenced. Module-level `LetMutDecl` is handled by extending `extractMainExpr` to desugar it into a nested `LetMut` expression — identical to the existing `LetDecl` → `Let` pattern.
 
@@ -27,7 +27,7 @@ This phase introduces no new libraries or tools.
 | `Printer.fs` | `src/FunLangCompiler.Compiler/` | MlirIR → MLIR text — no changes needed | Unchanged |
 | `Pipeline.fs` | `src/FunLangCompiler.Compiler/` | Shell pipeline — no changes needed | Unchanged |
 | `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | C runtime — no changes needed for Phase 21 | Unchanged |
-| LangThree AST | `../LangThree/src/LangThree/Ast.fs` | Defines LetMut, Assign, LetMutDecl nodes | Read-only reference |
+| FunLang AST | `../FunLang/src/FunLang/Ast.fs` | Defines LetMut, Assign, LetMutDecl nodes | Read-only reference |
 
 ### Existing MlirOp Cases Used (no new cases needed)
 
@@ -227,7 +227,7 @@ When `capName` is in `MutableVars`, the captured value in `innerEnvWithCaptures.
 
 **What goes wrong:** The existing `| _ -> Set.empty` at line 151 of `Elaboration.fs` discards free variables in any AST node without an explicit case. `LetMut` and `Assign` have no explicit case. A closure containing `Assign(outerVar, ...)` will not include `outerVar` in its capture list. At codegen time, `Map.tryFind outerVar innerEnv.Vars = None` → `failwithf "unbound variable"` or reads uninitialized memory.
 
-**Why it happens:** LangThree added `LetMut`/`Assign` AST nodes without the compiler being updated.
+**Why it happens:** FunLang added `LetMut`/`Assign` AST nodes without the compiler being updated.
 
 **How to avoid:** Add explicit `freeVars` cases for `LetMut` and `Assign` as the very first change in this phase. See Pattern 6 above.
 
@@ -327,7 +327,7 @@ Inside the closure inner function:
 
 | Old Approach | Current Approach | Impact |
 |--------------|-----------------|--------|
-| No mutable variables (v4.0) | GC heap ref cell via `GC_malloc(8)` | Enables LangThree imperative patterns |
+| No mutable variables (v4.0) | GC heap ref cell via `GC_malloc(8)` | Enables FunLang imperative patterns |
 | All `env.Vars` bindings are `I64` | `env.Vars` can hold `Ptr` (cell pointer) for mutable names; `MutableVars` set distinguishes them | Var case must branch on `MutableVars` membership |
 | `freeVars` only handles known AST nodes | Add `LetMut`/`Assign` cases before codegen | Prevents silent capture omission |
 | Closure captures always load `I64` from env slot | For mutable captures: env slot holds `Ptr`, capture type is conditional | Closure mutations become visible |
@@ -336,8 +336,8 @@ Inside the closure inner function:
 
 ## Open Questions
 
-1. **Semicolon sequencing in LangThree**
-   - What we know: `x <- 10; x` is parsed as a sequencing expression. In LangThree, this likely desugars to `Let("_", Assign(...), Var("x"))` or is a distinct `Seq` node.
+1. **Semicolon sequencing in FunLang**
+   - What we know: `x <- 10; x` is parsed as a sequencing expression. In FunLang, this likely desugars to `Let("_", Assign(...), Var("x"))` or is a distinct `Seq` node.
    - What's unclear: The exact AST shape of `x <- 10; x` after parsing — whether it becomes `Let("_", Assign, Var)` or a `Sequence` node.
    - Recommendation: Check by printing the AST for a simple mutable test before writing elaboration code. If it's `Let("_", Assign, body)`, the existing `Let` case handles sequencing automatically and `Assign` just needs to return a dummy unit value. If it's a `Sequence` node, a new elaboration case is needed.
 
@@ -349,10 +349,10 @@ Inside the closure inner function:
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — all existing patterns confirmed by reading the file
-- Direct code analysis of `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `LetMut`, `Assign`, `LetMutDecl` node shapes confirmed
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/ARCHITECTURE.md` — Feature 1 section on mutable variables (HIGH confidence, based on same code analysis)
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/PITFALLS.md` — Pitfalls C-17, C-18, M-19 (HIGH confidence)
+- Direct code analysis of `src/FunLangCompiler.Compiler/Elaboration.fs` — all existing patterns confirmed by reading the file
+- Direct code analysis of `deps/FunLang/src/FunLang/Ast.fs` — `LetMut`, `Assign`, `LetMutDecl` node shapes confirmed
+- `.planning/research/ARCHITECTURE.md` — Feature 1 section on mutable variables (HIGH confidence, based on same code analysis)
+- `.planning/research/PITFALLS.md` — Pitfalls C-17, C-18, M-19 (HIGH confidence)
 
 ### Secondary (MEDIUM confidence)
 - `MlirIR.fs` confirmed: existing `LlvmCallOp`, `LlvmStoreOp`, `LlvmLoadOp`, `ArithConstantOp` are sufficient — no new DU cases needed
@@ -365,4 +365,4 @@ Inside the closure inner function:
 - Pitfalls: HIGH — C-17, C-18, M-19 derived from direct code analysis; exact line numbers confirmed
 
 **Research date:** 2026-03-27
-**Valid until:** 2026-04-27 (stable domain — only changes if LangThree AST or Elaboration architecture changes)
+**Valid until:** 2026-04-27 (stable domain — only changes if FunLang AST or Elaboration architecture changes)

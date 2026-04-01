@@ -22,7 +22,7 @@ affects:
 tech-stack:
   added: []
   patterns:
-    - "Elaboration pass: LangThree Ast.Expr -> MlirValue * MlirOp list (accumulator pattern)"
+    - "Elaboration pass: FunLang Ast.Expr -> MlirValue * MlirOp list (accumulator pattern)"
     - "ElabEnv with int ref Counter for SSA fresh-name generation (%t0, %t1, ...)"
     - "elaborateModule wraps result in @main func returning i64 with ReturnOp"
     - "CLI arg parsing: parseArgs extracts -o separately, input is remaining[0]"
@@ -42,7 +42,7 @@ key-decisions:
   - "freshName generates %t0, %t1, ... SSA names via int ref counter in ElabEnv"
   - "Negate lowered as: zero = arith.constant 0; result = arith.subi zero, inner"
   - "CLI uses parseArgs to extract -o flag independently, supports any argument order"
-  - "parseExpr in Program.fs replicates LangThree.Program.parse 3-line pattern (avoids Eval/Prelude init)"
+  - "parseExpr in Program.fs replicates FunLang.Program.parse 3-line pattern (avoids Eval/Prelude init)"
 
 patterns-established:
   - "elaborateExpr: Expr -> (MlirValue * MlirOp list) — return value plus accumulated ops"
@@ -70,7 +70,7 @@ completed: 2026-03-26
 - Elaboration pass skeleton with ElabEnv, freshName, elaborateExpr (handles Number, Add, Subtract, Multiply, Divide, Negate, Var, Let, catch-all), and elaborateModule wrapping in @main
 - MlirOp DU extended from 2 cases to 6 (added ArithAddIOp, ArithSubIOp, ArithMulIOp, ArithDivSIOp)
 - Printer updated with exhaustive match covering all 6 op cases, emitting valid MLIR text
-- CLI now parses real .lt source files via Lexer/Parser from LangThree, then calls Elaboration instead of hardcoded return42Module
+- CLI now parses real .lt source files via Lexer/Parser from FunLang, then calls Elaboration instead of hardcoded return42Module
 - FsLit test 02-01-literal.flt proves integer literal 7 compiles end-to-end and binary exits with code 7
 - Regression: 01-return42.flt still passes (42 parsed and elaborated correctly)
 
@@ -94,7 +94,7 @@ Each task was committed atomically:
 - freshName uses `%t0`, `%t1`, ... pattern with int ref counter in ElabEnv for SSA value naming
 - Negate lowered as two ops: `arith.constant 0` then `arith.subi zero, inner`
 - CLI parseArgs extracts `-o` and its value independently, remainder[0] is the input file (any arg order)
-- parseExpr in Program.fs replicates LangThree.Program.parse's 3-line pattern directly, avoiding Eval/Prelude module initialization
+- parseExpr in Program.fs replicates FunLang.Program.parse's 3-line pattern directly, avoiding Eval/Prelude module initialization
 
 ## Deviations from Plan
 

@@ -1,18 +1,18 @@
 # Phase 9: Tuples - Research
 
 **Researched:** 2026-03-26
-**Domain:** MLIR llvm dialect GEP/store/load for heap structs, LangThree Tuple/LetPat AST, Boehm GC_malloc struct allocation
+**Domain:** MLIR llvm dialect GEP/store/load for heap structs, FunLang Tuple/LetPat AST, Boehm GC_malloc struct allocation
 **Confidence:** HIGH
 
 ---
 
 ## Summary
 
-Phase 9 compiles LangThree tuple expressions to GC-managed heap structs and destructures them via GEP + load. The work is entirely internal to the existing MlirIR/Elaboration/Printer pipeline — no new external dependencies are required beyond the Boehm GC already wired in Phase 7.
+Phase 9 compiles FunLang tuple expressions to GC-managed heap structs and destructures them via GEP + load. The work is entirely internal to the existing MlirIR/Elaboration/Printer pipeline — no new external dependencies are required beyond the Boehm GC already wired in Phase 7.
 
 A tuple `(e1, e2, ..., eN)` becomes a `GC_malloc(N * 8)`-allocated block of N pointer-sized (8-byte) slots. Each field is stored via `llvm.getelementptr ptr[i]` + `llvm.store`. Destructuring `let (a, b) = t in body` becomes two GEP + load pairs that bind `a` and `b` to SSA values. The uniform `Ptr` representation already used for closures is reused for tuple pointers — each field is stored/loaded as `i64` (or `Ptr` for nested tuples), matching the project's fully-boxed-value convention.
 
-The LangThree AST encodes tuples as `Tuple(exprs, span)` and destructuring as `LetPat(TuplePat(pats, span), bindExpr, bodyExpr, span)`. The Elaboration pass currently handles `LetPat` for `WildcardPat` and `VarPat` only (Phase 7). Phase 9 adds the `TuplePat` case. For `TuplePat in match`, the scrutinee is already a `Ptr`; each sub-pattern gets a GEP + load and is then matched recursively.
+The FunLang AST encodes tuples as `Tuple(exprs, span)` and destructuring as `LetPat(TuplePat(pats, span), bindExpr, bodyExpr, span)`. The Elaboration pass currently handles `LetPat` for `WildcardPat` and `VarPat` only (Phase 7). Phase 9 adds the `TuplePat` case. For `TuplePat in match`, the scrutinee is already a `Ptr`; each sub-pattern gets a GEP + load and is then matched recursively.
 
 **Primary recommendation:** Add `LlvmGEPStructOp` (struct-indexed GEP producing `!llvm.ptr`) to MlirIR + Printer, then implement `Tuple` and `LetPat(TuplePat)` in Elaboration using `GC_malloc + sequential GEP/store` and `GEP/load per field` respectively. All three requirements fit in one plan.
 
@@ -194,7 +194,7 @@ let typeOfPat = function
 
 - **Using `llvm.alloca` for tuples:** Tuples must use `GC_malloc` per TUP-01 success criterion ("no llvm.alloca for tuple storage"). The alloca would also break for tuples returned from functions.
 - **Hardcoding `i64` as load type for nested tuples:** A nested tuple field contains a `Ptr`, not an `i64`. Load with the correct type based on sub-pattern shape.
-- **Emitting `N * 8` as the byte count without checking field count:** Tuples with 0 or 1 fields are theoretically possible but should at minimum not crash; use `max 1 n` if needed (though LangThree tuples are always ≥ 2 elements in practice).
+- **Emitting `N * 8` as the byte count without checking field count:** Tuples with 0 or 1 fields are theoretically possible but should at minimum not crash; use `max 1 n` if needed (though FunLang tuples are always ≥ 2 elements in practice).
 - **Forgetting to bind the scrutinee before GEP:** In `LetPat(TuplePat, bindExpr, bodyExpr)`, the bindExpr must be fully elaborated to obtain the `tupPtrVal` BEFORE the GEP ops.
 
 ---
@@ -392,7 +392,7 @@ Phase 9 adds `LetPat (TuplePat (...))` immediately after these.
 - MLIR 20 `llvm.getelementptr` syntax: confirmed from existing `LlvmGEPLinearOp` in `Printer.fs` line 83
 
 ### Secondary (MEDIUM confidence)
-- LangThree `Ast.fs` tuple/pattern nodes: directly read from `../LangThree/src/LangThree/Ast.fs`
+- FunLang `Ast.fs` tuple/pattern nodes: directly read from `../FunLang/src/FunLang/Ast.fs`
 - Phase 7 RESEARCH.md patterns: `LlvmGEPLinearOp` as verified field accessor
 
 ---

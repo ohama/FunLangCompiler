@@ -603,12 +603,12 @@ Phase 39 has a single clean boundary: all changes are in `lang_runtime.c/h` and 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Complete elaborateExpr function; `eprintfn` pattern arms (lines 1649-1659) as model for sprintf dispatch; both externalFuncs lists; `addStringGlobal`, `coerceToPtrArg`, `freshName` utilities; `LlvmAddressOfOp`, `LlvmGEPStructOp`, `LlvmLoadOp` usage patterns
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — `lang_to_string_int` (lines 29-38) as model for snprintf+GC_malloc pattern; `LangString` struct layout (lines 12-15); existing `snprintf` usage for length measurement (lines 31, 269)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — All existing declarations; LangString forward declaration; Phase 38 pattern for declaration additions
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — Confirmed vararg call syntax is only for `@printf` (lines 115-117); standard `LlvmCallOp` syntax for non-vararg calls (lines 118-120)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — `LlvmCallOp`, `LlvmGEPStructOp`, `LlvmLoadOp`, `LlvmAddressOfOp` all exist as MlirOp cases
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/38-cli-arguments/38-RESEARCH.md` — Confirmed two-externalFuncs-list pitfall; %arg0/%arg1 naming; LangString/GC_malloc patterns
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — Complete elaborateExpr function; `eprintfn` pattern arms (lines 1649-1659) as model for sprintf dispatch; both externalFuncs lists; `addStringGlobal`, `coerceToPtrArg`, `freshName` utilities; `LlvmAddressOfOp`, `LlvmGEPStructOp`, `LlvmLoadOp` usage patterns
+- `src/FunLangCompiler.Compiler/lang_runtime.c` — `lang_to_string_int` (lines 29-38) as model for snprintf+GC_malloc pattern; `LangString` struct layout (lines 12-15); existing `snprintf` usage for length measurement (lines 31, 269)
+- `src/FunLangCompiler.Compiler/lang_runtime.h` — All existing declarations; LangString forward declaration; Phase 38 pattern for declaration additions
+- `src/FunLangCompiler.Compiler/Printer.fs` — Confirmed vararg call syntax is only for `@printf` (lines 115-117); standard `LlvmCallOp` syntax for non-vararg calls (lines 118-120)
+- `src/FunLangCompiler.Compiler/MlirIR.fs` — `LlvmCallOp`, `LlvmGEPStructOp`, `LlvmLoadOp`, `LlvmAddressOfOp` all exist as MlirOp cases
+- `.planning/phases/38-cli-arguments/38-RESEARCH.md` — Confirmed two-externalFuncs-list pitfall; %arg0/%arg1 naming; LangString/GC_malloc patterns
 
 ### Secondary (MEDIUM confidence)
 - POSIX `snprintf` with NULL/0 returning required length: standard behavior, confirmed present in glibc and macOS libc

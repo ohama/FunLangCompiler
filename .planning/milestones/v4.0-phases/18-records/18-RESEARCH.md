@@ -442,8 +442,8 @@ let preloadOps =
 ### Primary (HIGH confidence)
 - Codebase: `src/FunLangCompiler.Compiler/Elaboration.fs` — direct inspection of all existing patterns, stubs, and helper functions
 - Codebase: `src/FunLangCompiler.Compiler/MatchCompiler.fs` — direct inspection of `RecordCtor`, `desugarPattern`, `splitClauses`
-- Codebase: `LangThree/src/LangThree/Ast.fs` — direct inspection of `RecordExpr`, `RecordPat`, `RecordFieldDecl`, `RecordDecl` definitions
-- Codebase: `LangThree/src/LangThree/Parser.fsy` — confirmed parser always produces `RecordExpr(typeName = None, ...)`
+- Codebase: `FunLang/src/FunLang/Ast.fs` — direct inspection of `RecordExpr`, `RecordPat`, `RecordFieldDecl`, `RecordDecl` definitions
+- Codebase: `FunLang/src/FunLang/Parser.fsy` — confirmed parser always produces `RecordExpr(typeName = None, ...)`
 - Codebase: `src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed all needed ops are present
 
 ### Secondary (MEDIUM confidence)

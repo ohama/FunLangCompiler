@@ -8,11 +8,11 @@
 
 Phase 33 adds four new mutable collection types — StringBuilder (COL-01), HashSet (COL-02), Queue (COL-03), and MutableList (COL-04). Each follows the established three-layer pattern: (1) a new C struct + functions in `lang_runtime.c`, (2) a header declaration in `lang_runtime.h`, and (3) elaboration arms + externalFuncs entries in `Elaboration.fs`. All four types are fully absent from the compiler today; Phase 32 is complete and all its builtins are in place.
 
-The LangThree reference interpreter (Eval.fs) defines the exact semantics for all four types using .NET collection classes. The builtin naming in LangThree uses `stringbuilder_append` (not `stringbuilder_add`); the Phase 33 description says "add" but the correct canonical name from LangThree is `stringbuilder_append`. All other types use `hashset_add`, `queue_enqueue`/`queue_dequeue`, `mutablelist_add`/`mutablelist_get`/`mutablelist_set`/`mutablelist_count` — matching LangThree exactly.
+The FunLang reference interpreter (Eval.fs) defines the exact semantics for all four types using .NET collection classes. The builtin naming in FunLang uses `stringbuilder_append` (not `stringbuilder_add`); the Phase 33 description says "add" but the correct canonical name from FunLang is `stringbuilder_append`. All other types use `hashset_add`, `queue_enqueue`/`queue_dequeue`, `mutablelist_add`/`mutablelist_get`/`mutablelist_set`/`mutablelist_count` — matching FunLang exactly.
 
 The dominant pattern is: create-function returns `Ptr`, most mutating functions return void (→ `LlvmCallVoidOp` + `ArithConstantOp(unitVal, 0L)` for unit), query functions return I64. All new structs use `GC_malloc`. HashSet reuses the existing `lang_ht_hash` murmurhash3 infrastructure from LangHashtable. Queue uses a linked-list (LangCons) or a head/tail pointer struct. MutableList uses a growable int64_t array.
 
-**Primary recommendation:** Implement all four types as C structs in lang_runtime.c following the LangHashtable pattern, use the exact builtin names from LangThree, and follow the established void-return/unit pattern for all mutating operations.
+**Primary recommendation:** Implement all four types as C structs in lang_runtime.c following the LangHashtable pattern, use the exact builtin names from FunLang, and follow the established void-return/unit pattern for all mutating operations.
 
 ## Standard Stack
 
@@ -38,7 +38,7 @@ The dominant pattern is: create-function returns `Ptr`, most mutating functions 
 | Linked-list Queue | Circular buffer Queue | Linked list simpler to implement and GC-friendly; circular buffer needs modular arithmetic + resize |
 | Separate HashSet C struct | Reuse LangHashtable with dummy values | New struct is cleaner; reuse would muddle semantics and `lang_index_get` dispatch |
 | Growable array for MutableList | Static-sized array | Must support arbitrary `.Add()` calls; growable (cap doubling) is the correct approach |
-| stringbuilder_append name | stringbuilder_add | LangThree uses `stringbuilder_append`; phase description says "add" — use `stringbuilder_append` to match LangThree |
+| stringbuilder_append name | stringbuilder_add | FunLang uses `stringbuilder_append`; phase description says "add" — use `stringbuilder_append` to match FunLang |
 
 **Installation:** No new packages. Uses existing `<stdlib.h>` (`realloc` for StringBuilder/MutableList) and murmurhash3 already in lang_runtime.c.
 
@@ -105,7 +105,7 @@ Same shape for `hashset_create`, `queue_create`, `mutablelist_create`.
     let unitVal = { Name = freshName env; Type = I64 }
     (unitVal, hsOps @ valOps @ [LlvmCallVoidOp("@lang_hashset_add", [hsVal; valVal]); ArithConstantOp(unitVal, 0L)])
 ```
-Note: LangThree's `hashset_add` returns `bool` (whether newly added). For Phase 33, the phase description says "add" only — the return value is used in some FunLexYacc code. However, the phase success criteria just needs compilation to work. To match LangThree exactly: `hashset_add` returns `I64` (1 if new, 0 if duplicate). Use `LlvmCallOp` (not Void) for `hashset_add`. Use `LlvmCallVoidOp` for `queue_enqueue` and `mutablelist_add`.
+Note: FunLang's `hashset_add` returns `bool` (whether newly added). For Phase 33, the phase description says "add" only — the return value is used in some FunLexYacc code. However, the phase success criteria just needs compilation to work. To match FunLang exactly: `hashset_add` returns `I64` (1 if new, 0 if duplicate). Use `LlvmCallOp` (not Void) for `hashset_add`. Use `LlvmCallVoidOp` for `queue_enqueue` and `mutablelist_add`.
 
 ### Pattern 3: Query Functions Returning I64 (count)
 ```fsharp
@@ -157,7 +157,7 @@ Same shape for `queue_count`, `mutablelist_count`.
     let result = { Name = freshName env; Type = Ptr }
     (result, sbOps @ strOps @ [LlvmCallOp(result, "@lang_sb_append", [sbVal; strVal])])
 ```
-LangThree returns the StringBuilder value itself (for chaining). The C function should return `LangStringBuilder*`.
+FunLang returns the StringBuilder value itself (for chaining). The C function should return `LangStringBuilder*`.
 
 ### Pattern 7: mutablelist_set — three-arg, void return
 ```fsharp
@@ -179,9 +179,9 @@ Note: Must appear BEFORE two-arg `mutablelist_get` pattern (same three-arg-first
 - **Forgetting the duplicate externalFuncs:** Two lists at lines 2853 and 3058 — both must be updated.
 - **Using malloc/realloc without GC_malloc for new struct allocations:** StringBuilder and MutableList buffers must use GC_malloc for the initial buffer; however, the grow operation can use GC_malloc for a new block + memcpy (since Boehm GC does not support realloc). Do NOT use `realloc` — use a GC_malloc new block + memcpy + old block is collected.
 - **LangCons typedef ordering:** New struct definitions in lang_runtime.c must be placed after `LangCons` typedef. Use forward typedef if needed.
-- **hashset_add return type:** LangThree returns `bool` (1 or 0). The C function should return `int64_t` (not void). Use `LlvmCallOp` (not `LlvmCallVoidOp`) for `hashset_add`.
-- **queue_dequeue signature mismatch:** LangThree's `queue_dequeue` takes a Queue and a unit. The Elaboration pattern is two-arg curried: `App(App(Var "queue_dequeue", qExpr), unitExpr)`. The C function only takes the queue pointer: `lang_queue_dequeue(LangQueue* q)` — the unit arg is elaborated and discarded.
-- **stringbuilder_append vs stringbuilder_add:** Use `stringbuilder_append` to match LangThree exactly. Phase description says "add" but the interpreter name is `stringbuilder_append`.
+- **hashset_add return type:** FunLang returns `bool` (1 or 0). The C function should return `int64_t` (not void). Use `LlvmCallOp` (not `LlvmCallVoidOp`) for `hashset_add`.
+- **queue_dequeue signature mismatch:** FunLang's `queue_dequeue` takes a Queue and a unit. The Elaboration pattern is two-arg curried: `App(App(Var "queue_dequeue", qExpr), unitExpr)`. The C function only takes the queue pointer: `lang_queue_dequeue(LangQueue* q)` — the unit arg is elaborated and discarded.
+- **stringbuilder_append vs stringbuilder_add:** Use `stringbuilder_append` to match FunLang exactly. Phase description says "add" but the interpreter name is `stringbuilder_append`.
 
 ## Don't Hand-Roll
 
@@ -214,14 +214,14 @@ Note: Must appear BEFORE two-arg `mutablelist_get` pattern (same three-arg-first
 **Warning signs:** C compilation error: "unknown type name 'LangCons'".
 
 ### Pitfall 4: hashset_add return value — I64, not void
-**What goes wrong:** `hashset_add` should return `int64_t` (1 = newly added, 0 = already present), matching LangThree's `bool`. If declared void, callers that check `if hashset_add hs v then ...` will fail.
+**What goes wrong:** `hashset_add` should return `int64_t` (1 = newly added, 0 = already present), matching FunLang's `bool`. If declared void, callers that check `if hashset_add hs v then ...` will fail.
 **Why it happens:** Phase description says "add" without specifying return type; temptation to use void pattern.
 **How to avoid:** `int64_t lang_hashset_add(LangHashSet* hs, int64_t key)` returns 1 or 0. Use `LlvmCallOp` (not Void) in elaboration.
 **Warning signs:** FunLexYacc code that checks `if hs.Add(v) then ...` will produce wrong results.
 
 ### Pitfall 5: queue_dequeue currying — two-arg pattern required
 **What goes wrong:** Implementing `queue_dequeue` as one-arg (just the queue) while the language-level call is `queue_dequeue q ()` (two args).
-**Why it happens:** LangThree shows `"queue_dequeue", BuiltinValue (fun qVal -> BuiltinValue (fun _ -> ...))` — it's curried. The parser will generate `App(App(Var "queue_dequeue", q), unit)`.
+**Why it happens:** FunLang shows `"queue_dequeue", BuiltinValue (fun qVal -> BuiltinValue (fun _ -> ...))` — it's curried. The parser will generate `App(App(Var "queue_dequeue", q), unit)`.
 **How to avoid:** Match `App(App(Var "queue_dequeue", qExpr), unitExpr)` in Elaboration.fs. The C function takes only the queue pointer.
 **Warning signs:** "Partial application of queue_dequeue" elaboration failure — the one-arg arm would fire prematurely.
 
@@ -521,14 +521,14 @@ println (to_string (mutablelist_get ml 1))
 ## Open Questions
 
 1. **stringbuilder_append vs stringbuilder_add naming**
-   - What we know: LangThree Eval.fs uses `stringbuilder_append`. Phase 33 description says "add".
+   - What we know: FunLang Eval.fs uses `stringbuilder_append`. Phase 33 description says "add".
    - What's unclear: Whether "add" is intentional renaming or a typo in the phase description.
-   - Recommendation: Use `stringbuilder_append` to match LangThree exactly. The FunLexYacc source code uses `.Append()` method calls, and the LangThree interpreter recognizes `stringbuilder_append`. This avoids a name mismatch between interpreter and compiler.
+   - Recommendation: Use `stringbuilder_append` to match FunLang exactly. The FunLexYacc source code uses `.Append()` method calls, and the FunLang interpreter recognizes `stringbuilder_append`. This avoids a name mismatch between interpreter and compiler.
 
 2. **hashset_add boolean return vs unit**
-   - What we know: LangThree returns `BoolValue (hs.Add v)` — the return value is used in some FunLexYacc code that checks `if hs.Add(x) then ...`.
+   - What we know: FunLang returns `BoolValue (hs.Add v)` — the return value is used in some FunLexYacc code that checks `if hs.Add(x) then ...`.
    - What's unclear: Phase 33 success criteria doesn't mention testing the return value.
-   - Recommendation: Implement `lang_hashset_add` as returning `int64_t` (1 or 0). Use `LlvmCallOp` for the elaboration. This is consistent with LangThree and enables future FunLexYacc compilation.
+   - Recommendation: Implement `lang_hashset_add` as returning `int64_t` (1 or 0). Use `LlvmCallOp` for the elaboration. This is consistent with FunLang and enables future FunLexYacc compilation.
 
 3. **lang_hashset_* placement relative to lang_ht_hash**
    - What we know: `lang_ht_hash` is declared `static` at line 302 of lang_runtime.c. HashSet needs to call it.
@@ -541,17 +541,17 @@ println (to_string (mutablelist_get ml 1))
 5. **COL-04: mutablelist_set uses `lang_index_set` vs new function**
    - What we know: `lang_index_set` (already in Elaboration.fs) dispatches on collection type (hashtable vs array). It could be extended to dispatch on MutableList too.
    - What's unclear: Whether to extend `lang_index_set` or add a dedicated `mutablelist_set` builtin.
-   - Recommendation: Add dedicated `mutablelist_set` builtin (matches LangThree name exactly, no dispatch complexity). Do NOT extend `lang_index_set` — that would add a runtime tag requirement.
+   - Recommendation: Add dedicated `mutablelist_set` builtin (matches FunLang name exactly, no dispatch complexity). Do NOT extend `lang_index_set` — that would add a runtime tag requirement.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — lines 297–430 (LangHashtable pattern), 550–612 (Phase 32 additions), all struct and function layout patterns
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — current declarations (103 lines), no Phase 33 types present
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — lines 1086–1222 (Phase 32 patterns), 2853–2920 and 3058–3125 (both externalFuncs lists)
-- `/Users/ohama/vibe-coding/FunLangCompiler/../LangThree/src/LangThree/Eval.fs` — lines 684–797 (all four collection types, exact semantics, confirmed builtin names)
-- `/Users/ohama/vibe-coding/FunLangCompiler/langbackend-feature-requests.md` — lines 254–420 (Feature 7–11: C struct hints, FunLexYacc usage, test suggestions)
-- `/Users/ohama/vibe-coding/FunLangCompiler/tests/compiler/32-*.flt` — test file format and naming conventions
+- `src/FunLangCompiler.Compiler/lang_runtime.c` — lines 297–430 (LangHashtable pattern), 550–612 (Phase 32 additions), all struct and function layout patterns
+- `src/FunLangCompiler.Compiler/lang_runtime.h` — current declarations (103 lines), no Phase 33 types present
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — lines 1086–1222 (Phase 32 patterns), 2853–2920 and 3058–3125 (both externalFuncs lists)
+- `../FunLang/src/FunLang/Eval.fs` — lines 684–797 (all four collection types, exact semantics, confirmed builtin names)
+- `langbackend-feature-requests.md` — lines 254–420 (Feature 7–11: C struct hints, FunLexYacc usage, test suggestions)
+- `tests/compiler/32-*.flt` — test file format and naming conventions
 
 ### Secondary (MEDIUM confidence)
 - Phase 32 RESEARCH.md (`.planning/phases/32-hashtable-list-array-builtins/32-RESEARCH.md`) — confirmed externalFuncs duplication pitfall, GEP patterns, void-return pattern
@@ -560,7 +560,7 @@ println (to_string (mutablelist_get ml 1))
 
 **Confidence breakdown:**
 - Standard stack: HIGH — all files examined directly; no new libraries needed
-- Architecture: HIGH — four complete C struct implementations derived from working LangHashtable pattern; all LangThree reference implementations confirmed
+- Architecture: HIGH — four complete C struct implementations derived from working LangHashtable pattern; all FunLang reference implementations confirmed
 - Pitfalls: HIGH — GC_malloc vs realloc confirmed from existing pattern; duplicate externalFuncs confirmed from Elaboration.fs grep; ordering issues confirmed from hashtable_set precedent
 
 **Research date:** 2026-03-29

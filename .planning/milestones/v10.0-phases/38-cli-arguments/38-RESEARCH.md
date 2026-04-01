@@ -342,13 +342,13 @@ baz
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Complete elaborateProgram function, mainFunc construction (lines 3340, 3591), all existing builtin arms, both externalFuncs lists
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — LangString/LangCons struct layouts, GC_malloc usage, lang_range/lang_read_lines as list-building reference patterns
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — All existing function declarations; confirms `LangCons` forward-declared at line 28
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — `printFuncOp` (lines 165-177): confirms `%arg{i}` naming, `func.func` keyword, InputTypes rendering
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — `FuncOp`, `MlirBlock`, `MlirValue` type definitions; confirms `InputTypes: MlirType list` and `LlvmCallVoidOp`/`LlvmCallOp` exist
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` — Confirmed lang_runtime.c is compiled and linked automatically; no Pipeline changes needed
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/37-hashtable-string-keys/37-RESEARCH.md` — Documents the two-externalFuncs-list pitfall and LangCons head ptr-as-i64 convention
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — Complete elaborateProgram function, mainFunc construction (lines 3340, 3591), all existing builtin arms, both externalFuncs lists
+- `src/FunLangCompiler.Compiler/lang_runtime.c` — LangString/LangCons struct layouts, GC_malloc usage, lang_range/lang_read_lines as list-building reference patterns
+- `src/FunLangCompiler.Compiler/lang_runtime.h` — All existing function declarations; confirms `LangCons` forward-declared at line 28
+- `src/FunLangCompiler.Compiler/Printer.fs` — `printFuncOp` (lines 165-177): confirms `%arg{i}` naming, `func.func` keyword, InputTypes rendering
+- `src/FunLangCompiler.Compiler/MlirIR.fs` — `FuncOp`, `MlirBlock`, `MlirValue` type definitions; confirms `InputTypes: MlirType list` and `LlvmCallVoidOp`/`LlvmCallOp` exist
+- `src/FunLangCompiler.Compiler/Pipeline.fs` — Confirmed lang_runtime.c is compiled and linked automatically; no Pipeline changes needed
+- `.planning/phases/37-hashtable-string-keys/37-RESEARCH.md` — Documents the two-externalFuncs-list pitfall and LangCons head ptr-as-i64 convention
 
 ### Secondary (MEDIUM confidence)
 - LLVM opaque pointer ABI: `!llvm.ptr` in MLIR lowers to `ptr` in LLVM IR, which is ABI-compatible with `char**` — standard knowledge, no external source needed

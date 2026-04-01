@@ -1,4 +1,4 @@
-// Test: Parameter type annotations — plain and annotated params mixed (LangThree v8.0)
+// Test: Parameter type annotations — plain and annotated params mixed (FunLang v8.0)
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let f (x : int) y (z : bool) = if z then x else y

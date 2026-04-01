@@ -52,8 +52,8 @@ re_verification: false
 
 | From                              | To                         | Via                      | Status     | Details                                        |
 |-----------------------------------|----------------------------|--------------------------|------------|------------------------------------------------|
-| LangThree parser e1;e2            | LetPat(WildcardPat, e1, e2) | parser desugaring       | VERIFIED   | LetPat WildcardPat handler at Elaboration.fs line 545 |
-| LangThree parser if cond then e   | If(cond, e, Tuple([]))      | parser desugaring       | VERIFIED   | Tuple([]) = I64 0 at line 1364-1367; If handler at line 652 |
+| FunLang parser e1;e2            | LetPat(WildcardPat, e1, e2) | parser desugaring       | VERIFIED   | LetPat WildcardPat handler at Elaboration.fs line 545 |
+| FunLang parser if cond then e   | If(cond, e, Tuple([]))      | parser desugaring       | VERIFIED   | Tuple([]) = I64 0 at line 1364-1367; If handler at line 652 |
 | Elaboration.fs IndexGet handler   | lang_index_get              | LlvmCallOp              | VERIFIED   | Line 950: `LlvmCallOp(result, "@lang_index_get", [collVal; idxV])` |
 | Elaboration.fs IndexSet handler   | lang_index_set              | LlvmCallVoidOp          | VERIFIED   | Line 966: `LlvmCallVoidOp("@lang_index_set", [collVal; idxV; valV])` |
 | Elaboration.fs freeVars           | IndexGet/IndexSet           | pattern match           | VERIFIED   | Lines 166-169 both cases present               |

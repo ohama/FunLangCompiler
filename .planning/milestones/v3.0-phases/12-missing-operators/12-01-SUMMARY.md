@@ -74,7 +74,7 @@ completed: 2026-03-26
 
 ## Decisions Made
 - App(Lambda) inline path binds the argument in env and elaborates the body directly, avoiding closure allocation for immediately-applied lambdas
-- Char lowering uses F# `int64 (int c)` — no UTF-8 codec needed, BMP code point is what LangThree expects
+- Char lowering uses F# `int64 (int c)` — no UTF-8 codec needed, BMP code point is what FunLang expects
 - freeVars previously had a conservative `| _ -> Set.empty` catch-all; Modulo has two subexpressions so it MUST recurse both to correctly track free variables in closure bodies
 
 ## Deviations from Plan
@@ -83,7 +83,7 @@ completed: 2026-03-26
 
 **1. [Rule 1 - Bug] Plan test syntax used `let main = X` but parser expects bare expression**
 - **Found during:** Task 2 verification
-- **Issue:** The plan's smoke tests used `let main = 10 % 3` but the LangThree parser `start` rule expects a bare `Expr EOF`, not a top-level `let main = ...` binding
+- **Issue:** The plan's smoke tests used `let main = 10 % 3` but the FunLang parser `start` rule expects a bare `Expr EOF`, not a top-level `let main = ...` binding
 - **Fix:** Used bare expressions: `10 % 3`, `'A'`, `(fun x -> x + 1) 5`
 - **Files modified:** None (test syntax only)
 - **Verification:** All three expressions compiled and exited with correct codes
@@ -94,7 +94,7 @@ completed: 2026-03-26
 **Impact on plan:** No code changes needed — the compiler and tests are correct. Plan docs had wrong test syntax.
 
 ## Issues Encountered
-- Plan tests used `let main = ...` wrapper which doesn't parse. The LangThree CLI takes a bare expression. Fixed by using bare expressions in verification.
+- Plan tests used `let main = ...` wrapper which doesn't parse. The FunLang CLI takes a bare expression. Fixed by using bare expressions in verification.
 
 ## Next Phase Readiness
 - App(Lambda) inline call works: prerequisite for Plan 02 PipeRight is complete

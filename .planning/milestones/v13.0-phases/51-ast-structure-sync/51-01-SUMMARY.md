@@ -9,7 +9,7 @@ requires:
   - phase: 50-error-format
     provides: working Elaboration.fs baseline
 provides:
-  - Elaboration.fs compiles against updated LangThree AST with 5-field TypeDecl
+  - Elaboration.fs compiles against updated FunLang AST with 5-field TypeDecl
   - Explicit skip arms for TypeClassDecl, InstanceDecl, DerivingDecl in prePassDecls
 affects:
   - 52-typeclass-elaboration
@@ -40,7 +40,7 @@ completed: 2026-04-01
 
 # Phase 51 Plan 01: AST Structure Sync Summary
 
-**TypeDecl pattern updated to 5-field match and TypeClassDecl/InstanceDecl/DerivingDecl explicit skip arms added — build unblocked against LangThree v12.0 AST**
+**TypeDecl pattern updated to 5-field match and TypeClassDecl/InstanceDecl/DerivingDecl explicit skip arms added — build unblocked against FunLang v12.0 AST**
 
 ## Performance
 
@@ -87,7 +87,7 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-- Build is unblocked; Elaboration.fs compiles cleanly against LangThree v12.0 AST
+- Build is unblocked; Elaboration.fs compiles cleanly against FunLang v12.0 AST
 - Phase 52 (typeclass elaboration) can now proceed — `elaborateTypeclasses` function needs to be added
 - No blockers
 

@@ -4,7 +4,7 @@
 
 See: .planning/PROJECT.md (updated 2026-04-01)
 
-**Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
+**Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
 **Current focus:** Planning next milestone
 
 ## Current Position

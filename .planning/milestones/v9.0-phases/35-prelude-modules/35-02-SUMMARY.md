@@ -92,7 +92,7 @@ completed: 2026-03-29
 
 - `Prelude/Option.fun` — Option ADT + map, bind, defaultValue, iter, filter, isSome, isNone
 - `Prelude/Result.fun` — Result ADT + map, bind, mapError, defaultValue, toOption
-- `Prelude/List.fun` — 30+ list functions, adapted from LangThree with FunLangCompiler builtin names
+- `Prelude/List.fun` — 30+ list functions, adapted from FunLang with FunLangCompiler builtin names
 - `Prelude/Array.fun` — Array module wrapping all array_* builtins
 - `tests/compiler/35-05-option-module.flt` — Option.map, bind, defaultValue, isSome, isNone
 - `tests/compiler/35-06-result-module.flt` — Result.map, bind, defaultValue, toOption

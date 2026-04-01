@@ -50,8 +50,8 @@ key-decisions:
   - "eq builtin: string literals use strcmp, non-string literals use integer comparison; falls through to Prelude eq when eq is in KnownFuncs"
   - "replace-if-exists for redefined MLIR functions: avoids symbol redefinition when Prelude loads 4 show and 4 eq instances"
   - "to_string Ptr passthrough: to_string on a string pointer returns the string unchanged (extends to_string to handle strings)"
-  - "FunLangCompiler.Compiler.fsproj project reference updated from LangThree/LangThree.fsproj to LangThree/FunLang/FunLang.fsproj (LangThree was renamed)"
-  - "Program.fs namespace import updated from LangThree.IndentFilter to FunLang.IndentFilter"
+  - "FunLangCompiler.Compiler.fsproj project reference updated from FunLang/FunLang.fsproj to FunLang/FunLang/FunLang.fsproj (FunLang was renamed)"
+  - "Program.fs namespace import updated from FunLang.IndentFilter to FunLang.IndentFilter"
 
 patterns-established:
   - "Elaborator builtins for polymorphic functions: add cases before general App dispatch using Var(name) pattern match"
@@ -76,13 +76,13 @@ completed: 2026-04-01
 
 ## Accomplishments
 
-- Copied Typeclass.fun from LangThree Prelude (Show/Eq typeclasses for int/bool/string/char) verbatim
+- Copied Typeclass.fun from FunLang Prelude (Show/Eq typeclasses for int/bool/string/char) verbatim
 - Registered Typeclass.fun as first entry in CLI ordered Prelude load array
 - Enhanced elaborateTypeclasses with two-pass DerivingDecl expansion: ctorMap + LetDecl generation for Show and Eq
 - Added `show`/`eq` as elaborator builtins with static argument type dispatch (string literals, ints, bools)
 - Added replace-if-exists logic for MLIR function redefinition (4 show + 4 eq instances from Prelude no longer conflict)
 - Fixed `to_string` to handle Ptr (string) arguments by returning string unchanged
-- Fixed FunLangCompiler.Compiler.fsproj project reference (LangThree was renamed to FunLang)
+- Fixed FunLangCompiler.Compiler.fsproj project reference (FunLang was renamed to FunLang)
 - Created 5 E2E test pairs; all 5 pass with correct output
 
 ## Task Commits
@@ -93,7 +93,7 @@ completed: 2026-04-01
 
 ## Files Created/Modified
 
-- `Prelude/Typeclass.fun` - Show/Eq typeclass declarations and instances (copied from LangThree)
+- `Prelude/Typeclass.fun` - Show/Eq typeclass declarations and instances (copied from FunLang)
 - `src/FunLangCompiler.Cli/Program.fs` - Added Typeclass.fun as first entry in ordered array; fixed namespace import
 - `src/FunLangCompiler.Compiler/Elaboration.fs` - Two-pass DerivingDecl expansion, show/eq builtins, replace-if-exists, to_string Ptr fix
 - `src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` - Fixed project reference to FunLang.fsproj
@@ -109,10 +109,10 @@ completed: 2026-04-01
 
 ### Auto-fixed Issues
 
-**1. [Rule 3 - Blocking] FunLangCompiler.Compiler.fsproj referenced missing LangThree.fsproj**
+**1. [Rule 3 - Blocking] FunLangCompiler.Compiler.fsproj referenced missing FunLang.fsproj**
 - **Found during:** Task 1 (build verification)
-- **Issue:** Project referenced `LangThree/src/LangThree/LangThree.fsproj` but LangThree was renamed to FunLang. Build had 100+ errors.
-- **Fix:** Updated project reference to `LangThree/src/FunLang/FunLang.fsproj` and namespace import from LangThree.IndentFilter to FunLang.IndentFilter
+- **Issue:** Project referenced `FunLang/src/FunLang/FunLang.fsproj` but FunLang was renamed to FunLang. Build had 100+ errors.
+- **Fix:** Updated project reference to `FunLang/src/FunLang/FunLang.fsproj` and namespace import from FunLang.IndentFilter to FunLang.IndentFilter
 - **Files modified:** src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj, src/FunLangCompiler.Cli/Program.fs
 - **Verification:** `dotnet build` succeeds with 0 errors
 - **Committed in:** d028952 (Task 1 commit)
@@ -140,12 +140,12 @@ completed: 2026-04-01
 
 ## Issues Encountered
 
-- LangThree renamed its root namespace from `LangThree` to `FunLang` (parallel development). Updated both project reference and namespace import.
+- FunLang renamed its root namespace from `FunLang` to `FunLang` (parallel development). Updated both project reference and namespace import.
 - FunLangCompiler's lack of type dispatch required adding show/eq as elaborator builtins rather than relying purely on Prelude functions. This is the pragmatic solution given FunLangCompiler's untyped compilation model.
 
 ## Next Phase Readiness
 
-- v13.0 LangThree Typeclass Sync is now complete (Phase 52 + 53)
+- v13.0 FunLang Typeclass Sync is now complete (Phase 52 + 53)
 - show and eq work for int, string, and user-defined ADTs via deriving Show
 - Typeclass.fun is loaded as the first Prelude module
 - Ready for next milestone or feature phase

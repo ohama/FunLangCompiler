@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 25 implements module system support entirely within `Elaboration.fs` — no new MlirIR DU cases, no runtime C changes, no new NuGet packages. The work is compile-time AST transformation: the backend must process `ModuleDecl` nodes the same way the LangThree interpreter (`Eval.fs`) and type checker (`TypeCheck.fs`) already handle them.
+Phase 25 implements module system support entirely within `Elaboration.fs` — no new MlirIR DU cases, no runtime C changes, no new NuGet packages. The work is compile-time AST transformation: the backend must process `ModuleDecl` nodes the same way the FunLang interpreter (`Eval.fs`) and type checker (`TypeCheck.fs`) already handle them.
 
 The interpreter in `Eval.fs/evalModuleDecls` is the reference implementation. It recurses into `ModuleDecl` inner decls to register types and execute bindings, treats `OpenDecl` and `NamespaceDecl` as no-ops (or transparent scope flattening), handles `LetPatDecl` by evaluating and binding pattern variables, and resolves qualified names via `rewriteModuleAccess` before expression evaluation. The backend must mirror this behavior at the elaboration level, with two passes: `prePassDecls` (types/records/exceptions registration) and `extractMainExpr` (expression flattening).
 
@@ -22,9 +22,9 @@ This phase adds no new packages. All tooling is already present.
 | Component | Location | Purpose | Notes |
 |-----------|----------|---------|-------|
 | `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Primary change target — prePassDecls, extractMainExpr, elaborateExpr | All 6 requirements land here |
-| `Ast.fs` (LangThree) | `../LangThree/src/LangThree/Ast.fs` | Reference for ModuleDecl, OpenDecl, NamespaceDecl, LetPatDecl AST nodes | Read-only |
-| `TypeCheck.fs` (LangThree) | `../LangThree/src/LangThree/TypeCheck.fs` | Reference for rewriteModuleAccess logic | Read-only |
-| `Eval.fs` (LangThree) | `../LangThree/src/LangThree/Eval.fs` | Reference implementation for module semantics | Read-only |
+| `Ast.fs` (FunLang) | `../FunLang/src/FunLang/Ast.fs` | Reference for ModuleDecl, OpenDecl, NamespaceDecl, LetPatDecl AST nodes | Read-only |
+| `TypeCheck.fs` (FunLang) | `../FunLang/src/FunLang/TypeCheck.fs` | Reference for rewriteModuleAccess logic | Read-only |
+| `Eval.fs` (FunLang) | `../FunLang/src/FunLang/Eval.fs` | Reference implementation for module semantics | Read-only |
 
 ### Installation
 No new packages. Build with existing `dotnet build` and test with `dotnet run`.
@@ -393,14 +393,14 @@ let _ = println (to_string result)
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Lines 2315-2400: prePassDecls, extractMainExpr, elaborateProgram; Line 1777: FieldAccess handler; Lines 538-600: LetPat handlers
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` — Lines 1148-1281: evalModuleDecls reference implementation (ModuleDecl recursion, LetPatDecl, OpenDecl handling)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/TypeCheck.fs` — Lines 512-593: rewriteModuleAccess; Lines 820-906: ModuleDecl/OpenDecl/NamespaceDecl type check handling
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — Lines 311-352: Decl DU definition (ModuleDecl, OpenDecl, NamespaceDecl, LetPatDecl)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fsy` — Lines 491-545: Module syntax grammar
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — Lines 2315-2400: prePassDecls, extractMainExpr, elaborateProgram; Line 1777: FieldAccess handler; Lines 538-600: LetPat handlers
+- `deps/FunLang/src/FunLang/Eval.fs` — Lines 1148-1281: evalModuleDecls reference implementation (ModuleDecl recursion, LetPatDecl, OpenDecl handling)
+- `deps/FunLang/src/FunLang/TypeCheck.fs` — Lines 512-593: rewriteModuleAccess; Lines 820-906: ModuleDecl/OpenDecl/NamespaceDecl type check handling
+- `deps/FunLang/src/FunLang/Ast.fs` — Lines 311-352: Decl DU definition (ModuleDecl, OpenDecl, NamespaceDecl, LetPatDecl)
+- `deps/FunLang/src/FunLang/Parser.fsy` — Lines 491-545: Module syntax grammar
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/REQUIREMENTS.md` — MOD-01 through MOD-06 definitions
+- `.planning/REQUIREMENTS.md` — MOD-01 through MOD-06 definitions
 
 ## Metadata
 

@@ -61,7 +61,7 @@ completed: 2026-04-01
 - Prelude is now parsed under `"<prelude>"` filename, user code under actual inputPath
 - User code line numbers start at 1 (was off by 173 due to Prelude prepended as text)
 - 7 error test .flt files updated with correct line numbers
-- 216/217 E2E tests pass (43-02 has pre-existing LangThree build issue, unrelated)
+- 216/217 E2E tests pass (43-02 has pre-existing FunLang build issue, unrelated)
 
 ## Task Commits
 
@@ -93,7 +93,7 @@ None - plan executed exactly as written.
 
 ## Issues Encountered
 
-Test 43-02-return-type-annotation.flt fails due to a pre-existing LangThree apphost build issue (unrelated to our changes). This was already failing before plan execution.
+Test 43-02-return-type-annotation.flt fails due to a pre-existing FunLang apphost build issue (unrelated to our changes). This was already failing before plan execution.
 
 ## User Setup Required
 

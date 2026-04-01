@@ -1,4 +1,4 @@
-# LangThree Span Zeroing Bug — 수정 가이드
+# FunLang Span Zeroing Bug — 수정 가이드
 
 **Date:** 2026-03-31
 **Context:** FunLangCompiler v11.0 Phase 44에서 발견. `failWithSpan`이 `:0:0:` 출력.
@@ -8,7 +8,7 @@
 
 ## 1. 문제 요약
 
-LangThree 파서가 생성하는 AST 노드의 Span이 모두 `{FileName=""; StartLine=0; StartColumn=0}` 또는 `{FileName=filename; StartLine=1; StartColumn=0}`으로 채워짐. 실제 소스 코드의 행/열 위치가 반영되지 않음.
+FunLang 파서가 생성하는 AST 노드의 Span이 모두 `{FileName=""; StartLine=0; StartColumn=0}` 또는 `{FileName=filename; StartLine=1; StartColumn=0}`으로 채워짐. 실제 소스 코드의 행/열 위치가 반영되지 않음.
 
 **영향:** FunLangCompiler의 에러 메시지에 소스 위치를 표시할 수 없음.
 
@@ -51,7 +51,7 @@ lexbuf → Lexer.tokenize → 토큰 반환 + lexbuf.EndPos 업데이트
                      ruleSpan(parseState, 1, 3) → 내부 테이블에서 위치 조회
 ```
 
-LangThree는 IndentFilter를 위해 이 흐름을 끊음:
+FunLang는 IndentFilter를 위해 이 흐름을 끊음:
 ```
 lexbuf₁ → 전체 렉싱 → 토큰 리스트 → IndentFilter → 필터된 토큰 리스트
                                                           ↓
@@ -195,9 +195,9 @@ let inline failWithSpan (span: Ast.Span) fmt =
     ) fmt
 ```
 
-LangThree가 Span에 올바른 값을 채우면, FunLangCompiler의 에러 메시지에 자동으로 정확한 위치가 표시됨.
+FunLang가 Span에 올바른 값을 채우면, FunLangCompiler의 에러 메시지에 자동으로 정확한 위치가 표시됨.
 
 ---
 
 *이 문서는 FunLangCompiler v11.0 Phase 44 검증 과정에서 작성됨.*
-*LangThree 수정 시 이 가이드를 참조할 것.*
+*FunLang 수정 시 이 가이드를 참조할 것.*

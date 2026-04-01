@@ -7,7 +7,7 @@ tags: [fsharp, mlir, discriminated-union, ssa, ir]
 # Dependency graph
 requires: []
 provides:
-  - F# library project FunLangCompiler.Compiler with LangThree project reference
+  - F# library project FunLangCompiler.Compiler with FunLang project reference
   - MlirIR discriminated union types (MlirType, MlirValue, MlirOp, MlirBlock, MlirRegion, FuncOp, MlirModule)
   - Hardcoded return42Module value representing a well-typed `return 42` program in MlirIR
 affects:
@@ -17,7 +17,7 @@ affects:
 
 # Tech tracking
 tech-stack:
-  added: [dotnet-10, fsharp, LangThree (project reference)]
+  added: [dotnet-10, fsharp, FunLang (project reference)]
   patterns: [discriminated-union-ir, ssa-values, region-block-op-hierarchy]
 
 key-files:
@@ -45,7 +45,7 @@ completed: 2026-03-26
 
 # Phase 1 Plan 01: MlirIR Foundation Summary
 
-**F# compiler IR scaffold: MlirModule/FuncOp/MlirRegion/MlirBlock/MlirOp DU hierarchy with a well-typed `return42Module` value and LangThree project reference**
+**F# compiler IR scaffold: MlirModule/FuncOp/MlirRegion/MlirBlock/MlirOp DU hierarchy with a well-typed `return42Module` value and FunLang project reference**
 
 ## Performance
 
@@ -57,7 +57,7 @@ completed: 2026-03-26
 
 ## Accomplishments
 
-- Created FunLangCompiler.Compiler F# library project with ProjectReference to LangThree
+- Created FunLangCompiler.Compiler F# library project with ProjectReference to FunLang
 - Defined MlirIR discriminated union types covering the full Region > Block > Op hierarchy
 - Implemented `return42Module` as a well-typed MlirModule value (no string manipulation)
 
@@ -72,7 +72,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` - F# classlib with LangThree ProjectReference and MlirIR.fs compile entry
+- `src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` - F# classlib with FunLang ProjectReference and MlirIR.fs compile entry
 - `src/FunLangCompiler.Compiler/MlirIR.fs` - MlirIR DU types and return42Module value
 - `.gitignore` - Covers bin/ and obj/ directories
 

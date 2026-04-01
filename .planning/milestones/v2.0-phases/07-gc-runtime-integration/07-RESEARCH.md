@@ -14,7 +14,7 @@ The GC integration requires only two new external function declarations in the M
 
 Closure environment migration is straightforward: replace the two-op sequence `(ArithConstantOp(1), LlvmAllocaOp)` in `elaborateExpr` App dispatch with a bytes-constant + `LlvmCallOp(@GC_malloc)`. The caller-allocates interface of the closure-maker functions (`@add_n` takes `(i64, ptr) -> ptr`) is unchanged — the only difference is that the ptr passed in now points to GC heap instead of stack. Escaped closures (returned from their defining function) now work correctly because the env outlives the stack frame.
 
-`print`/`println` are builtin variables in LangThree's `Eval.initialBuiltinEnv`. They appear in the parsed AST as `App(Var("print", _), String("hello", _), _)`. The MLIR implementation emits a module-level string constant (`llvm.mlir.global internal constant`) plus an `llvm.call @printf` with vararg syntax. `MlirModule` needs a new `Globals` field for these string constants, and `MlirModule` needs an `ExternalFuncs` field for the `llvm.func` declarations.
+`print`/`println` are builtin variables in FunLang's `Eval.initialBuiltinEnv`. They appear in the parsed AST as `App(Var("print", _), String("hello", _), _)`. The MLIR implementation emits a module-level string constant (`llvm.mlir.global internal constant`) plus an `llvm.call @printf` with vararg syntax. `MlirModule` needs a new `Globals` field for these string constants, and `MlirModule` needs an `ExternalFuncs` field for the `llvm.func` declarations.
 
 **Primary recommendation:** Add `Globals` + `ExternalFuncs` to `MlirModule`, two new `MlirOp` cases (`LlvmCallOp` and `LlvmCallVoidOp`), handle `App(Var("print"|"println"), String(s), _)` specially in `elaborateExpr`, prepend `LlvmCallVoidOp("@GC_init", [])` to `@main`'s entry block, and add platform-aware `-lgc` flags in `Pipeline.fs`.
 
@@ -440,7 +440,7 @@ let gcLinkFlags =
 ## Open Questions
 
 1. **print/println with non-String arguments**
-   - What we know: The LangThree Eval builtins fail at runtime if arg is not StringValue.
+   - What we know: The FunLang Eval builtins fail at runtime if arg is not StringValue.
    - What's unclear: Should the backend handle `App(Var("print"), Var(x))` where x might be a string?
    - Recommendation: For Phase 7 scope, only handle the `String` literal case (`App(Var("print"), String(s, _), _)`). Variable arguments require a full string type in the IR (future phase).
 
@@ -472,7 +472,7 @@ let gcLinkFlags =
 
 ### Secondary (MEDIUM confidence)
 - Boehm GC bdw-gc 8.2.12 pkg-config at `/opt/homebrew/opt/bdw-gc/lib/pkgconfig/bdw-gc.pc`
-- LangThree `Eval.fs` lines 230-246 — confirmed `print`/`println` appear as `App(Var("print"), String(s))` in AST
+- FunLang `Eval.fs` lines 230-246 — confirmed `print`/`println` appear as `App(Var("print"), String(s))` in AST
 
 ---
 

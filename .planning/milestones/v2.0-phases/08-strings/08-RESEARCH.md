@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 8 extends the FunLangCompiler compiler to compile LangThree string literals into heap-allocated
+Phase 8 extends the FunLangCompiler compiler to compile FunLang string literals into heap-allocated
 two-field structs (`{i64 length, ptr data}`) and wire up the string builtins `string_length`,
 `string_concat`, `to_string`, and `=`/`<>` for strings. The codebase already supports string
 globals (Phase 7 print/println), GC_malloc heap allocation, and LlvmCallOp/LlvmCallVoidOp — all
@@ -390,7 +390,7 @@ for Phase 9 tuples.
 ### Primary (HIGH confidence)
 
 - Direct code inspection of MlirIR.fs, Elaboration.fs, Printer.fs, Pipeline.fs — exact types and patterns
-- Direct code inspection of LangThree/src/LangThree/Ast.fs — String(string * span) literal node confirmed
+- Direct code inspection of FunLang/src/FunLang/Ast.fs — String(string * span) literal node confirmed
 - MLIR 20 LLVM dialect docs (pattern from existing codebase) — llvm.getelementptr inbounds syntax
 
 ### Secondary (MEDIUM confidence)

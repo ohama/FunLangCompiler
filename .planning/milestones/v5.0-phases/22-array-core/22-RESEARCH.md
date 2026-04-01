@@ -137,7 +137,7 @@ LangArray lang_array_create(int64_t n, int64_t default_val) {
 void lang_array_bounds_check(int64_t* arr, int64_t i) {
     int64_t len = arr[0];
     if (i < 0 || i >= len) {
-        // Raise exception consistent with LangThree evaluator
+        // Raise exception consistent with FunLang evaluator
         // The evaluator raises StringValue "Array.get: index N out of bounds (length M)"
         // lang_failwith calls lang_throw internally (see existing pattern)
         char msg[128];
@@ -180,7 +180,7 @@ LangCons* lang_array_to_list(int64_t* arr) {
 }
 ```
 
-**Note on `lang_array_bounds_check`:** The LangThree evaluator raises `LangThreeException(StringValue(...))`. To match this, `lang_array_bounds_check` should call `lang_throw` with a proper exception value. However, the simplest approach for Phase 22 is to call `lang_failwith` (which already calls `lang_throw`). This exits correctly but with a simpler message format. Match the exact evaluator message format if test 22-05 checks the exception payload.
+**Note on `lang_array_bounds_check`:** The FunLang evaluator raises `FunLangException(StringValue(...))`. To match this, `lang_array_bounds_check` should call `lang_throw` with a proper exception value. However, the simplest approach for Phase 22 is to call `lang_failwith` (which already calls `lang_throw`). This exits correctly but with a simpler message format. Match the exact evaluator message format if test 22-05 checks the exception payload.
 
 ### Pattern 4: array_length Elaboration (Inline, ARR-04)
 
@@ -478,21 +478,21 @@ LangCons* lang_array_to_list(int64_t* arr) {
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed `LlvmGEPLinearOp` takes `int` (compile-time constant); no dynamic variant exists
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — confirmed GEP printer output format; `LlvmGEPLinearOp` → `llvm.getelementptr %ptr[N]`
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — confirmed string_length inline GEP pattern; ExternalFuncDecl list locations (lines ~2036, ~2169); two-list requirement
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed LangCons struct layout; GC_malloc usage patterns; lang_range loop pattern
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/STATE.md` — authoritative project decision: one-block GC_malloc((n+1)*8) layout
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/REQUIREMENTS.md` — authoritative requirements: ARR-01 through ARR-07 specifications
-- Direct code analysis of `../LangThree/src/LangThree/Eval.fs` — confirmed array builtin semantics: bounds check + OOB exception; array_of_list/array_to_list round-trip behavior
+- Direct code analysis of `src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed `LlvmGEPLinearOp` takes `int` (compile-time constant); no dynamic variant exists
+- Direct code analysis of `src/FunLangCompiler.Compiler/Printer.fs` — confirmed GEP printer output format; `LlvmGEPLinearOp` → `llvm.getelementptr %ptr[N]`
+- Direct code analysis of `src/FunLangCompiler.Compiler/Elaboration.fs` — confirmed string_length inline GEP pattern; ExternalFuncDecl list locations (lines ~2036, ~2169); two-list requirement
+- Direct code analysis of `src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed LangCons struct layout; GC_malloc usage patterns; lang_range loop pattern
+- `.planning/STATE.md` — authoritative project decision: one-block GC_malloc((n+1)*8) layout
+- `.planning/REQUIREMENTS.md` — authoritative requirements: ARR-01 through ARR-07 specifications
+- Direct code analysis of `../FunLang/src/FunLang/Eval.fs` — confirmed array builtin semantics: bounds check + OOB exception; array_of_list/array_to_list round-trip behavior
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/ARCHITECTURE.md` — array section; note: C-runtime-only recommendation superseded by REQUIREMENTS.md inline GEP spec, but C function signatures remain accurate
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/PITFALLS.md` — M-17 (bounds check), M-18 (GC_malloc variant) confirmed
+- `.planning/research/ARCHITECTURE.md` — array section; note: C-runtime-only recommendation superseded by REQUIREMENTS.md inline GEP spec, but C function signatures remain accurate
+- `.planning/research/PITFALLS.md` — M-17 (bounds check), M-18 (GC_malloc variant) confirmed
 - WebSearch: MLIR `llvm.getelementptr` with SSA-value index syntax confirmed: `%r = llvm.getelementptr %ptr[%idx] : (!llvm.ptr, i64) -> !llvm.ptr, T` (https://mlir.llvm.org/docs/Dialects/LLVM/)
 
 ### Tertiary (LOW confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/FEATURES.md` — original two-vs-one-block analysis; superseded by STATE.md decision
+- `.planning/research/FEATURES.md` — original two-vs-one-block analysis; superseded by STATE.md decision
 
 ## Metadata
 

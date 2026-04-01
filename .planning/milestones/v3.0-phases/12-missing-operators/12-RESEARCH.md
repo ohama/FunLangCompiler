@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 12 adds five missing operators to the FunLangCompiler compiler: Modulo (%), Char literals, PipeRight (|>), ComposeRight (>>), and ComposeLeft (<<). All five AST nodes already exist in LangThree's Ast.fs. The compiler pipeline (Elaboration.fs) has no cases for them, causing match exceptions at runtime.
+Phase 12 adds five missing operators to the FunLangCompiler compiler: Modulo (%), Char literals, PipeRight (|>), ComposeRight (>>), and ComposeLeft (<<). All five AST nodes already exist in FunLang's Ast.fs. The compiler pipeline (Elaboration.fs) has no cases for them, causing match exceptions at runtime.
 
 The work splits cleanly into three categories:
 1. **New MlirOp + one Elaboration case**: Modulo requires `ArithRemSIOp` added to MlirIR.fs, a print case in Printer.fs, and one elaboration case matching `Divide`'s pattern exactly.
@@ -29,7 +29,7 @@ All five operators reuse existing infrastructure. No new NuGet packages, no new 
 
 ## Architecture Patterns
 
-### AST Representation (LangThree/src/LangThree/Ast.fs)
+### AST Representation (FunLang/src/FunLang/Ast.fs)
 
 ```fsharp
 // Lines 65, 105-111
@@ -110,7 +110,7 @@ This is a one-liner that recursively dispatches to the existing `App` elaboratio
     elaborateExpr env lambda
 ```
 
-**Important:** Use a fresh name that does not collide with user variables. Prefix `__comp_` is safe since the LangThree parser never produces identifiers starting with `__`.
+**Important:** Use a fresh name that does not collide with user variables. Prefix `__comp_` is safe since the FunLang parser never produces identifiers starting with `__`.
 
 ### Pattern 5: ComposeLeft Desugar (f << g)
 
@@ -219,7 +219,7 @@ This fixes both PipeRight-with-lambda and any other inline lambda application.
 
 ### Primary (HIGH confidence)
 - MLIR arith dialect docs: `arith.remsi` is the canonical signed remainder op (same format as `arith.divsi`)
-- LangThree Ast.fs (read directly): confirmed all 5 AST node shapes
+- FunLang Ast.fs (read directly): confirmed all 5 AST node shapes
 - Elaboration.fs (read directly): confirmed App dispatch limitation at line 718
 
 ### Secondary (MEDIUM confidence)

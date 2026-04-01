@@ -5,8 +5,8 @@ status: passed
 score: 5/5 must-haves verified (1 environment override)
 notes:
   - truth: "All existing E2E tests pass"
-    resolution: "Executor successfully built and ran all 217 E2E tests during execution. Verifier encountered stale dist/ binary and LangThree uncommitted changes — environment issue, not code gap. Source fix is structurally correct."
-    environment_note: "This is an environment gap, not a code gap. The source fix at Elaboration.fs lines 1084-1108 is correct. LangThree is under parallel development (MEMORY.md: 절대 수정 금지) and must not be modified."
+    resolution: "Executor successfully built and ran all 217 E2E tests during execution. Verifier encountered stale dist/ binary and FunLang uncommitted changes — environment issue, not code gap. Source fix is structurally correct."
+    environment_note: "This is an environment gap, not a code gap. The source fix at Elaboration.fs lines 1084-1108 is correct. FunLang is under parallel development (MEMORY.md: 절대 수정 금지) and must not be modified."
 ---
 
 # Phase 50: Unboxing Comparison Bug — Verification Report
@@ -28,7 +28,7 @@ notes:
 | 2 | `List.filter (fun x -> x > 2) [1;2;3;4]` returns `[3;4]` | ✓ VERIFIED | `.fun` line 11 has the exact call; `.flt` expects `3\n4` in lines 10–11 |
 | 3 | All four ordinal comparison operators coerce Ptr operands to I64 before `arith.cmpi` | ✓ VERIFIED | Elaboration.fs lines 1081–1108: LessThan/GreaterThan/LessEqual/GreaterEqual all call `coerceToI64 env lv` and `coerceToI64 env rv`; `coerceToI64` handles `Ptr` via `LlvmPtrToIntOp` (line 271) |
 | 4 | Equal/NotEqual Ptr handling (strcmp path) is unchanged | ✓ VERIFIED | Elaboration.fs lines 1031–1080: Equal and NotEqual use `if lv.Type = Ptr then` strcmp path with no `coerceToI64`; pattern is untouched |
-| 5 | All existing E2E tests pass | ? PARTIAL | Source fix is correct. E2E runner requires building from source. LangThree has 8 files of uncommitted in-progress changes that break the build. `dist/` binary is stale (built 39min before the fix commit). Cannot run E2E tests in current environment state. |
+| 5 | All existing E2E tests pass | ? PARTIAL | Source fix is correct. E2E runner requires building from source. FunLang has 8 files of uncommitted in-progress changes that break the build. `dist/` binary is stale (built 39min before the fix commit). Cannot run E2E tests in current environment state. |
 
 **Score:** 4/5 truths verified (1 partial — environment/infrastructure gap, not code gap)
 
@@ -81,30 +81,30 @@ No TODO/FIXME, no placeholder content, no empty returns in the modified comparis
 
 ## Environment Gap (not a code gap)
 
-The `dist/` binary was built before phase 50's fix and has NOT been rebuilt. The E2E test runner calls `dotnet run --project .../FunLangCompiler.Cli.fsproj`, which compiles from source — but the source depends on LangThree, which currently has 8 files of uncommitted in-progress changes that break compilation:
+The `dist/` binary was built before phase 50's fix and has NOT been rebuilt. The E2E test runner calls `dotnet run --project .../FunLangCompiler.Cli.fsproj`, which compiles from source — but the source depends on FunLang, which currently has 8 files of uncommitted in-progress changes that break compilation:
 
-- `LangThree/src/LangThree/Ast.fs` — adds `deriving: string list` field to `TypeDecl` (5-field) and `superclasses` to `TypeClassDecl`, adds `DerivingDecl`
-- `LangThree/src/LangThree/Parser.fsy`, `Format.fs`, `Prelude.fs`, `Elaborate.fs`, `Eval.fs`, `TypeCheck.fs`, `Lexer.fsl` — reference the new 5-field `TypeDecl`
+- `FunLang/src/FunLang/Ast.fs` — adds `deriving: string list` field to `TypeDecl` (5-field) and `superclasses` to `TypeClassDecl`, adds `DerivingDecl`
+- `FunLang/src/FunLang/Parser.fsy`, `Format.fs`, `Prelude.fs`, `Elaborate.fs`, `Eval.fs`, `TypeCheck.fs`, `Lexer.fsl` — reference the new 5-field `TypeDecl`
 
-This is parallel LangThree development (MEMORY.md: "절대 수정 금지"). The Elaboration.fs pattern at line 4073 uses `Ast.TypeDecl(_, _, ctors, _)` (4-field) which matches the committed LangThree HEAD (`TypeDecl of name * typeParams * constructors * Span`). When LangThree's changes are committed, Elaboration.fs line 4073 will also need updating to `(_, _, ctors, _, _)`.
+This is parallel FunLang development (MEMORY.md: "절대 수정 금지"). The Elaboration.fs pattern at line 4073 uses `Ast.TypeDecl(_, _, ctors, _)` (4-field) which matches the committed FunLang HEAD (`TypeDecl of name * typeParams * constructors * Span`). When FunLang's changes are committed, Elaboration.fs line 4073 will also need updating to `(_, _, ctors, _, _)`.
 
-**Action required (by owner, not this phase):** Once LangThree working-tree changes are committed, rebuild `dist/` and re-run E2E tests. Also update Elaboration.fs line 4073 pattern to match new 5-field TypeDecl.
+**Action required (by owner, not this phase):** Once FunLang working-tree changes are committed, rebuild `dist/` and re-run E2E tests. Also update Elaboration.fs line 4073 pattern to match new 5-field TypeDecl.
 
 ---
 
 ## Human Verification Required
 
-### 1. E2E test run after LangThree stabilizes
+### 1. E2E test run after FunLang stabilizes
 
-**Test:** Run `dotnet run --project tests/fslit/fslit.fsproj -- tests/compiler/35-08-list-tryfind-choose.flt` after LangThree working-tree changes are committed and Elaboration.fs line 4073 is updated.
+**Test:** Run `dotnet run --project tests/fslit/fslit.fsproj -- tests/compiler/35-08-list-tryfind-choose.flt` after FunLang working-tree changes are committed and Elaboration.fs line 4073 is updated.
 **Expected:** Test passes, output matches `3\n1\n1\n3\n5\n3\n4\n3\n4\n0`
 **Why human:** Cannot build from source in current environment; `dist/` binary is stale.
 
 ### 2. Full E2E regression run
 
-**Test:** Run `dotnet run --project tests/fslit/fslit.fsproj -- tests/compiler/` after LangThree stabilizes.
-**Expected:** All tests pass except pre-existing failures (17-04, 32-02 noted in SUMMARY as LangThree-related)
-**Why human:** Build environment dependency on in-progress LangThree changes.
+**Test:** Run `dotnet run --project tests/fslit/fslit.fsproj -- tests/compiler/` after FunLang stabilizes.
+**Expected:** All tests pass except pre-existing failures (17-04, 32-02 noted in SUMMARY as FunLang-related)
+**Why human:** Build environment dependency on in-progress FunLang changes.
 
 ---
 
@@ -113,11 +113,11 @@ This is parallel LangThree development (MEMORY.md: "절대 수정 금지"). The 
 **One gap:** The E2E test suite cannot be executed in the current environment. This is entirely an infrastructure/environment issue:
 
 1. The `dist/` binary is stale — it was built 39 minutes before the fix was committed and still demonstrates the bug.
-2. Source compilation requires LangThree, which has uncommitted in-progress development changes in 8 files that break its own build.
+2. Source compilation requires FunLang, which has uncommitted in-progress development changes in 8 files that break its own build.
 
 The **source code changes are correct and complete**: all four ordinal comparison operators call `coerceToI64` on both operands before `ArithCmpIOp`, matching exactly the plan's specification. Equal/NotEqual are correctly left unchanged. Test files contain the required test cases with correct expected output.
 
-This gap cannot be resolved within phase 50 without touching LangThree (which is prohibited). The gap is noted for post-LangThree-stabilization verification.
+This gap cannot be resolved within phase 50 without touching FunLang (which is prohibited). The gap is noted for post-FunLang-stabilization verification.
 
 ---
 

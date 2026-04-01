@@ -6,11 +6,11 @@
 
 ## Summary
 
-Phase 27 adds eight builtins to the FunLangCompiler compiler: `read_lines`, `write_lines`, `stdin_read_line`, `stdin_read_all`, `get_env`, `get_cwd`, `path_combine`, and `dir_files`. This is a direct continuation of Phase 26 and follows the identical three-layer pattern: C helper in `lang_runtime.c`, declaration in `lang_runtime.h`, `ExternalFuncDecl` in both `externalFuncs` lists in `Elaboration.fs`, and pattern-match arms in `elaborateExpr`. All eight builtins are already implemented in LangThree's `Eval.fs` (reference interpreter), so exact behavior is known.
+Phase 27 adds eight builtins to the FunLangCompiler compiler: `read_lines`, `write_lines`, `stdin_read_line`, `stdin_read_all`, `get_env`, `get_cwd`, `path_combine`, and `dir_files`. This is a direct continuation of Phase 26 and follows the identical three-layer pattern: C helper in `lang_runtime.c`, declaration in `lang_runtime.h`, `ExternalFuncDecl` in both `externalFuncs` lists in `Elaboration.fs`, and pattern-match arms in `elaborateExpr`. All eight builtins are already implemented in FunLang's `Eval.fs` (reference interpreter), so exact behavior is known.
 
 The primary new complexity versus Phase 26 is list-handling. Three builtins return `string list` (`read_lines`, `dir_files`) or consume one (`write_lines`). In the MLIR ABI, a `string list` is a `LangCons*` linked list where each `cell->head` (an `int64_t`) stores a `LangString*` cast to `int64_t`. This is the same pointer-cast-to-i64 pattern used by `lang_hashtable_keys` (which stores keys as `int64_t`) — except here the head value is a pointer. The second new complexity is new POSIX headers: `<dirent.h>` for `dir_files` and `<unistd.h>` for `get_cwd` must be added to `lang_runtime.c`.
 
-All type signatures are locked in `LangThree/TypeCheck.fs`. The reference implementations are locked in `LangThree/Eval.fs`. The externalFuncs pattern, elaboration arm patterns, and test format are directly copied from Phase 26.
+All type signatures are locked in `FunLang/TypeCheck.fs`. The reference implementations are locked in `FunLang/Eval.fs`. The externalFuncs pattern, elaboration arm patterns, and test format are directly copied from Phase 26.
 
 **Primary recommendation:** Implement all eight builtins as C functions in `lang_runtime.c`, add their declarations to `lang_runtime.h`, register them in both `externalFuncs` lists in `Elaboration.fs`, add pattern-match arms in `elaborateExpr`, and add E2E `.flt` tests following the Phase 26 test format.
 
@@ -340,7 +340,7 @@ Elaboration arm (two-arg returning Ptr):
 
 **What:** C function takes a `LangString*` directory path, opens it with `opendir`, iterates entries with `readdir`, skips `.` and `..`, builds a `LangCons*` list of `LangString*` filenames (not full paths, matching `Directory.GetFiles` on the last component).
 
-**Important:** LangThree's `Eval.fs` uses `Directory.GetFiles(path)` which returns **full absolute paths**. The C implementation should match this — combine `path` + `/` + `d_name` to produce full paths (not bare filenames). Verify against `Eval.fs` line 415: `let files = System.IO.Directory.GetFiles(path)`.
+**Important:** FunLang's `Eval.fs` uses `Directory.GetFiles(path)` which returns **full absolute paths**. The C implementation should match this — combine `path` + `/` + `d_name` to produce full paths (not bare filenames). Verify against `Eval.fs` line 415: `let files = System.IO.Directory.GetFiles(path)`.
 
 ```c
 // Source: lang_runtime.c
@@ -419,7 +419,7 @@ Both `externalFuncs` lists in `Elaboration.fs` (around lines 2376 and 2553) must
 
 ### Anti-Patterns to Avoid
 
-- **Fixed-size line buffer in read_lines:** Using a stack buffer like `char line_buf[4096]` truncates lines longer than 4095 bytes. Since these are GC-managed programs, consider this an acceptable tradeoff but document the limit. For Phase 27 this is acceptable given LangThree's `File.ReadAllLines` also has practical limits.
+- **Fixed-size line buffer in read_lines:** Using a stack buffer like `char line_buf[4096]` truncates lines longer than 4095 bytes. Since these are GC-managed programs, consider this an acceptable tradeoff but document the limit. For Phase 27 this is acceptable given FunLang's `File.ReadAllLines` also has practical limits.
 - **Using `realloc` instead of `GC_malloc`:** The GC owns all memory. Never call `malloc`/`realloc`/`free`. When growing a buffer, allocate a new `GC_malloc` block and `memcpy`.
 - **Forgetting `d_type` check for dir_files:** `readdir` returns all directory entries including subdirectories and symlinks. `Directory.GetFiles` on .NET returns only files. Use `d_type == DT_REG` (regular file) check, with `DT_UNKNOWN` fallback for filesystems that don't set d_type.
 - **Using empty dir path for get_cwd:** `getcwd` requires a buffer. The 4096-byte static buffer is sufficient for PATH_MAX (typically 4096 on Linux/macOS).
@@ -464,7 +464,7 @@ Both `externalFuncs` lists in `Elaboration.fs` (around lines 2376 and 2553) must
 
 **What goes wrong:** Confusing `stdin_read_line` (read one line) with `stdin_read_all` (read all of stdin until EOF).
 **Why it happens:** Both use fgetc loop; they differ in termination condition.
-**How to avoid:** `stdin_read_line` terminates on `\n` OR `EOF`. `stdin_read_all` terminates only on `EOF`. Match LangThree's `Console.In.ReadToEnd()` vs `Console.In.ReadLine()`.
+**How to avoid:** `stdin_read_line` terminates on `\n` OR `EOF`. `stdin_read_all` terminates only on `EOF`. Match FunLang's `Console.In.ReadToEnd()` vs `Console.In.ReadLine()`.
 **Warning signs:** `stdin_read_all` tests end early; pipe tests with multi-line input only produce first line.
 
 ### Pitfall 5: dir_files order not guaranteed
@@ -577,9 +577,9 @@ This is an internal compiler project with no external library evolution.
 ## Open Questions
 
 1. **dir_files: full paths vs. bare filenames**
-   - What we know: LangThree `Eval.fs` line 415 uses `Directory.GetFiles(path)` which returns full absolute paths (e.g., `/tmp/dir/file.txt`, not just `file.txt`).
+   - What we know: FunLang `Eval.fs` line 415 uses `Directory.GetFiles(path)` which returns full absolute paths (e.g., `/tmp/dir/file.txt`, not just `file.txt`).
    - What's unclear: Do tests in Phase 27 rely on full paths or just filenames? The requirement (FIO-13) says "lists files in directory" without specifying path format.
-   - Recommendation: Match LangThree behavior — return full paths (dir + "/" + d_name). If `dir` is relative, the result will be relative (e.g., `./dir/file.txt`). Tests should be written to extract the last component if needed.
+   - Recommendation: Match FunLang behavior — return full paths (dir + "/" + d_name). If `dir` is relative, the result will be relative (e.g., `./dir/file.txt`). Tests should be written to extract the last component if needed.
 
 2. **read_lines: trailing newline on last line**
    - What we know: `fgets` includes the `\n` in the buffer if present. `File.ReadAllLines` in .NET strips the `\n`. The C implementation strips `\n` (and `\r\n`) in the loop.
@@ -600,8 +600,8 @@ This is an internal compiler project with no external library evolution.
 
 ### Primary (HIGH confidence)
 
-- Direct code reading: `LangThree/Eval.fs` lines 350-417 — exact implementations of all 8 builtins; error messages, edge cases (stdin EOF returns "", get_env null check, dir_files missing dir)
-- Direct code reading: `LangThree/TypeCheck.fs` lines 84-104 — exact type signatures for all 8 builtins
+- Direct code reading: `FunLang/Eval.fs` lines 350-417 — exact implementations of all 8 builtins; error messages, edge cases (stdin EOF returns "", get_env null check, dir_files missing dir)
+- Direct code reading: `FunLang/TypeCheck.fs` lines 84-104 — exact type signatures for all 8 builtins
 - Direct code reading: `lang_runtime.c` — LangString struct, LangCons struct, existing patterns for lang_file_read (string return), lang_file_write (void two-arg), lang_hashtable_keys (LangCons* return), lang_range (cursor-based cons building)
 - Direct code reading: `Elaboration.fs` lines 875-969 — exact elaboration patterns for array_to_list (one-arg Ptr return), hashtable_keys (one-arg Ptr return), write_file (two-arg void), hashtable_create (unit-arg)
 - Direct code reading: `Elaboration.fs` lines 2376-2381 and 2553-2558 — both externalFuncs list locations for Phase 26 entries
@@ -622,7 +622,7 @@ This is an internal compiler project with no external library evolution.
 **Confidence breakdown:**
 - Standard stack: HIGH — entire stack is in-repo code read directly
 - Architecture: HIGH — all patterns copied directly from working Phase 26 examples in the same codebase
-- C function signatures: HIGH — derived from LangThree Eval.fs implementations
+- C function signatures: HIGH — derived from FunLang Eval.fs implementations
 - Type signatures: HIGH — directly from TypeCheck.fs
 - Pitfalls: HIGH — identified from code inspection (two externalFuncs lists, pointer casting, buffer sizing)
 - Open questions: MEDIUM — dir_files path format and d_type behavior are genuinely ambiguous in requirements

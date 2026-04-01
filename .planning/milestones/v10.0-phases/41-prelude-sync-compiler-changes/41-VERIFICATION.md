@@ -13,7 +13,7 @@ status: passed
 |---|-------|--------|----------|
 | 1 | `open Core` makes `id` available without prefix | ✓ | 41-01-open-module.flt passes |
 | 2 | `(^^)` inside module compiles to valid MLIR | ✓ | 41-02-open-operator.flt passes |
-| 3 | All 12 Prelude .fun files match LangThree (except Hashtable) | ✓ | `diff -q` confirms 11/11 identical |
+| 3 | All 12 Prelude .fun files match FunLang (except Hashtable) | ✓ | `diff -q` confirms 11/11 identical |
 | 4 | `List.take 2 [1;2;3]` and `List.drop 1 [1;2;3]` work | ✓ | 41-04-list-take-drop.flt passes |
 
 ## Artifacts
@@ -33,4 +33,4 @@ status: passed
 
 ## Summary
 
-Phase goal achieved. All Prelude files match LangThree exactly (except Hashtable.fun which intentionally retains backend-specific `createStr`/`keysStr`). `open Module` works correctly via two-pass flattenDecls. Custom operators compile via sanitizeMlirName.
+Phase goal achieved. All Prelude files match FunLang exactly (except Hashtable.fun which intentionally retains backend-specific `createStr`/`keysStr`). `open Module` works correctly via two-pass flattenDecls. Custom operators compile via sanitizeMlirName.

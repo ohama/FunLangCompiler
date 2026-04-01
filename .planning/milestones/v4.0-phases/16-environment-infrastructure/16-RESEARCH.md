@@ -28,12 +28,12 @@ No new external libraries. All work is pure F# within the existing project.
 | `Elaboration.fs` | `ElabEnv` has 8 fields; entry point is `elaborateModule : Expr -> MlirModule` | Add `TypeEnv`, `RecordEnv`, `ExnTags` fields; add `elaborateProgram : Ast.Module -> MlirModule` |
 | `MatchCompiler.fs` | `CtorTag` has 6 variants; `desugarPattern` has `failwith` stubs at lines 121-125 | Add `AdtCtor of string * int` and `RecordCtor of string list`; implement stubs |
 | `Program.fs` | Calls `Parser.start` (returns `Ast.Expr`), then `elaborateModule` | Change to `Parser.parseModule` (returns `Ast.Module`), then `elaborateProgram` |
-| `LangThree.Parser` | Exports `parseModule : _ -> _ -> Ast.Module` and `start : _ -> _ -> Ast.Expr` | Unchanged; `parseModule` is already available |
+| `FunLang.Parser` | Exports `parseModule : _ -> _ -> Ast.Module` and `start : _ -> _ -> Ast.Expr` | Unchanged; `parseModule` is already available |
 
 ### Supporting
 | Component | Purpose |
 |-----------|---------|
-| `Ast.Decl` (LangThree) | DU with `LetDecl`, `TypeDecl of TypeDecl`, `RecordTypeDecl of RecordDecl`, `ExceptionDecl`, etc. |
+| `Ast.Decl` (FunLang) | DU with `LetDecl`, `TypeDecl of TypeDecl`, `RecordTypeDecl of RecordDecl`, `ExceptionDecl`, etc. |
 | `Ast.TypeDecl` | `TypeDecl of name: string * typeParams: string list * constructors: ConstructorDecl list * Span` |
 | `Ast.ConstructorDecl` | `ConstructorDecl of name: string * dataType: TypeExpr option * Span` or `GadtConstructorDecl of ...` |
 | `Ast.RecordDecl` | `RecordDecl of name: string * typeParams: string list * fields: RecordFieldDecl list * Span` |
@@ -270,7 +270,7 @@ let mlirMod = Elaboration.elaborateProgram ast
 
 **What goes wrong:** Existing E2E test inputs are bare expressions (e.g., `let rec sum lst = ... in sum [1..5]`). `Parser.parseModule` may wrap these differently than expected — for example, as a `Module([LetDecl(...)], ...)` or as a `Module([LetRecDecl(...)], ...)` rather than as a single expression.
 
-**Why it happens:** The LangThree parser has two entry points: `start` (expression grammar) and `parseModule` (declaration grammar). The module grammar may or may not accept bare expressions or may desugar them differently.
+**Why it happens:** The FunLang parser has two entry points: `start` (expression grammar) and `parseModule` (declaration grammar). The module grammar may or may not accept bare expressions or may desugar them differently.
 
 **How to avoid:** Before implementing `elaborateProgram`, empirically test `Parser.parseModule` on the simplest existing test input (e.g., `42`) and a `let` expression. Inspect the `Ast.Module` structure. Then design `extractMainExpr` to match what `parseModule` actually produces.
 
@@ -282,7 +282,7 @@ let mlirMod = Elaboration.elaborateProgram ast
 
 **Why it happens:** `TypeEnv` uses constructor name as the key with no namespace prefix.
 
-**How to avoid:** For Phase 16, accept this limitation (it's the same behavior as the LangThree interpreter). Document it. Phase 17+ can address it if needed.
+**How to avoid:** For Phase 16, accept this limitation (it's the same behavior as the FunLang interpreter). Document it. Phase 17+ can address it if needed.
 
 **Warning signs:** Tests that use constructors from multiple types with overlapping names produce wrong tag values.
 
@@ -469,11 +469,11 @@ Note: The `TuplePat` implementation has dead code (the first expression with `|>
 
 ### Primary (HIGH confidence)
 
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` (lines 20-35, 1226-1268) — `ElabEnv` definition, `emptyEnv`, `elaborateModule` — direct inspection
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MatchCompiler.fs` (lines 29-126) — `CtorTag` DU, `ctorArity`, `desugarPattern` with `failwith` stubs — direct inspection
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` — current `parseExpr`/`elaborateModule` call site — direct inspection
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` (lines 161-338) — `TypeDecl`, `ConstructorDecl`, `RecordDecl`, `RecordFieldDecl`, `Decl`, `Module` — direct inspection
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fs` (lines 3764-3767) — `parseModule` and `start` signatures — direct inspection
+- `src/FunLangCompiler.Compiler/Elaboration.fs` (lines 20-35, 1226-1268) — `ElabEnv` definition, `emptyEnv`, `elaborateModule` — direct inspection
+- `src/FunLangCompiler.Compiler/MatchCompiler.fs` (lines 29-126) — `CtorTag` DU, `ctorArity`, `desugarPattern` with `failwith` stubs — direct inspection
+- `src/FunLangCompiler.Cli/Program.fs` — current `parseExpr`/`elaborateModule` call site — direct inspection
+- `deps/FunLang/src/FunLang/Ast.fs` (lines 161-338) — `TypeDecl`, `ConstructorDecl`, `RecordDecl`, `RecordFieldDecl`, `Decl`, `Module` — direct inspection
+- `deps/FunLang/src/FunLang/Parser.fs` (lines 3764-3767) — `parseModule` and `start` signatures — direct inspection
 - `.planning/research/SUMMARY.md` — project-level research confirming architecture approach and ElabEnv extension design
 
 ### Secondary (MEDIUM confidence)
@@ -487,7 +487,7 @@ Note: The `TuplePat` implementation has dead code (the first expression with `|>
 
 **Confidence breakdown:**
 - Standard stack: HIGH — no new dependencies; all changes are additive F# map/DU extensions
-- Architecture: HIGH — pre-pass pattern is identical to LangThree's `Elaborate.fs` pre-pass; CtorTag extension is a textbook DU additive extension
+- Architecture: HIGH — pre-pass pattern is identical to FunLang's `Elaborate.fs` pre-pass; CtorTag extension is a textbook DU additive extension
 - Pitfalls: HIGH — all pitfalls identified from direct code inspection (shadow names, `Parser.parseModule` behavior, tag placeholder)
 
 **Research date:** 2026-03-26

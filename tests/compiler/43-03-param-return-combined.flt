@@ -1,4 +1,4 @@
-// Test: Combined param + return type annotations (LangThree v8.0)
+// Test: Combined param + return type annotations (FunLang v8.0)
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let isPos (x : int) : bool = x > 0

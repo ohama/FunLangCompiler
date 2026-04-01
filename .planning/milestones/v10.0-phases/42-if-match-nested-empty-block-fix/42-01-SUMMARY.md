@@ -96,7 +96,7 @@ None - no external service configuration required.
 ## Next Phase Readiness
 
 - List.take, List.drop, List.filter patterns in Prelude can now compile
-- Phase 41-02 (operator sanitization, Prelude LangThree sync) unblocked for if/match patterns
+- Phase 41-02 (operator sanitization, Prelude FunLang sync) unblocked for if/match patterns
 
 ---
 *Phase: 42-if-match-nested-empty-block-fix*

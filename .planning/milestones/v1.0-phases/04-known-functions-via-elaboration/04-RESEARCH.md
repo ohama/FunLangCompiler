@@ -1,7 +1,7 @@
 # Phase 4: Known Functions via Elaboration - Research
 
 **Researched:** 2026-03-26
-**Domain:** MLIR func dialect (func.func / func.call), recursive function elaboration, LangThree LetRec AST
+**Domain:** MLIR func dialect (func.func / func.call), recursive function elaboration, FunLang LetRec AST
 **Confidence:** HIGH
 
 ---
@@ -12,7 +12,7 @@ Phase 4 extends the compiler with recursive function support via MLIR's `func` d
 
 All MLIR patterns have been verified end-to-end on this system (LLVM 20.1.4): multi-function modules with `@main` + `@fact`, recursive `func.call` inside a multi-block function body, and the full pipeline to binary. The `func` dialect requires `--convert-func-to-llvm` which is already present in `Pipeline.loweringPasses`. The only constraint is exit-code range: `fact(10) = 3628800` wraps to 0 mod 256, so FsLit tests must use `fact 5` (exits 120) and `fib 10` (exits 55).
 
-The LangThree parser's `LetRec` case (single-parameter recursive binding) is already implemented. Parsing requires the explicit `in` keyword on one line with no trailing newline in the input file (the IndentFilter rejects trailing newlines for top-level expressions). The elaboration gap is entirely in `Elaboration.fs` — currently falls through to `failwithf "unsupported expression LetRec"` and `failwithf "unsupported expression App"`.
+The FunLang parser's `LetRec` case (single-parameter recursive binding) is already implemented. Parsing requires the explicit `in` keyword on one line with no trailing newline in the input file (the IndentFilter rejects trailing newlines for top-level expressions). The elaboration gap is entirely in `Elaboration.fs` — currently falls through to `failwithf "unsupported expression LetRec"` and `failwithf "unsupported expression App"`.
 
 **Primary recommendation:** Add `DirectCallOp` to `MlirOp`, add `KnownFuncs` + `Funcs` to `ElabEnv`, and implement `LetRec` + `App` in `elaborateExpr`. All in one plan (04-01) — these changes are tightly coupled.
 
@@ -28,7 +28,7 @@ The LangThree parser's `LetRec` case (single-parameter recursive binding) is alr
 | `arith` + `cf` MLIR dialects | LLVM 20.1.4 | Recursive function body uses if-else (cf) and arithmetic (arith) | Already in Pipeline.loweringPasses |
 | `MlirIR.fs` (this project) | Phase 4 additions | Add `DirectCallOp` case to `MlirOp` DU | Same extensible DU pattern from Phases 1-3 |
 | `Elaboration.fs` | Phase 4 extensions | Handle `LetRec` and `App`; extend `ElabEnv` with `KnownFuncs` + `Funcs` | Extended in place; no new files needed |
-| `LangThree Ast.fs` | project ref | `LetRec(name, param, body, inExpr, span)` and `App(func, arg, span)` already defined | Phase 5 section of Ast.Expr DU |
+| `FunLang Ast.fs` | project ref | `LetRec(name, param, body, inExpr, span)` and `App(func, arg, span)` already defined | Phase 5 section of Ast.Expr DU |
 
 ### Supporting
 
@@ -225,7 +225,7 @@ let elaborateModule (expr: Expr) : MlirModule =
 
 ### Pattern 7: FsLit Test Syntax
 
-**What:** FsLit tests must use single-line `let rec ... in ...` syntax without trailing newlines. The LangThree IndentFilter rejects trailing newlines for top-level expressions.
+**What:** FsLit tests must use single-line `let rec ... in ...` syntax without trailing newlines. The FunLang IndentFilter rejects trailing newlines for top-level expressions.
 
 ```
 // --- Input:
@@ -302,7 +302,7 @@ let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2) in fib 10
 
 **What goes wrong:** FsLit test with `let rec fact n = ... in fact 5\n` (trailing newline) causes "parse error" at runtime.
 
-**Why it happens:** The LangThree IndentFilter treats a trailing newline at column 0 as a `DEDENT` that terminates the expression prematurely.
+**Why it happens:** The FunLang IndentFilter treats a trailing newline at column 0 as a `DEDENT` that terminates the expression prematurely.
 
 **How to avoid:** FsLit test `.flt` files should have the Input section end immediately with `// --- Output:` on the next line, not a blank line. The FsLit command passes the file content via a temp file — check exactly what `%input` contains.
 
@@ -406,7 +406,7 @@ module {
 // mlir-opt accepts this — forward references are fine
 ```
 
-### LangThree test syntax — confirmed parseable
+### FunLang test syntax — confirmed parseable
 
 ```
 // This parses correctly (single line, no trailing newline):
@@ -437,7 +437,7 @@ let rec fact n = if n <= 1 then 1 else n * fact (n - 1) in fact 5
 ## Open Questions
 
 1. **Multi-parameter functions (curried)**
-   - What we know: `LetRec(name, param, body, inExpr)` has one parameter. Multi-param functions in LangThree use currying: `let rec f x y = ...` produces nested Lambdas inside LetRec body.
+   - What we know: `LetRec(name, param, body, inExpr)` has one parameter. Multi-param functions in FunLang use currying: `let rec f x y = ...` produces nested Lambdas inside LetRec body.
    - What's unclear: Whether Phase 4 should support curried multi-param functions (would require App chains and nested Lambda handling).
    - Recommendation: Phase 4 scope is single-parameter only. Add `failwithf` for `App` cases where the function is not a simple `Var` in `KnownFuncs`. Document limitation.
 
@@ -465,18 +465,18 @@ All MLIR patterns tested with `mlir-opt 20.1.4` + `mlir-translate` + `clang`, fu
 - `fact 5 = 120` exits 120; `fact 10 mod 256 = 0` exits 0 — confirmed
 - `fib 10 = 55` exits 55 — confirmed
 - `func.call @add(%a, %b) : (i64, i64) -> i64` (multi-arg) — verified exits 7 for 3+4
-- LangThree parser accepts `let rec fact n = ... in fact 5` (single line, no trailing newline) and produces `LetRec("fact", "n", If(...), App(Var("fact"), Number(5,...), ...), ...)`
-- LangThree parser produces `Elaboration: unsupported expression LetRec` (not parse error) — confirmed the parsing works correctly
+- FunLang parser accepts `let rec fact n = ... in fact 5` (single line, no trailing newline) and produces `LetRec("fact", "n", If(...), App(Var("fact"), Number(5,...), ...), ...)`
+- FunLang parser produces `Elaboration: unsupported expression LetRec` (not parse error) — confirmed the parsing works correctly
 - `let rec fib n = ... in fib 10` parses correctly and fails at elaboration only
 
 ### Secondary (HIGH confidence — project source)
 
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — `MlirModule.Funcs: FuncOp list` already supports multiple funcs; `FuncOp.InputTypes: MlirType list` already supports params; `Printer.printFuncOp` already generates `%arg0`, `%arg1`, etc.
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — `printModule` already iterates `m.Funcs`; `printFuncOp` already handles `InputTypes`
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv` structure, `freshName`/`freshLabel` helpers, multi-block assembly in `elaborateModule`, `LetRec` falls to `failwithf`
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` — `--convert-func-to-llvm` confirmed in `loweringPasses`; no changes needed
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `LetRec of name * param * body * inExpr * span` and `App of func * arg * span` confirmed
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fs` — LetRec grammar rule confirmed: `let rec name params = body in inExpr`; Parser.start expects single `Expr`
+- `src/FunLangCompiler.Compiler/MlirIR.fs` — `MlirModule.Funcs: FuncOp list` already supports multiple funcs; `FuncOp.InputTypes: MlirType list` already supports params; `Printer.printFuncOp` already generates `%arg0`, `%arg1`, etc.
+- `src/FunLangCompiler.Compiler/Printer.fs` — `printModule` already iterates `m.Funcs`; `printFuncOp` already handles `InputTypes`
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv` structure, `freshName`/`freshLabel` helpers, multi-block assembly in `elaborateModule`, `LetRec` falls to `failwithf`
+- `src/FunLangCompiler.Compiler/Pipeline.fs` — `--convert-func-to-llvm` confirmed in `loweringPasses`; no changes needed
+- `deps/FunLang/src/FunLang/Ast.fs` — `LetRec of name * param * body * inExpr * span` and `App of func * arg * span` confirmed
+- `deps/FunLang/src/FunLang/Parser.fs` — LetRec grammar rule confirmed: `let rec name params = body in inExpr`; Parser.start expects single `Expr`
 
 ---
 
@@ -492,4 +492,4 @@ All MLIR patterns tested with `mlir-opt 20.1.4` + `mlir-translate` + `clang`, fu
 - FsLit test syntax: HIGH — confirmed parser accepts single-line let rec ... in ... without trailing newline
 
 **Research date:** 2026-03-26
-**Valid until:** 2026-04-25 (MLIR 20.x stable; LangThree AST and parser locked)
+**Valid until:** 2026-04-25 (MLIR 20.x stable; FunLang AST and parser locked)

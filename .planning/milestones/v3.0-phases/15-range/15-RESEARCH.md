@@ -7,7 +7,7 @@
 ## Summary
 
 Phase 15 adds support for the range syntax `[start..stop]` (RNG-01) and `[start..step..stop]`
-(RNG-02). The LangThree AST already has a `Range` node (added in Phase 18 of LangThree's own
+(RNG-02). The FunLang AST already has a `Range` node (added in Phase 18 of FunLang's own
 numbering). The backend simply needs to handle that node in Elaboration.fs.
 
 The standard approach is **Option A**: emit a single C runtime call `lang_range(start, stop, step)`
@@ -50,9 +50,9 @@ on range-produced lists without modification.
 
 ## Architecture Patterns
 
-### AST Node (LangThree)
+### AST Node (FunLang)
 ```fsharp
-// Ast.fs in LangThree — already present
+// Ast.fs in FunLang — already present
 | Range of start: Expr * stop: Expr * step: Expr option * Span
 ```
 
@@ -127,7 +127,7 @@ ConsCell* lang_range(int64_t start, int64_t stop, int64_t step) {
 ### Anti-Patterns to Avoid
 - **Using `Ptr` for step when it should be `I64`:** The step is always an integer; declare `@lang_range` as `(i64, i64, i64) -> ptr`.
 - **Forgetting to add `ExternalFuncDecl`:** mlir-opt will reject an undeclared external function reference; this is a common pitfall when adding new runtime calls.
-- **Using `<=` vs `<` for stop boundary:** LangThree's evaluator uses `[start..step..stop]` which is inclusive on stop (F# semantics). Confirm: `[1..5]` should yield `[1;2;3;4;5]`.
+- **Using `<=` vs `<` for stop boundary:** FunLang's evaluator uses `[start..step..stop]` which is inclusive on stop (F# semantics). Confirm: `[1..5]` should yield `[1;2;3;4;5]`.
 
 ---
 
@@ -154,7 +154,7 @@ trivial and keeps the MLIR output simple (one `llvm.call`).
 ### Pitfall 2: Inclusive vs exclusive stop
 **What goes wrong:** `[1..5]` produces `[1;2;3;4]` (length 4) instead of `[1;2;3;4;5]` (length 5).
 **Why it happens:** Using `i < stop` instead of `i <= stop` in the C loop.
-**How to avoid:** Check LangThree Eval.fs — it uses `[start .. step .. stop]` which is F# inclusive.
+**How to avoid:** Check FunLang Eval.fs — it uses `[start .. step .. stop]` which is F# inclusive.
 **Warning signs:** `sum [1..5]` returns 10 instead of 15.
 
 ### Pitfall 3: Negative step direction
@@ -194,7 +194,7 @@ let rec sum lst = match lst with | [] -> 0 | h :: t -> h + sum t in sum [1..5]
 ## Open Questions
 
 1. **Negative step with default:** `[5..1]` — should this produce empty list or error?
-   - What we know: LangThree eval uses F# `[start..step..stop]` with step=1, so `[5..1]` = empty.
+   - What we know: FunLang eval uses F# `[start..step..stop]` with step=1, so `[5..1]` = empty.
    - What's unclear: Whether the backend should match this or fail.
    - Recommendation: Match the interpreter — step=1, `5 <= 1` is false immediately, return NULL (empty list). Covered by the `i <= stop` guard.
 
@@ -206,10 +206,10 @@ let rec sum lst = match lst with | [] -> 0 | h :: t -> h + sum t in sum [1..5]
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — Range node definition confirmed
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` — Range evaluation semantics confirmed
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Cons/List elaboration, externalFuncs list, LlvmCallOp pattern
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — Runtime helper structure confirmed
+- `deps/FunLang/src/FunLang/Ast.fs` — Range node definition confirmed
+- `deps/FunLang/src/FunLang/Eval.fs` — Range evaluation semantics confirmed
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — Cons/List elaboration, externalFuncs list, LlvmCallOp pattern
+- `src/FunLangCompiler.Compiler/lang_runtime.c` — Runtime helper structure confirmed
 
 ### Secondary (MEDIUM confidence)
 - Existing test files (`10-02-list-length.flt`, `11-05-list-sum.flt`) — test format and list-processing idioms

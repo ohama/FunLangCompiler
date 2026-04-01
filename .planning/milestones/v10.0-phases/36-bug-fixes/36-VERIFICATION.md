@@ -7,7 +7,7 @@ score: 3/3 must-haves verified
 
 # Phase 36: Bug Fixes Verification Report
 
-**Phase Goal:** Real-world LangThree code patterns compile without workarounds
+**Phase Goal:** Real-world FunLang code patterns compile without workarounds
 **Verified:** 2026-03-29T20:58:18Z
 **Status:** passed
 **Re-verification:** No — initial verification

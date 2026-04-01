@@ -108,7 +108,7 @@ Phase 6 is complete. All 6 phases of the FunLangCompiler compiler are done:
 - Phase 5: Closures via Elaboration
 - Phase 6: CLI driver with auto-naming and error handling
 
-The compiler is a complete usable tool: `langbackend file.lt` compiles a LangThree source file to a native binary.
+The compiler is a complete usable tool: `langbackend file.lt` compiles a FunLang source file to a native binary.
 
 ---
 *Phase: 06-cli*

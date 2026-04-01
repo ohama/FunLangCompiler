@@ -41,7 +41,7 @@ This phase uses no external libraries. All implementation is in the existing pro
 | Instead of | Could Use | Tradeoff |
 |------------|-----------|----------|
 | C runtime functions (lang_file_*) | Inline MLIR ops for fopen/fread | C functions are cleaner, already used for all complex operations; inline MLIR for fopen would require 10+ ops per builtin |
-| lang_throw for read_file error | lang_failwith (exits process) | lang_throw is catchable, matches LangThree Eval.fs behavior (raises LangThreeException) |
+| lang_throw for read_file error | lang_failwith (exits process) | lang_throw is catchable, matches FunLang Eval.fs behavior (raises FunLangException) |
 | fprintf(stderr,...) for eprint | fputs(s->data, stderr) | fprintf handles the char* extraction cleanly; fputs is equally valid |
 
 **Installation:** No packages needed. All components are in-repo or system libraries already linked.
@@ -265,8 +265,8 @@ Note: `fopen` to check existence is portable and consistent with POSIX. `access(
 
 **What goes wrong:** Opening files with `"r"` (text mode) on Windows would mangle `\r\n` to `\n`. On Linux/macOS, text and binary mode are identical, but `"rb"` is more correct for byte-accurate reads.
 **Why it happens:** Platform differences in text mode.
-**How to avoid:** Use `"rb"` for read_file and `"wb"`/`"ab"` for write/append. The LangThree Eval.fs uses `File.ReadAllText` which is text-mode, but for the C backend, binary mode ensures no byte mangling.
-**Warning signs:** String length mismatches between LangThree interpreted and compiled modes on Windows (not currently tested).
+**How to avoid:** Use `"rb"` for read_file and `"wb"`/`"ab"` for write/append. The FunLang Eval.fs uses `File.ReadAllText` which is text-mode, but for the C backend, binary mode ensures no byte mangling.
+**Warning signs:** String length mismatches between FunLang interpreted and compiled modes on Windows (not currently tested).
 
 ### Pitfall 4: eprint/eprintln ARM Placement in elaborateExpr
 
@@ -349,9 +349,9 @@ This is an internal compiler project with no external library evolution. All pat
 ## Open Questions
 
 1. **write_file error handling on open failure**
-   - What we know: LangThree Eval.fs does NOT throw on write failure — it just calls `File.WriteAllText` which throws .NET IOException if it fails. The requirement (FIO-02) says "creates or overwrites" but doesn't specify error behavior.
+   - What we know: FunLang Eval.fs does NOT throw on write failure — it just calls `File.WriteAllText` which throws .NET IOException if it fails. The requirement (FIO-02) says "creates or overwrites" but doesn't specify error behavior.
    - What's unclear: Should `lang_file_write` silently ignore fopen failure, or throw via `lang_throw`?
-   - Recommendation: Silently ignore (return without writing) for now, matching the simplest safe behavior. The LangThree interpreter would throw a .NET exception, but since the requirement doesn't specify, silent failure is less surprising than a crash. This can be revisited if FIO-02 gets an error-handling requirement.
+   - Recommendation: Silently ignore (return without writing) for now, matching the simplest safe behavior. The FunLang interpreter would throw a .NET exception, but since the requirement doesn't specify, silent failure is less surprising than a crash. This can be revisited if FIO-02 gets an error-handling requirement.
 
 2. **Test file cleanup for write/append tests**
    - What we know: Tests that write to `/tmp/` files leave artifacts if the test command doesn't clean up.
@@ -365,8 +365,8 @@ This is an internal compiler project with no external library evolution. All pat
 - Direct code reading: `lang_runtime.c` — LangString struct layout, GC_malloc pattern, lang_throw usage, lang_hashtable_get error throwing
 - Direct code reading: `Elaboration.fs` — externalFuncs list structure (both occurrences), elaborateExpr arm patterns for hashtable_containsKey (bool return), hashtable_set (void two-arg), hashtable_create (one-arg), print/println (void + stdio), failwith (void + noreturn)
 - Direct code reading: `MlirIR.fs` — LlvmCallOp, LlvmCallVoidOp, ExternalFuncDecl type definitions
-- Direct code reading: `LangThree/Eval.fs` — read_file error behavior (throws on missing file), write_file/append_file behavior, eprint/eprintln stderr behavior
-- Direct code reading: `LangThree/TypeCheck.fs` — type signatures for all 6 builtins
+- Direct code reading: `FunLang/Eval.fs` — read_file error behavior (throws on missing file), write_file/append_file behavior, eprint/eprintln stderr behavior
+- Direct code reading: `FunLang/TypeCheck.fs` — type signatures for all 6 builtins
 
 ### Secondary (MEDIUM confidence)
 

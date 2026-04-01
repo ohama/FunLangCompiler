@@ -11,7 +11,7 @@ requires:
   - phase: 22-array-core
     provides: array builtin elaboration pattern (coerceToI64, ExternalFuncDecl, match arm ordering)
 provides:
-  - hashtable_create, hashtable_get, hashtable_set, hashtable_containsKey, hashtable_remove, hashtable_keys builtins callable from LangThree source
+  - hashtable_create, hashtable_get, hashtable_set, hashtable_containsKey, hashtable_remove, hashtable_keys builtins callable from FunLang source
   - 8 E2E tests covering all hashtable operations
 affects: [24-array-hofs, future collection phases]
 
@@ -117,7 +117,7 @@ Each task was committed atomically:
 - Three-let-bound containsKey values summed together (`a + b + c` where each is I64 from if/then/else) caused "empty block" in MLIR generation — root cause likely a missing terminator in one of the conditional blocks. Worked around by using keys + len instead.
 
 ## Next Phase Readiness
-- Phase 23 complete — all hashtable builtins available from LangThree source
+- Phase 23 complete — all hashtable builtins available from FunLang source
 - Phase 24 (Array HOFs) can proceed — no hashtable dependencies
 - Hashtable is fully functional: create, get, set, containsKey, remove, keys, with exception handling for missing keys
 

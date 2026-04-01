@@ -1,12 +1,12 @@
-# FunLangCompiler — LangThree Compiler
+# FunLangCompiler — FunLang Compiler
 
 ## What This Is
 
-LangThree의 AST/타입체커를 재사용하고 MLIR → LLVM 파이프라인을 통해 네이티브 실행 바이너리를 생성하는 컴파일러. F#으로 구현되며 ../LangThree 프로젝트를 project reference로 참조한다. v1-v3에서 기본 타입/연산자/빌트인, v4에서 ADT/Records/Exceptions, v5에서 mutable variables/Array/Hashtable, v6에서 Module system/File I/O builtins(14종)를 추가하여 118개 E2E 테스트가 통과한다.
+FunLang의 AST/타입체커를 재사용하고 MLIR → LLVM 파이프라인을 통해 네이티브 실행 바이너리를 생성하는 컴파일러. F#으로 구현되며 ../FunLang 프로젝트를 project reference로 참조한다. v1-v3에서 기본 타입/연산자/빌트인, v4에서 ADT/Records/Exceptions, v5에서 mutable variables/Array/Hashtable, v6에서 Module system/File I/O builtins(14종)를 추가하여 118개 E2E 테스트가 통과한다.
 
 ## Core Value
 
-LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다. 이것이 동작하면 나머지는 부가적이다.
+FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다. 이것이 동작하면 나머지는 부가적이다.
 
 ## Current State
 
@@ -18,7 +18,7 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 
 ### Validated (v1.0)
 
-- ✓ LangThree frontend(.fsproj) project reference로 AST, 타입체커 재사용
+- ✓ FunLang frontend(.fsproj) project reference로 AST, 타입체커 재사용
 - ✓ MLIR 텍스트 포맷 직접 생성 → mlir-opt → mlir-translate → clang
 - ✓ AST → MlirIR Elaboration (int/bool, 산술/비교, let/let rec, lambda/app, if-else)
 - ✓ MlirIR → .mlir → LLVM IR → 네이티브 바이너리
@@ -107,7 +107,7 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 - ✓ 멀티파일 import open "file.fun" (COMP-01~COMP-04) — v10.0
 - ✓ OpenDecl open Module 스코프 바인딩 (OPEN-01~OPEN-03) — v10.0
 - ✓ 컴파일러 버그 수정 FIX-01~FIX-04 — v10.0
-- ✓ Prelude 12개 모듈 LangThree 동기화 — v10.0
+- ✓ Prelude 12개 모듈 FunLang 동기화 — v10.0
 - ✓ 202개 FsLit E2E 테스트 (전 카테고리)
 
 ### Validated (v11.0)
@@ -146,7 +146,7 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 
 ## Context
 
-- LangThree: ../LangThree/src/LangThree/LangThree.fsproj
+- FunLang: ../FunLang/src/FunLang/FunLang.fsproj
   - AST (Ast.fs): Expr, Pattern, Value, TypeExpr 정의
   - 타입 추론: Infer.fs (Hindley-Milner), Bidir.fs
   - 렉서/파서: Lexer.fsl, Parser.fsy (FsLexYacc)
@@ -157,7 +157,7 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 - v5 완성: Mutable variables + Array + Hashtable + Array HOFs (92 E2E tests)
 - v6 완성: Module system + File I/O builtins 14종 (118 E2E tests)
 - v7 완성: Expression sequencing + indexing + if-then + while/for loops (138 E2E tests)
-- v8 완성: Type annotations + for-in collection loops (144 E2E tests) — LangThree parity
+- v8 완성: Type annotations + for-in collection loops (144 E2E tests) — FunLang parity
 - v9 완성: Collections + Builtins + Language Constructs + Prelude Modules (183 E2E tests)
 - v10 완성: Bug Fixes + Hashtable String Keys + CLI Args + sprintf + Multi-file Import + OpenDecl + Prelude Sync (202 E2E tests)
 - v11 완성: failWithSpan + Parse error preservation + MLIR debug + Context hints + Error categories (217 E2E tests)
@@ -169,7 +169,7 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 
 - **Tech Stack**: F# (.NET 10), MLIR text format, LLVM 20, FsLexYacc
 - **Dependencies**: mlir-opt, mlir-translate, clang (shell pipeline)
-- **Reuse**: LangThree frontend 변경 없이 참조만 함
+- **Reuse**: FunLang frontend 변경 없이 참조만 함
 - **GC**: Boehm GC (libgc) — 보수적 GC, 가장 간단한 통합 경로
 - **Platform**: Linux x86-64 / macOS arm64
 
@@ -177,7 +177,7 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| LangThree .fsproj 참조 | 파서/타입체커 중복 구현 방지 | ✓ Good |
+| FunLang .fsproj 참조 | 파서/타입체커 중복 구현 방지 | ✓ Good |
 | MLIR 텍스트 포맷 직접 생성 | 소유권/메모리 문제 없음, 코드 단순 | ✓ Good |
 | MlirIR as typed internal IR | Printer 분리로 테스트 용이, 미래 최적화 패스 가능 | ✓ Good |
 | Flat closure struct {fn_ptr, env} | 단순하고 정확, 모든 클로저 테스트 통과 | ✓ Good |
@@ -213,7 +213,7 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 | lastParsedPos before try block | F# with-handler can't access try-block vars | ✓ Good |
 | coerceToI64 for ordinal comparison | Ptr→I64 before arith.cmpi, Equal/NotEqual unchanged | ✓ Good |
 
-| elaborateTypeclasses replicated | LangThree Elaborate.fs 포트, 공유 안함 | ✓ Good |
+| elaborateTypeclasses replicated | FunLang Elaborate.fs 포트, 공유 안함 | ✓ Good |
 | Two-pass ctorMap for DerivingDecl | TypeDecl ctors 수집 → Show/Eq LetDecl 생성 | ✓ Good |
 | Instance methods no mangling | show/eq 원래 이름 유지, 마지막 정의 wins | ✓ Good |
 

@@ -317,7 +317,7 @@ Insert before line ~970 (after the `hashtable_create` case, before `char_to_int`
 
 **What goes wrong:** Writing `lang_array_fold` as a single call `fn(closure, elem)` produces wrong results or a crash because the fold function is `(acc -> a -> acc)`, which is a curried two-argument function compiled as two nested closures.
 
-**Why it happens:** In LangThree's evaluator, `callValue (callValue fVal acc) x` makes this explicit. In C, the first call returns an intermediate closure (as `int64_t` via ptrtoint), which must then be called with the element.
+**Why it happens:** In FunLang's evaluator, `callValue (callValue fVal acc) x` makes this explicit. In C, the first call returns an intermediate closure (as `int64_t` via ptrtoint), which must then be called with the element.
 
 **How to avoid:** In `lang_array_fold`:
 1. `int64_t partial = fn(closure, acc)` — first call returns inner closure as i64
@@ -409,7 +409,7 @@ int64_t* lang_array_map(void* closure, int64_t* arr) {
 ### Complete lang_array_fold (Two-Call Pattern for Curried Binary Function)
 
 ```c
-/* Source: LangThree Eval.fs array_fold uses callValue(callValue fVal acc) x — two applications */
+/* Source: FunLang Eval.fs array_fold uses callValue(callValue fVal acc) x — two applications */
 int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr) {
     int64_t n = arr[0];
     LangClosureFn fn = *(LangClosureFn*)closure;
@@ -429,7 +429,7 @@ int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr) {
 ### Complete lang_array_init
 
 ```c
-/* Source: LangThree Eval.fs array_init uses Array.init n (fun i -> callValue fVal (IntValue i)) */
+/* Source: FunLang Eval.fs array_init uses Array.init n (fun i -> callValue fVal (IntValue i)) */
 int64_t* lang_array_init(int64_t n, void* closure) {
     if (n < 0) {
         lang_failwith("array_init: negative size");
@@ -517,17 +517,17 @@ sum
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` lines 108-110 — confirmed `IndirectCallOp` ABI: `llvm.call %fnPtr(%envPtr, %arg) : !llvm.ptr, (!llvm.ptr, argType) -> resultType` — env ptr comes before arg
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` lines 40-79 — confirmed no loop ops (no ForOp, WhileOp, scf.for); confirmed `IndirectCallOp` signature
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` lines 446-451 — confirmed inner llvm.func signature `InputTypes = [Ptr; I64]; ReturnType = Some I64` (env first, arg second)
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` lines 1544-1548 — confirmed lambda body: `%arg0: Ptr = env`, `%arg1: I64 = arg`
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed array layout: `arr[0]=length, arr[1..n]=elements`; `GC_malloc` pattern; `lang_failwith` usage
-- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — confirmed no HOF declarations exist; `LangClosureFn` typedef not yet present
-- Direct code analysis of `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` lines 488-522 — confirmed LangThree HOF semantics: `array_fold` uses `callValue (callValue fVal acc) x` (two calls), `array_init` uses `Array.init n (fun i -> callValue fVal (IntValue i))` (zero-based index)
+- Direct code analysis of `src/FunLangCompiler.Compiler/Printer.fs` lines 108-110 — confirmed `IndirectCallOp` ABI: `llvm.call %fnPtr(%envPtr, %arg) : !llvm.ptr, (!llvm.ptr, argType) -> resultType` — env ptr comes before arg
+- Direct code analysis of `src/FunLangCompiler.Compiler/MlirIR.fs` lines 40-79 — confirmed no loop ops (no ForOp, WhileOp, scf.for); confirmed `IndirectCallOp` signature
+- Direct code analysis of `src/FunLangCompiler.Compiler/Elaboration.fs` lines 446-451 — confirmed inner llvm.func signature `InputTypes = [Ptr; I64]; ReturnType = Some I64` (env first, arg second)
+- Direct code analysis of `src/FunLangCompiler.Compiler/Elaboration.fs` lines 1544-1548 — confirmed lambda body: `%arg0: Ptr = env`, `%arg1: I64 = arg`
+- Direct code analysis of `src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed array layout: `arr[0]=length, arr[1..n]=elements`; `GC_malloc` pattern; `lang_failwith` usage
+- Direct code analysis of `src/FunLangCompiler.Compiler/lang_runtime.h` — confirmed no HOF declarations exist; `LangClosureFn` typedef not yet present
+- Direct code analysis of `deps/FunLang/src/FunLang/Eval.fs` lines 488-522 — confirmed FunLang HOF semantics: `array_fold` uses `callValue (callValue fVal acc) x` (two calls), `array_init` uses `Array.init n (fun i -> callValue fVal (IntValue i))` (zero-based index)
 - Direct code analysis of `Elaboration.fs` lines 2205 and 2348 — confirmed two `externalFuncs` lists exist; both must be updated
 
 ### Secondary (MEDIUM confidence)
-- Phase 22 RESEARCH.md (`/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/22-array-core/22-RESEARCH.md`) — confirmed one-block array layout, GEP patterns, coercion requirements (Pitfall 4 re: Ptr-typed defVal); directly applicable
+- Phase 22 RESEARCH.md (`.planning/phases/22-array-core/22-RESEARCH.md`) — confirmed one-block array layout, GEP patterns, coercion requirements (Pitfall 4 re: Ptr-typed defVal); directly applicable
 
 ### Tertiary (LOW confidence)
 - None required — all findings sourced from direct code analysis

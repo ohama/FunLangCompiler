@@ -560,7 +560,7 @@ let add_n n = fun x -> x + n in let add5 = add_n 5 in add5 3
 ## Open Questions
 
 1. **Multi-level lambda nesting (currying beyond one level)**
-   - What we know: `let f a b = a + b` in LangThree desugars to `Let("f", Lambda("a", Lambda("b", Add(a,b))), ...)`. The inner Lambda("b", Add(a,b)) captures `a`.
+   - What we know: `let f a b = a + b` in FunLang desugars to `Let("f", Lambda("a", Lambda("b", Add(a,b))), ...)`. The inner Lambda("b", Add(a,b)) captures `a`.
    - Phase 5 scope: one closure level (Lambda wrapping non-Lambda body). `fun x -> x + n` is the target.
    - What's unclear: Whether Phase 5 test suite requires `f a b = a + b` style (curried two-arg function).
    - Recommendation: Start with one closure level. If multi-level is needed, the recursive structure is the same: each Lambda layer adds one level of closure wrapping.
@@ -600,12 +600,12 @@ All patterns verified with `mlir-opt 20.1.4` + `mlir-translate` + `clang`, full 
 
 ### Secondary (HIGH confidence — project source)
 
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — existing `MlirOp` DU shape, `FuncOp` structure, `MlirType` variants
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv`, `FuncSignature`, `freshName`, `LetRec` / `App` elaboration patterns from Phase 4
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — `printOp`, `printFuncOp`, `printType` functions
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` — `loweringPasses` unchanged; no new passes needed
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `Lambda of param: string * body: Expr * span: Span`, `App of func: Expr * arg: Expr * span: Span`
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fsy` — `let name params = body in inExpr` desugars to `Let(name, foldBack Lambda params body, inExpr)`. So `let add_n n = fun x -> x + n in ...` → `Let("add_n", Lambda("n", Lambda("x", ...)), ...)`.
+- `src/FunLangCompiler.Compiler/MlirIR.fs` — existing `MlirOp` DU shape, `FuncOp` structure, `MlirType` variants
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv`, `FuncSignature`, `freshName`, `LetRec` / `App` elaboration patterns from Phase 4
+- `src/FunLangCompiler.Compiler/Printer.fs` — `printOp`, `printFuncOp`, `printType` functions
+- `src/FunLangCompiler.Compiler/Pipeline.fs` — `loweringPasses` unchanged; no new passes needed
+- `deps/FunLang/src/FunLang/Ast.fs` — `Lambda of param: string * body: Expr * span: Span`, `App of func: Expr * arg: Expr * span: Span`
+- `deps/FunLang/src/FunLang/Parser.fsy` — `let name params = body in inExpr` desugars to `Let(name, foldBack Lambda params body, inExpr)`. So `let add_n n = fun x -> x + n in ...` → `Let("add_n", Lambda("n", Lambda("x", ...)), ...)`.
 
 ---
 
@@ -622,4 +622,4 @@ All patterns verified with `mlir-opt 20.1.4` + `mlir-translate` + `clang`, full 
 - App dispatch for 3 cases: MEDIUM — more complex than Phase 4; test each case
 
 **Research date:** 2026-03-26
-**Valid until:** 2026-04-25 (MLIR 20.x stable; LangThree Ast locked; all patterns verified)
+**Valid until:** 2026-04-25 (MLIR 20.x stable; FunLang Ast locked; all patterns verified)

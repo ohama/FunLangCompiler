@@ -26,8 +26,8 @@ key-files:
 
 key-decisions:
   - "elaborateTypeclasses placed in Elaboration.fs (not Program.fs) — correct home for compiler passes"
-  - "Instance methods become plain LetDecl with original method name (no mangling) — matches LangThree behavior"
-  - "ModuleDecl hoists instance bindings to outer scope — mirrors LangThree Elaborate.fs reference implementation"
+  - "Instance methods become plain LetDecl with original method name (no mangling) — matches FunLang behavior"
+  - "ModuleDecl hoists instance bindings to outer scope — mirrors FunLang Elaborate.fs reference implementation"
 
 patterns-established:
   - "Pattern 1: Typeclass preprocessing — strip TypeClassDecl/DerivingDecl, hoist InstanceDecl methods as LetDecl before elaborateProgram"
@@ -68,7 +68,7 @@ Each task was committed atomically:
 ## Decisions Made
 - Instance methods use original method names (no mangling) — `show` not `show_Int`
 - `Ast.Decl.` prefix used consistently throughout, matching FunLangCompiler conventions
-- Direct port from LangThree `Elaborate.fs` reference implementation
+- Direct port from FunLang `Elaborate.fs` reference implementation
 
 ## Deviations from Plan
 

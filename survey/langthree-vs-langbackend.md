@@ -1,4 +1,4 @@
-# LangThree (인터프리터) vs FunLangCompiler (컴파일러) 비교
+# FunLang (인터프리터) vs FunLangCompiler (컴파일러) 비교
 
 **조사일:** 2026-03-30
 
@@ -6,9 +6,9 @@
 
 **결론: 동일하다.**
 
-FunLangCompiler는 LangThree의 Parser/Lexer/AST를 **submodule로 직접 참조**한다.
-- `FunLangCompiler.Compiler.fsproj` → `ProjectReference` → `LangThree`
-- Parser.fsy, Lexer.fsl, Ast.fs 모두 LangThree 것을 그대로 사용
+FunLangCompiler는 FunLang의 Parser/Lexer/AST를 **submodule로 직접 참조**한다.
+- `FunLangCompiler.Compiler.fsproj` → `ProjectReference` → `FunLang`
+- Parser.fsy, Lexer.fsl, Ast.fs 모두 FunLang 것을 그대로 사용
 - 별도의 파서가 없으므로 문법 차이가 발생할 수 없음
 
 지원하는 문법:
@@ -26,7 +26,7 @@ FunLangCompiler는 LangThree의 Parser/Lexer/AST를 **submodule로 직접 참조
 
 ### 공통 모듈 (8개)
 
-| 모듈 | LangThree | FunLangCompiler | 비고 |
+| 모듈 | FunLang | FunLangCompiler | 비고 |
 |------|-----------|-------------|------|
 | Array.fun | O | O | 동일 |
 | Char.fun | O | O | 동일 |
@@ -37,7 +37,7 @@ FunLangCompiler는 LangThree의 Parser/Lexer/AST를 **submodule로 직접 참조
 | String.fun | O | O | 동일 |
 | StringBuilder.fun | O | O | 동일 |
 
-### LangThree에만 있는 모듈 (4개)
+### FunLang에만 있는 모듈 (4개)
 
 | 모듈 | 내용 | FunLangCompiler 대응 |
 |------|------|-------------------|
@@ -48,11 +48,11 @@ FunLangCompiler는 LangThree의 Parser/Lexer/AST를 **submodule로 직접 참조
 
 ### FunLangCompiler에만 있는 모듈
 
-없음. FunLangCompiler는 LangThree의 부분집합.
+없음. FunLangCompiler는 FunLang의 부분집합.
 
 ### 함수명 차이 (Option / Result)
 
-| LangThree | FunLangCompiler | 비고 |
+| FunLang | FunLangCompiler | 비고 |
 |-----------|-------------|------|
 | `optionMap` | `map` | FunLangCompiler가 모듈 컨텍스트에서 간결한 이름 사용 |
 | `optionBind` | `bind` | |

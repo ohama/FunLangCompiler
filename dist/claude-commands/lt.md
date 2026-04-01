@@ -1,6 +1,6 @@
-# LangThree Compiler Expert
+# FunLang Compiler Expert
 
-Compile, run, and debug LangThree (.fun/.lt) files using the native compiler.
+Compile, run, and debug FunLang (.fun/.lt) files using the native compiler.
 
 **Usage:** `/lt [compile|run|check] <file>` or `/lt` for language help.
 
@@ -13,7 +13,7 @@ Compile, run, and debug LangThree (.fun/.lt) files using the native compiler.
 
 ## Compiler
 
-**Binary:** `/Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli`
+**Binary:** `dist/FunLangCompiler.Cli`
 
 ```bash
 # Compile
@@ -32,14 +32,14 @@ When the user provides arguments:
 ### `/lt compile <file>`
 ```bash
 OUTBIN=$(mktemp /tmp/langback_XXXXXX)
-/Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli "$FILE" -o "$OUTBIN" 2>&1
+dist/FunLangCompiler.Cli "$FILE" -o "$OUTBIN" 2>&1
 echo "Compiled: $OUTBIN"
 ```
 
 ### `/lt run <file>`
 ```bash
 OUTBIN=$(mktemp /tmp/langback_XXXXXX)
-/Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli "$FILE" -o "$OUTBIN" 2>&1 && "$OUTBIN"
+dist/FunLangCompiler.Cli "$FILE" -o "$OUTBIN" 2>&1 && "$OUTBIN"
 RC=$?; rm -f "$OUTBIN"; exit $RC
 ```
 
@@ -48,7 +48,7 @@ RC=$?; rm -f "$OUTBIN"; exit $RC
 for f in *.fun; do
   echo -n "$f: "
   OUTBIN=$(mktemp /tmp/langback_XXXXXX)
-  if /Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli "$f" -o "$OUTBIN" 2>&1; then
+  if dist/FunLangCompiler.Cli "$f" -o "$OUTBIN" 2>&1; then
     echo "OK"
   else
     echo "FAIL"

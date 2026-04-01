@@ -27,7 +27,7 @@ The tools are confirmed present at `/usr/local/bin/mlir-opt`, `/usr/local/bin/ml
 | `mlir-opt` | LLVM 20.1.4 | Lower `.mlir` text through pass pipeline | Canonical MLIR tool; handles all dialect conversions |
 | `mlir-translate` | LLVM 20.1.4 | Translate lowered MLIR to LLVM IR (`.ll`) | Only standard tool for `--mlir-to-llvmir` |
 | `clang` | 20.1.4 | Compile `.ll` to native ELF binary | Handles crt0/libc startup automatically; simpler than raw ld |
-| F# / .NET | 10.0.105 | Host language for MlirIR DU and Printer | Same language as LangThree frontend |
+| F# / .NET | 10.0.105 | Host language for MlirIR DU and Printer | Same language as FunLang frontend |
 | `System.Diagnostics.Process` | .NET 10 built-in | Spawn mlir-opt/mlir-translate/clang | Standard .NET subprocess API; no extra dependencies |
 
 ### Supporting
@@ -35,7 +35,7 @@ The tools are confirmed present at `/usr/local/bin/mlir-opt`, `/usr/local/bin/ml
 | Tool | Version | Purpose | When to Use |
 |------|---------|---------|-------------|
 | FsLit (`fslit`) | — | `.flt` file-based E2E test runner | TEST-01: compile → run → verify exit code |
-| LangThree.fsproj | project ref | Frontend AST, type checker reuse | CLI-02: reference from FunLangCompiler.Compiler |
+| FunLang.fsproj | project ref | Frontend AST, type checker reuse | CLI-02: reference from FunLangCompiler.Compiler |
 
 ### Alternatives Considered
 
@@ -206,7 +206,7 @@ let compileMlir (mlirText: string) (outputBinary: string) : Result<unit, Pipelin
 - `%s` — path to the test file itself
 - `%S` — directory containing the test file
 
-**Pattern for "compile LangThree source, run binary, verify exit code":**
+**Pattern for "compile FunLang source, run binary, verify exit code":**
 
 ```
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && langbackend %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
@@ -555,7 +555,7 @@ let compile (m: MlirIR.MlirModule) (outputPath: string) : Result<unit, CompileEr
 
 3. **`main() -> i64` vs `main() -> i32`**
    - What we know: Both work on this system; `i64` return from `@main` is truncated to 8 bits by the OS exit code mechanism. `i32` is the C standard for `main`.
-   - Recommendation: Use `i64` for Phase 1 (matching LangThree's `int` type = i64). For Phase 6 CLI, consider wrapping in a proper `main(argc, argv) -> i32` that calls an inner `eval() -> i64`.
+   - Recommendation: Use `i64` for Phase 1 (matching FunLang's `int` type = i64). For Phase 6 CLI, consider wrapping in a proper `main(argc, argv) -> i32` that calls an inner `eval() -> i64`.
 
 ---
 
@@ -578,7 +578,7 @@ let compile (m: MlirIR.MlirModule) (outputPath: string) : Result<unit, CompileEr
 ### Tertiary (MEDIUM confidence — not re-verified in this session)
 
 - LLVM upstream PR #120548 — confirms `arith-to-llvm` must precede `func-to-llvm` in LLVM 20
-- LangThree `Ast.fs` — Expr DU shape; relevant for Phase 2+ Elaboration design
+- FunLang `Ast.fs` — Expr DU shape; relevant for Phase 2+ Elaboration design
 
 ---
 

@@ -63,7 +63,7 @@ completed: 2026-03-27
 ## Accomplishments
 
 - Fixed critical MatchCompiler bug: `argAccessors` for `AdtCtor` were using `Field(selAcc, i)` (tag slot) instead of `Field(selAcc, i+1)` (payload slot). This caused `Some 42 -> 1` instead of `42`.
-- Fixed parseProgram to route through `LangThree.IndentFilter` so multi-line `.lt` source files parse correctly. Previously, raw NEWLINE tokens caused parse errors and tests were "passing by accident" (exit 1 = expected "1").
+- Fixed parseProgram to route through `FunLang.IndentFilter` so multi-line `.lt` source files parse correctly. Previously, raw NEWLINE tokens caused parse errors and tests were "passing by accident" (exit 1 = expected "1").
 - Added Ptr-retype guard in `resolveAccessor Field` case: when a parent accessor was cached as `I64` but the new use requires a GEP (pointer deref), re-resolve the parent as `Ptr` using `resolveAccessorTyped`.
 - Added 3 real E2E tests that verify actual semantics: nullary dispatch (Green->2), unary payload extraction (Some 42->42), multi-arg field extraction (Pair(7,5)->b=5).
 - All 51/51 tests pass.
@@ -101,7 +101,7 @@ completed: 2026-03-27
 **2. [Rule 1 - Bug] parseProgram bypassing IndentFilter — multi-line inputs failing**
 - **Found during:** Task 2 test creation (17-04 and 17-05 tests failed to compile)
 - **Issue:** `Program.fs` was calling `Parser.parseModule Lexer.tokenize lexbuf` directly; raw `NEWLINE col` tokens are unknown to the parser grammar. All type declarations spanning multiple lines caused parse errors. Tests 17-01, 17-02, 17-03 were "passing by accident" — exit code 1 from parse error matched expected output "1".
-- **Fix:** Added `lexAndFilter` helper (mirrors LangThree's `lexAndFilter`) and updated `parseProgram` to use filtered tokens via custom tokenizer function
+- **Fix:** Added `lexAndFilter` helper (mirrors FunLang's `lexAndFilter`) and updated `parseProgram` to use filtered tokens via custom tokenizer function
 - **Files modified:** `src/FunLangCompiler.Cli/Program.fs`
 - **Commit:** `29fffdb`
 

@@ -252,7 +252,7 @@ let compile (m: MlirModule) (outputPath: string) : Result<unit, CompileError> =
 1. **Token-to-position mapping**
    - What we know: The `idx` variable tells us which token failed. The filtered token list has token types but no attached positions.
    - What's unclear: Whether we should attempt to compute line:col from the token index (would require storing positions alongside filtered tokens -- a larger change).
-   - Recommendation: For Phase 45, use "near token N of M" as position info for parse errors. True line:col for parse errors requires fixing LangThree's span propagation (a larger upstream effort documented in survey/langthree-span-zeroing-fix.md). Mark as a future enhancement.
+   - Recommendation: For Phase 45, use "near token N of M" as position info for parse errors. True line:col for parse errors requires fixing FunLang's span propagation (a larger upstream effort documented in survey/langthree-span-zeroing-fix.md). Mark as a future enhancement.
 
 2. **Deterministic vs random temp file paths**
    - What we know: `Path.GetTempFileName()` creates random names in /tmp.
@@ -267,13 +267,13 @@ let compile (m: MlirModule) (outputPath: string) : Result<unit, CompileError> =
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` -- Parser invocation and fallback logic (lines 29-52)
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` -- MLIR temp file management (lines 77-114)
-- `/Users/ohama/.nuget/packages/fslexyacc.runtime/11.3.0/fable/Parsing.fs` -- FsLexYacc exception types (`RecoverableParseError`, `failwith "parse error"`)
-- `/Users/ohama/vibe-coding/FunLangCompiler/survey/langthree-span-zeroing-fix.md` -- Upstream span zeroing analysis
+- `src/FunLangCompiler.Cli/Program.fs` -- Parser invocation and fallback logic (lines 29-52)
+- `src/FunLangCompiler.Compiler/Pipeline.fs` -- MLIR temp file management (lines 77-114)
+- `fslexyacc.runtime/11.3.0 (NuGet) Parsing.fs` -- FsLexYacc exception types (`RecoverableParseError`, `failwith "parse error"`)
+- `survey/langthree-span-zeroing-fix.md` -- Upstream span zeroing analysis
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/44-error-location-foundation/44-VERIFICATION.md` -- Phase 44 findings on span zeroing
+- `.planning/phases/44-error-location-foundation/44-VERIFICATION.md` -- Phase 44 findings on span zeroing
 
 ## Metadata
 

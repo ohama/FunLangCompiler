@@ -28,7 +28,7 @@ The key architectural challenge is the transition from single-block elaboration 
 | `cf` MLIR dialect | LLVM 20.1.4 | `cf.cond_br`, `cf.br`, block arguments for merge points | Required for control flow; `--convert-cf-to-llvm` already in Pipeline.loweringPasses |
 | `MlirIR.fs` (this project) | Phase 3 additions | Adds `ArithCmpIOp`, `CfCondBrOp`, `CfBrOp` to `MlirOp` DU | Same extensible DU pattern from Phases 1+2 |
 | `Elaboration.fs` | Phase 3 extensions | Handles `Bool`, comparison ops, `If`, `And`, `Or` | Extended in place; no new files needed |
-| `LangThree Ast.fs` | project ref | `Bool`, `Equal`/`NotEqual`/`LessThan`/`GreaterThan`/`LessEqual`/`GreaterEqual`, `If`, `And`, `Or` | All cases already defined in Phase 4 section of Ast.Expr DU |
+| `FunLang Ast.fs` | project ref | `Bool`, `Equal`/`NotEqual`/`LessThan`/`GreaterThan`/`LessEqual`/`GreaterEqual`, `If`, `And`, `Or` | All cases already defined in Phase 4 section of Ast.Expr DU |
 
 ### Supporting
 
@@ -385,12 +385,12 @@ Verified patterns from end-to-end tests on this system (LLVM 20.1.4, 2026-03-26)
 ### arith.cmpi — all 6 predicates verified
 
 ```mlir
-// LangThree =  -> arith.cmpi eq
-// LangThree <> -> arith.cmpi ne
-// LangThree <  -> arith.cmpi slt
-// LangThree >  -> arith.cmpi sgt
-// LangThree <= -> arith.cmpi sle
-// LangThree >= -> arith.cmpi sge
+// FunLang =  -> arith.cmpi eq
+// FunLang <> -> arith.cmpi ne
+// FunLang <  -> arith.cmpi slt
+// FunLang >  -> arith.cmpi sgt
+// FunLang <= -> arith.cmpi sle
+// FunLang >= -> arith.cmpi sge
 %result = arith.cmpi slt, %a, %b : i64
 // %result has type i1 (true/false)
 ```
@@ -533,11 +533,11 @@ All MLIR patterns below were tested with `mlir-opt 20.1.4` at `/opt/homebrew/opt
 
 ### Secondary (HIGH confidence — project source)
 
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — `MlirBlock.Label` and `MlirBlock.Args` already exist; `I1` type already in `MlirType`; `MlirOp` extensibility pattern confirmed
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — `printBlock` already emits label+args; `printType` already handles `I1`
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv` design, `freshName` pattern, `elaborateModule` single-block structure
-- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` — `--convert-cf-to-llvm` confirmed in `loweringPasses`
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `Bool`, `If`, `Equal`, `NotEqual`, `LessThan`, `GreaterThan`, `LessEqual`, `GreaterEqual`, `And`, `Or` all confirmed in `Ast.Expr` DU
+- `src/FunLangCompiler.Compiler/MlirIR.fs` — `MlirBlock.Label` and `MlirBlock.Args` already exist; `I1` type already in `MlirType`; `MlirOp` extensibility pattern confirmed
+- `src/FunLangCompiler.Compiler/Printer.fs` — `printBlock` already emits label+args; `printType` already handles `I1`
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv` design, `freshName` pattern, `elaborateModule` single-block structure
+- `src/FunLangCompiler.Compiler/Pipeline.fs` — `--convert-cf-to-llvm` confirmed in `loweringPasses`
+- `deps/FunLang/src/FunLang/Ast.fs` — `Bool`, `If`, `Equal`, `NotEqual`, `LessThan`, `GreaterThan`, `LessEqual`, `GreaterEqual`, `And`, `Or` all confirmed in `Ast.Expr` DU
 
 ---
 
@@ -551,4 +551,4 @@ All MLIR patterns below were tested with `mlir-opt 20.1.4` at `/opt/homebrew/opt
 - Nested if-else: LOW — explicitly deferred; known limitation documented
 
 **Research date:** 2026-03-26
-**Valid until:** 2026-04-25 (MLIR 20.x stable; LangThree AST structure locked)
+**Valid until:** 2026-04-25 (MLIR 20.x stable; FunLang AST structure locked)

@@ -112,7 +112,7 @@ completed: 2026-03-29
 
 **2. [Rule 1 - Bug] E2E test format — sum-based verification not usable**
 - **Found during:** Task 2
-- **Issue:** `let sum = ref 0; sum := !sum + x` syntax not supported (`ref`/`:=`/`!` not LangThree builtins). `let mut sum = 0; sum <- sum + x` inside for-in closure causes pre-existing segfault
+- **Issue:** `let sum = ref 0; sum := !sum + x` syntax not supported (`ref`/`:=`/`!` not FunLang builtins). `let mut sum = 0; sum <- sum + x` inside for-in closure causes pre-existing segfault
 - **Fix:** Used single-element iteration for non-deterministic collections; ordered multi-element for Queue/MutableList
 - **Files modified:** tests/compiler/34-05 through 34-08
 - **Verification:** All four tests PASS with fslit

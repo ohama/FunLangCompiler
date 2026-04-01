@@ -8,7 +8,7 @@ re_verification: false
 
 # Phase 27: File I/O Extended Verification Report
 
-**Phase Goal:** LangThree programs can read/write line lists, read stdin, query environment variables, get the current directory, join paths, and list directory contents.
+**Phase Goal:** FunLang programs can read/write line lists, read stdin, query environment variables, get the current directory, join paths, and list directory contents.
 **Verified:** 2026-03-27T23:55:00Z
 **Status:** passed
 **Re-verification:** No — initial verification

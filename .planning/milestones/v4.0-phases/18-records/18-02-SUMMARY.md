@@ -95,7 +95,7 @@ Each task was committed atomically:
 **1. [Rule 1 - Bug] Test syntax corrected from shorthand to explicit form**
 
 - **Found during:** Task 2 (E2E test creation)
-- **Issue:** Plan specified `{ x = 3; y }` and `{ x; y }` shorthand syntax but the LangThree grammar only supports `IDENT EQUALS Pattern` — shorthand form produces parse error
+- **Issue:** Plan specified `{ x = 3; y }` and `{ x; y }` shorthand syntax but the FunLang grammar only supports `IDENT EQUALS Pattern` — shorthand form produces parse error
 - **Fix:** Updated both test files to use explicit `{ x = 3; y = yv }` and `{ x = xv; y = yv }` syntax
 - **Files modified:** tests/compiler/18-05-record-pat.flt, tests/compiler/18-06-record-pat-ordering.flt
 - **Verification:** Both tests pass with corrected syntax; 18-06 exits with 20 confirming correct slot mapping

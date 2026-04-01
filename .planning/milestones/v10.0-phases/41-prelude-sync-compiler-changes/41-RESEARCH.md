@@ -6,9 +6,9 @@
 
 ## Summary
 
-Phase 41 requires three compiler changes: implementing `OpenDecl` in `flattenDecls`, verifying operator MLIR name sanitization, and syncing 12 Prelude `.fun` files with LangThree.
+Phase 41 requires three compiler changes: implementing `OpenDecl` in `flattenDecls`, verifying operator MLIR name sanitization, and syncing 12 Prelude `.fun` files with FunLang.
 
-Research confirmed that `sanitizeMlirName` in Printer.fs is already fully integrated and handles all operator characters (`^^`, `++`, `<|>`) in both `func.func` definitions and call sites. Integration testing proves operators inside modules compile to valid MLIR without errors. The `OpenDecl` implementation requires a two-pass refactor of `flattenDecls` to build a module member map first, then emit alias `LetDecl`s on open. The Prelude sync is a mechanical diff application with one exception: Hashtable.fun intentionally retains backend-specific `createStr`/`keysStr` functions absent from LangThree.
+Research confirmed that `sanitizeMlirName` in Printer.fs is already fully integrated and handles all operator characters (`^^`, `++`, `<|>`) in both `func.func` definitions and call sites. Integration testing proves operators inside modules compile to valid MLIR without errors. The `OpenDecl` implementation requires a two-pass refactor of `flattenDecls` to build a module member map first, then emit alias `LetDecl`s on open. The Prelude sync is a mechanical diff application with one exception: Hashtable.fun intentionally retains backend-specific `createStr`/`keysStr` functions absent from FunLang.
 
 **Primary recommendation:** Implement `flattenDecls` as a two-pass function (pass 1: collect module member names; pass 2: flatten with alias emission on `OpenDecl`), update 4 Prelude files (Core, List, Option, Result) and add newlines to 3 others (HashSet, MutableList, Queue).
 
@@ -21,14 +21,14 @@ This phase is entirely within the existing codebase — no new libraries.
 |------|----------|---------|-----------------|
 | `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | AST-to-MLIR lowering | `flattenDecls` OpenDecl handling |
 | `Printer.fs` | `src/FunLangCompiler.Compiler/` | MLIR serialization | `sanitizeMlirName` already integrated |
-| `Prelude/*.fun` | `Prelude/` | Standard library source | Sync with LangThree |
+| `Prelude/*.fun` | `Prelude/` | Standard library source | Sync with FunLang |
 
 ### Supporting
 | File | Location | Purpose | When to Read |
 |------|----------|---------|-------------|
-| `Ast.fs` (LangThree) | `../LangThree/src/LangThree/` | `OpenDecl` type definition | Understanding OpenDecl fields |
-| `Eval.fs` (LangThree) | `../LangThree/src/LangThree/` | Reference OpenDecl semantics | Understanding expected behavior |
-| `Parser.fsy` (LangThree) | `../LangThree/src/LangThree/` | Custom operator syntax | `let (^^) a b = ...` parsing |
+| `Ast.fs` (FunLang) | `../FunLang/src/FunLang/` | `OpenDecl` type definition | Understanding OpenDecl fields |
+| `Eval.fs` (FunLang) | `../FunLang/src/FunLang/` | Reference OpenDecl semantics | Understanding expected behavior |
+| `Parser.fsy` (FunLang) | `../FunLang/src/FunLang/` | Custom operator syntax | `let (^^) a b = ...` parsing |
 
 ### Alternatives Considered
 | Instead of | Could Use | Tradeoff |
@@ -142,11 +142,11 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
 
 ### Pattern 4: Prelude File Sync
 
-**What:** Replace 4 Prelude files to match LangThree exactly. Add newline to 3 files.
+**What:** Replace 4 Prelude files to match FunLang exactly. Add newline to 3 files.
 
-**When to use:** Required to reach byte-identical state with `../LangThree/Prelude/`.
+**When to use:** Required to reach byte-identical state with `../FunLang/Prelude/`.
 
-**Exception:** `Hashtable.fun` intentionally differs — keeps `createStr` and `keysStr` functions that are backend-specific (not in LangThree).
+**Exception:** `Hashtable.fun` intentionally differs — keeps `createStr` and `keysStr` functions that are backend-specific (not in FunLang).
 
 ### Anti-Patterns to Avoid
 
@@ -285,7 +285,7 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
 ### Prelude File Changes — Core.fun
 
 ```fsharp
-// Target: match LangThree/Prelude/Core.fun exactly
+// Target: match FunLang/Prelude/Core.fun exactly
 module Core =
     let id x = x
     let const x = fun y -> x
@@ -327,7 +327,7 @@ open List
 ### Prelude File Changes — Option.fun
 
 ```fsharp
-// Target: match LangThree/Prelude/Option.fun exactly
+// Target: match FunLang/Prelude/Option.fun exactly
 module Option =
     type Option 'a = None | Some of 'a
     let optionMap f = fun opt -> match opt with | Some x -> Some (f x) | None -> None
@@ -348,7 +348,7 @@ open Option
 ### Prelude File Changes — Result.fun
 
 ```fsharp
-// Target: match LangThree/Prelude/Result.fun exactly
+// Target: match FunLang/Prelude/Result.fun exactly
 module Result =
     type Result 'a 'b = Ok of 'a | Error of 'b
     let resultMap f = fun r -> match r with | Ok x -> Ok (f x) | Error e -> Error e
@@ -366,7 +366,7 @@ open Result
 
 ### Newline Fix (HashSet.fun, MutableList.fun, Queue.fun)
 
-These files are byte-identical to LangThree EXCEPT for missing trailing newline. Add `\n` at end of each file.
+These files are byte-identical to FunLang EXCEPT for missing trailing newline. Add `\n` at end of each file.
 
 ### Verifying sanitizeMlirName coverage
 
@@ -390,7 +390,7 @@ let sc = sanitizeMlirName callee
 | Old Approach | Current Approach | When Changed | Impact |
 |--------------|------------------|--------------|--------|
 | `OpenDecl` is a no-op | `OpenDecl` emits alias LetDecls | Phase 41 | Unqualified names work correctly after `open` |
-| Prelude Option uses `map`, `bind`, etc. | Prelude Option uses `optionMap`, `optionBind`, etc. | Phase 41 | LangThree parity; avoids `map` name collision with List.map |
+| Prelude Option uses `map`, `bind`, etc. | Prelude Option uses `optionMap`, `optionBind`, etc. | Phase 41 | FunLang parity; avoids `map` name collision with List.map |
 | Prelude List has no `zip`/`take`/`drop`/(++) | Added | Phase 41 | Enables new list operations in compiled programs |
 
 **Deprecated/outdated:**
@@ -399,12 +399,12 @@ let sc = sanitizeMlirName callee
 ## Open Questions
 
 1. **Multi-segment open paths (e.g., `open A.B`)**
-   - What we know: `OpenDecl` type is `OpenDecl of path: string list * Span`, so `open A.B` = `OpenDecl(["A"; "B"], _)`. LangThree's evaluator only handles the `[name]` single-segment case and ignores multi-segment.
+   - What we know: `OpenDecl` type is `OpenDecl of path: string list * Span`, so `open A.B` = `OpenDecl(["A"; "B"], _)`. FunLang's evaluator only handles the `[name]` single-segment case and ignores multi-segment.
    - What's unclear: Prelude files only use single-segment `open Core`, `open List`, etc. Multi-segment is not needed.
-   - Recommendation: Match only `OpenDecl([openedMod], s)` (single-segment) and emit `[]` for multi-segment paths. This matches LangThree evaluator behavior.
+   - Recommendation: Match only `OpenDecl([openedMod], s)` (single-segment) and emit `[]` for multi-segment paths. This matches FunLang evaluator behavior.
 
 2. **`open` inside a module body**
-   - What we know: LangThree allows `open` at top-level only for Prelude files. No Prelude file uses nested open.
+   - What we know: FunLang allows `open` at top-level only for Prelude files. No Prelude file uses nested open.
    - What's unclear: If `open List` appears inside a `module Foo = ... open List ...`, `flattenDecls` is processing `innerDecls` with `modName = "Foo"`. The `OpenDecl` handler would look up `List` in `moduleMembers` and emit aliases — but those aliases would be namespaced as `LetDecl("Foo_map", ...)` if `modName <> ""`.
    - Recommendation: Emit aliases WITHOUT the outer `modName` prefix regardless of current `modName`. Add `when modName = ""` guard to the `OpenDecl` case, OR emit unqualified aliases always. Research finding: Prelude only uses top-level open, so this edge case doesn't block Phase 41.
 
@@ -423,8 +423,8 @@ let sc = sanitizeMlirName callee
 - Integration tests (`/tmp/test_op*.fun`) — verified operator compilation works end-to-end
 
 ### Secondary (MEDIUM confidence)
-- `../LangThree/src/LangThree/Eval.fs` lines 1620–1631 — reference implementation of `open` semantics
-- `../LangThree/src/LangThree/Parser.fsy` lines 363–367, 782–786 — custom operator `let (op)` syntax
+- `../FunLang/src/FunLang/Eval.fs` lines 1620–1631 — reference implementation of `open` semantics
+- `../FunLang/src/FunLang/Parser.fsy` lines 363–367, 782–786 — custom operator `let (op)` syntax
 
 ## Metadata
 

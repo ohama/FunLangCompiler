@@ -1,8 +1,8 @@
 # FunLangCompiler
 
-LangThree 소스 코드를 네이티브 x86-64 바이너리로 컴파일하는 컴파일러 백엔드.
+FunLang 소스 코드를 네이티브 x86-64 바이너리로 컴파일하는 컴파일러 백엔드.
 
-F#으로 구현되며, [LangThree](../LangThree) 프론트엔드(파서/타입체커)를 재사용한다. 내부 IR(MlirIR)을 MLIR 텍스트로 직렬화한 뒤 `mlir-opt` → `mlir-translate` → `clang` 파이프라인으로 네이티브 바이너리를 생성한다.
+F#으로 구현되며, [FunLang](deps/FunLang) 프론트엔드(파서/타입체커)를 재사용한다. 내부 IR(MlirIR)을 MLIR 텍스트로 직렬화한 뒤 `mlir-opt` → `mlir-translate` → `clang` 파이프라인으로 네이티브 바이너리를 생성한다.
 
 ## Quick Start
 
@@ -45,7 +45,7 @@ dotnet run --project src/FunLangCompiler.Cli -- hello.lt -o hello
 ## Architecture
 
 ```
-LangThree AST
+FunLang AST
     |
     v
 Elaboration (F#)     -- AST -> MlirIR translation
@@ -121,7 +121,7 @@ dotnet run --project deps/fslit/FsLit -- tests/compiler/
 dotnet run --project deps/fslit/FsLit -- tests/compiler/04-01-fact.flt
 ```
 
-Each `.flt` file compiles a LangThree expression, runs the binary, and verifies the output.
+Each `.flt` file compiles a FunLang expression, runs the binary, and verifies the output.
 
 ## Examples
 
