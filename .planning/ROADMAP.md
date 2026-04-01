@@ -6,6 +6,11 @@
 
 **Requirements:** SSA-01 ~ SSA-03, TEST-01, TEST-02
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 63-01-PLAN.md — Add guard to 2-lambda pattern + 3-arg curried function E2E test
+
 **Success Criteria:**
 1. 3-arg curried function (mutable record + list + bool) 컴파일 성공
 2. 생성된 MLIR에서 maker func.func가 inner body SSA를 참조하지 않음
@@ -13,9 +18,9 @@
 4. Issue #4 재현 케이스 통과
 
 **Approach:**
-- Research 필요: 2-lambda 패턴의 capture store가 env.Vars에서 가져오는 SSA가 왜 inner body의 것인지 분석
-- maker body와 inner body elaboration의 순서/스코프 관계 확인
-- capture store를 maker 스코프 내에서만 유효한 값으로 제한하는 방법 결정
+- 2-lambda 패턴에 `when` guard 추가: innerBody가 Lambda일 때 매칭 거부
+- 3+ lambda는 general Let path로 fallthrough → 각 lambda layer가 별도 closure로 올바르게 컴파일
+- 기존 2-arg curried function은 영향 없음 (guard 통과)
 
 ---
 *Created: 2026-04-02*
