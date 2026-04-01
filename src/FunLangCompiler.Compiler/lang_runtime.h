@@ -113,6 +113,11 @@ LangString* lang_string_slice(LangString* s, int64_t start, int64_t stop);
 int64_t     lang_string_endswith(LangString* s, LangString* suffix);
 int64_t     lang_string_startswith(LangString* s, LangString* prefix);
 LangString* lang_string_trim(LangString* s);
+LangCons*   lang_string_split(LangString* s, LangString* sep);
+int64_t     lang_string_indexof(LangString* s, LangString* sub);
+LangString* lang_string_replace(LangString* s, LangString* old_str, LangString* rep);
+LangString* lang_string_toupper(LangString* s);
+LangString* lang_string_tolower(LangString* s);
 LangString* lang_string_concat_list(LangString* sep, LangCons* list);
 
 int64_t lang_char_is_digit(int64_t c);

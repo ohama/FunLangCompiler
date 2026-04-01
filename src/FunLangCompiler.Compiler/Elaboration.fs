@@ -1429,6 +1429,49 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, strOps @ strCoerce @ [LlvmCallOp(result, "@lang_string_trim", [strPtr])])
 
+    // Phase 54: string_split builtin — App(App(Var("string_split"), s), sep)
+    | App (App (Var ("string_split", _), strExpr, _), sepExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let (sepVal, sepOps) = elaborateExpr env sepExpr
+        let (strPtr, strCoerce) = coerceToPtrArg env strVal
+        let (sepPtr, sepCoerce) = coerceToPtrArg env sepVal
+        let result = { Name = freshName env; Type = Ptr }
+        (result, strOps @ sepOps @ strCoerce @ sepCoerce @ [LlvmCallOp(result, "@lang_string_split", [strPtr; sepPtr])])
+
+    // Phase 54: string_indexof builtin — App(App(Var("string_indexof"), s), sub)
+    | App (App (Var ("string_indexof", _), strExpr, _), subExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let (subVal, subOps) = elaborateExpr env subExpr
+        let (strPtr, strCoerce) = coerceToPtrArg env strVal
+        let (subPtr, subCoerce) = coerceToPtrArg env subVal
+        let result = { Name = freshName env; Type = I64 }
+        (result, strOps @ subOps @ strCoerce @ subCoerce @ [LlvmCallOp(result, "@lang_string_indexof", [strPtr; subPtr])])
+
+    // Phase 54: string_replace builtin — App(App(App(Var("string_replace"), s), old), rep)
+    | App (App (App (Var ("string_replace", _), strExpr, _), oldExpr, _), repExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let (oldVal, oldOps) = elaborateExpr env oldExpr
+        let (repVal, repOps) = elaborateExpr env repExpr
+        let (strPtr, strCoerce) = coerceToPtrArg env strVal
+        let (oldPtr, oldCoerce) = coerceToPtrArg env oldVal
+        let (repPtr, repCoerce) = coerceToPtrArg env repVal
+        let result = { Name = freshName env; Type = Ptr }
+        (result, strOps @ oldOps @ repOps @ strCoerce @ oldCoerce @ repCoerce @ [LlvmCallOp(result, "@lang_string_replace", [strPtr; oldPtr; repPtr])])
+
+    // Phase 54: string_toupper builtin — App(Var("string_toupper"), s)
+    | App (Var ("string_toupper", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let (strPtr, strCoerce) = coerceToPtrArg env strVal
+        let result = { Name = freshName env; Type = Ptr }
+        (result, strOps @ strCoerce @ [LlvmCallOp(result, "@lang_string_toupper", [strPtr])])
+
+    // Phase 54: string_tolower builtin — App(Var("string_tolower"), s)
+    | App (Var ("string_tolower", _), strExpr, _) ->
+        let (strVal, strOps) = elaborateExpr env strExpr
+        let (strPtr, strCoerce) = coerceToPtrArg env strVal
+        let result = { Name = freshName env; Type = Ptr }
+        (result, strOps @ strCoerce @ [LlvmCallOp(result, "@lang_string_tolower", [strPtr])])
+
     // Phase 31: string_concat_list builtin — App(App(Var("string_concat_list"), sep), list)
     | App (App (Var ("string_concat_list", _), sepExpr, _), listExpr, _) ->
         let (sepVal,  sepOps)  = elaborateExpr env sepExpr
@@ -4104,6 +4147,11 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_string_endswith";   ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_startswith"; ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_trim";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_split";      ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_indexof";    ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_replace";    ExtParams = [Ptr; Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_toupper";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_tolower";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_concat_list";ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_char_is_digit";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_char_is_letter";    ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
@@ -4494,6 +4542,11 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_string_endswith";   ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_startswith"; ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_trim";       ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_split";      ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_indexof";    ExtParams = [Ptr; Ptr];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_replace";    ExtParams = [Ptr; Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_toupper";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_string_tolower";    ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_concat_list";ExtParams = [Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_char_is_digit";     ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_char_is_letter";    ExtParams = [I64];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }

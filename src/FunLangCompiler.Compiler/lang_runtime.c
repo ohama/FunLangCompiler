@@ -114,6 +114,78 @@ LangString* lang_string_trim(LangString* s) {
     return r;
 }
 
+/* Phase 54: string_indexof — find substring position, return -1 if not found */
+int64_t lang_string_indexof(LangString* s, LangString* sub) {
+    if (sub->length == 0) return 0;
+    if (sub->length > s->length) return 0 - 1;
+    char* found = strstr(s->data, sub->data);
+    if (!found) return 0 - 1;
+    return (int64_t)(found - s->data);
+}
+
+/* Phase 54: string_replace — replace all occurrences */
+LangString* lang_string_replace(LangString* s, LangString* old, LangString* rep) {
+    if (old->length == 0) {
+        LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+        char* buf = (char*)GC_malloc((size_t)(s->length + 1));
+        memcpy(buf, s->data, (size_t)s->length);
+        buf[s->length] = '\0';
+        r->length = s->length;
+        r->data = buf;
+        return r;
+    }
+    int64_t count = 0;
+    const char* p = s->data;
+    while ((p = strstr(p, old->data)) != NULL) {
+        count++;
+        p += old->length;
+    }
+    int64_t new_len = s->length + count * (rep->length - old->length);
+    char* buf = (char*)GC_malloc((size_t)(new_len + 1));
+    char* dst = buf;
+    const char* src = s->data;
+    while (*src) {
+        if (strncmp(src, old->data, (size_t)old->length) == 0) {
+            memcpy(dst, rep->data, (size_t)rep->length);
+            dst += rep->length;
+            src += old->length;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+    LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->length = new_len;
+    r->data = buf;
+    return r;
+}
+
+/* Phase 54: string_toupper — convert to uppercase */
+LangString* lang_string_toupper(LangString* s) {
+    char* buf = (char*)GC_malloc((size_t)(s->length + 1));
+    for (int64_t i = 0; i < s->length; i++) {
+        buf[i] = (char)toupper((unsigned char)s->data[i]);
+    }
+    buf[s->length] = '\0';
+    LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->length = s->length;
+    r->data = buf;
+    return r;
+}
+
+/* Phase 54: string_tolower — convert to lowercase */
+LangString* lang_string_tolower(LangString* s) {
+    char* buf = (char*)GC_malloc((size_t)(s->length + 1));
+    for (int64_t i = 0; i < s->length; i++) {
+        buf[i] = (char)tolower((unsigned char)s->data[i]);
+    }
+    buf[s->length] = '\0';
+    LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->length = s->length;
+    r->data = buf;
+    return r;
+}
+
 int64_t lang_string_to_int(LangString* s) {
     return (int64_t)strtol(s->data, NULL, 10);
 }
@@ -175,6 +247,56 @@ LangString* lang_string_concat_list(LangString* sep, LangCons* list) {
     r->length = total;
     r->data = buf;
     return r;
+}
+
+/* Phase 54: string_split — split string by separator, return cons list of LangString* */
+LangCons* lang_string_split(LangString* s, LangString* sep) {
+    LangCons* head = NULL;
+    LangCons** cursor = &head;
+    const char* src = s->data;
+    int64_t src_len = s->length;
+    int64_t sep_len = sep->length;
+    if (sep_len == 0) {
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->head = (int64_t)s;
+        cell->tail = NULL;
+        return cell;
+    }
+    int64_t pos = 0;
+    while (pos <= src_len) {
+        const char* found = NULL;
+        if (pos < src_len) {
+            for (int64_t i = pos; i <= src_len - sep_len; i++) {
+                if (memcmp(src + i, sep->data, (size_t)sep_len) == 0) {
+                    found = src + i;
+                    break;
+                }
+            }
+        }
+        int64_t chunk_len;
+        if (found) {
+            chunk_len = (int64_t)(found - (src + pos));
+        } else {
+            chunk_len = src_len - pos;
+        }
+        LangString* part = (LangString*)GC_malloc(sizeof(LangString));
+        char* buf = (char*)GC_malloc((size_t)(chunk_len + 1));
+        memcpy(buf, src + pos, (size_t)chunk_len);
+        buf[chunk_len] = '\0';
+        part->length = chunk_len;
+        part->data = buf;
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->head = (int64_t)part;
+        cell->tail = NULL;
+        *cursor = cell;
+        cursor = &cell->tail;
+        if (found) {
+            pos = (int64_t)(found - src) + sep_len;
+        } else {
+            break;
+        }
+    }
+    return head ? head : NULL;
 }
 
 /* lang_range: build inclusive cons list [start..step..stop].

@@ -1,7 +1,14 @@
 module String =
     let concat sep lst = string_concat_list sep lst
+    let join sep lst = string_concat_list sep lst
     let endsWith s suffix = string_endswith s suffix
     let startsWith s prefix = string_startswith s prefix
     let trim s = string_trim s
     let length s = string_length s
     let contains s needle = string_contains s needle
+    let split s sep = string_split s sep
+    let indexOf s sub = string_indexof s sub
+    let replace s old rep = string_replace s old rep
+    let toUpper s = string_toupper s
+    let toLower s = string_tolower s
+    let substring s start len = string_sub s start len

@@ -1,0 +1,7 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let a = string_toupper "hello World" in let _ = println a in let b = string_tolower "Hello WORLD" in let _ = println b in 0
+// --- Output:
+HELLO WORLD
+hello world
+0

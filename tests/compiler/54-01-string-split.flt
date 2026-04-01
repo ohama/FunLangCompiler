@@ -1,0 +1,14 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let parts = string_split "a,b,c" ","
+in let rec printList xs = match xs with | [] -> 0 | h :: t -> let _ = println h in printList t
+in let _ = printList parts
+in let parts2 = string_split "hello" ","
+in let _ = printList parts2
+in 0
+// --- Output:
+a
+b
+c
+hello
+0

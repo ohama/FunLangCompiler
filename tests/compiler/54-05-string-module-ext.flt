@@ -1,0 +1,41 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+module String =
+    let concat sep lst = string_concat_list sep lst
+    let join sep lst = string_concat_list sep lst
+    let endsWith s suffix = string_endswith s suffix
+    let startsWith s prefix = string_startswith s prefix
+    let trim s = string_trim s
+    let length s = string_length s
+    let contains s needle = string_contains s needle
+    let split s sep = string_split s sep
+    let indexOf s sub = string_indexof s sub
+    let replace s old rep = string_replace s old rep
+    let toUpper s = string_toupper s
+    let toLower s = string_tolower s
+    let substring s start len = string_sub s start len
+let rec printList xs = match xs with | [] -> 0 | h :: t -> let _ = println h in printList t
+let _ = printList (String.split "x-y-z" "-")
+let a = String.indexOf "abcdef" "cd"
+let _ = println (to_string a)
+let b = String.replace "hello world" "world" "FunLang"
+let _ = println b
+let c = String.toUpper "hello"
+let _ = println c
+let d = String.toLower "HELLO"
+let _ = println d
+let e = String.join "," ["a"; "b"; "c"]
+let _ = println e
+let f = String.substring "hello world" 6 5
+let _ = println f
+// --- Output:
+x
+y
+z
+2
+hello FunLang
+HELLO
+hello
+a,b,c
+world
+0

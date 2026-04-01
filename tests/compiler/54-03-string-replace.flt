@@ -1,0 +1,8 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let a = string_replace "foo bar foo" "foo" "baz" in let _ = println a in let b = string_replace "hello" "xyz" "abc" in let _ = println b in let c = string_replace "aaa" "a" "bb" in let _ = println c in 0
+// --- Output:
+baz bar baz
+hello
+bbbbbb
+0
