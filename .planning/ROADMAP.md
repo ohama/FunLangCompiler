@@ -34,8 +34,8 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 61-01-PLAN.md — Extract compileFile helper + wire build/test subcommands
-- [ ] 61-02-PLAN.md — E2E tests for fnc build and fnc test
+- [x] 61-01-PLAN.md — Extract compileFile helper + wire build/test subcommands
+- [x] 61-02-PLAN.md — E2E tests for fnc build and fnc test
 
 **Success Criteria:**
 1. `fnc build` — 모든 [[executable]] 타겟을 build/에 네이티브 바이너리로 컴파일

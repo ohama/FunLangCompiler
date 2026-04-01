@@ -15,30 +15,30 @@
 
 ### CLI 서브커맨드
 
-- [ ] **CLI-01**: `fnc build` — 모든 [[executable]] 타겟을 네이티브 바이너리로 컴파일
-- [ ] **CLI-02**: `fnc build <name>` — 특정 [[executable]] 타겟만 컴파일
-- [ ] **CLI-03**: `fnc test` — 모든 [[test]] 타겟을 컴파일 + 실행
-- [ ] **CLI-04**: `fnc test <name>` — 특정 [[test]] 타겟만 컴파일 + 실행
-- [ ] **CLI-05**: `fnc <file.fun>` — 기존 단일 파일 모드 유지 (regression 없음)
-- [ ] **CLI-06**: `-O0/-O1/-O2/-O3` 플래그가 build/test에도 적용
+- [x] **CLI-01**: `fnc build` — 모든 [[executable]] 타겟을 네이티브 바이너리로 컴파일
+- [x] **CLI-02**: `fnc build <name>` — 특정 [[executable]] 타겟만 컴파일
+- [x] **CLI-03**: `fnc test` — 모든 [[test]] 타겟을 컴파일 + 실행
+- [x] **CLI-04**: `fnc test <name>` — 특정 [[test]] 타겟만 컴파일 + 실행
+- [x] **CLI-05**: `fnc <file.fun>` — 기존 단일 파일 모드 유지 (regression 없음)
+- [x] **CLI-06**: `-O0/-O1/-O2/-O3` 플래그가 build/test에도 적용
 
 ### 빌드 출력
 
-- [ ] **OUT-01**: build/ 디렉토리에 바이너리 출력 (자동 생성)
-- [ ] **OUT-02**: 빌드 결과 출력 — `OK: <name> → build/<name> (Xs)` 형식
-- [ ] **OUT-03**: funproj.toml의 prelude 경로가 Prelude 로딩에 우선 적용
+- [x] **OUT-01**: build/ 디렉토리에 바이너리 출력 (자동 생성)
+- [x] **OUT-02**: 빌드 결과 출력 — `OK: <name> → build/<name> (Xs)` 형식
+- [x] **OUT-03**: funproj.toml의 prelude 경로가 Prelude 로딩에 우선 적용
 
 ### 에러 처리
 
-- [ ] **ERR-01**: funproj.toml 없으면 에러 메시지
-- [ ] **ERR-02**: 타겟 파일 없으면 에러 메시지
-- [ ] **ERR-03**: 존재하지 않는 타겟 이름이면 에러 메시지
+- [x] **ERR-01**: funproj.toml 없으면 에러 메시지
+- [x] **ERR-02**: 타겟 파일 없으면 에러 메시지
+- [x] **ERR-03**: 존재하지 않는 타겟 이름이면 에러 메시지
 
 ### 테스트
 
 - [x] **TEST-01**: funproj.toml 파싱 E2E 테스트
-- [ ] **TEST-02**: fnc build E2E 테스트 (프로젝트 컴파일 + 바이너리 실행)
-- [ ] **TEST-03**: fnc test E2E 테스트
+- [x] **TEST-02**: fnc build E2E 테스트 (프로젝트 컴파일 + 바이너리 실행)
+- [x] **TEST-03**: fnc test E2E 테스트
 
 ## Future Requirements
 
@@ -60,21 +60,21 @@
 | TOML-03 | Phase 60 | Complete |
 | TOML-04 | Phase 60 | Complete |
 | TOML-05 | Phase 60 | Complete |
-| CLI-01 | Phase 61 | Pending |
-| CLI-02 | Phase 61 | Pending |
-| CLI-03 | Phase 61 | Pending |
-| CLI-04 | Phase 61 | Pending |
-| CLI-05 | Phase 61 | Pending |
-| CLI-06 | Phase 61 | Pending |
-| OUT-01 | Phase 61 | Pending |
-| OUT-02 | Phase 61 | Pending |
-| OUT-03 | Phase 61 | Pending |
-| ERR-01 | Phase 61 | Pending |
-| ERR-02 | Phase 61 | Pending |
-| ERR-03 | Phase 61 | Pending |
+| CLI-01 | Phase 61 | Complete |
+| CLI-02 | Phase 61 | Complete |
+| CLI-03 | Phase 61 | Complete |
+| CLI-04 | Phase 61 | Complete |
+| CLI-05 | Phase 61 | Complete |
+| CLI-06 | Phase 61 | Complete |
+| OUT-01 | Phase 61 | Complete |
+| OUT-02 | Phase 61 | Complete |
+| OUT-03 | Phase 61 | Complete |
+| ERR-01 | Phase 61 | Complete |
+| ERR-02 | Phase 61 | Complete |
+| ERR-03 | Phase 61 | Complete |
 | TEST-01 | Phase 60 | Complete |
-| TEST-02 | Phase 61 | Pending |
-| TEST-03 | Phase 61 | Pending |
+| TEST-02 | Phase 61 | Complete |
+| TEST-03 | Phase 61 | Complete |
 
 **Coverage:**
 - v17.0 requirements: 20 total
