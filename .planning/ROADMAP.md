@@ -9,7 +9,7 @@
 **Plans:** 1 plan
 
 Plans:
-- [ ] 63-01-PLAN.md — Add guard to 2-lambda pattern + 3-arg curried function E2E test
+- [x] 63-01-PLAN.md — Add guard to 2-lambda pattern + 3-arg curried function E2E test
 
 **Success Criteria:**
 1. 3-arg curried function (mutable record + list + bool) 컴파일 성공

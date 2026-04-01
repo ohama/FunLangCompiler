@@ -8,14 +8,14 @@
 
 ### SSA Scope 수정
 
-- [ ] **SSA-01**: 2-lambda maker의 capture store가 maker func.func 스코프 내 유효한 SSA만 참조
-- [ ] **SSA-02**: inner body elaboration에서 생성된 SSA 값이 maker 함수 경계를 넘지 않음
-- [ ] **SSA-03**: 3-arg curried function (buildCharClass 패턴) 정상 컴파일
+- [x] **SSA-01**: 2-lambda maker의 capture store가 maker func.func 스코프 내 유효한 SSA만 참조
+- [x] **SSA-02**: inner body elaboration에서 생성된 SSA 값이 maker 함수 경계를 넘지 않음
+- [x] **SSA-03**: 3-arg curried function (buildCharClass 패턴) 정상 컴파일
 
 ### 테스트
 
-- [ ] **TEST-01**: 3-arg curried function E2E 테스트 (mutable record + list + bool)
-- [ ] **TEST-02**: 기존 243 E2E 테스트 전부 통과
+- [x] **TEST-01**: 3-arg curried function E2E 테스트 (mutable record + list + bool)
+- [x] **TEST-02**: 기존 243 E2E 테스트 전부 통과
 
 ## Future Requirements
 
@@ -30,11 +30,11 @@ None.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SSA-01 | Phase 63 | Pending |
-| SSA-02 | Phase 63 | Pending |
-| SSA-03 | Phase 63 | Pending |
-| TEST-01 | Phase 63 | Pending |
-| TEST-02 | Phase 63 | Pending |
+| SSA-01 | Phase 63 | Complete |
+| SSA-02 | Phase 63 | Complete |
+| SSA-03 | Phase 63 | Complete |
+| TEST-01 | Phase 63 | Complete |
+| TEST-02 | Phase 63 | Complete |
 
 **Coverage:**
 - v19.0 requirements: 5 total
