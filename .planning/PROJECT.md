@@ -8,6 +8,15 @@ FunLang의 AST/타입체커를 재사용하고 MLIR → LLVM 파이프라인을 
 
 FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다. 이것이 동작하면 나머지는 부가적이다.
 
+## Current Milestone: v14.0 FunLang Standard Library Sync
+
+**Goal:** FunLang v13.0/v14.0에서 추가된 String/List 표준 라이브러리 함수를 컴파일러에 동기화
+
+**Target features:**
+- String 모듈 확장: split, indexOf, replace, toUpper, toLower, join, substring (C 런타임 + Elaboration + Prelude)
+- List 모듈 확장: init, find, findIndex, partition, groupBy, scan, replicate, collect, pairwise, sumBy, sum, minBy, maxBy, contains, unzip, forall, iter (순수 FunLang Prelude)
+- 새 함수에 대한 E2E 테스트
+
 ## Current State
 
 v13.0 shipped. 222+ E2E tests. 13 Prelude modules (Typeclass.fun 추가).

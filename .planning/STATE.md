@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Planning next milestone
+**Current focus:** v14.0 — FunLang Standard Library Sync
 
 ## Current Position
 
-Phase: N/A — between milestones
-Plan: N/A
-Status: v13.0 complete, next milestone not started
-Last activity: 2026-04-01 — v13.0 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-01 — Milestone v14.0 started
 
 Progress: v1.0-v13.0 complete (53 phases, 92 plans)
 
