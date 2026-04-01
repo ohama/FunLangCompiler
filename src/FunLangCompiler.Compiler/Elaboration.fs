@@ -9,6 +9,8 @@ type ClosureInfo = {
     InnerLambdaFn: string    // MLIR name of the llvm.func body, e.g. "@closure_fn_0"
     NumCaptures:   int       // number of captured variables
     InnerReturnIsBool: bool  // Phase 43: inner closure returns bool (for to_string dispatch)
+    CaptureNames: string list   // Phase 64: ordered capture variable names (for caller-side stores)
+    OuterParamName: string      // Phase 64: which capture the maker stores (skip at call site)
 }
 
 type FuncSignature = {
@@ -710,8 +712,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     // Phase 43: StripAnnot sees through Annot/LambdaAnnot wrappers from type annotations
-    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, _)), _)), inExpr, letSpan)
-        when (match stripAnnot innerBody with Lambda _ -> false | _ -> true) ->
+    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, _)), _)), inExpr, letSpan) ->
         // Step 1: Compute free variables of the inner lambda body relative to innerParam only.
         // These are variables that need to come from the closure environment struct.
         // outerParam IS one such variable — it's passed to the closure-maker and stored at env[1+i].
@@ -816,29 +817,19 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ LlvmAddressOfOp(fnPtrVal, closureFnName)
               LlvmStoreOp(fnPtrVal, makerArg1) ]
 
-        // For each capture at index i: GEP to slot i+1, store the captured value
-        let captureStoreOps =
-            captures |> List.mapi (fun i capName ->
-                let slotName = nextMakerName ()
-                let slotVal = { Name = slotName; Type = Ptr }
-                let gepOp = LlvmGEPLinearOp(slotVal, makerArg1, i + 1)
-                // Look up capture value in the OUTER env
-                // If the capture name is the outerParam, it IS %arg0
-                let captureVal =
-                    if capName = outerParam then makerArg0
-                    else
-                        match Map.tryFind capName env.Vars with
-                        | Some v -> v
-                        | None -> failWithSpan letSpan "Elaboration: closure capture '%s' not found in outer scope" capName
-                // Issue #4: Closure env slots are Ptr. If captureVal is I64, insert inttoptr.
-                if captureVal.Type = I64 then
-                    let ptrVal = { Name = nextMakerName (); Type = Ptr }
-                    [gepOp; LlvmIntToPtrOp(ptrVal, captureVal); LlvmStoreOp(ptrVal, slotVal)]
-                else
-                    [gepOp; LlvmStoreOp(captureVal, slotVal)]
-            ) |> List.concat
+        // Phase 64: Maker only stores outerParam at its capture slot.
+        // All other captures are stored by the CALLER (caller-side env population).
+        let outerParamStoreOps =
+            match List.tryFindIndex ((=) outerParam) captures with
+            | Some idx ->
+                let slotVal = { Name = nextMakerName(); Type = Ptr }
+                let ptrVal = { Name = nextMakerName(); Type = Ptr }
+                [LlvmGEPLinearOp(slotVal, makerArg1, idx + 1)
+                 LlvmIntToPtrOp(ptrVal, makerArg0)
+                 LlvmStoreOp(ptrVal, slotVal)]
+            | None -> []
 
-        let makerBodyOps = makerOps @ captureStoreOps @ [ReturnOp [makerArg1]]
+        let makerBodyOps = makerOps @ outerParamStoreOps @ [ReturnOp [makerArg1]]
 
         let makerFuncOp : FuncOp =
             { Name        = "@" + name
@@ -859,7 +850,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
         // Step 6: Add to KnownFuncs
         let closureInfo = { InnerLambdaFn = closureFnName; NumCaptures = numCaptures
-                            InnerReturnIsBool = bodyReturnsBool innerBody }
+                            InnerReturnIsBool = bodyReturnsBool innerBody
+                            CaptureNames = captures; OuterParamName = outerParam }
         let sig_ : FuncSignature =
             { MlirName    = "@" + name
               ParamTypes  = [I64]
@@ -2624,8 +2616,29 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         (coerced, [LlvmPtrToIntOp(coerced, argVal)])
                     else
                         (argVal, [])
+                // Phase 64: Caller stores non-outerParam captures (SSA values are in scope here).
+                // The maker handles fn_ptr (env[0]) and outerParam. We store the rest.
+                let captureStoreOps =
+                    ci.CaptureNames
+                    |> List.mapi (fun i capName ->
+                        if capName = ci.OuterParamName then []  // Maker handles outerParam
+                        else
+                            let slotVal = { Name = freshName env; Type = Ptr }
+                            let capVal =
+                                match Map.tryFind capName env.Vars with
+                                | Some v -> v
+                                | None -> failwith (sprintf "Elaboration: closure capture '%s' not found at call site" capName)
+                            if capVal.Type = I64 then
+                                let ptrVal = { Name = freshName env; Type = Ptr }
+                                [LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
+                                 LlvmIntToPtrOp(ptrVal, capVal)
+                                 LlvmStoreOp(ptrVal, slotVal)]
+                            else
+                                [LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
+                                 LlvmStoreOp(capVal, slotVal)]
+                    ) |> List.concat
                 let callOp = DirectCallOp(resultVal, sig_.MlirName, [i64ArgVal; envPtrVal])
-                (resultVal, argOps @ setupOps @ coerceOps @ [callOp])
+                (resultVal, argOps @ setupOps @ coerceOps @ captureStoreOps @ [callOp])
             | None ->
                 // Check Vars for closure value (type Ptr)
                 match Map.tryFind name env.Vars with
