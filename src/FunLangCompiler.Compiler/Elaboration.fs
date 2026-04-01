@@ -677,7 +677,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     // Phase 43: StripAnnot sees through Annot/LambdaAnnot wrappers from type annotations
-    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, _)), _)), inExpr, _) ->
+    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, _)), _)), inExpr, letSpan) ->
         // Step 1: Compute free variables of the inner lambda body relative to innerParam only.
         // These are variables that need to come from the closure environment struct.
         // outerParam IS one such variable — it's passed to the closure-maker and stored at env[1+i].
@@ -795,7 +795,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     else
                         match Map.tryFind capName env.Vars with
                         | Some v -> v
-                        | None -> failWithSpan Ast.unknownSpan "Elaboration: closure capture '%s' not found in outer scope" capName
+                        | None -> failWithSpan letSpan "Elaboration: closure capture '%s' not found in outer scope" capName
                 let storeOp = LlvmStoreOp(captureVal, slotVal)
                 [gepOp; storeOp]
             ) |> List.concat
@@ -1495,9 +1495,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Fires when argument is statically a string literal OR an integer/bool expression.
     // If the argument is a constructor, ADT variable, or other Ptr, falls through to the
     // derived/user-defined show function in KnownFuncs.
-    | App (Var ("show", _), String (s, _), _) ->
+    | App (Var ("show", _), String (s, _), appSpan) ->
         // show on string literal: return the string as-is (identity)
-        elaborateExpr env (Ast.String(s, Ast.unknownSpan))
+        elaborateExpr env (Ast.String(s, appSpan))
     | App (Var ("show", _), argExpr, _) when
             (let isStr = match stripAnnot argExpr with
                          | Ast.Var(v, _) -> Map.tryFind v env.Vars |> Option.exists (fun mv -> mv.Type = Ptr)
@@ -1523,10 +1523,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 53: eq builtin — polymorphic equality, dispatches on static argument type.
     // Fires when arguments are string literals or non-Ptr values.
-    | App (App (Var ("eq", _), String(ls, _), _), String(rs, _), _) ->
+    | App (App (Var ("eq", _), String(ls, lsSpan), _), String(rs, rsSpan), _) ->
         // eq on two string literals
-        let (lv, lops) = elaborateExpr env (Ast.String(ls, Ast.unknownSpan))
-        let (rv, rops) = elaborateExpr env (Ast.String(rs, Ast.unknownSpan))
+        let (lv, lops) = elaborateExpr env (Ast.String(ls, lsSpan))
+        let (rv, rops) = elaborateExpr env (Ast.String(rs, rsSpan))
         let lDataPtr   = { Name = freshName env; Type = Ptr }
         let lData      = { Name = freshName env; Type = Ptr }
         let rDataPtr   = { Name = freshName env; Type = Ptr }
@@ -2186,20 +2186,17 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (unitVal, strOps @ ops)
 
     // Phase 39: printfn — 2-arg case (MUST come before 1-arg case)
-    | App (App (App (Var ("printfn", _), String (fmt, _), _), arg1Expr, _), arg2Expr, _) ->
-        let s = Ast.unknownSpan
+    | App (App (App (Var ("printfn", _), String (fmt, _), _), arg1Expr, _), arg2Expr, s) ->
         let sprintfExpr = App(App(App(Var("sprintf", s), String(fmt, s), s), arg1Expr, s), arg2Expr, s)
         elaborateExpr env (App(Var("println", s), sprintfExpr, s))
 
     // Phase 39: printfn — 1-arg case (MUST come before 0-arg case)
-    | App (App (Var ("printfn", _), String (fmt, _), _), argExpr, _) ->
-        let s = Ast.unknownSpan
+    | App (App (Var ("printfn", _), String (fmt, _), _), argExpr, s) ->
         let sprintfExpr = App(App(Var("sprintf", s), String(fmt, s), s), argExpr, s)
         elaborateExpr env (App(Var("println", s), sprintfExpr, s))
 
     // Phase 39: printfn — 0-arg case: printfn "literal" (desugar to println "literal")
-    | App (Var ("printfn", _), String (fmt, _), _) ->
-        let s = Ast.unknownSpan
+    | App (Var ("printfn", _), String (fmt, _), s) ->
         elaborateExpr env (App(Var("println", s), String(fmt, s), s))
 
     // Phase 39: sprintf — 2-arg case (MUST come BEFORE 1-arg cases — see Pitfall 1)
@@ -2295,8 +2292,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (unitVal, argOps @ ops)
 
     // eprintfn — one-arg case: eprintfn "literal" (desugar to eprintln "literal")
-    | App (Var ("eprintfn", _), String (fmt, _), _) ->
-        let s = Ast.unknownSpan
+    | App (Var ("eprintfn", _), String (fmt, _), s) ->
         elaborateExpr env (App(Var("eprintln", s), String(fmt, s), s))
 
     // Phase 27: write_lines — two-arg, void return (MUST come before one-arg arms)
@@ -3143,14 +3139,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Allocates a 16-byte block: slot 0 = i64 tag, slot 1 = null ptr.
     // Phase 20: If arity >= 1, the constructor is used as a first-class value (e.g. `apply Some 42`).
     // In that case, wrap as Lambda(param, Constructor(name, Some(Var(param)), _)) and re-elaborate.
-    | Constructor(name, None, _) ->
+    | Constructor(name, None, ctorSpan) ->
         let info = Map.find name env.TypeEnv
         if info.Arity >= 1 then
             // First-class unary+ constructor: produce a closure fun __ctor_N_Name x -> Name x
             let n = env.Counter.Value
             env.Counter.Value <- n + 1
             let paramName = sprintf "__ctor_%d_%s" n name
-            let s = Ast.unknownSpan
+            let s = ctorSpan
             elaborateExpr env (Lambda(paramName, Constructor(name, Some(Var(paramName, s)), s), s))
         else
             // Nullary constructor: allocate 16-byte block with tag and null payload
@@ -4310,8 +4306,8 @@ let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName:
 // LetRecDecl bindings are wrapped in LetRec expressions.
 // Phase 25: Flattens ModuleDecl/NamespaceDecl before processing; handles LetPatDecl;
 // Phase 41: OpenDecl is handled by flattenDecls (two-pass: collect members first, then flatten).
-let private extractMainExpr (decls: Ast.Decl list) : Expr =
-    let s = unknownSpan
+let private extractMainExpr (moduleSpan: Ast.Span) (decls: Ast.Decl list) : Expr =
+    let s = moduleSpan
     let moduleMembers = collectModuleMembers decls
     let flatDecls = flattenDecls moduleMembers "" decls
     let exprDecls =
@@ -4447,7 +4443,7 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) | Ast.NamespacedModule(_, decls, _) -> decls
         | Ast.EmptyModule _ -> []
     let (typeEnv, recordEnv, exnTags) = prePassDecls (ref 0) decls
-    let mainExpr = extractMainExpr decls
+    let mainExpr = extractMainExpr (Ast.moduleSpanOf ast) decls
     let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags }
     let (resultVal, entryOps) = elaborateExpr env mainExpr
     let sideBlocks = env.Blocks.Value
