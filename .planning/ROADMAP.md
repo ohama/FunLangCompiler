@@ -41,6 +41,10 @@ Plans:
 - FieldAccess: 중첩 FieldAccess(FieldAccess(Constructor("Outer"), "Inner"), "foo") 패턴 처리
 - OpenDecl: multi-segment path를 "." join하여 복합 키로 lookup
 
+**Plans:** 1 plan
+Plans:
+- [ ] 59-01-PLAN.md — Implement nested module qualified access in Elaboration.fs + E2E test
+
 ---
 *Created: 2026-04-01*
 *Milestone: v16.0 FunLang AST 동기화*
