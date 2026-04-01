@@ -1,0 +1,14 @@
+let optGet opt = match opt with | Some v -> v | None -> -1
+let found = List.tryFind (fun x -> x > 2) [1; 2; 3; 4]
+let notfound = List.tryFind (fun x -> x > 10) [1; 2; 3]
+let items = [Some 1; None; Some 3; None; Some 5]
+let chosen = List.choose (fun x -> x) items
+let fv = optGet found
+let nf_is_none = Option.isNone notfound
+let _ = println (to_string fv)
+let _ = println (to_string nf_is_none)
+let _ = (for x in chosen do println (to_string x))
+let filtered = List.filter (fun x -> x > 2) [1;2;3;4]
+let chosen2 = List.choose (fun x -> if x > 2 then Some x else None) [1;2;3;4]
+let _ = (for x in filtered do println (to_string x))
+let _ = (for x in chosen2 do println (to_string x))
