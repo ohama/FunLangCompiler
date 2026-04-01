@@ -4286,17 +4286,16 @@ let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName:
         | Ast.Decl.LetRecDecl(bindings, s) when modName <> "" ->
             let prefixed = bindings |> List.map (fun (name, param, pt, body, s2) -> (modName + "_" + name, param, pt, body, s2))
             [Ast.Decl.LetRecDecl(prefixed, s)]
-        | Ast.Decl.OpenDecl([openedMod], s) ->
-            // Single-segment open: emit short-name aliases for each member of the opened module
+        | Ast.Decl.OpenDecl(path, s) when not (List.isEmpty path) ->
+            // open A or open A.B — resolve using last segment (module names are registered by innermost name)
+            let openedMod = path |> List.last
             match Map.tryFind openedMod moduleMembers with
             | Some qualifiedNames ->
                 qualifiedNames |> List.map (fun qualifiedName ->
                     let shortName = qualifiedName.Substring(openedMod.Length + 1)
                     Ast.Decl.LetDecl(shortName, Ast.Var(qualifiedName, s), s))
             | None -> []
-        | Ast.Decl.OpenDecl(_, _) ->
-            // Multi-segment open paths: no-op (not supported)
-            []
+        | Ast.Decl.OpenDecl(_, _) -> []
         | _ -> [d])
 
 // Phase 16: Extract the main expression from a Decl list.
