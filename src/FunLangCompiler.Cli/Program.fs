@@ -334,8 +334,8 @@ let main argv =
     match remaining with
     | "build" :: rest -> handleBuild optLevel rest
     | "test" :: rest  -> handleTest optLevel rest
-    | inputPath :: _ when inputPath.EndsWith(".fun") ->
-        // Derive output path: explicit -o takes priority, else strip .fun from filename
+    | inputPath :: _ ->
+        // Derive output path: explicit -o takes priority, else strip extension from filename
         let outputPath =
             match outputOpt with
             | Some o -> o
@@ -353,7 +353,4 @@ let main argv =
         eprintfn "Usage: fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3]"
         eprintfn "       fnc build [<target>] [-O0|-O1|-O2|-O3]"
         eprintfn "       fnc test [<target>] [-O0|-O1|-O2|-O3]"
-        1
-    | other :: _ ->
-        eprintfn "Error: unknown command or file: %s" other
         1
