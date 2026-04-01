@@ -6,17 +6,33 @@
 # Build
 dotnet build src/FunLangCompiler.Cli
 
-# Run all E2E tests (234 tests)
+# Run all E2E tests (239+ tests)
 dotnet run --project deps/fslit/FsLit/FsLit.fsproj -- tests/compiler/
 
 # Run a specific test
 dotnet run --project deps/fslit/FsLit/FsLit.fsproj -- tests/compiler/04-01-fact.flt
 
-# Compile a FunLang source file (default -O2)
-dotnet run --project src/FunLangCompiler.Cli -- hello.fun -o hello
-# Or after install: fnc hello.fun -o hello
-# Optimization: fnc hello.fun -O0 (none) / -O2 (default) / -O3 (aggressive)
+# Run ProjectFile parser tests
+dotnet run --project tests/projfile
+
+# Compile a single file (default -O2)
+fnc hello.fun -o hello
+# Or: dotnet run --project src/FunLangCompiler.Cli -- hello.fun -o hello
+
+# Optimization: -O0 (none) / -O2 (default) / -O3 (aggressive)
+fnc hello.fun -O3
 ```
+
+## Project Build (funproj.toml)
+
+```bash
+fnc build              # 모든 [[executable]] → build/ 네이티브 바이너리
+fnc build myapp        # 특정 타겟만
+fnc test               # 모든 [[test]] 컴파일 + 실행
+fnc test unit          # 특정 테스트만
+```
+
+See [PROJECTFILE.md](PROJECTFILE.md) for funproj.toml format.
 
 ## Binary Names
 
