@@ -2649,13 +2649,61 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let callOp = IndirectCallOp(result, fnPtrVal, closurePtrVal, argVal)
                     (result, argOps @ [castOp; loadOp; callOp])
                 | _ ->
-                    let knownNames =
+                    // Collect all known names for "Did you mean?" suggestion
+                    let builtinNames = [
+                        "print"; "println"; "printfn"; "eprint"; "eprintln"; "eprintfn"; "sprintf"
+                        "failwith"; "dbg"; "to_string"
+                        "string_length"; "string_concat"; "string_sub"; "string_contains"
+                        "string_startswith"; "string_endswith"; "string_trim"; "string_to_int"
+                        "string_concat_list"; "string_split"; "string_indexof"; "string_replace"
+                        "string_toupper"; "string_tolower"
+                        "char_to_int"; "int_to_char"; "char_is_digit"; "char_is_letter"
+                        "char_is_upper"; "char_is_lower"; "char_to_upper"; "char_to_lower"
+                        "read_file"; "write_file"; "append_file"; "file_exists"
+                        "read_lines"; "write_lines"; "stdin_read_line"; "stdin_read_all"
+                        "get_env"; "get_cwd"; "path_combine"; "dir_files"; "get_args"
+                        "array_create"; "array_init"; "array_get"; "array_set"; "array_length"
+                        "array_of_list"; "array_to_list"; "array_iter"; "array_map"; "array_fold"
+                        "array_sort"; "array_of_seq"
+                        "hashtable_create"; "hashtable_get"; "hashtable_set"
+                        "hashtable_containsKey"; "hashtable_keys"; "hashtable_remove"
+                        "stringbuilder_create"; "stringbuilder_append"; "stringbuilder_tostring"
+                        "hashset_create"; "hashset_add"; "hashset_contains"; "hashset_count"
+                        "queue_create"; "queue_enqueue"; "queue_dequeue"; "queue_count"
+                        "mutablelist_create"; "mutablelist_add"; "mutablelist_count"
+                        "list_sort_by"; "list_of_seq"
+                    ]
+                    let allNames =
+                        builtinNames @
                         (env.KnownFuncs |> Map.toList |> List.map fst) @
                         (env.Vars |> Map.toList |> List.map fst)
                         |> List.filter (fun n -> not (n.StartsWith("%")) && not (n.StartsWith("@")))
-                        |> List.truncate 10
-                        |> String.concat ", "
-                    failWithSpan appSpan "Elaboration: unsupported App — '%s' is not a known function or closure value. In scope: %s" name knownNames
+                    // Levenshtein edit distance for suggestions
+                    let editDistance (s1: string) (s2: string) =
+                        let m, n = s1.Length, s2.Length
+                        let d = Array2D.init (m + 1) (n + 1) (fun i j -> if i = 0 then j elif j = 0 then i else 0)
+                        for i in 1..m do
+                            for j in 1..n do
+                                let cost = if s1.[i-1] = s2.[j-1] then 0 else 1
+                                d.[i, j] <- min (min (d.[i-1, j] + 1) (d.[i, j-1] + 1)) (d.[i-1, j-1] + cost)
+                        d.[m, n]
+                    // Convert internal Module_name to user-facing Module.name
+                    let toUserName (n: string) =
+                        let idx = n.IndexOf('_')
+                        if idx > 0 && System.Char.IsUpper(n.[0]) then
+                            n.[..idx-1] + "." + n.[idx+1..]
+                        else n
+                    let suggestions =
+                        allNames
+                        |> List.map (fun n -> (n, editDistance (name.ToLower()) (n.ToLower())))
+                        |> List.filter (fun (_, d) -> d <= 3)
+                        |> List.sortBy snd
+                        |> List.truncate 3
+                        |> List.map (fst >> toUserName)
+                    let hint =
+                        if suggestions.IsEmpty then ""
+                        else sprintf "\n   Did you mean: %s?" (suggestions |> String.concat ", ")
+                    failWithSpan appSpan "Elaboration: undefined function '%s'%s" name hint
         | Lambda(param, body, _) ->
             // Inline lambda application: (fun x -> body) arg  ≡  let x = arg in body
             let (argVal, argOps) = elaborateExpr env argExpr
