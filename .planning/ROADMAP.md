@@ -61,6 +61,9 @@ Plans:
 **Goal**: boxed 리스트 원소에 대한 비교 연산이 올바르게 동작
 **Depends on**: Phase 47 (테스트를 위해 정확한 줄 번호 필요)
 **Requirements**: UNBOX-01 (비교 unboxing), UNBOX-02 (테스트)
+**Plans:** 1 plan
+Plans:
+- [ ] 50-01-PLAN.md — Add coerceToI64 to four ordinal comparison operators + E2E tests
 **Success Criteria** (what must be TRUE):
   1. `List.choose (fun x -> if x > 2 then Some x else None) [1;2;3;4]`가 `[3;4]` 반환
   2. `List.filter (fun x -> x > 2) [1;2;3;4]`가 `[3;4]` 반환
@@ -74,4 +77,4 @@ Plans:
 | 47. Prelude Separate Parsing | 1/1 | ✓ Complete | 2026-04-01 |
 | 48. Parse Error Position | 1/1 | ✓ Complete | 2026-04-01 |
 | 49. Error Tests CHECK-RE | 1/1 | ✓ Complete | 2026-04-01 |
-| 50. Unboxing Comparison Bug | 0/? | Not started | - |
+| 50. Unboxing Comparison Bug | 0/1 | Not started | - |
