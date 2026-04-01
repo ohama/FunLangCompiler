@@ -2618,27 +2618,45 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         (argVal, [])
                 // Phase 64: Caller stores non-outerParam captures (SSA values are in scope here).
                 // The maker handles fn_ptr (env[0]) and outerParam. We store the rest.
-                let captureStoreOps =
+                // If any capture is not in scope (e.g., LetRec body), fall back to indirect call.
+                let captureStoreResult =
                     ci.CaptureNames
                     |> List.mapi (fun i capName ->
-                        if capName = ci.OuterParamName then []  // Maker handles outerParam
+                        if capName = ci.OuterParamName then Some []
                         else
-                            let slotVal = { Name = freshName env; Type = Ptr }
-                            let capVal =
-                                match Map.tryFind capName env.Vars with
-                                | Some v -> v
-                                | None -> failwith (sprintf "Elaboration: closure capture '%s' not found at call site" capName)
-                            if capVal.Type = I64 then
-                                let ptrVal = { Name = freshName env; Type = Ptr }
-                                [LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
-                                 LlvmIntToPtrOp(ptrVal, capVal)
-                                 LlvmStoreOp(ptrVal, slotVal)]
-                            else
-                                [LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
-                                 LlvmStoreOp(capVal, slotVal)]
-                    ) |> List.concat
-                let callOp = DirectCallOp(resultVal, sig_.MlirName, [i64ArgVal; envPtrVal])
-                (resultVal, argOps @ setupOps @ coerceOps @ captureStoreOps @ [callOp])
+                            match Map.tryFind capName env.Vars with
+                            | Some capVal ->
+                                let slotVal = { Name = freshName env; Type = Ptr }
+                                if capVal.Type = I64 then
+                                    let ptrVal = { Name = freshName env; Type = Ptr }
+                                    Some [LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
+                                          LlvmIntToPtrOp(ptrVal, capVal)
+                                          LlvmStoreOp(ptrVal, slotVal)]
+                                else
+                                    Some [LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
+                                          LlvmStoreOp(capVal, slotVal)]
+                            | None -> None  // Capture not in scope — need fallback
+                    )
+                if captureStoreResult |> List.forall Option.isSome then
+                    let captureStoreOps = captureStoreResult |> List.collect Option.get
+                    let callOp = DirectCallOp(resultVal, sig_.MlirName, [i64ArgVal; envPtrVal])
+                    (resultVal, argOps @ setupOps @ coerceOps @ captureStoreOps @ [callOp])
+                else
+                    // Fallback: call via indirect closure (captures already stored at definition site)
+                    match Map.tryFind name env.Vars with
+                    | Some closureVal ->
+                        let closurePtrVal = { Name = freshName env; Type = Ptr }
+                        let fnPtrVal = { Name = freshName env; Type = Ptr }
+                        let result = { Name = freshName env; Type = I64 }
+                        let castOp = if closureVal.Type = I64 then LlvmIntToPtrOp(closurePtrVal, closureVal) else LlvmPtrToIntOp(closurePtrVal, closureVal) // identity-ish
+                        let (closurePtr, castOps) =
+                            if closureVal.Type = Ptr then (closureVal, [])
+                            else (closurePtrVal, [LlvmIntToPtrOp(closurePtrVal, closureVal)])
+                        let loadOp = LlvmLoadOp(fnPtrVal, closurePtr)
+                        let callOp = IndirectCallOp(result, fnPtrVal, closurePtr, argVal)
+                        (result, argOps @ castOps @ [loadOp; callOp])
+                    | None ->
+                        failwith (sprintf "Elaboration: '%s' has captures not in scope and no closure fallback available" name)
             | None ->
                 // Check Vars for closure value (type Ptr)
                 match Map.tryFind name env.Vars with
