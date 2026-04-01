@@ -6,6 +6,12 @@
 
 **Requirements:** ABI-01 ~ ABI-04, CLEAN-01 ~ CLEAN-02, TEST-01 ~ TEST-03
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 62-01-PLAN.md — Closure ABI change: %arg1 always Ptr + reversed coercion
+- [ ] 62-02-PLAN.md — Issue #1 E2E test + gh issue close
+
 **Success Criteria:**
 1. Issue #1 재현 케이스 (mutable record + string curried function) 컴파일 성공
 2. 생성되는 모든 클로저 함수가 `(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i64` 시그니처
