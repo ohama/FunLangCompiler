@@ -1,0 +1,14 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+module Outer =
+    module Inner =
+        let value = 99
+        let triple x = x + x + x
+
+open Outer.Inner
+let _ = println (to_string value)
+let _ = println (to_string (triple 4))
+// --- Output:
+99
+12
+0
