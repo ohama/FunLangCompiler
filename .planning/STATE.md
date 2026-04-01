@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 
 ## Current Position
 
-Phase: 60 of 61 — Not started
-Plan: Not started (defining requirements)
-Status: Defining requirements
-Last activity: 2026-04-01 — Milestone v17.0 started
+Phase: 60 of 61 — In progress (1/1 plans complete)
+Plan: 60-01 complete
+Status: Phase 60 complete — ready for Phase 61
+Last activity: 2026-04-01 — Completed 60-01-PLAN.md (TOML parser)
 
-Progress: v1.0-v16.0 complete [████████████████████] 59/59 phases + v17.0 planning
+Progress: v1.0-v16.0 + phase 60 complete [█████████████████████] 60/61 phases
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 99 (v1.0-v10.0: 81 + v11.0: 4 + v12.0: 4 + v13.0: 3 + v14.0: 3 + v15.0: 2 + v16.0: 2)
+- Total plans completed: 100 (v1.0-v10.0: 81 + v11.0: 4 + v12.0: 4 + v13.0: 3 + v14.0: 3 + v15.0: 2 + v16.0: 2 + v17.0: 1)
 - Average duration: ~10 min/plan
 
 **By Phase:**
@@ -29,16 +29,21 @@ Progress: v1.0-v16.0 complete [████████████████�
 | (prior milestones) | 97 | ~970 min | ~10 min |
 | 58 | 1 | ~6 min | ~6 min |
 | 59 | 1 | ~8 min | ~8 min |
+| 60 | 1 | ~2 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: v16.0 (2 plans) + v15.0 (2 plans) + v14.0 (1 plan)
+- Last 5 plans: v17.0 (1 plan) + v16.0 (2 plans) + v15.0 (2 plans)
 - Trend: Stable
 
 ## Accumulated Context
 
 ### Decisions
 
-(Cleared — full history in PROJECT.md Key Decisions table and milestones/ archives)
+| Phase | Decision | Rationale |
+|-------|----------|-----------|
+| 60-01 | No external TOML library — hand-rolled parser | Only small subset needed; avoids NuGet dependency |
+| 60-01 | Standalone test project (tests/projfile/) vs dotnet fsi | fsproj more reliable than FSI DLL loading |
+| 60-01 | ProjectFile.fs last in Compile list | No compiler modules depend on it yet; Phase 61 wires it |
 
 ### Pending Todos
 
@@ -50,6 +55,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-01
-Stopped at: v17.0 milestone started, requirements definition
+Last session: 2026-04-01T11:50:48Z
+Stopped at: Completed 60-01-PLAN.md (ProjectFile TOML parser)
 Resume file: None
