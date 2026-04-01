@@ -49,6 +49,9 @@ Plans:
 **Goal**: 에러 테스트가 Prelude 줄 수 변경에 독립적
 **Depends on**: Phase 47, Phase 48 (최종 에러 포맷 확정 후)
 **Requirements**: TEST-01 (CHECK-RE 전환), TEST-02 (안정성)
+**Plans:** 1 plan
+Plans:
+- [ ] 49-01-PLAN.md — Convert 7 error tests from exact-match to CHECK-RE regex patterns
 **Success Criteria** (what must be TRUE):
   1. 44-*, 45-*, 46-* 에러 테스트가 CHECK-RE 정규식 매칭 사용
   2. Prelude에 줄을 추가/삭제해도 에러 테스트 통과
@@ -70,5 +73,5 @@ Plans:
 |-------|----------------|--------|-----------|
 | 47. Prelude Separate Parsing | 1/1 | ✓ Complete | 2026-04-01 |
 | 48. Parse Error Position | 1/1 | ✓ Complete | 2026-04-01 |
-| 49. Error Tests CHECK-RE | 0/? | Not started | - |
+| 49. Error Tests CHECK-RE | 0/1 | Not started | - |
 | 50. Unboxing Comparison Bug | 0/? | Not started | - |
