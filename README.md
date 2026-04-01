@@ -35,6 +35,34 @@ fnc hello.fun -O3    # aggressive
 dotnet run --project src/FunLangCompiler.Cli -- hello.fun -o hello
 ```
 
+## Project Build (funproj.toml)
+
+`fnc`는 [FunLang](https://github.com/ohama/FunLang)과 동일한 `funproj.toml`로 멀티파일 프로젝트를 관리한다.
+
+```toml
+# funproj.toml
+[project]
+name = "myproject"
+prelude = "Prelude"
+
+[[executable]]
+name = "myapp"
+main = "src/main.fun"
+
+[[test]]
+name = "unit"
+main = "tests/unit.fun"
+```
+
+```bash
+fnc build              # 모든 executable → build/ 네이티브 바이너리
+fnc build myapp        # 특정 타겟만
+fnc test               # 모든 test 컴파일 + 실행
+fnc test unit          # 특정 테스트만
+```
+
+자세한 내용은 [PROJECTFILE.md](PROJECTFILE.md) 참조.
+
 ## Binary Names
 
 | Binary | Repository | Description |
@@ -89,9 +117,10 @@ clang + libgc         -- Native binary linking
 | `MatchCompiler.fs` | ~150 | Decision tree pattern matching compiler ([Jacobs algorithm](#pattern-matching-compilation)) |
 | `Printer.fs` | ~180 | Pure serializer: MlirIR -> `.mlir` text |
 | `Elaboration.fs` | ~4600 | AST -> MlirIR recursive pass with `ElabEnv` |
-| `Pipeline.fs` | ~110 | Shell pipeline: `mlir-opt` -> `mlir-translate` -> `clang` |
+| `Pipeline.fs` | ~130 | Shell pipeline: `mlir-opt` -> `mlir-translate` -> `clang` (-O0~O3) |
+| `ProjectFile.fs` | ~100 | funproj.toml TOML subset parser |
 | `lang_runtime.c` | ~1450 | C runtime: string, array, hashtable, collection, I/O builtins |
-| `Program.fs` | ~235 | CLI entry point: parse -> elaborate -> compile |
+| `Program.fs` | ~300 | CLI entry point: build/test/single-file modes |
 
 ## Dependencies
 
@@ -126,7 +155,7 @@ sudo apt install libgc-dev
 
 ## Testing
 
-234개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
+239+개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
 
 ```bash
 # Run all tests
