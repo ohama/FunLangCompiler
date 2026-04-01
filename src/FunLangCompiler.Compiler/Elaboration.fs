@@ -708,17 +708,17 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let closureFnName = sprintf "@closure_fn_%d" closureFnIdx
 
         // Step 3: Compile inner lambda body (llvm.func)
-        // Build the initial vars: %arg0 = env ptr, %arg1 = innerParam (always i64 for uniform ABI)
-        // If innerParam needs Ptr type (list, record, tuple, string), insert inttoptr coercion.
+        // Build the initial vars: %arg0 = env ptr, %arg1 = innerParam (always ptr for uniform ABI)
+        // If innerParam needs I64 type, coerce ptr arg1 to i64 via ptrtoint.
         let arg0Val = { Name = "%arg0"; Type = Ptr }
-        let innerParamIsPtr = isPtrParamBody innerParam innerBody
-        let arg1Val = { Name = "%arg1"; Type = I64 }
-        // If innerParam needs Ptr type, coerce i64 arg1 to ptr via inttoptr.
+        let arg1Val = { Name = "%arg1"; Type = Ptr }
+        // If innerParam needs I64 type, coerce ptr arg1 to i64 via ptrtoint.
         // The coerced value gets name %t0 (first SSA name after captures).
+        let innerParamNeedsI64 = not (isPtrParamBody innerParam innerBody)
         let (innerParamVal, paramCoerceOps, captureStartIdx) =
-            if innerParamIsPtr then
-                let ptrVal = { Name = "%t0"; Type = Ptr }
-                (ptrVal, [LlvmIntToPtrOp(ptrVal, arg1Val)], 1)
+            if innerParamNeedsI64 then
+                let i64Val = { Name = "%t0"; Type = I64 }
+                (i64Val, [LlvmPtrToIntOp(i64Val, arg1Val)], 1)
             else
                 (arg1Val, [], 0)
         let innerEnv : ElabEnv =
@@ -3084,15 +3084,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         env.ClosureCounter.Value <- closureFnIdx + 1
         let closureFnName = sprintf "@closure_fn_%d" closureFnIdx
 
-        // Build inner llvm.func: (%arg0: !llvm.ptr, %arg1: i64) -> i64
-        // If param needs Ptr type (list, record, tuple, string), insert inttoptr coercion.
+        // Build inner llvm.func: (%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i64
+        // If param needs I64 type, coerce ptr arg1 to i64 via ptrtoint.
         let arg0Val = { Name = "%arg0"; Type = Ptr }
-        let lambdaParamIsPtr = isPtrParamBody param body
-        let arg1Val = { Name = "%arg1"; Type = I64 }
+        let arg1Val = { Name = "%arg1"; Type = Ptr }
+        let lambdaParamNeedsI64 = not (isPtrParamBody param body)
         let (lambdaParamVal, lambdaParamCoerceOps, lambdaCaptureStart) =
-            if lambdaParamIsPtr then
-                let ptrVal = { Name = "%t0"; Type = Ptr }
-                (ptrVal, [LlvmIntToPtrOp(ptrVal, arg1Val)], 1)
+            if lambdaParamNeedsI64 then
+                let i64Val = { Name = "%t0"; Type = I64 }
+                (i64Val, [LlvmPtrToIntOp(i64Val, arg1Val)], 1)
             else
                 (arg1Val, [], 0)
         let innerEnv : ElabEnv =
