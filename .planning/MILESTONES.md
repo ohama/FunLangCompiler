@@ -380,6 +380,26 @@
 
 ---
 
+### v18.0 — Closure ABI 통일 (2026-04-01)
+
+**Goal:** 클로저 %arg1을 항상 !llvm.ptr로 선언, isPtrParamBody 휴리스틱 버그 근본 해결
+
+**Phases:** 62 (2 plans)
+**Requirements:** 9/9 complete
+**Tests:** 240 FsLit E2E tests (1 new)
+**Issue:** ohama/FunLangCompiler#1 closed
+
+**What shipped:**
+- Closure ABI: `(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i64` (기존 %arg1: i64)
+- isPtrParamBody: 12개 AST 패턴 재귀 추가 (SetField, LetMut, Assign 등)
+- Issue #1 E2E 재현 테스트 (mutable record + string curried function)
+
+**Key decisions validated:**
+- Closure %arg1 always Ptr + ptrtoint for i64 bodies ✓
+- isPtrParamBody for coercion direction only, not declared type ✓
+
+---
+
 ## Current
 
 Planning next milestone

@@ -15,15 +15,7 @@ v17.0 shipped. 239+ E2E tests. 13 Prelude modules.
 `fnc build`/`fnc test` 프로젝트 빌드 시스템 (funproj.toml).
 Nested module qualified access (Outer.Inner.value) 지원.
 
-## Current Milestone: v18.0 Closure ABI 통일
-
-**Goal:** 클로저 %arg1을 항상 !llvm.ptr로 선언하여 isPtrParamBody 휴리스틱 의존성 제거 (Issue #1 해결)
-
-**Target features:**
-- 클로저 함수 시그니처: (%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i64
-- body에서 i64 필요 시 ptrtoint 코어션 삽입
-- isPtrParamBody의 클로저 사용 제거
-- Issue #1 재현 케이스 E2E 테스트
+v18.0: Closure ABI 통일 — %arg1 항상 !llvm.ptr, Issue #1 해결. 240 E2E tests.
 
 ## Requirements
 
@@ -171,6 +163,13 @@ Nested module qualified access (Outer.Inner.value) 지원.
 - ✓ 에러 처리: funproj.toml/타겟 없음/존재하지 않는 이름 (ERR-01~03) — v17.0
 - ✓ 239+ E2E 테스트 (TEST-01~03) — v17.0
 
+### Validated (v18.0)
+
+- ✓ Closure ABI 통일: %arg1 항상 !llvm.ptr (ABI-01~04) — v18.0
+- ✓ isPtrParamBody 12개 AST 패턴 재귀 추가 (CLEAN-01~02) — v18.0
+- ✓ Issue #1 해결 + E2E 재현 테스트 (TEST-01~03) — v18.0
+- ✓ 240 FsLit E2E 테스트
+
 ### Out of Scope
 
 - REPL — 인터프리터가 이미 존재함
@@ -205,6 +204,7 @@ Nested module qualified access (Outer.Inner.value) 지원.
 - v15 완성: unknownSpan 전면 제거 — 에러 메시지 소스 위치 정확성 (231 E2E tests)
 - v16 완성: FunLang AST 동기화 — namespace 제거 + 중첩 모듈 qualified access (234 E2E tests)
 - v17 완성: Project File — funproj.toml 파서 + fnc build/test CLI (239+ E2E tests)
+- v18 완성: Closure ABI 통일 — %arg1 always Ptr + isPtrParamBody fix (240 E2E tests, Issue #1 closed)
 - 참고: survey/funlexyacc-gap-status-v9.md (FunLexYacc 컴파일 갭 분석)
 
 ## Constraints
@@ -268,5 +268,8 @@ Nested module qualified access (Outer.Inner.value) 지원.
 | Hand-rolled TOML subset parser | 외부 의존성 없이 funproj.toml 파싱 | ✓ Good |
 | compileFile with optional preludeDir | 단일 파일/프로젝트 모드 공유 | ✓ Good |
 
+| Closure %arg1 always Ptr | isPtrParamBody 결과와 무관하게 선언 타입 통일 | ✓ Good |
+| isPtrParamBody 12-pattern recursion | SetField/LetMut 등 뒤의 param 사용도 감지 | ✓ Good |
+
 ---
-*Last updated: 2026-04-01 after v17.0 milestone completed*
+*Last updated: 2026-04-01 after v18.0 milestone completed*
