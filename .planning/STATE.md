@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** LangThree 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Planning next milestone
+**Current focus:** v13.0 LangThree Typeclass Sync
 
 ## Current Position
 
-Phase: N/A — between milestones
-Plan: N/A
-Status: v12.0 complete, next milestone not started
-Last activity: 2026-04-01 — v12.0 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-01 — Milestone v13.0 started
 
-Progress: v1.0-v12.0 complete (50 phases, 89 plans)
+Progress: v1.0-v12.0 complete (50 phases, 89 plans). v13.0: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
