@@ -3332,7 +3332,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 18: RecordUpdate — allocate new block, copy non-overridden fields, write overridden fields
     | RecordUpdate(sourceExpr, overrides, ruSpan) ->
-        let (srcVal, srcOps) = elaborateExpr env sourceExpr
+        let (srcValRaw, srcOpsRaw) = elaborateExpr env sourceExpr
+        // Issue #3: If source record is I64 (e.g., extracted from list match), coerce to Ptr
+        let (srcVal, srcOps) =
+            if srcValRaw.Type = I64 then
+                let ptrVal = { Name = freshName env; Type = Ptr }
+                (ptrVal, srcOpsRaw @ [LlvmIntToPtrOp(ptrVal, srcValRaw)])
+            else (srcValRaw, srcOpsRaw)
         let overrideNames = overrides |> List.map fst |> Set.ofList
         let (typeName, fieldMap) =
             env.RecordEnv

@@ -1,0 +1,5 @@
+// Test: Issue #3 — record update on list-matched record needs inttoptr
+// --- Command: bash %S/63-02-record-update-list.sh
+// --- Input:
+// --- Output:
+42
