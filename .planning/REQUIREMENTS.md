@@ -57,26 +57,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AST-01 | - | Pending |
-| AST-02 | - | Pending |
-| AST-03 | - | Pending |
-| AST-04 | - | Pending |
-| AST-05 | - | Pending |
-| TC-01 | - | Pending |
-| TC-02 | - | Pending |
-| TC-03 | - | Pending |
-| TC-04 | - | Pending |
-| TC-05 | - | Pending |
-| PRE-01 | - | Pending |
-| PRE-02 | - | Pending |
-| TEST-01 | - | Pending |
-| TEST-02 | - | Pending |
-| TEST-03 | - | Pending |
+| AST-01 | Phase 51 | Pending |
+| AST-02 | Phase 51 | Pending |
+| AST-03 | Phase 51 | Pending |
+| AST-04 | Phase 51 | Pending |
+| AST-05 | Phase 51 | Pending |
+| TC-01 | Phase 52 | Pending |
+| TC-02 | Phase 52 | Pending |
+| TC-03 | Phase 52 | Pending |
+| TC-04 | Phase 52 | Pending |
+| TC-05 | Phase 52 | Pending |
+| PRE-01 | Phase 53 | Pending |
+| PRE-02 | Phase 53 | Pending |
+| TEST-01 | Phase 53 | Pending |
+| TEST-02 | Phase 53 | Pending |
+| TEST-03 | Phase 53 | Pending |
 
 **Coverage:**
 - v13 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-01*
