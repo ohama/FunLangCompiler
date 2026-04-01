@@ -274,6 +274,27 @@
 
 ---
 
+### v13.0 — LangThree Typeclass Sync (2026-04-01)
+
+**Goal:** LangThree v10.0-v12.0에서 추가된 AST 구조 변경과 Typeclass 컴파일 지원을 LangBackend에 반영
+
+**Phases:** 51–53 (3 plans, all verified)
+**Tests:** 222+ FsLit E2E tests (5 new typeclass tests)
+
+**What shipped:**
+- AST 구조 동기화 (TypeDecl 5-field, TypeClassDecl superclasses, InstanceDecl constraints, DerivingDecl)
+- elaborateTypeclasses: TypeClassDecl 제거, InstanceDecl→LetDecl, DerivingDecl→Show/Eq 자동 생성
+- Prelude/Typeclass.fun: Show, Eq 빌트인 인스턴스 (int/bool/string/char)
+- show/eq/deriving Show E2E 테스트
+
+**Key decisions validated:**
+- elaborateTypeclasses replicated from LangThree (not shared) ✓
+- Two-pass ctorMap for DerivingDecl expansion ✓
+- Instance methods use original names (no mangling) ✓
+- Typeclass.fun first in Prelude load order ✓
+
+---
+
 ## Current
 
 Planning next milestone
