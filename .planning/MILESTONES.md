@@ -336,6 +336,29 @@
 
 ---
 
+### v16.0 — FunLang AST 동기화 (2026-04-01)
+
+**Goal:** FunLang이 namespace를 제거한 AST 변경에 맞춰 Compiler를 동기화하고 중첩 모듈 qualified access 지원
+
+**Phases:** 58–59 (2 plans, all verified)
+**Requirements:** 11/11 complete
+**Tests:** 234 FsLit E2E tests (2 new)
+
+**What shipped:**
+- NamespaceDecl/NamespacedModule 참조 전면 제거 (Elaboration.fs + Program.fs)
+- collectModuleMembers dotPath/underPath 이중 경로 추적
+- flattenDecls 중첩 모듈 full prefix 전달 (Outer_Inner_foo)
+- tryDecodeModulePath 재귀 헬퍼 (임의 깊이 FieldAccess 디코딩)
+- 중첩 모듈 qualified access: Outer.Inner.value, Outer.Inner.f arg
+- open Outer.Inner → full-path key lookup
+
+**Key decisions validated:**
+- dotPath/underPath dual tracking for nested modules ✓
+- tryDecodeModulePath recursive helper (arbitrary depth) ✓
+- Namespace test updated to module syntax (FunLang removed namespace) ✓
+
+---
+
 ## Current
 
 Planning next milestone

@@ -10,19 +10,11 @@ FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력
 
 ## Current State
 
-v15.0 shipped. 231 E2E tests. 13 Prelude modules.
+v16.0 shipped. 234 E2E tests. 13 Prelude modules.
 ~4,600 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 13 Prelude .fun files.
 String module: 14 functions. List module: 40+ functions.
 Zero unknownSpan in source — all error messages show real file:line:col.
-
-## Current Milestone: v16.0 FunLang AST 동기화
-
-**Goal:** FunLang이 namespace를 제거한 AST 변경에 맞춰 Compiler를 동기화하고 중첩 모듈 qualified access 지원
-
-**Target features:**
-- NamespaceDecl/NamespacedModule 참조 제거 (빌드 복구)
-- 중첩 모듈 qualified access (Outer.Inner.value)
-- 관련 주석/문서 정리
+Nested module qualified access (Outer.Inner.value) 지원.
 
 ## Requirements
 
@@ -156,6 +148,12 @@ Zero unknownSpan in source — all error messages show real file:line:col.
 - ✓ E2E 테스트: 에러 메시지에 실제 file:line:col 표시 검증 (TEST-01) — v15.0
 - ✓ 231 FsLit E2E 테스트
 
+### Validated (v16.0)
+
+- ✓ NamespaceDecl/NamespacedModule 참조 제거 — FunLang AST 동기화 (NS-01~05) — v16.0
+- ✓ 중첩 모듈 qualified access: Outer.Inner.value, open Outer.Inner (NEST-01~04) — v16.0
+- ✓ 234 FsLit E2E 테스트
+
 ### Out of Scope
 
 - REPL — 인터프리터가 이미 존재함
@@ -188,6 +186,7 @@ Zero unknownSpan in source — all error messages show real file:line:col.
 - v13 완성: AST sync + elaborateTypeclasses + Prelude/Typeclass.fun + show/eq/deriving E2E (222+ E2E tests)
 - v14 완성: FunLang Standard Library Sync — String 7함수 + List 17함수 (230 E2E tests)
 - v15 완성: unknownSpan 전면 제거 — 에러 메시지 소스 위치 정확성 (231 E2E tests)
+- v16 완성: FunLang AST 동기화 — namespace 제거 + 중첩 모듈 qualified access (234 E2E tests)
 - 참고: survey/funlexyacc-gap-status-v9.md (FunLexYacc 컴파일 갭 분석)
 
 ## Constraints
@@ -245,5 +244,8 @@ Zero unknownSpan in source — all error messages show real file:line:col.
 | extractMainExpr moduleSpan param | 모듈 Span을 명시적 매개변수로 전달 | ✓ Good |
 | Instance methods no mangling | show/eq 원래 이름 유지, 마지막 정의 wins | ✓ Good |
 
+| dotPath/underPath dual tracking | 중첩 모듈 open key와 member prefix 분리 | ✓ Good |
+| tryDecodeModulePath recursive helper | 임의 깊이 중첩 FieldAccess 디코딩 | ✓ Good |
+
 ---
-*Last updated: 2026-04-01 after v15.0 milestone completed*
+*Last updated: 2026-04-01 after v16.0 milestone completed*
