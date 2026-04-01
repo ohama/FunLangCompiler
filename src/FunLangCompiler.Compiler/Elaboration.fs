@@ -38,6 +38,8 @@ type ElabEnv = {
     ClosureCounter: int ref   // Phase 5: generates unique closure function names
     Globals:        (string * string) list ref   // Phase 7: (name, rawValue) pairs for string constants
     GlobalCounter:  int ref                       // Phase 7: counter for unique global names
+    // Phase 65: Mutable global ptr vars for template envs (so LetRec body func.funcs can load them)
+    TplGlobals:     string list ref               // names of MutablePtrGlobal entries emitted
     // Phase 16: Declaration environment — populated by prePassDecls before elaboration
     TypeEnv:        Map<string, TypeInfo>            // constructor name -> tag + arity
     RecordEnv:      Map<string, Map<string, int>>    // record type name -> (field name -> index)
@@ -55,7 +57,7 @@ type ElabEnv = {
 let emptyEnv () : ElabEnv =
     { Vars = Map.empty; Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
       KnownFuncs = Map.empty; Funcs = ref []; ClosureCounter = ref 0
-      Globals = ref []; GlobalCounter = ref 0
+      Globals = ref []; GlobalCounter = ref 0; TplGlobals = ref []
       TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty
       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
       BoolVars = Set.empty }
@@ -751,6 +753,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
+              TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
               BoolVars = Set.empty }
@@ -872,16 +875,17 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
         // Step 7: Phase 65 partial env pattern — if there are non-outerParam captures,
         // pre-allocate a "template env" at the definition site: GC_malloc, store fn_ptr at slot 0,
-        // store each non-outerParam capture at its slot. The template ptr is stored in env'.Vars[name]
-        // so that LetRec bodies can clone it at call time (captures are not in scope there).
+        // store each non-outerParam capture at its slot.
+        // The template ptr is stored in an LLVM global (@__tenv_<name>) so that LetRec body
+        // func.funcs (which cannot reference outer SSA values) can load it at call time.
         let hasNonOuterCaptures = captures |> List.exists (fun c -> c <> outerParam)
         let (templateEnvOps, envWithTemplateVar) =
             if not hasNonOuterCaptures then
                 ([], env')
             else
-                let tBytesVal = { Name = freshName env; Type = I64 }
-                let tEnvPtr   = { Name = freshName env; Type = Ptr }
-                let tFnPtrVal = { Name = freshName env; Type = Ptr }
+                let tBytesVal  = { Name = freshName env; Type = I64 }
+                let tEnvPtr    = { Name = freshName env; Type = Ptr }
+                let tFnPtrVal  = { Name = freshName env; Type = Ptr }
                 let allocOps = [
                     ArithConstantOp(tBytesVal, int64 ((numCaptures + 1) * 8))
                     LlvmCallOp(tEnvPtr, "@GC_malloc", [tBytesVal])
@@ -907,11 +911,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                                     [ LlvmGEPLinearOp(slotVal, tEnvPtr, i + 1)
                                       LlvmStoreOp(capVal, slotVal) ]
                     ) |> List.concat
-                // Store template env ptr in Vars so LetRec bodies can find it via env.Vars[name]
-                let envWithVar = { env' with Vars = Map.add name tEnvPtr env'.Vars }
-                (allocOps @ captureStoreOps, envWithVar)
+                // Store template ptr into a global var @__tenv_<name> so LetRec body
+                // func.funcs (separate LLVM functions) can reference it by name.
+                let globalName = "@__tenv_" + name.Replace(".", "_")
+                env.TplGlobals.Value <- env.TplGlobals.Value @ [globalName]
+                let globalAddrVal = { Name = freshName env; Type = Ptr }
+                let storeToGlobalOps = [
+                    LlvmAddressOfOp(globalAddrVal, globalName)
+                    LlvmStoreOp(tEnvPtr, globalAddrVal)
+                ]
+                (allocOps @ captureStoreOps @ storeToGlobalOps, env')
 
-        // Elaborate inExpr with template env in scope (prepend template ops to output)
+        // Elaborate inExpr (env' unchanged — template accessible via TplGlobals, not Vars)
         let (inVal, inOps) = elaborateExpr envWithTemplateVar inExpr
         (inVal, templateEnvOps @ inOps)
 
@@ -950,6 +961,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
+              TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
               BoolVars = Set.empty }
@@ -1422,6 +1434,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                       ClosureCounter = env.ClosureCounter
                       Globals = env.Globals
                       GlobalCounter = env.GlobalCounter
+                      TplGlobals = env.TplGlobals
                       TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
                       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
                       BoolVars = Set.empty }
@@ -2684,11 +2697,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let callOp = DirectCallOp(resultVal, sig_.MlirName, [i64ArgVal; envPtrVal])
                     (resultVal, argOps @ setupOps @ coerceOps @ captureStoreOps @ [callOp])
                 else
-                    // Fallback: captures not in scope at call site (e.g., LetRec body).
-                    // Phase 65: Use the pre-allocated template env from the definition site.
+                    // Fallback: captures not in scope at call site (e.g., LetRec body func.func).
+                    // Phase 65: Load template env from global @__tenv_<name> (set at definition site).
                     // Clone template env, fill outerParam, load fn_ptr, then indirect call.
-                    match Map.tryFind name env.Vars with
-                    | Some templatePtr ->
+                    let globalName = "@__tenv_" + name.Replace(".", "_")
+                    if List.contains globalName env.TplGlobals.Value then
+                        // Load the template env ptr from the global variable
+                        let globalAddrVal = { Name = freshName env; Type = Ptr }
+                        let templatePtr   = { Name = freshName env; Type = Ptr }
+                        let loadGlobalOps = [
+                            LlvmAddressOfOp(globalAddrVal, globalName)
+                            LlvmLoadOp(templatePtr, globalAddrVal)
+                        ]
                         // Allocate a fresh env of the same size as the template
                         let copyBytesVal = { Name = freshName env; Type = I64 }
                         let newEnvPtr    = { Name = freshName env; Type = Ptr }
@@ -2718,16 +2738,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                             [ LlvmGEPLinearOp(outerSlotVal, newEnvPtr, outerParamSlotIdx)
                               LlvmIntToPtrOp(outerPtrVal, i64ArgVal)
                               LlvmStoreOp(outerPtrVal, outerSlotVal) ]
-                        // Load fn_ptr from slot 0 of new env and call inner function indirectly
-                        let fnPtrVal  = { Name = freshName env; Type = Ptr }
-                        let resultVal = { Name = freshName env; Type = I64 }
-                        let callOps = [
-                            LlvmLoadOp(fnPtrVal, newEnvPtr)
-                            IndirectCallOp(resultVal, fnPtrVal, newEnvPtr, argVal)
-                        ]
-                        (resultVal, argOps @ coerceOps @ copyOps @ slotCopyOps @ outerStoreOps @ callOps)
-                    | None ->
-                        failwith (sprintf "Elaboration: '%s' has captures not in scope and no template env available (Phase 65)" name)
+                        // The cloned env IS the closure. Return it as Ptr (same as the maker would return).
+                        // The next application (e.g., (combine3 n) 1) will do an IndirectCallOp via this closure.
+                        (newEnvPtr, argOps @ coerceOps @ loadGlobalOps @ copyOps @ slotCopyOps @ outerStoreOps)
+                    else
+                        failwith (sprintf "Elaboration: '%s' has captures not in scope and no template env global available (Phase 65)" name)
             | None ->
                 // Check Vars for closure value (type Ptr)
                 match Map.tryFind name env.Vars with
@@ -3312,6 +3327,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ClosureCounter = env.ClosureCounter
               Globals = env.Globals
               GlobalCounter = env.GlobalCounter
+              TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
               BoolVars = Set.empty }
@@ -4331,7 +4347,9 @@ let elaborateModule (expr: Expr) : MlirModule =
           ReturnType  = Some resultVal.Type
           Body        = { Blocks = allBlocksWithGC }
           IsLlvmFunc  = false }
-    let globals = env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value))
+    let globals =
+        (env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value)))
+        @ (env.TplGlobals.Value |> List.map MutablePtrGlobal)
     let externalFuncs = [
         { ExtName = "@GC_init";              ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@GC_malloc";            ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
@@ -4728,7 +4746,9 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
           ReturnType  = Some resultVal.Type
           Body        = { Blocks = allBlocksWithGC }
           IsLlvmFunc  = false }
-    let globals = env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value))
+    let globals =
+        (env.Globals.Value |> List.map (fun (name, value) -> StringConstant(name, value)))
+        @ (env.TplGlobals.Value |> List.map MutablePtrGlobal)
     let externalFuncs = [
         { ExtName = "@GC_init";              ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@GC_malloc";            ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }

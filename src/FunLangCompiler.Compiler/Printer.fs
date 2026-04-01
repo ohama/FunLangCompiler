@@ -43,6 +43,9 @@ let private printGlobal (g: MlirGlobal) : string =
     | StringConstant(name, value) ->
         let escaped = value.Replace("\\", "\\5C").Replace("\n", "\\0A").Replace("\"", "\\22") + "\\00"
         sprintf "  llvm.mlir.global internal constant %s(\"%s\") {addr_space = 0 : i32}" name escaped
+    | MutablePtrGlobal(name) ->
+        // Phase 65: mutable global ptr for template env, initialized to null
+        sprintf "  llvm.mlir.global internal %s() {addr_space = 0 : i32} : !llvm.ptr {\n    %%null = llvm.mlir.zero : !llvm.ptr\n    llvm.return %%null : !llvm.ptr\n  }" name
 
 let private printExternalDecl (d: ExternalFuncDecl) : string =
     let paramStr = d.ExtParams |> List.map printType |> String.concat ", "

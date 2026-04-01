@@ -15,8 +15,11 @@ type MlirValue = {
 
 // Module-level string constant (for print/println)
 // name: MLIR global name e.g. "@__str_0"; value: raw content WITHOUT null terminator (Printer adds \00)
+// Phase 65: MutablePtrGlobal — a global mutable !llvm.ptr variable initialized to null.
+// Used to store template env pointers so LetRec body functions (separate func.funcs) can load them.
 type MlirGlobal =
-    | StringConstant of name: string * value: string
+    | StringConstant    of name: string * value: string
+    | MutablePtrGlobal  of name: string   // llvm.mlir.global internal @name : !llvm.ptr { null }
 
 // External function declaration (for GC_init, GC_malloc, printf)
 type ExternalFuncDecl = {

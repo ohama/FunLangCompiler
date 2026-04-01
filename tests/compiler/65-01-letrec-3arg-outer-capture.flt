@@ -1,0 +1,5 @@
+// Test: Issue #5 — LetRec body calling 3-arg curried function with outer capture
+// --- Command: bash %S/65-01-letrec-3arg-outer-capture.sh
+// --- Input:
+// --- Output:
+315

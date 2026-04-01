@@ -1,0 +1,5 @@
+// Test: Issue #5 — Two LetRec bodies calling 2-arg curried function with outer capture (shared template global)
+// --- Command: bash %S/65-02-nested-letrec-outer-capture.sh
+// --- Input:
+// --- Output:
+66
