@@ -1,0 +1,5 @@
+// Test: Issue #5 — 3-arg curried function with outer variable capture
+// --- Command: bash %S/64-01-3arg-outer-capture.sh
+// --- Input:
+// --- Output:
+36

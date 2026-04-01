@@ -1,0 +1,5 @@
+// Test: Issue #5 — 3-arg curried function called from LetRec body (no outer captures)
+// --- Command: bash %S/64-02-3arg-letrec.sh
+// --- Input:
+// --- Output:
+15
