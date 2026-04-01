@@ -19,14 +19,15 @@ v18.0: Closure ABI 통일 — %arg1 항상 !llvm.ptr, Issue #1 해결. 240 E2E t
 
 v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 
-## Current Milestone: v20.0 Caller-Side Closure Env Population
+## Current Milestone: v21.0 Partial Env Pattern
 
-**Goal:** 3+ arg curried function + outer capture 조합에서 scope loss 문제를 근본 해결 (Issue #5)
+**Goal:** Issue #5 완전 해결 — definition site에서 env+captures 미리 생성하여 LetRec body에서도 3+ arg curried function 정상 동작
 
 **Target features:**
-- 2-lambda 패턴의 maker body가 outer SSA를 참조하지 않도록 caller-side env population
-- 3+ arg curried function이 outer variable을 캡처하면서 LetRec body에서도 호출 가능
-- 기존 2-arg curried function (KnownFuncs 최적화) 유지
+- Definition site에서 env 할당 + captures 즉시 store
+- Call site에서 outerParam만 store (captures는 이미 env에 있음)
+- LetRec body에서 3+ arg curried function + outer capture 정상 동작
+- 기존 2-arg curried function / capture 없는 케이스 regression 없음
 
 ## Requirements
 
@@ -283,4 +284,15 @@ v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 | isPtrParamBody 12-pattern recursion | SetField/LetMut 등 뒤의 param 사용도 감지 | ✓ Good |
 
 ---
-*Last updated: 2026-04-01 after v18.0 milestone completed*
+### Validated (v19.0)
+
+- ✓ 3+ lambda chain guard → general Let path fallthrough (GUARD-01) — v19.0
+- ✓ 244 FsLit E2E 테스트
+
+### Validated (v20.0)
+
+- ✓ ClosureInfo CaptureNames/OuterParamName 추가 (ENV-01) — v20.0
+- ✓ Caller-side env population: maker는 fn_ptr+outerParam만, call site에서 captures store (ENV-02~04) — v20.0
+- ✓ 246 FsLit E2E 테스트
+
+*Last updated: 2026-04-02 after v21.0 milestone started*
