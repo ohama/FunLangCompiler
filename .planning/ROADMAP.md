@@ -18,7 +18,7 @@ See MILESTONES.md for full history.
 
 </details>
 
-### 🚧 v21.0 — Partial Env Pattern (In Progress)
+### ✅ v21.0 — Partial Env Pattern (Completed 2026-04-02)
 
 **Milestone Goal:** Issue #5 완전 해결 — definition site에서 env+captures 미리 생성하여 LetRec body에서도 3+ arg curried function 정상 동작
 
@@ -33,14 +33,14 @@ See MILESTONES.md for full history.
   3. 기존 2-arg curried function과 capture 없는 curried function이 변경 전과 동일하게 동작함
   4. `dotnet run -- tests/compiler/` 실행 시 246개 기존 E2E 테스트가 전부 통과함
   5. LetRec body + outer capture + 3-arg curried function 시나리오를 커버하는 신규 E2E 테스트 2개가 통과함
-**Plans**: TBD
+**Plans**: 2/2 complete
 
 Plans:
-- [ ] 65-01: Definition site env allocation + immediate capture store (ENV-01~03, REC-01~02)
-- [ ] 65-02: Regression verification + E2E tests (REG-01~03, TEST-01~02)
+- [x] 65-01: Definition site env allocation + immediate capture store (ENV-01~03, REC-01~02)
+- [x] 65-02: Regression verification + E2E tests (REG-01~03, TEST-01~02)
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 65. Partial Env Pattern | v21.0 | 0/2 | Not started | - |
+| 65. Partial Env Pattern | v21.0 | 2/2 | ✓ Complete | 2026-04-02 |
