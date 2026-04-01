@@ -17,6 +17,15 @@ Nested module qualified access (Outer.Inner.value) 지원.
 
 v18.0: Closure ABI 통일 — %arg1 항상 !llvm.ptr, Issue #1 해결. 240 E2E tests.
 
+## Current Milestone: v19.0 3-Lambda SSA Scope Fix
+
+**Goal:** 3+ argument curried function에서 maker body가 inner elaboration의 SSA 값을 leak하는 코드 생성 버그 수정 (Issue #4)
+
+**Target features:**
+- 2-lambda 패턴에서 capture store가 maker 함수 스코프 내 유효한 SSA만 참조
+- inner body elaboration의 SSA가 maker func.func 경계를 넘지 않음
+- 3-arg curried function (buildCharClass 등) 정상 컴파일
+
 ## Requirements
 
 ### Validated (v1.0)
