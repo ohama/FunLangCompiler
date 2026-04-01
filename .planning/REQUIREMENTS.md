@@ -7,11 +7,11 @@
 
 ### Namespace 제거 (빌드 수정)
 
-- [ ] **NS-01**: Elaboration.fs prePassDecls에서 NamespaceDecl 패턴 제거 (line 4237-4238)
-- [ ] **NS-02**: Elaboration.fs flattenDecls에서 NamespaceDecl 패턴 제거 (line 4283)
-- [ ] **NS-03**: Elaboration.fs elaborateTypeclasses에서 NamespaceDecl 패턴 제거 (line 4380-4381)
-- [ ] **NS-04**: Elaboration.fs elaborateProgram에서 NamespacedModule 패턴 제거 (line 4442)
-- [ ] **NS-05**: 관련 주석에서 "NamespaceDecl" 참조 제거/수정
+- [x] **NS-01**: Elaboration.fs prePassDecls에서 NamespaceDecl 패턴 제거 (line 4237-4238)
+- [x] **NS-02**: Elaboration.fs flattenDecls에서 NamespaceDecl 패턴 제거 (line 4283)
+- [x] **NS-03**: Elaboration.fs elaborateTypeclasses에서 NamespaceDecl 패턴 제거 (line 4380-4381)
+- [x] **NS-04**: Elaboration.fs elaborateProgram에서 NamespacedModule 패턴 제거 (line 4442)
+- [x] **NS-05**: 관련 주석에서 "NamespaceDecl" 참조 제거/수정
 
 ### 중첩 모듈 (Nested Module)
 
@@ -22,7 +22,7 @@
 
 ### 테스트
 
-- [ ] **TEST-01**: 빌드 성공 + 기존 232 E2E 테스트 통과
+- [x] **TEST-01**: 빌드 성공 + 기존 232 E2E 테스트 통과
 - [ ] **TEST-02**: 중첩 모듈 E2E 테스트 — Outer.Inner.value qualified access + open Outer.Inner
 
 ## Future Requirements
@@ -39,16 +39,16 @@ None.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| NS-01 | Phase 58 | Pending |
-| NS-02 | Phase 58 | Pending |
-| NS-03 | Phase 58 | Pending |
-| NS-04 | Phase 58 | Pending |
-| NS-05 | Phase 58 | Pending |
+| NS-01 | Phase 58 | Complete |
+| NS-02 | Phase 58 | Complete |
+| NS-03 | Phase 58 | Complete |
+| NS-04 | Phase 58 | Complete |
+| NS-05 | Phase 58 | Complete |
 | NEST-01 | Phase 59 | Pending |
 | NEST-02 | Phase 59 | Pending |
 | NEST-03 | Phase 59 | Pending |
 | NEST-04 | Phase 59 | Pending |
-| TEST-01 | Phase 58 | Pending |
+| TEST-01 | Phase 58 | Complete |
 | TEST-02 | Phase 59 | Pending |
 
 **Coverage:**

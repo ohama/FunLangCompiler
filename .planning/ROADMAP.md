@@ -19,7 +19,7 @@
 
 **Plans:** 1 plan
 Plans:
-- [ ] 58-01-PLAN.md — Remove all NamespaceDecl/NamespacedModule references from Elaboration.fs and Program.fs
+- [x] 58-01-PLAN.md — Remove all NamespaceDecl/NamespacedModule references from Elaboration.fs and Program.fs
 
 ---
 
