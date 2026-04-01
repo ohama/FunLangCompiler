@@ -15,6 +15,15 @@ v15.0 shipped. 231 E2E tests. 13 Prelude modules.
 String module: 14 functions. List module: 40+ functions.
 Zero unknownSpan in source — all error messages show real file:line:col.
 
+## Current Milestone: v16.0 FunLang AST 동기화
+
+**Goal:** FunLang이 namespace를 제거한 AST 변경에 맞춰 Compiler를 동기화하고 중첩 모듈 qualified access 지원
+
+**Target features:**
+- NamespaceDecl/NamespacedModule 참조 제거 (빌드 복구)
+- 중첩 모듈 qualified access (Outer.Inner.value)
+- 관련 주석/문서 정리
+
 ## Requirements
 
 ### Validated (v1.0)
