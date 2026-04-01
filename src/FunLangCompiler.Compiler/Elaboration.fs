@@ -425,6 +425,13 @@ let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
         | Let(name, bindE, bodyE, _) ->
             let strVars' = if isStringReturningExpr bindE then Set.add name strVars else strVars
             hasParamPtrUse strVars bindE || hasParamPtrUse strVars' bodyE
+        // Phase 62: LetPat(WildcardPat, e1, e2) is the desugared form of e1; e2 (statement sequence).
+        // Must traverse to find param usage deeper in the body (was causing premature false).
+        | LetPat(VarPat(vname, _), bindE, bodyE, _) ->
+            let strVars' = if isStringReturningExpr bindE then Set.add vname strVars else strVars
+            hasParamPtrUse strVars bindE || hasParamPtrUse strVars' bodyE
+        | LetPat(_, bindE, bodyE, _) ->
+            hasParamPtrUse strVars bindE || hasParamPtrUse strVars bodyE
         | Match(scrut, clauses, _) ->
             hasParamPtrUse strVars scrut || clauses |> List.exists (fun (_, _, arm) -> hasParamPtrUse strVars arm)
         | If(c, t, e, _) -> hasParamPtrUse strVars c || hasParamPtrUse strVars t || hasParamPtrUse strVars e
@@ -433,6 +440,19 @@ let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
         | App(f, a, _) -> hasParamPtrUse strVars f || hasParamPtrUse strVars a
         | Lambda(p, b, _) when p <> paramName -> hasParamPtrUse strVars b
         | Annot(inner, _, _) -> hasParamPtrUse strVars inner
+        // Phase 62: Recurse through SetField, LetMut, Assign, TryWith, LetRec, ForIn, While, For, Tuple, List
+        | SetField(e, _, v, _) -> hasParamPtrUse strVars e || hasParamPtrUse strVars v
+        | LetMut(_, v, b, _) -> hasParamPtrUse strVars v || hasParamPtrUse strVars b
+        | Assign(_, v, _) -> hasParamPtrUse strVars v
+        | TryWith(b, clauses, _) -> hasParamPtrUse strVars b || clauses |> List.exists (fun (_, _, arm) -> hasParamPtrUse strVars arm)
+        | LetRec(bindings, body, _) -> hasParamPtrUse strVars body || bindings |> List.exists (fun (_, _, _, b, _) -> hasParamPtrUse strVars b)
+        | ForInExpr(_, coll, body, _) -> hasParamPtrUse strVars coll || hasParamPtrUse strVars body
+        | WhileExpr(cond, body, _) -> hasParamPtrUse strVars cond || hasParamPtrUse strVars body
+        | ForExpr(_, s, _, e, body, _) -> hasParamPtrUse strVars s || hasParamPtrUse strVars e || hasParamPtrUse strVars body
+        | Tuple(elems, _) -> elems |> List.exists (hasParamPtrUse strVars)
+        | List(elems, _) -> elems |> List.exists (hasParamPtrUse strVars)
+        | Cons(h, t, _) -> hasParamPtrUse strVars h || hasParamPtrUse strVars t
+        | Raise(e, _) -> hasParamPtrUse strVars e
         | _ -> false
     hasParamPtrUse Set.empty bodyExpr
 
@@ -770,7 +790,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
         let innerFuncOp : FuncOp =
             { Name        = closureFnName
-              InputTypes  = [Ptr; I64]
+              InputTypes  = [Ptr; Ptr]
               ReturnType  = Some I64
               Body        = { Blocks = allBodyBlocks }
               IsLlvmFunc  = true }
@@ -3134,7 +3154,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
                 entryBlock :: sideBlocksPatched
         let innerFuncOp : FuncOp =
-            { Name = closureFnName; InputTypes = [Ptr; I64]; ReturnType = Some I64
+            { Name = closureFnName; InputTypes = [Ptr; Ptr]; ReturnType = Some I64
               Body = { Blocks = allBodyBlocks }; IsLlvmFunc = true }
         env.Funcs.Value <- env.Funcs.Value @ [innerFuncOp]
 
