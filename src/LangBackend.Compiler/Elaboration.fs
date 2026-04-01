@@ -4205,6 +4205,33 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
             | _ :: rest -> build rest
         build exprDecls
 
+// Phase 52: Transform typeclass declarations before main elaboration.
+// - TypeClassDecl: removed (class definitions are not needed at runtime)
+// - InstanceDecl: each method becomes a plain LetDecl binding
+// - DerivingDecl: removed (auto-derivation handled at parse time)
+// - ModuleDecl: recurse into inner decls; hoist instance bindings to outer scope
+// - NamespaceDecl: recurse into inner decls
+let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
+    decls |> List.collect (fun decl ->
+        match decl with
+        | Ast.Decl.TypeClassDecl _ -> []
+        | Ast.Decl.InstanceDecl(_className, _instType, methods, _constraints, span) ->
+            methods |> List.map (fun (methodName, methodBody) ->
+                Ast.Decl.LetDecl(methodName, methodBody, span))
+        | Ast.Decl.ModuleDecl(name, innerDecls, span) ->
+            let instanceBindings =
+                innerDecls |> List.collect (fun d ->
+                    match d with
+                    | Ast.Decl.InstanceDecl(_, _, methods, _, ispan) ->
+                        methods |> List.map (fun (methodName, methodBody) ->
+                            Ast.Decl.LetDecl(methodName, methodBody, ispan))
+                    | _ -> [])
+            [Ast.Decl.ModuleDecl(name, elaborateTypeclasses innerDecls, span)] @ instanceBindings
+        | Ast.Decl.NamespaceDecl(path, innerDecls, span) ->
+            [Ast.Decl.NamespaceDecl(path, elaborateTypeclasses innerDecls, span)]
+        | Ast.Decl.DerivingDecl _ -> []
+        | other -> [other])
+
 // Phase 16: elaborateProgram — new entry point accepting Ast.Module.
 // Runs prePassDecls to populate TypeEnv/RecordEnv/ExnTags, then elaborates the program body.
 let elaborateProgram (ast: Ast.Module) : MlirModule =
