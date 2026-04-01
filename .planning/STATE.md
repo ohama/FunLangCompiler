@@ -5,44 +5,39 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v15.0 unknownSpan 제거
+**Current focus:** v15.0 complete — Planning next milestone
 
 ## Current Position
 
-Phase: 57 of 57 — unknownSpan 제거
-Plan: 2 of 2 complete
-Status: Phase complete — v15.0 milestone complete
-Last activity: 2026-04-01 — Completed 57-02-PLAN.md
+Phase: 57 of 57 — All phases complete
+Plan: N/A
+Status: v15.0 complete
+Last activity: 2026-04-01 — v15.0 milestone shipped (phase 57)
 
-Progress: v1.0-v15.0 [█████████████████████] 57-02/57 complete
+Progress: v1.0-v15.0 complete [████████████████████] 57/57 phases
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 95 (v1.0-v10.0: 81 + v11.0: 4 + v12.0: 4 + v13.0: 3 + v14.0: 3)
+- Total plans completed: 97 (v1.0-v10.0: 81 + v11.0: 4 + v12.0: 4 + v13.0: 3 + v14.0: 3 + v15.0: 2)
 - Average duration: ~10 min/plan
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| (prior milestones) | 92 | ~920 min | ~10 min |
+| (prior milestones) | 95 | ~950 min | ~10 min |
+| 57 | 2 | ~17 min | ~9 min |
 
 **Recent Trend:**
-- Last 5 plans: v13.0 (3 plans) + v12.0 (2 plans)
+- Last 5 plans: v15.0 (2 plans) + v14.0 (3 plans)
 - Trend: Stable
 
 ## Accumulated Context
 
 ### Decisions
 
-| Phase | Decision |
-|-------|----------|
-| 57-01 | Bind outer App/Constructor/Let span field to named var; remove `let s = unknownSpan` line |
-| 57-01 | extractMainExpr gains explicit moduleSpan parameter; call site uses Ast.moduleSpanOf ast |
-| 57-01 | Program.fs parseExpr fallback uses Ast.spanOf expr for both LetDecl and Module spans |
-| 57-02 | Use "unsupported App" error path for E2E span test — most reliable trigger with real appSpan |
-| 57-02 | CHECK-RE: \d+:\d+ pattern proves non-zero span without being brittle to exact position |
+(Cleared — full history in PROJECT.md Key Decisions table and milestones/ archives)
 
 ### Pending Todos
 
@@ -54,6 +49,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-01T09:57:49Z
-Stopped at: Completed 57-02-PLAN.md (E2E span accuracy test + phase 57 / v15.0 complete)
+Last session: 2026-04-01
+Stopped at: v15.0 milestone completed and archived
 Resume file: None

@@ -10,18 +10,10 @@ FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력
 
 ## Current State
 
-v14.0 shipped. 230 E2E tests. 13 Prelude modules.
-~4,300 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 13 Prelude .fun files.
+v15.0 shipped. 231 E2E tests. 13 Prelude modules.
+~4,600 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 13 Prelude .fun files.
 String module: 14 functions. List module: 40+ functions.
-
-## Current Milestone: v15.0 unknownSpan 제거
-
-**Goal:** 에러 메시지에서 unknownSpan(0:0:0) 대신 실제 소스 위치를 표시하도록 전체 11곳 수정
-
-**Target features:**
-- Elaboration.fs 10곳의 unknownSpan을 호출부 AST 노드 Span으로 교체
-- Program.fs 1곳의 unknownSpan을 적절한 Span으로 교체
-- 에러 발생 시 정확한 file:line:col 표시 보장
+Zero unknownSpan in source — all error messages show real file:line:col.
 
 ## Requirements
 
@@ -149,6 +141,12 @@ String module: 14 functions. List module: 40+ functions.
 - ✓ List 모듈 확장: 17개 함수 (init, find, findIndex, partition, groupBy, scan, replicate, collect, pairwise, sumBy, sum, minBy, maxBy, contains, unzip, forall, iter) (LIST-01) — v14.0
 - ✓ 230 FsLit E2E 테스트 (TEST-01, TEST-02) — v14.0
 
+### Validated (v15.0)
+
+- ✓ unknownSpan 전면 제거: Elaboration.fs 10곳 + Program.fs 1곳 → 실제 AST Span (SPAN-01~08) — v15.0
+- ✓ E2E 테스트: 에러 메시지에 실제 file:line:col 표시 검증 (TEST-01) — v15.0
+- ✓ 231 FsLit E2E 테스트
+
 ### Out of Scope
 
 - REPL — 인터프리터가 이미 존재함
@@ -180,6 +178,7 @@ String module: 14 functions. List module: 40+ functions.
 - v12 완성: Prelude separate parsing + Parse error position + CHECK-RE tests + Unboxing comparison fix (217 E2E tests)
 - v13 완성: AST sync + elaborateTypeclasses + Prelude/Typeclass.fun + show/eq/deriving E2E (222+ E2E tests)
 - v14 완성: FunLang Standard Library Sync — String 7함수 + List 17함수 (230 E2E tests)
+- v15 완성: unknownSpan 전면 제거 — 에러 메시지 소스 위치 정확성 (231 E2E tests)
 - 참고: survey/funlexyacc-gap-status-v9.md (FunLexYacc 컴파일 갭 분석)
 
 ## Constraints
@@ -232,7 +231,10 @@ String module: 14 functions. List module: 40+ functions.
 
 | elaborateTypeclasses replicated | FunLang Elaborate.fs 포트, 공유 안함 | ✓ Good |
 | Two-pass ctorMap for DerivingDecl | TypeDecl ctors 수집 → Show/Eq LetDecl 생성 | ✓ Good |
+
+| Bind outer pattern match span | unknownSpan 대신 AST 노드의 실제 Span 사용 | ✓ Good |
+| extractMainExpr moduleSpan param | 모듈 Span을 명시적 매개변수로 전달 | ✓ Good |
 | Instance methods no mangling | show/eq 원래 이름 유지, 마지막 정의 wins | ✓ Good |
 
 ---
-*Last updated: 2026-04-01 after v14.0 milestone completed*
+*Last updated: 2026-04-01 after v15.0 milestone completed*

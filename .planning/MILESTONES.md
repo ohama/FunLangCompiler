@@ -316,6 +316,26 @@
 
 ---
 
+### v15.0 — unknownSpan 제거 (2026-04-01)
+
+**Goal:** 에러 메시지에서 unknownSpan(0:0:0) 대신 실제 소스 위치를 표시
+
+**Phases:** 57 (2 plans, all verified)
+**Requirements:** 9/9 complete
+**Tests:** 231 FsLit E2E tests (1 new)
+
+**What shipped:**
+- Elaboration.fs 10곳의 unknownSpan → 실제 AST Span (printfn/eprintfn desugar, show/eq builtin, closure capture, first-class ctor, extractMainExpr)
+- Program.fs 1곳의 unknownSpan → Ast.spanOf expr
+- E2E test verifying real file:line:col in error messages
+
+**Key decisions validated:**
+- Bind outer pattern match span field to named var ✓
+- extractMainExpr explicit moduleSpan parameter ✓
+- Ast.spanOf expr for parseExpr fallback ✓
+
+---
+
 ## Current
 
 Planning next milestone
