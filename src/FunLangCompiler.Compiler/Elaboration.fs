@@ -3211,8 +3211,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             captures |> List.mapi (fun i capName ->
                 let slotVal = { Name = freshName env; Type = Ptr }
                 let capVal  = Map.find capName env.Vars
-                [ LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
-                  LlvmStoreOp(capVal, slotVal) ]
+                // Issue #4: Env slots are Ptr. If capVal is I64, insert inttoptr.
+                if capVal.Type = I64 then
+                    let ptrVal = { Name = freshName env; Type = Ptr }
+                    [ LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
+                      LlvmIntToPtrOp(ptrVal, capVal)
+                      LlvmStoreOp(ptrVal, slotVal) ]
+                else
+                    [ LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
+                      LlvmStoreOp(capVal, slotVal) ]
             ) |> List.concat
         (envPtrVal, allocOps @ captureStoreOps)
 
