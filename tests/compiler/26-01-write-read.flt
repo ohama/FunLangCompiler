@@ -1,4 +1,4 @@
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -f /tmp/lang_test_26_01.txt $OUTBIN; echo $RC'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -f /tmp/lang_test_26_01.txt $OUTBIN; echo $RC'
 // --- Input:
 let path = "/tmp/lang_test_26_01.txt" in
 write_file path "hello world";

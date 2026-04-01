@@ -1,5 +1,5 @@
-// --- Command: bash -c 'dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- /tmp/langback_nonexistent_file.lt 2>&1; echo $?'
+// --- Command: bash -c 'dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- /tmp/fnc_nonexistent_file.lt 2>&1; echo $?'
 // --- Input:
 // --- Output:
-Error: file not found: /tmp/langback_nonexistent_file.lt
+Error: file not found: /tmp/fnc_nonexistent_file.lt
 1

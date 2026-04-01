@@ -113,7 +113,7 @@ let main argv =
 
     match remaining with
     | [] ->
-        eprintfn "Usage: langbackend <file.lt> [-o <output>]"
+        eprintfn "Usage: fnc <file.fun> [-o <output>]"
         1
     | inputPath :: _ ->
         // Derive output path: explicit -o takes priority, else strip .lt from filename

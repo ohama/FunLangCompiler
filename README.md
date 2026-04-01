@@ -18,14 +18,24 @@ git submodule update --init
 dotnet build src/FunLangCompiler.Cli
 
 # Compile a source file
-dotnet run --project src/FunLangCompiler.Cli -- hello.lt
+fnc hello.fun
 
 # With explicit output name
-dotnet run --project src/FunLangCompiler.Cli -- hello.lt -o hello
+fnc hello.fun -o hello
 
 # Run the compiled binary
 ./hello
+
+# Or use dotnet run directly
+dotnet run --project src/FunLangCompiler.Cli -- hello.fun -o hello
 ```
+
+## Binary Names
+
+| Binary | Repository | Description |
+|--------|-----------|-------------|
+| `fn` | [FunLang](https://github.com/ohama/FunLang) | FunLang 인터프리터 |
+| `fnc` | [FunLangCompiler](https://github.com/ohama/FunLangCompiler) | FunLang → 네이티브 컴파일러 |
 
 ## Supported Language Features
 
@@ -73,10 +83,10 @@ clang + libgc         -- Native binary linking
 | `MlirIR.fs` | ~130 | Typed IR: `MlirModule`, `FuncOp`, `MlirOp` DU (~25 cases), `MlirType`, `MlirValue` |
 | `MatchCompiler.fs` | ~150 | Decision tree pattern matching compiler ([Jacobs algorithm](#pattern-matching-compilation)) |
 | `Printer.fs` | ~180 | Pure serializer: MlirIR -> `.mlir` text |
-| `Elaboration.fs` | ~900 | AST -> MlirIR recursive pass with `ElabEnv` |
+| `Elaboration.fs` | ~4600 | AST -> MlirIR recursive pass with `ElabEnv` |
 | `Pipeline.fs` | ~110 | Shell pipeline: `mlir-opt` -> `mlir-translate` -> `clang` |
-| `lang_runtime.c` | ~50 | C runtime: `lang_string_concat`, `lang_to_string_int/bool`, `lang_match_failure` |
-| `Program.fs` | ~65 | CLI entry point: parse -> elaborate -> compile |
+| `lang_runtime.c` | ~1450 | C runtime: string, array, hashtable, collection, I/O builtins |
+| `Program.fs` | ~235 | CLI entry point: parse -> elaborate -> compile |
 
 ## Dependencies
 
@@ -111,7 +121,7 @@ sudo apt install libgc-dev
 
 ## Testing
 
-222개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
+234개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
 
 ```bash
 # Run all tests
@@ -121,7 +131,7 @@ dotnet run --project deps/fslit/FsLit -- tests/compiler/
 dotnet run --project deps/fslit/FsLit -- tests/compiler/04-01-fact.flt
 ```
 
-Each `.flt` file compiles a FunLang expression, runs the binary, and verifies the output.
+Each `.flt` file compiles a FunLang source file, runs the binary, and verifies the output.
 
 ## Examples
 
