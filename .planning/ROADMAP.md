@@ -6,6 +6,11 @@
 
 **Requirements:** TOML-01 ~ TOML-05, TEST-01
 
+**Plans:** 1 plans
+
+Plans:
+- [ ] 60-01-PLAN.md — TOML subset parser (ProjectFile.fs) + E2E test
+
 **Success Criteria:**
 1. funproj.toml을 읽어 FunProjConfig 구조체로 파싱
 2. [project].name, [project].prelude 추출
