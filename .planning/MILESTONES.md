@@ -359,6 +359,27 @@
 
 ---
 
+### v17.0 — Project File (funproj.toml) (2026-04-01)
+
+**Goal:** FunLang과 동일한 funproj.toml로 멀티파일 프로젝트를 네이티브 바이너리로 컴파일
+
+**Phases:** 60–61 (3 plans, all verified)
+**Requirements:** 20/20 complete
+
+**What shipped:**
+- ProjectFile.fs: 최소 TOML 서브셋 파서 (외부 의존성 없음)
+- `fnc build [name]` — [[executable]] 타겟 → build/ 네이티브 바이너리
+- `fnc test [name]` — [[test]] 타겟 → 컴파일 + 실행 + PASS/FAIL 리포트
+- compileFile 헬퍼: 단일 파일/프로젝트 모드 공유
+- 5개 E2E 테스트 (build, test, specific target, error cases)
+
+**Key decisions validated:**
+- Hand-rolled TOML parser (no external dependency) ✓
+- compileFile with optional preludeDir parameter ✓
+- fnc test continues on failure (reports all results) ✓
+
+---
+
 ## Current
 
 Planning next milestone
