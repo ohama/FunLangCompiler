@@ -810,7 +810,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               IsLlvmFunc  = false }
 
         // Step 5: Add both FuncOps to env.Funcs
-        env.Funcs.Value <- env.Funcs.Value @ [innerFuncOp; makerFuncOp]
+        // Phase 53: If maker function with same name already exists (e.g., from Prelude InstanceDecl
+        // shadowing of eq/show), replace it to avoid MLIR "redefinition of symbol" errors.
+        let makerMlirName = "@" + name
+        let existingFuncs = env.Funcs.Value
+        if existingFuncs |> List.exists (fun f -> f.Name = makerMlirName) then
+            env.Funcs.Value <- (existingFuncs |> List.filter (fun f -> f.Name <> makerMlirName)) @ [innerFuncOp; makerFuncOp]
+        else
+            env.Funcs.Value <- existingFuncs @ [innerFuncOp; makerFuncOp]
 
         // Step 6: Add to KnownFuncs
         let closureInfo = { InnerLambdaFn = closureFnName; NumCaptures = numCaptures
@@ -892,7 +899,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ReturnType = Some bodyVal.Type
               Body = { Blocks = allBodyBlocks }
               IsLlvmFunc = false }
-        env.Funcs.Value <- env.Funcs.Value @ [funcOp]
+        // Phase 53: If a function with the same name already exists (e.g., from Prelude InstanceDecl
+        // shadowing), replace it rather than appending, to avoid MLIR "redefinition of symbol" errors.
+        let mlirName = "@" + name
+        let existingFuncs = env.Funcs.Value
+        if existingFuncs |> List.exists (fun f -> f.Name = mlirName) then
+            env.Funcs.Value <- existingFuncs |> List.map (fun f -> if f.Name = mlirName then funcOp else f)
+        else
+            env.Funcs.Value <- existingFuncs @ [funcOp]
         let finalSig = { sig_ with ReturnType = bodyVal.Type }
         let env' =
             let kf = Map.add name finalSig env.KnownFuncs
@@ -1434,6 +1448,86 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, aOps @ bOps @ aCoerce @ bCoerce @ [LlvmCallOp(result, "@lang_string_concat", [aPtr; bPtr])])
 
+    // Phase 53: show builtin — polymorphic display, dispatches on static argument type.
+    // Fires when argument is statically a string literal OR an integer/bool expression.
+    // If the argument is a constructor, ADT variable, or other Ptr, falls through to the
+    // derived/user-defined show function in KnownFuncs.
+    | App (Var ("show", _), String (s, _), _) ->
+        // show on string literal: return the string as-is (identity)
+        elaborateExpr env (Ast.String(s, Ast.unknownSpan))
+    | App (Var ("show", _), argExpr, _) when
+            (let isStr = match stripAnnot argExpr with
+                         | Ast.Var(v, _) -> Map.tryFind v env.Vars |> Option.exists (fun mv -> mv.Type = Ptr)
+                                            || Map.tryFind v env.KnownFuncs |> Option.exists (fun s -> s.ReturnType = Ptr)
+                         | _ -> false
+             not isStr && not (Map.containsKey "show" env.KnownFuncs &&
+                               (Map.find "show" env.KnownFuncs).ParamTypes = [Ptr])) ->
+        let (argVal, argOps) = elaborateExpr env argExpr
+        let result = { Name = freshName env; Type = Ptr }
+        let isBool = argVal.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs argExpr
+        if isBool then
+            if argVal.Type = I1 then
+                let extVal = { Name = freshName env; Type = I64 }
+                (result, argOps @ [ArithExtuIOp(extVal, argVal); LlvmCallOp(result, "@lang_to_string_bool", [extVal])])
+            else
+                (result, argOps @ [LlvmCallOp(result, "@lang_to_string_bool", [argVal])])
+        elif argVal.Type = Ptr then
+            // Ptr: already a LangString* — return unchanged (handles string variables)
+            (argVal, argOps)
+        else
+            // I64 — call lang_to_string_int
+            (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
+
+    // Phase 53: eq builtin — polymorphic equality, dispatches on static argument type.
+    // Fires when arguments are string literals or non-Ptr values.
+    | App (App (Var ("eq", _), String(ls, _), _), String(rs, _), _) ->
+        // eq on two string literals
+        let (lv, lops) = elaborateExpr env (Ast.String(ls, Ast.unknownSpan))
+        let (rv, rops) = elaborateExpr env (Ast.String(rs, Ast.unknownSpan))
+        let lDataPtr   = { Name = freshName env; Type = Ptr }
+        let lData      = { Name = freshName env; Type = Ptr }
+        let rDataPtr   = { Name = freshName env; Type = Ptr }
+        let rData      = { Name = freshName env; Type = Ptr }
+        let cmpResult  = { Name = freshName env; Type = I32 }
+        let zero32     = { Name = freshName env; Type = I32 }
+        let boolResult = { Name = freshName env; Type = I1 }
+        let ops = [
+            LlvmGEPStructOp(lDataPtr, lv, 1)
+            LlvmLoadOp(lData, lDataPtr)
+            LlvmGEPStructOp(rDataPtr, rv, 1)
+            LlvmLoadOp(rData, rDataPtr)
+            LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
+            ArithConstantOp(zero32, 0L)
+            ArithCmpIOp(boolResult, "eq", cmpResult, zero32)
+        ]
+        (boolResult, lops @ rops @ ops)
+    | App (App (Var ("eq", _), lhsExpr, _), rhsExpr, _) when not (Map.containsKey "eq" env.KnownFuncs) ->
+        let (lv, lops) = elaborateExpr env lhsExpr
+        let (rv, rops) = elaborateExpr env rhsExpr
+        if lv.Type = Ptr then
+            // String equality via strcmp (same as Equal case for Ptr)
+            let lDataPtr   = { Name = freshName env; Type = Ptr }
+            let lData      = { Name = freshName env; Type = Ptr }
+            let rDataPtr   = { Name = freshName env; Type = Ptr }
+            let rData      = { Name = freshName env; Type = Ptr }
+            let cmpResult  = { Name = freshName env; Type = I32 }
+            let zero32     = { Name = freshName env; Type = I32 }
+            let boolResult = { Name = freshName env; Type = I1 }
+            let ops = [
+                LlvmGEPStructOp(lDataPtr, lv, 1)
+                LlvmLoadOp(lData, lDataPtr)
+                LlvmGEPStructOp(rDataPtr, rv, 1)
+                LlvmLoadOp(rData, rDataPtr)
+                LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
+                ArithConstantOp(zero32, 0L)
+                ArithCmpIOp(boolResult, "eq", cmpResult, zero32)
+            ]
+            (boolResult, lops @ rops @ ops)
+        else
+            // I64 (int, bool, char) — integer comparison
+            let result = { Name = freshName env; Type = I1 }
+            (result, lops @ rops @ [ArithCmpIOp(result, "eq", lv, rv)])
+
     // Phase 8: to_string builtin — dispatch on elaborated arg type
     // Phase 43: also check BoolVars/KnownFuncs for bool-returning function calls
     | App (Var ("to_string", _), argExpr, _) ->
@@ -1448,6 +1542,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             else
                 // I64 value known to be bool — call lang_to_string_bool directly
                 (result, argOps @ [LlvmCallOp(result, "@lang_to_string_bool", [argVal])])
+        elif argVal.Type = Ptr then
+            // Phase 53: Ptr value is already a LangString* — return it unchanged.
+            // This handles to_string on string arguments (and show string via Show string instance).
+            (argVal, argOps)
         else
             // I64 and other numeric types — call lang_to_string_int directly
             (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
