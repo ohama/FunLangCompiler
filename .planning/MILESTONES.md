@@ -295,17 +295,28 @@
 
 ---
 
+### v14.0 — FunLang Standard Library Sync (2026-04-01)
+
+**Goal:** FunLang v13.0/v14.0에서 추가된 String/List 표준 라이브러리 함수를 컴파일러에 동기화
+
+**Phases:** 54–56 (3 plans, all verified)
+**Requirements:** 16/16 complete
+**Tests:** 230 FsLit E2E tests (8 new)
+
+**What shipped:**
+- String runtime: 5 new C functions (split, indexof, replace, toupper, tolower)
+- String Elaboration: 5 new builtin dispatch patterns
+- Prelude/String.fun: 7 new functions (split, indexOf, replace, toUpper, toLower, join, substring)
+- Prelude/List.fun: 17 new functions (init, find, findIndex, partition, groupBy, scan, replicate, collect, pairwise, sumBy, sum, minBy, maxBy, contains, unzip, forall, iter)
+
+**Key decisions validated:**
+- Module-level helper functions instead of nested closures (compiler limitation) ✓
+- scan rewritten to direct match (avoid MLIR block issue) ✓
+- unzip inlines fst/snd pattern matching (Core not in scope within List) ✓
+
+---
+
 ## Current
 
-### v14.0 — FunLang Standard Library Sync (In Progress)
-
-**Goal:** FunLang Prelude/String.fun과 Prelude/List.fun에 추가된 함수들을 컴파일러에 반영
-
-**Phases:** 54–56
-**Requirements:** 16 requirements (STR-01~07, RT-01~06, LIST-01, TEST-01~02)
-
-**Planned deliverables:**
-- String: split, indexOf, replace, toUpper, toLower (신규 C 런타임 + Elaboration 디스패치), join/substring (별칭)
-- List: 17개 순수 FunLang 함수 Prelude 동기화
-- E2E 테스트: 모든 신규 String/List 함수 검증
+Planning next milestone
 

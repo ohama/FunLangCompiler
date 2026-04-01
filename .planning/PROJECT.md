@@ -8,20 +8,11 @@ FunLang의 AST/타입체커를 재사용하고 MLIR → LLVM 파이프라인을 
 
 FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다. 이것이 동작하면 나머지는 부가적이다.
 
-## Current Milestone: v14.0 FunLang Standard Library Sync
-
-**Goal:** FunLang v13.0/v14.0에서 추가된 String/List 표준 라이브러리 함수를 컴파일러에 동기화
-
-**Target features:**
-- String 모듈 확장: split, indexOf, replace, toUpper, toLower, join, substring (C 런타임 + Elaboration + Prelude)
-- List 모듈 확장: init, find, findIndex, partition, groupBy, scan, replicate, collect, pairwise, sumBy, sum, minBy, maxBy, contains, unzip, forall, iter (순수 FunLang Prelude)
-- 새 함수에 대한 E2E 테스트
-
 ## Current State
 
-v13.0 shipped. 222+ E2E tests. 13 Prelude modules (Typeclass.fun 추가).
-~4,300 lines F# (Elaboration.fs), 1,343 lines C (lang_runtime.c), 13 Prelude .fun files.
-Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성).
+v14.0 shipped. 230 E2E tests. 13 Prelude modules.
+~4,300 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 13 Prelude .fun files.
+String module: 14 functions. List module: 40+ functions.
 
 ## Requirements
 
@@ -142,6 +133,13 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 - ✓ Typeclass E2E 테스트 — show/eq/deriving Show (TEST-01~03) — v13.0
 - ✓ 222+ FsLit E2E 테스트
 
+### Validated (v14.0)
+
+- ✓ String 모듈 확장: split, indexOf, replace, toUpper, toLower, join, substring (STR-01~07) — v14.0
+- ✓ C 런타임: string_split, string_indexof, string_replace, string_toupper, string_tolower (RT-01~06) — v14.0
+- ✓ List 모듈 확장: 17개 함수 (init, find, findIndex, partition, groupBy, scan, replicate, collect, pairwise, sumBy, sum, minBy, maxBy, contains, unzip, forall, iter) (LIST-01) — v14.0
+- ✓ 230 FsLit E2E 테스트 (TEST-01, TEST-02) — v14.0
+
 ### Out of Scope
 
 - REPL — 인터프리터가 이미 존재함
@@ -172,6 +170,7 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 - v11 완성: failWithSpan + Parse error preservation + MLIR debug + Context hints + Error categories (217 E2E tests)
 - v12 완성: Prelude separate parsing + Parse error position + CHECK-RE tests + Unboxing comparison fix (217 E2E tests)
 - v13 완성: AST sync + elaborateTypeclasses + Prelude/Typeclass.fun + show/eq/deriving E2E (222+ E2E tests)
+- v14 완성: FunLang Standard Library Sync — String 7함수 + List 17함수 (230 E2E tests)
 - 참고: survey/funlexyacc-gap-status-v9.md (FunLexYacc 컴파일 갭 분석)
 
 ## Constraints
@@ -227,4 +226,4 @@ Typeclass 컴파일 지원 (Show/Eq 인스턴스, deriving Show/Eq 자동 생성
 | Instance methods no mangling | show/eq 원래 이름 유지, 마지막 정의 wins | ✓ Good |
 
 ---
-*Last updated: 2026-04-01 after v13.0 milestone completed*
+*Last updated: 2026-04-01 after v14.0 milestone completed*
