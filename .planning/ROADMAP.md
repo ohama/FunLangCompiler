@@ -32,10 +32,10 @@ Phases 47-50: v12.0 (archived)
   3. Elaboration.fs pattern matches on InstanceDecl with constraints field without compiler warning or error
   4. DerivingDecl is handled (skipped/ignored) rather than causing a match-incomplete warning
   5. All existing E2E tests (tests/compiler/) that passed before continue to pass
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 51-01-PLAN.md — Update all pattern match sites for TypeDecl, TypeClassDecl, InstanceDecl, DerivingDecl
+- [ ] 51-01-PLAN.md — Update TypeDecl to 5-field pattern, add explicit skip arms for TypeClassDecl/InstanceDecl/DerivingDecl
 
 #### Phase 52: Typeclass Elaboration
 **Goal**: LangBackend can elaborate programs that contain typeclass declarations and instances by running elaborateTypeclasses before elaborateProgram
@@ -74,6 +74,6 @@ Plans:
 | 44. Error Location Foundation | v11.0 | 2/2 | Complete | 2026-03-31 |
 | 45. Error Preservation | v11.0 | 1/1 | Complete | 2026-03-31 |
 | 46. Context Hints & Unified Format | v11.0 | 1/1 | Complete | 2026-03-31 |
-| 51. AST Structure Sync | v13.0 | 0/TBD | Not started | - |
+| 51. AST Structure Sync | v13.0 | 0/1 | Not started | - |
 | 52. Typeclass Elaboration | v13.0 | 0/TBD | Not started | - |
 | 53. Prelude Sync & E2E Tests | v13.0 | 0/TBD | Not started | - |
