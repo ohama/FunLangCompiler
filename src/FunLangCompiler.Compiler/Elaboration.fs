@@ -870,8 +870,50 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let kf' = match twoLambdaShortAlias with Some sn -> Map.add sn sig_ kf | None -> kf
             { env with KnownFuncs = kf' }
 
-        // Step 7: Elaborate inExpr with updated env
-        elaborateExpr env' inExpr
+        // Step 7: Phase 65 partial env pattern — if there are non-outerParam captures,
+        // pre-allocate a "template env" at the definition site: GC_malloc, store fn_ptr at slot 0,
+        // store each non-outerParam capture at its slot. The template ptr is stored in env'.Vars[name]
+        // so that LetRec bodies can clone it at call time (captures are not in scope there).
+        let hasNonOuterCaptures = captures |> List.exists (fun c -> c <> outerParam)
+        let (templateEnvOps, envWithTemplateVar) =
+            if not hasNonOuterCaptures then
+                ([], env')
+            else
+                let tBytesVal = { Name = freshName env; Type = I64 }
+                let tEnvPtr   = { Name = freshName env; Type = Ptr }
+                let tFnPtrVal = { Name = freshName env; Type = Ptr }
+                let allocOps = [
+                    ArithConstantOp(tBytesVal, int64 ((numCaptures + 1) * 8))
+                    LlvmCallOp(tEnvPtr, "@GC_malloc", [tBytesVal])
+                    LlvmAddressOfOp(tFnPtrVal, closureFnName)
+                    LlvmStoreOp(tFnPtrVal, tEnvPtr)   // env[0] = fn_ptr
+                ]
+                // Store each non-outerParam capture at its slot (skip outerParam — filled per-call).
+                // Look up capture values in the OUTER env (env.Vars), where they are in scope.
+                let captureStoreOps =
+                    captures |> List.mapi (fun i capName ->
+                        if capName = outerParam then []
+                        else
+                            match Map.tryFind capName env.Vars with
+                            | None -> []  // not in scope — shouldn't happen at top-level Let
+                            | Some capVal ->
+                                let slotVal = { Name = freshName env; Type = Ptr }
+                                if capVal.Type = I64 then
+                                    let ptrVal = { Name = freshName env; Type = Ptr }
+                                    [ LlvmGEPLinearOp(slotVal, tEnvPtr, i + 1)
+                                      LlvmIntToPtrOp(ptrVal, capVal)
+                                      LlvmStoreOp(ptrVal, slotVal) ]
+                                else
+                                    [ LlvmGEPLinearOp(slotVal, tEnvPtr, i + 1)
+                                      LlvmStoreOp(capVal, slotVal) ]
+                    ) |> List.concat
+                // Store template env ptr in Vars so LetRec bodies can find it via env.Vars[name]
+                let envWithVar = { env' with Vars = Map.add name tEnvPtr env'.Vars }
+                (allocOps @ captureStoreOps, envWithVar)
+
+        // Elaborate inExpr with template env in scope (prepend template ops to output)
+        let (inVal, inOps) = elaborateExpr envWithTemplateVar inExpr
+        (inVal, templateEnvOps @ inOps)
 
     // Phase 41: OpenDecl alias — Let(shortName, Var(qualifiedName), cont) where qualifiedName is in
     // KnownFuncs (two-lambda direct-call function) but not Vars. Add shortName as KnownFuncs alias.
@@ -2642,21 +2684,50 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let callOp = DirectCallOp(resultVal, sig_.MlirName, [i64ArgVal; envPtrVal])
                     (resultVal, argOps @ setupOps @ coerceOps @ captureStoreOps @ [callOp])
                 else
-                    // Fallback: call via indirect closure (captures already stored at definition site)
+                    // Fallback: captures not in scope at call site (e.g., LetRec body).
+                    // Phase 65: Use the pre-allocated template env from the definition site.
+                    // Clone template env, fill outerParam, load fn_ptr, then indirect call.
                     match Map.tryFind name env.Vars with
-                    | Some closureVal ->
-                        let closurePtrVal = { Name = freshName env; Type = Ptr }
-                        let fnPtrVal = { Name = freshName env; Type = Ptr }
-                        let result = { Name = freshName env; Type = I64 }
-                        let castOp = if closureVal.Type = I64 then LlvmIntToPtrOp(closurePtrVal, closureVal) else LlvmPtrToIntOp(closurePtrVal, closureVal) // identity-ish
-                        let (closurePtr, castOps) =
-                            if closureVal.Type = Ptr then (closureVal, [])
-                            else (closurePtrVal, [LlvmIntToPtrOp(closurePtrVal, closureVal)])
-                        let loadOp = LlvmLoadOp(fnPtrVal, closurePtr)
-                        let callOp = IndirectCallOp(result, fnPtrVal, closurePtr, argVal)
-                        (result, argOps @ castOps @ [loadOp; callOp])
+                    | Some templatePtr ->
+                        // Allocate a fresh env of the same size as the template
+                        let copyBytesVal = { Name = freshName env; Type = I64 }
+                        let newEnvPtr    = { Name = freshName env; Type = Ptr }
+                        let copyOps = [
+                            ArithConstantOp(copyBytesVal, int64 ((ci.NumCaptures + 1) * 8))
+                            LlvmCallOp(newEnvPtr, "@GC_malloc", [copyBytesVal])
+                        ]
+                        // Copy all slots from template (slot 0 = fn_ptr, slots 1..n = captures)
+                        let slotCopyOps =
+                            [ 0 .. ci.NumCaptures ] |> List.collect (fun i ->
+                                let srcSlot   = { Name = freshName env; Type = Ptr }
+                                let loadedVal = { Name = freshName env; Type = Ptr }
+                                let dstSlot   = { Name = freshName env; Type = Ptr }
+                                [ LlvmGEPLinearOp(srcSlot, templatePtr, i)
+                                  LlvmLoadOp(loadedVal, srcSlot)
+                                  LlvmGEPLinearOp(dstSlot, newEnvPtr, i)
+                                  LlvmStoreOp(loadedVal, dstSlot) ])
+                        // Overwrite outerParam slot in new env with the actual call argument.
+                        // Slot index = position of outerParam in CaptureNames (0-indexed) + 1 (slot 0 = fn_ptr).
+                        let outerParamSlotIdx =
+                            match List.tryFindIndex ((=) ci.OuterParamName) ci.CaptureNames with
+                            | Some idx -> idx + 1
+                            | None -> failwith (sprintf "Elaboration: outerParam '%s' not found in CaptureNames" ci.OuterParamName)
+                        let outerSlotVal = { Name = freshName env; Type = Ptr }
+                        let outerPtrVal  = { Name = freshName env; Type = Ptr }
+                        let outerStoreOps =
+                            [ LlvmGEPLinearOp(outerSlotVal, newEnvPtr, outerParamSlotIdx)
+                              LlvmIntToPtrOp(outerPtrVal, i64ArgVal)
+                              LlvmStoreOp(outerPtrVal, outerSlotVal) ]
+                        // Load fn_ptr from slot 0 of new env and call inner function indirectly
+                        let fnPtrVal  = { Name = freshName env; Type = Ptr }
+                        let resultVal = { Name = freshName env; Type = I64 }
+                        let callOps = [
+                            LlvmLoadOp(fnPtrVal, newEnvPtr)
+                            IndirectCallOp(resultVal, fnPtrVal, newEnvPtr, argVal)
+                        ]
+                        (resultVal, argOps @ coerceOps @ copyOps @ slotCopyOps @ outerStoreOps @ callOps)
                     | None ->
-                        failwith (sprintf "Elaboration: '%s' has captures not in scope and no closure fallback available" name)
+                        failwith (sprintf "Elaboration: '%s' has captures not in scope and no template env available (Phase 65)" name)
             | None ->
                 // Check Vars for closure value (type Ptr)
                 match Map.tryFind name env.Vars with
