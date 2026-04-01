@@ -14,6 +14,15 @@ v14.0 shipped. 230 E2E tests. 13 Prelude modules.
 ~4,300 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 13 Prelude .fun files.
 String module: 14 functions. List module: 40+ functions.
 
+## Current Milestone: v15.0 unknownSpan 제거
+
+**Goal:** 에러 메시지에서 unknownSpan(0:0:0) 대신 실제 소스 위치를 표시하도록 전체 11곳 수정
+
+**Target features:**
+- Elaboration.fs 10곳의 unknownSpan을 호출부 AST 노드 Span으로 교체
+- Program.fs 1곳의 unknownSpan을 적절한 Span으로 교체
+- 에러 발생 시 정확한 file:line:col 표시 보장
+
 ## Requirements
 
 ### Validated (v1.0)

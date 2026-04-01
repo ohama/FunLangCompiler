@@ -1,34 +1,27 @@
-# Requirements: v14.0 FunLang Standard Library Sync
+# Requirements: v15.0 unknownSpan 제거
+
+**Defined:** 2026-04-01
+**Core Value:** 에러 메시지에서 정확한 소스 위치를 표시하여 디버깅 효율 향상
 
 ## Milestone Requirements
 
-### String Module Extension
+### Elaboration Span Propagation
 
-- [ ] **STR-01**: `String.split s sep` — 문자열을 구분자로 분리하여 리스트 반환 (C 런타임 `string_split` 필요)
-- [ ] **STR-02**: `String.indexOf s sub` — 부분 문자열 위치 반환 (C 런타임 `string_indexof` 필요)
-- [ ] **STR-03**: `String.replace s old new` — 부분 문자열 치환 (C 런타임 `string_replace` 필요)
-- [ ] **STR-04**: `String.toUpper s` — 대문자 변환 (C 런타임 `string_toupper` 필요)
-- [ ] **STR-05**: `String.toLower s` — 소문자 변환 (C 런타임 `string_tolower` 필요)
-- [ ] **STR-06**: `String.join sep lst` — `string_concat_list` 별칭 (런타임 변경 없음)
-- [ ] **STR-07**: `String.substring s start len` — `string_sub` 별칭 (런타임 변경 없음)
+- [ ] **SPAN-01**: printfn 3가지 desugar 패턴(0/1/2-arg)에서 원본 App Span 사용 (Elaboration.fs:2190,2196,2202)
+- [ ] **SPAN-02**: eprintfn desugar에서 원본 App Span 사용 (Elaboration.fs:2299)
+- [ ] **SPAN-03**: show 빌트인 문자열 리터럴 경로에서 원본 App Span 사용 (Elaboration.fs:1500)
+- [ ] **SPAN-04**: eq 빌트인 문자열 리터럴 경로에서 원본 App Span 사용 (Elaboration.fs:1528-1529)
+- [ ] **SPAN-05**: 클로저 캡처 실패 에러에서 Lambda/LetRec Span 전달 (Elaboration.fs:798)
+- [ ] **SPAN-06**: first-class constructor 래핑에서 Var/Constructor Span 전달 (Elaboration.fs:3153)
+- [ ] **SPAN-07**: extractMainExpr에서 모듈 Span 사용 (Elaboration.fs:4314)
 
-### List Module Extension
+### Program Span Propagation
 
-- [ ] **LIST-01**: 17개 새 List 함수 Prelude 동기화 — init, find, findIndex, partition, groupBy, scan, replicate, collect, pairwise, sumBy, sum, minBy, maxBy, contains, unzip, forall, iter (순수 FunLang 구현, 기존 primitive 기반)
-
-### Runtime & Elaboration
-
-- [ ] **RT-01**: C 런타임 `lang_string_split` 구현 — 구분자로 문자열 분리, cons list 반환
-- [ ] **RT-02**: C 런타임 `lang_string_indexof` 구현 — strstr 기반 부분 문자열 검색
-- [ ] **RT-03**: C 런타임 `lang_string_replace` 구현 — 모든 occurrence 치환
-- [ ] **RT-04**: C 런타임 `lang_string_toupper` 구현 — toupper 루프
-- [ ] **RT-05**: C 런타임 `lang_string_tolower` 구현 — tolower 루프
-- [ ] **RT-06**: Elaboration.fs에 5개 새 string builtin dispatch 추가 (string_split, string_indexof, string_replace, string_toupper, string_tolower)
+- [ ] **SPAN-08**: parseExpr fallback에서 expression wrapping 시 적절한 Span 사용 (Program.fs:51)
 
 ### Testing
 
-- [ ] **TEST-01**: String 새 함수 E2E 테스트 (split, indexOf, replace, toUpper, toLower, join, substring)
-- [ ] **TEST-02**: List 새 함수 E2E 테스트 (17개 함수 각각)
+- [ ] **TEST-01**: unknownSpan 에러 경로에 대한 E2E 테스트 — 에러 메시지에 0:0 위치가 나타나지 않음을 검증
 
 ## Future Requirements
 
@@ -36,30 +29,28 @@ None for this milestone scope.
 
 ## Out of Scope
 
-- REPL 개선 (v14.0 FunLang REPL 변경) — 배치 컴파일러와 무관
-- Multi-param lambda — FunLang 파서가 자동 desugar하므로 컴파일러 변경 불필요
-- LangThree → FunLang 리네이밍 — 이미 완료
+- 새로운 에러 메시지 종류 추가 — 기존 unknownSpan 제거만 수행
+- failWithSpan 인프라 변경 — 이미 v11.0에서 완성
+- Prelude 내부 에러 위치 — Prelude는 "<prelude>" 파일명으로 이미 구분됨
 
 ## Traceability
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STR-01 | Phase 54 | Pending |
-| STR-02 | Phase 54 | Pending |
-| STR-03 | Phase 54 | Pending |
-| STR-04 | Phase 54 | Pending |
-| STR-05 | Phase 54 | Pending |
-| STR-06 | Phase 54 | Pending |
-| STR-07 | Phase 54 | Pending |
-| RT-01 | Phase 54 | Pending |
-| RT-02 | Phase 54 | Pending |
-| RT-03 | Phase 54 | Pending |
-| RT-04 | Phase 54 | Pending |
-| RT-05 | Phase 54 | Pending |
-| RT-06 | Phase 54 | Pending |
-| LIST-01 | Phase 55 | Pending |
-| TEST-01 | Phase 56 | Pending |
-| TEST-02 | Phase 56 | Pending |
+| SPAN-01 | Phase 57 | Pending |
+| SPAN-02 | Phase 57 | Pending |
+| SPAN-03 | Phase 57 | Pending |
+| SPAN-04 | Phase 57 | Pending |
+| SPAN-05 | Phase 57 | Pending |
+| SPAN-06 | Phase 57 | Pending |
+| SPAN-07 | Phase 57 | Pending |
+| SPAN-08 | Phase 57 | Pending |
+| TEST-01 | Phase 57 | Pending |
+
+**Coverage:**
+- v15.0 requirements: 9 total
+- Mapped to phases: 9
+- Unmapped: 0
 
 ---
 *Created: 2026-04-01*
