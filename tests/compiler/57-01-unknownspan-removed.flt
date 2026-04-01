@@ -1,0 +1,6 @@
+// Test: Error messages include real source positions (non-zero line:col) after unknownSpan removal
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 57-01-unknownspan-removed.fun 2>&1; echo $?'
+// --- Input:
+// --- Output:
+CHECK-RE: \[Elaboration\] 57-01-unknownspan-removed\.fun:\d+:\d+: Elaboration: unsupported App.*
+1
