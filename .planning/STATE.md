@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 ## Current Position
 
 Phase: 57 of 57 — unknownSpan 제거
-Plan: 1 of 2 complete
-Status: In progress
-Last activity: 2026-04-01 — Completed 57-01-PLAN.md
+Plan: 2 of 2 complete
+Status: Phase complete — v15.0 milestone complete
+Last activity: 2026-04-01 — Completed 57-02-PLAN.md
 
-Progress: v1.0-v15.0 [████████████████████░] 57-01/57 complete
+Progress: v1.0-v15.0 [█████████████████████] 57-02/57 complete
 
 ## Performance Metrics
 
@@ -41,6 +41,8 @@ Progress: v1.0-v15.0 [███████████████████�
 | 57-01 | Bind outer App/Constructor/Let span field to named var; remove `let s = unknownSpan` line |
 | 57-01 | extractMainExpr gains explicit moduleSpan parameter; call site uses Ast.moduleSpanOf ast |
 | 57-01 | Program.fs parseExpr fallback uses Ast.spanOf expr for both LetDecl and Module spans |
+| 57-02 | Use "unsupported App" error path for E2E span test — most reliable trigger with real appSpan |
+| 57-02 | CHECK-RE: \d+:\d+ pattern proves non-zero span without being brittle to exact position |
 
 ### Pending Todos
 
@@ -52,6 +54,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-01T09:48:21Z
-Stopped at: Completed 57-01-PLAN.md (unknownSpan removal in Elaboration.fs + Program.fs)
+Last session: 2026-04-01T09:57:49Z
+Stopped at: Completed 57-02-PLAN.md (E2E span accuracy test + phase 57 / v15.0 complete)
 Resume file: None
