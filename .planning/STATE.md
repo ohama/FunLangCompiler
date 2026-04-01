@@ -5,7 +5,7 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v18.0 complete — Planning next milestone
+**Current focus:** v18.0 complete — All 240 E2E tests passing
 
 ## Current Position
 
@@ -39,5 +39,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: v18.0 milestone completed and archived
+Stopped at: Completed 62-01-PLAN.md — 240/240 tests passing
 Resume file: None
