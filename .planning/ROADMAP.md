@@ -74,6 +74,6 @@ Plans:
 | 44. Error Location Foundation | v11.0 | 2/2 | Complete | 2026-03-31 |
 | 45. Error Preservation | v11.0 | 1/1 | Complete | 2026-03-31 |
 | 46. Context Hints & Unified Format | v11.0 | 1/1 | Complete | 2026-03-31 |
-| 51. AST Structure Sync | v13.0 | 0/1 | Not started | - |
+| 51. AST Structure Sync | v13.0 | 1/1 | ✓ Complete | 2026-04-01 |
 | 52. Typeclass Elaboration | v13.0 | 0/TBD | Not started | - |
 | 53. Prelude Sync & E2E Tests | v13.0 | 0/TBD | Not started | - |
