@@ -400,6 +400,26 @@
 
 ---
 
+### v19.0 — 3-Lambda SSA Scope Fix (2026-04-02)
+
+**Goal:** 3+ arg curried function의 SSA scope violation 수정
+
+**Phases:** 63 (1 plan)
+**Requirements:** 5/5 complete
+**Tests:** 244 FsLit E2E tests (1 new)
+**Issue:** ohama/FunLangCompiler#4 closed
+
+**What shipped:**
+- 2-lambda pattern에 guard 추가: `when (match stripAnnot innerBody with Lambda _ -> false | _ -> true)`
+- 3+ lambda chains → general Let path로 fallthrough (올바른 SSA scope)
+- 3-arg curried function E2E 테스트 (add3, combine with outer capture)
+
+**Key decisions validated:**
+- Guard-only fix (no dedicated 3-lambda pattern) ✓
+- General Let path handles N-ary lambda chains correctly ✓
+
+---
+
 ## Current
 
 Planning next milestone
