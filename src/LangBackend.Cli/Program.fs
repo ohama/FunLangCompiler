@@ -2,7 +2,7 @@ module Program
 
 open System
 open FSharp.Text.Lexing
-open LangThree.IndentFilter
+open FunLang.IndentFilter
 
 let parseExpr (src: string) (filename: string) : Ast.Expr =
     let lexbuf = LexBuffer<char>.FromString src
@@ -164,7 +164,7 @@ let main argv =
                 if dir = "" then ""
                 else
                     // Explicit load order: Option/Result before List (List uses None/Some constructors)
-                    let ordered = [| "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun";
+                    let ordered = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun";
                                      "Hashtable.fun"; "HashSet.fun"; "MutableList.fun"; "Queue.fun";
                                      "StringBuilder.fun"; "List.fun"; "Array.fun" |]
                     ordered

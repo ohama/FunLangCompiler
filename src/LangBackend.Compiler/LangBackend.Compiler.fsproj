@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\LangThree\src\LangThree\LangThree.fsproj" />
+    <ProjectReference Include="..\..\..\LangThree\src\FunLang\FunLang.fsproj" />
   </ItemGroup>
 
 </Project>
