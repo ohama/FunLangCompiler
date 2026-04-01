@@ -62,10 +62,10 @@ Plans:
   3. A program calling `show` on an Int/String compiles and prints the correct string representation
   4. A program calling `eq` on two values compiles and returns the correct boolean
   5. A program using `deriving Show` compiles and the auto-generated show function produces correct output
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 53-01-PLAN.md — Copy Typeclass.fun, update CLI Prelude loading, add E2E tests
+- [ ] 53-01-PLAN.md — Copy Typeclass.fun, enhance DerivingDecl expansion, update CLI loader, add E2E tests
 
 ## Progress
 
@@ -76,4 +76,4 @@ Plans:
 | 46. Context Hints & Unified Format | v11.0 | 1/1 | Complete | 2026-03-31 |
 | 51. AST Structure Sync | v13.0 | 1/1 | ✓ Complete | 2026-04-01 |
 | 52. Typeclass Elaboration | v13.0 | 1/1 | ✓ Complete | 2026-04-01 |
-| 53. Prelude Sync & E2E Tests | v13.0 | 0/TBD | Not started | - |
+| 53. Prelude Sync & E2E Tests | v13.0 | 0/1 | Not started | - |
