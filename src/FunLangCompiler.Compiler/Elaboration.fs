@@ -710,7 +710,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     // Phase 43: StripAnnot sees through Annot/LambdaAnnot wrappers from type annotations
-    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, _)), _)), inExpr, letSpan) ->
+    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, _)), _)), inExpr, letSpan)
+        when (match stripAnnot innerBody with Lambda _ -> false | _ -> true) ->
         // Step 1: Compute free variables of the inner lambda body relative to innerParam only.
         // These are variables that need to come from the closure environment struct.
         // outerParam IS one such variable — it's passed to the closure-maker and stored at env[1+i].
