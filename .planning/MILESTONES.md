@@ -236,6 +236,44 @@
 
 ---
 
+### v11.0 — Compiler Error Messages (2026-03-31)
+
+**Goal:** 컴파일러 에러 메시지에 소스 위치, 파서 에러 보존, MLIR 디버그, 컨텍스트 힌트, 에러 분류 추가
+
+**Phases:** 44–46 (4 plans, all verified)
+**Requirements:** 12/12 complete
+**Tests:** 217 FsLit E2E tests (15 new)
+
+**What shipped:**
+- failWithSpan 인프라: [Elaboration] file:line:col: message 형태
+- 파서 에러 보존: parseModule 실패 시 첫 번째 에러 유지
+- MLIR 디버그: mlir-opt/translate 실패 시 .mlir 파일 보존
+- 컨텍스트 힌트: Record/Field/Function 에러에 사용 가능한 항목 표시
+- 에러 분류: [Parse]/[Elaboration]/[Compile] 카테고리 구분
+
+---
+
+### v12.0 — Error Message Accuracy (2026-04-01)
+
+**Goal:** 에러 메시지의 줄 번호 정확성, 파서 에러 위치 추가, 테스트 안정성, 비교 연산 unboxing 버그 수정
+
+**Phases:** 47–50 (4 plans, all verified)
+**Tests:** 217 FsLit E2E tests
+
+**What shipped:**
+- Prelude 별도 파싱: 유저 코드 줄 번호가 1부터 시작 (was 174)
+- Parse error position: [Parse] file:line:col: parse error 형태
+- Error tests CHECK-RE: 7 에러 테스트를 정규식 매칭으로 전환
+- Unboxing comparison bug: ordinal comparison에 coerceToI64 추가
+
+**Key decisions validated:**
+- Two-phase parsing (preludeDecls @ userDecls, "<prelude>" filename) ✓
+- lastParsedPos mutable before try block (F# scoping rule) ✓
+- fslit CHECK-RE per-line matching ✓
+- coerceToI64 for ordinal comparisons, Equal/NotEqual unchanged ✓
+
+---
+
 ## Current
 
 Planning next milestone
