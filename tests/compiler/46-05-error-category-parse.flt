@@ -1,5 +1,5 @@
 // Test: Parse errors start with [Parse] prefix
-// --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-05-error-category-parse.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 46-05-error-category-parse.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
 CHECK-RE: \[Parse\] 46-05-error-category-parse\.fun:\d+:\d+: parse error

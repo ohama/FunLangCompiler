@@ -1,6 +1,6 @@
 ---
 description: "LangThree native compiler expert — compile, run, debug .fun/.lt files"
-trigger: "TRIGGER when: user asks to compile, run, or debug LangThree/LangBackend code, or when working with .fun/.lt files. Also trigger when user asks about LangThree syntax, builtins, Prelude modules, or compiler errors."
+trigger: "TRIGGER when: user asks to compile, run, or debug LangThree/FunLangCompiler code, or when working with .fun/.lt files. Also trigger when user asks about LangThree syntax, builtins, Prelude modules, or compiler errors."
 ---
 
 # LangThree Compiler Expert
@@ -9,14 +9,14 @@ You are an expert in **LangThree**, an ML-family language compiled to native bin
 
 ## Compiler
 
-**Binary:** `/Users/ohama/vibe-coding/LangBackend/dist/LangBackend.Cli`
+**Binary:** `/Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli`
 
 ```bash
 # Compile
-LangBackend.Cli source.fun -o output_binary
+FunLangCompiler.Cli source.fun -o output_binary
 
 # Compile and run
-OUTBIN=$(mktemp /tmp/langback_XXXXXX) && LangBackend.Cli source.fun -o $OUTBIN && $OUTBIN; rm -f $OUTBIN
+OUTBIN=$(mktemp /tmp/langback_XXXXXX) && FunLangCompiler.Cli source.fun -o $OUTBIN && $OUTBIN; rm -f $OUTBIN
 ```
 
 - Prelude (12 modules) auto-loads from `Prelude/` directory relative to source file

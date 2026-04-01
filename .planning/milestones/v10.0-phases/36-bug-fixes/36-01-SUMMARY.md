@@ -33,7 +33,7 @@ key-files:
     - tests/compiler/36-02-sequential-if.flt
     - tests/compiler/36-03-bool-and-or-while.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "FIX-02: use blocksAfterBind - 1 index instead of List.last to target outer merge block"
@@ -75,7 +75,7 @@ Each task was committed atomically:
 2. **Task 2: Write E2E tests for all three fixes** - `fab820d` (test)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - FIX-02 in Let/LetPat cases; FIX-03 in And/Or/WhileExpr/If cases
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - FIX-02 in Let/LetPat cases; FIX-03 in And/Or/WhileExpr/If cases
 - `tests/compiler/36-01-forin-mutable-capture.flt` - FIX-01 E2E test (for-in mutable capture)
 - `tests/compiler/36-02-sequential-if.flt` - FIX-02 E2E test (sequential if expressions)
 - `tests/compiler/36-03-bool-and-or-while.flt` - FIX-03 E2E test (And/Or/While with I1-typed helper functions)
@@ -93,7 +93,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (FIX-03 implementation)
 - **Issue:** Plan specified coercing And/Or operands to I1, but when And/Or is used as condition to `If`, the condOps include a `CfCondBrOp` terminator. The If case then appended another `CfCondBrOp` inline, creating two terminators in the same block (mlir-opt error: "operation with block successors must terminate its parent block").
 - **Fix:** Added terminator detection to the `If` case (mirroring FIX-02 Let/LetPat logic): if `condOps` ends with a terminator and blocks were added during condition elaboration, patch the If's `CfCondBrOp` into the condition's merge block (at `blocksAfterCond - 1`).
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** `if always_true () && always_true () then ... else ...` compiles and runs correctly
 - **Committed in:** df729f8 (Task 1 commit)
 

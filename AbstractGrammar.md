@@ -1,9 +1,9 @@
-# LangBackend Abstract Grammar
+# FunLangCompiler Abstract Grammar
 
 ## 소개
 
-이 문서는 LangBackend 컴파일러가 지원하는 추상 문법을 정의한다.
-LangBackend는 LangThree의 파서/AST를 재사용하며, `Elaboration.fs`에서 AST를 MLIR IR로 변환한다.
+이 문서는 FunLangCompiler 컴파일러가 지원하는 추상 문법을 정의한다.
+FunLangCompiler는 LangThree의 파서/AST를 재사용하며, `Elaboration.fs`에서 AST를 MLIR IR로 변환한다.
 따라서 **파싱 가능한 문법은 LangThree와 동일**하며, 이 문서는 컴파일러가 실제로 코드 생성하는 범위를 기술한다.
 
 ---
@@ -81,7 +81,7 @@ op_name  ::= INFIXOP0 | INFIXOP1 | INFIXOP2 | INFIXOP3 | INFIXOP4
 
 ### 2.1 모듈 시스템 (Module System)
 
-LangBackend의 모듈 시스템은 **컴파일 타임 AST 평탄화**로 구현된다. 런타임 모듈 객체는 없다.
+FunLangCompiler의 모듈 시스템은 **컴파일 타임 AST 평탄화**로 구현된다. 런타임 모듈 객체는 없다.
 
 #### 모듈 선언 (Module Declaration)
 
@@ -351,7 +351,7 @@ atomic_type ::= 'int' | 'bool' | 'string' | 'char' | 'unit'
               | '(' type_expr ')'
 ```
 
-**주의:** 타입 표현식은 파싱되지만 코드 생성 시 무시된다. LangBackend는 균일 표현(uniform representation: I64/I1/Ptr)을 사용하며 런타임 타입 검사를 수행하지 않는다.
+**주의:** 타입 표현식은 파싱되지만 코드 생성 시 무시된다. FunLangCompiler는 균일 표현(uniform representation: I64/I1/Ptr)을 사용하며 런타임 타입 검사를 수행하지 않는다.
 
 **파라미터/반환 타입 어노테이션:** 파서는 `let f (x : int) : bool = ...` 형태를 완전히 지원한다. AST에서 `Annot`(반환 타입)과 `LambdaAnnot`(파라미터 타입)으로 표현되며, Elaboration.fs에서 래퍼를 벗겨 내부 표현식만 코드 생성한다. 단, `Annot`/`LambdaAnnot` 래퍼가 `elaborateExpr`의 핵심 패턴 매칭(2-lambda KnownFuncs 인식, LetRec 반환 타입 결정 등)을 방해하는 알려진 버그가 있다. 자세한 내용은 `survey/funlexyacc-type-annotation-incompatibility.md` Section 8 참조.
 
@@ -379,7 +379,7 @@ atomic_type ::= 'int' | 'bool' | 'string' | 'char' | 'unit'
 
 ## 7. 내장 함수 (Built-in Functions)
 
-LangBackend는 89개의 내장 함수를 `elaborateExpr`에서 직접 패턴 매치하여 컴파일한다.
+FunLangCompiler는 89개의 내장 함수를 `elaborateExpr`에서 직접 패턴 매치하여 컴파일한다.
 
 ### 7.1 I/O
 
@@ -464,7 +464,7 @@ LangBackend는 89개의 내장 함수를 `elaborateExpr`에서 직접 패턴 매
 
 ### 다른 부분 (Differences)
 
-| 영역 | LangThree | LangBackend | 이유 |
+| 영역 | LangThree | FunLangCompiler | 이유 |
 |------|-----------|-------------|------|
 | 실행 방식 | 트리-워킹 인터프리터 | MLIR → LLVM → 네이티브 바이너리 | 핵심 아키텍처 차이 |
 | 타입 검사 | HM 타입 추론 (`Infer.fs`, `Bidir.fs`) | 없음 (균일 표현 I64/Ptr) | 코드 생성에 불필요 |

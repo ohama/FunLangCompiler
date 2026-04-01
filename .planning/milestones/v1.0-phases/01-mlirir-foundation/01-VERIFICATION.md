@@ -29,11 +29,11 @@ score: 4/4 must-haves verified
 
 | Artifact                                            | Expected                                         | Status     | Details                                          |
 | --------------------------------------------------- | ------------------------------------------------ | ---------- | ------------------------------------------------ |
-| `src/LangBackend.Compiler/MlirIR.fs`               | F# DU types for MLIR IR + hardcoded return42     | ✓ VERIFIED | 70 lines; exports `MlirType`, `MlirValue`, `MlirOp`, `MlirBlock`, `MlirRegion`, `FuncOp`, `MlirModule`, `return42Module`; no stubs |
-| `src/LangBackend.Compiler/Printer.fs`              | Pure serializer; no I/O                          | ✓ VERIFIED | 55 lines; exports `printModule`; used by `Pipeline.fs` line 60; no stubs |
-| `src/LangBackend.Compiler/Pipeline.fs`             | Shell orchestration via `System.Diagnostics.Process` | ✓ VERIFIED | 82 lines; uses `ProcessStartInfo`/`Process`; all three tools wired in sequence; exports `compile` and `CompileError` |
-| `src/LangBackend.Cli/Program.fs`                   | Console app entry point calling `Pipeline.compile` | ✓ VERIFIED | 29 lines; `[<EntryPoint>]` calls `Pipeline.compile MlirIR.return42Module`; error cases handled |
-| `src/LangBackend.Cli/LangBackend.Cli.fsproj`       | Console project referencing compiler             | ✓ VERIFIED | `OutputType=Exe`; `ProjectReference` to `LangBackend.Compiler.fsproj`; builds successfully (0 warnings, 0 errors) |
+| `src/FunLangCompiler.Compiler/MlirIR.fs`               | F# DU types for MLIR IR + hardcoded return42     | ✓ VERIFIED | 70 lines; exports `MlirType`, `MlirValue`, `MlirOp`, `MlirBlock`, `MlirRegion`, `FuncOp`, `MlirModule`, `return42Module`; no stubs |
+| `src/FunLangCompiler.Compiler/Printer.fs`              | Pure serializer; no I/O                          | ✓ VERIFIED | 55 lines; exports `printModule`; used by `Pipeline.fs` line 60; no stubs |
+| `src/FunLangCompiler.Compiler/Pipeline.fs`             | Shell orchestration via `System.Diagnostics.Process` | ✓ VERIFIED | 82 lines; uses `ProcessStartInfo`/`Process`; all three tools wired in sequence; exports `compile` and `CompileError` |
+| `src/FunLangCompiler.Cli/Program.fs`                   | Console app entry point calling `Pipeline.compile` | ✓ VERIFIED | 29 lines; `[<EntryPoint>]` calls `Pipeline.compile MlirIR.return42Module`; error cases handled |
+| `src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj`       | Console project referencing compiler             | ✓ VERIFIED | `OutputType=Exe`; `ProjectReference` to `FunLangCompiler.Compiler.fsproj`; builds successfully (0 warnings, 0 errors) |
 | `tests/compiler/01-return42.flt`                   | FsLit smoke test for full E2E pipeline           | ✓ VERIFIED | 5 lines; command uses `mktemp`+`dotnet run`; input `42`; expected output `42`; test passes live |
 
 ### Key Link Verification
@@ -46,7 +46,7 @@ score: 4/4 must-haves verified
 | `Pipeline.fs` | `clang` (tool) | `runTool Clang` line 77 | ✓ WIRED | `-Wno-override-module` flag; exit 0 checked; produces ELF |
 | `Program.fs` | `Pipeline.compile` | direct call line 18 | ✓ WIRED | `Pipeline.compile MlirIR.return42Module outputPath` |
 | `Program.fs` | `MlirIR.return42Module` | direct reference line 18 | ✓ WIRED | hardcoded IR value passed to compile |
-| `01-return42.flt` | `LangBackend.Cli` project | `dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj` | ✓ WIRED | FsLit command drives CLI; binary executed; exit code captured by `echo $?` |
+| `01-return42.flt` | `FunLangCompiler.Cli` project | `dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj` | ✓ WIRED | FsLit command drives CLI; binary executed; exit code captured by `echo $?` |
 
 ### Requirements Coverage
 

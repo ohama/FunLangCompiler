@@ -1,4 +1,4 @@
-# Milestones: LangBackend
+# Milestones: FunLangCompiler
 
 ## Completed
 
@@ -276,7 +276,7 @@
 
 ### v13.0 — LangThree Typeclass Sync (2026-04-01)
 
-**Goal:** LangThree v10.0-v12.0에서 추가된 AST 구조 변경과 Typeclass 컴파일 지원을 LangBackend에 반영
+**Goal:** LangThree v10.0-v12.0에서 추가된 AST 구조 변경과 Typeclass 컴파일 지원을 FunLangCompiler에 반영
 
 **Phases:** 51–53 (3 plans, all verified)
 **Tests:** 222+ FsLit E2E tests (5 new typeclass tests)

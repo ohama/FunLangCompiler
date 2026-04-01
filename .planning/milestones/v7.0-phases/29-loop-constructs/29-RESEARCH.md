@@ -30,15 +30,15 @@ the same `env.Blocks.Value <- ...` side-effecting block accumulation pattern use
 
 ## Standard Stack
 
-This phase is entirely internal to the LangBackend compiler. There are no new
+This phase is entirely internal to the FunLangCompiler compiler. There are no new
 library dependencies.
 
 ### Core
 | Component | Location | Purpose | Why This |
 |-----------|----------|---------|----------|
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | Main elaboration logic | Only file to change for codegen |
-| `MlirIR.fs` | `src/LangBackend.Compiler/` | IR data types | No changes needed — `CfBrOp`/`CfCondBrOp`/`ArithConstantOp`/`ArithCmpIOp`/`ArithAddIOp`/`ArithSubIOp` already exist |
-| `Printer.fs` | `src/LangBackend.Compiler/` | MLIR text serializer | No changes needed — block args already printed |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Main elaboration logic | Only file to change for codegen |
+| `MlirIR.fs` | `src/FunLangCompiler.Compiler/` | IR data types | No changes needed — `CfBrOp`/`CfCondBrOp`/`ArithConstantOp`/`ArithCmpIOp`/`ArithAddIOp`/`ArithSubIOp` already exist |
+| `Printer.fs` | `src/FunLangCompiler.Compiler/` | MLIR text serializer | No changes needed — block args already printed |
 | `tests/compiler/` | repo root | E2E `.flt` test fixtures | New `29-*.flt` files needed |
 
 ### Alternatives Considered
@@ -435,7 +435,7 @@ entry ops alongside the start/stop elaboration.
 ### Test Fixture Format
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let x = ref 0 in
 while !x < 3 do
@@ -495,11 +495,11 @@ tests that don't require mutable vars, use a simple bounded loop or print loop.)
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` —
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` —
   complete `elaborateExpr` function, `freeVars`, `If`/`And`/`Or`/`TryWith` block patterns
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` —
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` —
   complete `MlirOp` DU, `MlirBlock` with `Args`, `CfBrOp`/`CfCondBrOp` signatures
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Printer.fs` —
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` —
   `printBlock` showing block argument formatting already implemented
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` —
   `WhileExpr`/`ForExpr` AST shapes confirmed (lines 116-117)

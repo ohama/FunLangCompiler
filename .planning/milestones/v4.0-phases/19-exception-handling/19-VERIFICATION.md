@@ -31,11 +31,11 @@ score: 6/6 must-haves verified
 
 | Artifact                                            | Expected                                          | Status      | Details                                                                      |
 | --------------------------------------------------- | ------------------------------------------------- | ----------- | ---------------------------------------------------------------------------- |
-| `src/LangBackend.Compiler/lang_runtime.h`           | LangExnFrame struct, function declarations        | ✓ VERIFIED  | 28 lines; LangExnFrame with jmp_buf+prev; lang_try_push/exit/throw/current_exception declared |
-| `src/LangBackend.Compiler/lang_runtime.c`           | setjmp/longjmp handler stack implementation       | ✓ VERIFIED  | 157 lines; lang_exn_top global; lang_try_push (stack link), lang_try_exit (pop), lang_throw (_longjmp), lang_current_exception |
-| `src/LangBackend.Compiler/Elaboration.fs`           | Raise case, TryWith case, appendReturnIfNeeded    | ✓ VERIFIED  | 2025 lines; Raise at line 1483, TryWith at line 1500, appendReturnIfNeeded at line 1843, prePassDecls dual-write at line 1922 |
-| `src/LangBackend.Compiler/MlirIR.fs`               | Attrs field on ExternalFuncDecl                   | ✓ VERIFIED  | Attrs: string list at line 27; used for returns_twice on @_setjmp            |
-| `src/LangBackend.Compiler/Printer.fs`               | Emit attributes string for external decls         | ✓ VERIFIED  | Attrs emission at lines 25-26                                                 |
+| `src/FunLangCompiler.Compiler/lang_runtime.h`           | LangExnFrame struct, function declarations        | ✓ VERIFIED  | 28 lines; LangExnFrame with jmp_buf+prev; lang_try_push/exit/throw/current_exception declared |
+| `src/FunLangCompiler.Compiler/lang_runtime.c`           | setjmp/longjmp handler stack implementation       | ✓ VERIFIED  | 157 lines; lang_exn_top global; lang_try_push (stack link), lang_try_exit (pop), lang_throw (_longjmp), lang_current_exception |
+| `src/FunLangCompiler.Compiler/Elaboration.fs`           | Raise case, TryWith case, appendReturnIfNeeded    | ✓ VERIFIED  | 2025 lines; Raise at line 1483, TryWith at line 1500, appendReturnIfNeeded at line 1843, prePassDecls dual-write at line 1922 |
+| `src/FunLangCompiler.Compiler/MlirIR.fs`               | Attrs field on ExternalFuncDecl                   | ✓ VERIFIED  | Attrs: string list at line 27; used for returns_twice on @_setjmp            |
+| `src/FunLangCompiler.Compiler/Printer.fs`               | Emit attributes string for external decls         | ✓ VERIFIED  | Attrs emission at lines 25-26                                                 |
 | `tests/compiler/19-01-raise-unhandled.flt`          | Unhandled raise aborts with "Fatal: unhandled exception" | ✓ VERIFIED | 7 lines; test passes                                                         |
 | `tests/compiler/19-02-raise-payload.flt`            | User-defined exception raise aborts correctly     | ✓ VERIFIED  | 7 lines; test passes                                                          |
 | `tests/compiler/19-03-try-basic.flt`                | Basic TryWith catch round-trip                    | ✓ VERIFIED  | 10 lines; test passes (outputs 1 = string_length "x")                        |

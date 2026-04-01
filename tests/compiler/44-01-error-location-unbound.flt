@@ -1,5 +1,5 @@
 // Test: Error location for unbound variable includes file:line:col
-// --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 44-01-error-location-unbound.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 44-01-error-location-unbound.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
 CHECK-RE: \[Elaboration\] 44-01-error-location-unbound\.fun:\d+:\d+: Elaboration: unbound variable 'y'

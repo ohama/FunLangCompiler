@@ -38,9 +38,9 @@ key-files:
     - tests/compiler/34-07-forin-queue.flt
     - tests/compiler/34-08-forin-mutablelist.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "E2E tests avoid mutable-capture-in-closures (pre-existing segfault bug): single-element tests for non-deterministic collections (HashSet/Hashtable), ordered multi-element for Queue/MutableList"
@@ -84,9 +84,9 @@ completed: 2026-03-29
 2. **Task 2: CollectionVars + ForInExpr dispatch + TuplePat + externalFuncs + E2E tests** - `c17b2c1` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - Four for-in functions after lang_for_in (hashset/queue/mlist/hashtable)
-- `src/LangBackend.Compiler/lang_runtime.h` - Four prototypes after Phase 33 typedefs
-- `src/LangBackend.Compiler/Elaboration.fs` - CollectionKind, CollectionVars, detectCollectionKind, ForInExpr + LetPat fixes, externalFuncs
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Four for-in functions after lang_for_in (hashset/queue/mlist/hashtable)
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Four prototypes after Phase 33 typedefs
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - CollectionKind, CollectionVars, detectCollectionKind, ForInExpr + LetPat fixes, externalFuncs
 - `tests/compiler/34-05-forin-tuple-ht.flt` - Hashtable (k,v) tuple destructuring
 - `tests/compiler/34-06-forin-hashset.flt` - HashSet element iteration
 - `tests/compiler/34-07-forin-queue.flt` - Queue FIFO iteration (3 elements, ordered)
@@ -106,7 +106,7 @@ completed: 2026-03-29
 - **Found during:** Task 1
 - **Issue:** Adding lang_for_in_hashset/etc. prototypes at line ~62 (before struct typedefs) caused forward-reference to undefined LangHashSet/LangQueue types
 - **Fix:** Moved prototypes to after Phase 33 typedef section at end of header
-- **Files modified:** src/LangBackend.Compiler/lang_runtime.h
+- **Files modified:** src/FunLangCompiler.Compiler/lang_runtime.h
 - **Verification:** Build succeeded with no clang errors
 - **Committed in:** 0a596b0
 

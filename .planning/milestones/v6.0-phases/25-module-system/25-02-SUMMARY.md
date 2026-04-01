@@ -31,7 +31,7 @@ key-files:
     - tests/compiler/25-07-qualified-ctor.flt
     - tests/compiler/25-08-qualified-func.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
     - tests/compiler/25-01-module-basic.flt
 
 key-decisions:
@@ -78,7 +78,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Added FieldAccess desugar arm (Phase 25 comment) + App-level desugar arm with TypeEnv guard
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added FieldAccess desugar arm (Phase 25 comment) + App-level desugar arm with TypeEnv guard
 - `tests/compiler/25-06-qualified-var.flt` - Config.x + Config.y → 42 (qualified value)
 - `tests/compiler/25-07-qualified-ctor.flt` - Shapes.Circle 5 match → 5 (qualified constructor)
 - `tests/compiler/25-08-qualified-func.flt` - Math.add 3 4 → 7, Math.double 10 → 20 (qualified functions)
@@ -98,7 +98,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (testing qualified name desugar)
 - **Issue:** Plan's FieldAccess desugar alone handled M.x (values) and M.Ctor (constructors) but not M.f arg (functions). Functions are in KnownFuncs, not env.Vars — `Var("f", span)` evaluated standalone fails with "unbound variable"
 - **Fix:** Added `App(FieldAccess(Constructor(_,None,_), memberName, fspan), argExpr, span) when not (Map.containsKey memberName env.TypeEnv)` arm before general App handler, rewrites to `App(Var(memberName, fspan), argExpr, span)` so direct-call dispatch applies
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Math.add 3 4 = 7, Math.double 10 = 20; all 100 tests pass
 - **Committed in:** c15fd30 (between Task 1 and Task 2)
 

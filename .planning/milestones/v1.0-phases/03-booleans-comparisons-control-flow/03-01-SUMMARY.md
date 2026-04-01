@@ -33,9 +33,9 @@ key-files:
     - tests/compiler/03-01-bool-literal.flt
     - tests/compiler/03-02-comparison.flt
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "arith.cmpi type annotation uses the operand type (i64), not the result type (i1) — matches MLIR spec"
@@ -77,9 +77,9 @@ Each task was committed atomically:
 2. **Task 2: FsLit E2E tests for bool literal and comparison operator** - `aaf8a0b` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added ArithCmpIOp, CfCondBrOp, CfBrOp to MlirOp DU
-- `src/LangBackend.Compiler/Printer.fs` - Added printOp cases for cmpi, cond_br, br
-- `src/LangBackend.Compiler/Elaboration.fs` - Bool/comparison elaboration, dynamic ReturnType
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added ArithCmpIOp, CfCondBrOp, CfBrOp to MlirOp DU
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added printOp cases for cmpi, cond_br, br
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Bool/comparison elaboration, dynamic ReturnType
 - `tests/compiler/03-01-bool-literal.flt` - E2E test: `true` exits 1
 - `tests/compiler/03-02-comparison.flt` - E2E test: `3 < 5` exits 1
 
@@ -96,7 +96,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (build verification)
 - **Issue:** `fmtArgs` local function's lambda parameter `v` was resolved by F# compiler as `FuncOp` (both `FuncOp` and `MlirValue` have a `Name` field); caused 5 build errors
 - **Fix:** Added explicit `(args: MlirValue list)` and `(v: MlirValue)` type annotations to `fmtArgs` lambdas in CfCondBrOp and CfBrOp printer cases
-- **Files modified:** src/LangBackend.Compiler/Printer.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Printer.fs
 - **Verification:** `dotnet build` succeeded with 0 warnings, 0 errors
 - **Committed in:** 6451305 (Task 1 commit)
 

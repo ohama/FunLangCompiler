@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 40 adds `open "file.fun"` support to the LangBackend compiler (no C runtime changes). The AST node `Ast.Decl.FileImportDecl of path: string * Span` already exists in the shared `LangThree/src/LangThree/Ast.fs` and the parser already emits it. The backend's `Elaboration.fs` currently silently drops `FileImportDecl` in both `prePassDecls` and `extractMainExpr`. The fix is entirely in the compiler pipeline: before elaboration, recursively expand each `FileImportDecl` into the declarations of the imported file, tracking a visited-file set to detect cycles.
+Phase 40 adds `open "file.fun"` support to the FunLangCompiler compiler (no C runtime changes). The AST node `Ast.Decl.FileImportDecl of path: string * Span` already exists in the shared `LangThree/src/LangThree/Ast.fs` and the parser already emits it. The backend's `Elaboration.fs` currently silently drops `FileImportDecl` in both `prePassDecls` and `extractMainExpr`. The fix is entirely in the compiler pipeline: before elaboration, recursively expand each `FileImportDecl` into the declarations of the imported file, tracking a visited-file set to detect cycles.
 
 The LangThree interpreter (`Prelude.fs`) already implements the complete reference pattern: a `HashSet<string>` loading stack for cycle detection, relative path resolution via `Path.GetFullPath(Path.Combine(dir, importPath))`, recursive parse-and-merge, and a `finally`-block to pop the stack on exit. The backend can follow the same pattern but at the Decl-list level (not at evaluation time) — expanding `FileImportDecl` nodes into inline `Decl list` before `elaborateProgram` runs.
 
@@ -37,13 +37,13 @@ This phase uses no new libraries. All tools are already in the project.
 
 ### Recommended Implementation Location
 
-The expansion happens in `Program.fs` (LangBackend.Cli), not inside `Elaboration.fs`. Reason: the expansion is I/O-bound (reads files) and the compiler proper (`Elaboration.fs`) is pure. Keeping I/O at the boundary is cleaner.
+The expansion happens in `Program.fs` (FunLangCompiler.Cli), not inside `Elaboration.fs`. Reason: the expansion is I/O-bound (reads files) and the compiler proper (`Elaboration.fs`) is pure. Keeping I/O at the boundary is cleaner.
 
 ```
-LangBackend.Cli/
+FunLangCompiler.Cli/
 └── Program.fs          # Add expandImports + resolveImportPath here
 
-LangBackend.Compiler/
+FunLangCompiler.Compiler/
 └── Elaboration.fs      # No changes needed — prePassDecls already handles unknown decls with | _ -> ()
 ```
 
@@ -225,7 +225,7 @@ let _ = println (to_string (add 1 2))
 
 For multi-file tests, use a temp directory + write both files before compiling:
 ```
-// --- Command: bash -c 'D=$(mktemp -d) && cat > $D/utils.fun << '"'"'EOF'"'"'\nlet add a b = a + b\nEOF\nOUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- $D/main.fun -o $OUTBIN && $OUTBIN; echo $?; rm -rf $D $OUTBIN'
+// --- Command: bash -c 'D=$(mktemp -d) && cat > $D/utils.fun << '"'"'EOF'"'"'\nlet add a b = a + b\nEOF\nOUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- $D/main.fun -o $OUTBIN && $OUTBIN; echo $?; rm -rf $D $OUTBIN'
 ```
 
 ## State of the Art
@@ -256,8 +256,8 @@ For multi-file tests, use a temp directory + write both files before compiling:
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Prelude.fs` — Full reference implementation of file import loading, cycle detection, path resolution
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/TypeCheck.fs` lines 725-733 — `resolveImportPath` function
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` lines 362-365 — `FileImportDecl` AST node definition
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` lines 3630-3733 — `prePassDecls`, `flattenDecls`, `extractMainExpr` — all silently ignore `FileImportDecl`
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Cli/Program.fs` — Current pipeline: string concat prelude → parseProgram → elaborateProgram
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` lines 3630-3733 — `prePassDecls`, `flattenDecls`, `extractMainExpr` — all silently ignore `FileImportDecl`
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` — Current pipeline: string concat prelude → parseProgram → elaborateProgram
 
 ### Secondary (MEDIUM confidence)
 - LangThree Parser.fs lines 3301/3313 — confirms parser emits `FileImportDecl` for `open "string"` syntax

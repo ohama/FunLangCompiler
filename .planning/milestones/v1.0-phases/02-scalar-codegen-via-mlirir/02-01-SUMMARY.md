@@ -29,13 +29,13 @@ tech-stack:
 
 key-files:
   created:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
     - tests/compiler/02-01-literal.flt
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/LangBackend.Compiler.fsproj
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj
+    - src/FunLangCompiler.Cli/Program.fs
 
 key-decisions:
   - "Elaboration.fs placed after Printer.fs in .fsproj (F# compilation order: depends on MlirIR and Ast)"
@@ -82,11 +82,11 @@ Each task was committed atomically:
 2. **Task 2: Wire CLI to parse .lt files and call Elaboration, add FsLit literal test** - `1c45a05` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - New elaboration pass: ElabEnv, freshName, elaborateExpr, elaborateModule
-- `src/LangBackend.Compiler/MlirIR.fs` - Added ArithAddIOp, ArithSubIOp, ArithMulIOp, ArithDivSIOp to MlirOp DU
-- `src/LangBackend.Compiler/Printer.fs` - Added printOp cases for addi, subi, muli, divsi
-- `src/LangBackend.Compiler/LangBackend.Compiler.fsproj` - Added Elaboration.fs compile entry after Printer.fs
-- `src/LangBackend.Cli/Program.fs` - Replaced hardcoded return42Module with parseExpr + Elaboration.elaborateModule
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - New elaboration pass: ElabEnv, freshName, elaborateExpr, elaborateModule
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added ArithAddIOp, ArithSubIOp, ArithMulIOp, ArithDivSIOp to MlirOp DU
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added printOp cases for addi, subi, muli, divsi
+- `src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` - Added Elaboration.fs compile entry after Printer.fs
+- `src/FunLangCompiler.Cli/Program.fs` - Replaced hardcoded return42Module with parseExpr + Elaboration.elaborateModule
 - `tests/compiler/02-01-literal.flt` - FsLit test for integer literal 7 end-to-end
 
 ## Decisions Made

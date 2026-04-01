@@ -32,7 +32,7 @@ re_verification: false
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | WhileExpr + ForExpr elaboration and freeVars cases | VERIFIED | 2848 lines. WhileExpr at lines 170, 2437. ForExpr at lines 172, 2508. No stubs. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | WhileExpr + ForExpr elaboration and freeVars cases | VERIFIED | 2848 lines. WhileExpr at lines 170, 2437. ForExpr at lines 172, 2508. No stubs. |
 | `tests/compiler/29-01-while-basic.flt` | While basic counter | VERIFIED | Exists, 8 lines, passes |
 | `tests/compiler/29-02-while-mutable.flt` | While accumulation | VERIFIED | Exists, 10 lines, passes |
 | `tests/compiler/29-03-while-nested.flt` | Nested while loops | VERIFIED | Exists, 13 lines, passes |
@@ -79,7 +79,7 @@ None. All success criteria are mechanically verifiable via test execution. 138/1
 
 ## Summary
 
-Phase 29 fully achieves its goal. Both WhileExpr (while loops) and ForExpr (for loops, ascending and descending) are implemented in `src/LangBackend.Compiler/Elaboration.fs` using MLIR CFG block patterns — WhileExpr uses a 3-block header/body/exit pattern with mutable-safe condition re-elaboration; ForExpr uses a block-argument pattern where the loop counter is carried as a block argument `%i : i64`.
+Phase 29 fully achieves its goal. Both WhileExpr (while loops) and ForExpr (for loops, ascending and descending) are implemented in `src/FunLangCompiler.Compiler/Elaboration.fs` using MLIR CFG block patterns — WhileExpr uses a 3-block header/body/exit pattern with mutable-safe condition re-elaboration; ForExpr uses a block-argument pattern where the loop counter is carried as a block argument `%i : i64`.
 
 Key correctness properties confirmed:
 - Nested loops work via back-edge patching into the inner merge block

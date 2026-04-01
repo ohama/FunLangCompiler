@@ -35,7 +35,7 @@ The tools are confirmed present at `/usr/local/bin/mlir-opt`, `/usr/local/bin/ml
 | Tool | Version | Purpose | When to Use |
 |------|---------|---------|-------------|
 | FsLit (`fslit`) | — | `.flt` file-based E2E test runner | TEST-01: compile → run → verify exit code |
-| LangThree.fsproj | project ref | Frontend AST, type checker reuse | CLI-02: reference from LangBackend.Compiler |
+| LangThree.fsproj | project ref | Frontend AST, type checker reuse | CLI-02: reference from FunLangCompiler.Compiler |
 
 ### Alternatives Considered
 
@@ -62,12 +62,12 @@ The tools are confirmed present at `/usr/local/bin/mlir-opt`, `/usr/local/bin/ml
 
 ```
 src/
-├── LangBackend.Compiler/
+├── FunLangCompiler.Compiler/
 │   ├── MlirIR.fs          # F# DU: Module, FuncOp, Block, Op, Value, Type
 │   ├── Printer.fs         # MlirIR -> .mlir text string (pure, no I/O)
 │   ├── Pipeline.fs        # System.Diagnostics.Process calls: mlir-opt, mlir-translate, clang
-│   └── LangBackend.Compiler.fsproj
-└── LangBackend.Cli/
+│   └── FunLangCompiler.Compiler.fsproj
+└── FunLangCompiler.Cli/
     └── Program.fs         # CLI driver (Phase 6 concern; in Phase 1 only used for smoke test)
 tests/
 └── compiler/
@@ -219,14 +219,14 @@ let compileMlir (mlirText: string) (outputBinary: string) : Result<unit, Pipelin
 For Phase 1, before there is a real CLI, the test can hardcode the `.mlir` generation:
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/r42_XXXXXX) && dotnet run --project /path/to/LangBackend.Cli -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/r42_XXXXXX) && dotnet run --project /path/to/FunLangCompiler.Cli -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 return 42
 // --- Output:
 42
 ```
 
-**Key insight about FsLit:** FsLit compares stdout of the command against `// --- Output:`. It does NOT have a native "exit code" assertion. The convention is: `$OUTBIN; echo $?` appends the exit code as the last line of stdout, then `// --- Output:` contains `42`. This is the standard LangBackend testing pattern.
+**Key insight about FsLit:** FsLit compares stdout of the command against `// --- Output:`. It does NOT have a native "exit code" assertion. The convention is: `$OUTBIN; echo $?` appends the exit code as the last line of stdout, then `// --- Output:` contains `42`. This is the standard FunLangCompiler testing pattern.
 
 ### Anti-Patterns to Avoid
 
@@ -544,14 +544,14 @@ let compile (m: MlirIR.MlirModule) (outputPath: string) : Result<unit, CompileEr
 ## Open Questions
 
 1. **dotnet solution structure**
-   - What we know: No `.sln` or `.fsproj` files exist yet in LangBackend
-   - What's unclear: Should CLI be in `LangBackend.Cli` or `FunLang.Compiler.Cli` (there was an untracked `src/FunLang.Compiler.Cli/` in git status)?
-   - Recommendation: The planner should create `src/LangBackend.Compiler/` (library) + `src/LangBackend.Cli/` (console). The git status shows an orphaned `src/FunLang.Compiler.Cli/` directory — either clean it up or use that naming convention; pick one and be consistent.
+   - What we know: No `.sln` or `.fsproj` files exist yet in FunLangCompiler
+   - What's unclear: Should CLI be in `FunLangCompiler.Cli` or `FunLang.Compiler.Cli` (there was an untracked `src/FunLang.Compiler.Cli/` in git status)?
+   - Recommendation: The planner should create `src/FunLangCompiler.Compiler/` (library) + `src/FunLangCompiler.Cli/` (console). The git status shows an orphaned `src/FunLang.Compiler.Cli/` directory — either clean it up or use that naming convention; pick one and be consistent.
 
 2. **FsLit test for Phase 1 before CLI exists**
    - What we know: FsLit requires a command that can run. In Phase 1, there's no CLI binary yet.
    - What's unclear: Should the FsLit test use `dotnet run --project ...` or wait for a proper CLI?
-   - Recommendation: Use `dotnet run --project src/LangBackend.Cli -- %input -o $OUTBIN` in the `.flt` command. This is slower but avoids publishing a binary in Phase 1.
+   - Recommendation: Use `dotnet run --project src/FunLangCompiler.Cli -- %input -o $OUTBIN` in the `.flt` command. This is slower but avoids publishing a binary in Phase 1.
 
 3. **`main() -> i64` vs `main() -> i32`**
    - What we know: Both work on this system; `i64` return from `@main` is truncated to 8 bits by the OS exit code mechanism. `i32` is the C standard for `main`.

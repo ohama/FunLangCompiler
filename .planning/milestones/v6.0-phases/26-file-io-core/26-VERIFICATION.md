@@ -33,9 +33,9 @@ gaps: []
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/lang_runtime.c` | 6 C functions: lang_file_read/write/append/exists, lang_eprint/eprintln | VERIFIED | All 6 functions present at lines 395-453; substantive implementations (fopen/fread/fwrite/fclose/fseek/ftell/fflush/lang_throw); no stubs |
-| `src/LangBackend.Compiler/lang_runtime.h` | Declarations for 6 new C functions | VERIFIED | All 6 declarations at lines 62-67; correct signatures matching implementations |
-| `src/LangBackend.Compiler/Elaboration.fs` | ExternalFuncDecl entries in BOTH lists + 6 elaborateExpr arms | VERIFIED | Both ExternalFuncDecl lists updated (lines 2376-2381, 2553-2558); 6 elaborateExpr arms at lines 1045-1092 |
+| `src/FunLangCompiler.Compiler/lang_runtime.c` | 6 C functions: lang_file_read/write/append/exists, lang_eprint/eprintln | VERIFIED | All 6 functions present at lines 395-453; substantive implementations (fopen/fread/fwrite/fclose/fseek/ftell/fflush/lang_throw); no stubs |
+| `src/FunLangCompiler.Compiler/lang_runtime.h` | Declarations for 6 new C functions | VERIFIED | All 6 declarations at lines 62-67; correct signatures matching implementations |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | ExternalFuncDecl entries in BOTH lists + 6 elaborateExpr arms | VERIFIED | Both ExternalFuncDecl lists updated (lines 2376-2381, 2553-2558); 6 elaborateExpr arms at lines 1045-1092 |
 | `tests/compiler/26-01-write-read.flt` | write+read round-trip test | VERIFIED | Exists, correct input/output, passes |
 | `tests/compiler/26-02-file-exists-true.flt` | file_exists true test | VERIFIED | Exists, correct input/output, passes |
 | `tests/compiler/26-03-file-exists-false.flt` | file_exists false test | VERIFIED | Exists, correct input/output, passes |

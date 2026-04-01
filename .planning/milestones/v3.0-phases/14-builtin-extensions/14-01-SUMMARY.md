@@ -43,8 +43,8 @@ key-files:
     - tests/compiler/14-05-char-to-int.flt
     - tests/compiler/14-06-println-variable.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "char_to_int and int_to_char are identity operations — char is already i64 in MLIR"
@@ -91,8 +91,8 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.c` - Added lang_failwith, lang_string_sub, lang_string_contains, lang_string_to_int
-- `src/LangBackend.Compiler/Elaboration.fs` - Added 7 new builtin App cases and 4 ExternalFuncDecl entries
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added lang_failwith, lang_string_sub, lang_string_contains, lang_string_to_int
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added 7 new builtin App cases and 4 ExternalFuncDecl entries
 - `tests/compiler/14-01-failwith.flt` - BLT-01: failwith exits 1
 - `tests/compiler/14-02-string-sub.flt` - BLT-02: string_sub extracts "world" (length 5)
 - `tests/compiler/14-03-string-contains.flt` - BLT-03: string_contains returns true

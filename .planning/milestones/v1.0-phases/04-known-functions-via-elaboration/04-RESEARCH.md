@@ -52,7 +52,7 @@ The LangThree parser's `LetRec` case (single-parameter recursive binding) is alr
 ### Recommended Project Structure
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── MlirIR.fs          # Add DirectCallOp to MlirOp DU
 ├── Printer.fs         # Add printOp case for DirectCallOp
 ├── Elaboration.fs     # Extend ElabEnv; handle LetRec and App
@@ -471,10 +471,10 @@ All MLIR patterns tested with `mlir-opt 20.1.4` + `mlir-translate` + `clang`, fu
 
 ### Secondary (HIGH confidence — project source)
 
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — `MlirModule.Funcs: FuncOp list` already supports multiple funcs; `FuncOp.InputTypes: MlirType list` already supports params; `Printer.printFuncOp` already generates `%arg0`, `%arg1`, etc.
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Printer.fs` — `printModule` already iterates `m.Funcs`; `printFuncOp` already handles `InputTypes`
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — `ElabEnv` structure, `freshName`/`freshLabel` helpers, multi-block assembly in `elaborateModule`, `LetRec` falls to `failwithf`
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Pipeline.fs` — `--convert-func-to-llvm` confirmed in `loweringPasses`; no changes needed
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — `MlirModule.Funcs: FuncOp list` already supports multiple funcs; `FuncOp.InputTypes: MlirType list` already supports params; `Printer.printFuncOp` already generates `%arg0`, `%arg1`, etc.
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — `printModule` already iterates `m.Funcs`; `printFuncOp` already handles `InputTypes`
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv` structure, `freshName`/`freshLabel` helpers, multi-block assembly in `elaborateModule`, `LetRec` falls to `failwithf`
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` — `--convert-func-to-llvm` confirmed in `loweringPasses`; no changes needed
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `LetRec of name * param * body * inExpr * span` and `App of func * arg * span` confirmed
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fs` — LetRec grammar rule confirmed: `let rec name params = body in inExpr`; Parser.start expects single `Expr`
 

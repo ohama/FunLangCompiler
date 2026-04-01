@@ -44,9 +44,9 @@ re_verification: false
 | `tests/compiler/28-08-idx-ht-get.flt`             | IDX-03 hashtable index read test                  | VERIFIED   | 7 lines, correct input/output               |
 | `tests/compiler/28-09-idx-ht-set.flt`             | IDX-04 hashtable index write test                 | VERIFIED   | 7 lines, correct input/output               |
 | `tests/compiler/28-10-idx-array-roundtrip.flt`    | Multi-index roundtrip test                        | VERIFIED   | 9 lines, correct input/output               |
-| `src/LangBackend.Compiler/lang_runtime.h`         | LangHashtable tag field + lang_index_get/set decls | VERIFIED  | tag field at offset 0, both decls present   |
-| `src/LangBackend.Compiler/lang_runtime.c`         | tag=-1 init + lang_index_get/set dispatch         | VERIFIED   | tag=-1 in hashtable_create; dispatch functions implemented (lines 348-374) |
-| `src/LangBackend.Compiler/Elaboration.fs`         | IndexGet/IndexSet elaboration + freeVars + externals | VERIFIED | Both cases in elaborateExpr (lines 941-966); freeVars cases (lines 166-169); externals in both elaborateModule and elaborateTopLevel (lines 2493-2494, 2680-2681) |
+| `src/FunLangCompiler.Compiler/lang_runtime.h`         | LangHashtable tag field + lang_index_get/set decls | VERIFIED  | tag field at offset 0, both decls present   |
+| `src/FunLangCompiler.Compiler/lang_runtime.c`         | tag=-1 init + lang_index_get/set dispatch         | VERIFIED   | tag=-1 in hashtable_create; dispatch functions implemented (lines 348-374) |
+| `src/FunLangCompiler.Compiler/Elaboration.fs`         | IndexGet/IndexSet elaboration + freeVars + externals | VERIFIED | Both cases in elaborateExpr (lines 941-966); freeVars cases (lines 166-169); externals in both elaborateModule and elaborateTopLevel (lines 2493-2494, 2680-2681) |
 
 ### Key Link Verification
 

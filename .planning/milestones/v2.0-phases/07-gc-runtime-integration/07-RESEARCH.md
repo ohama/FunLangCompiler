@@ -63,7 +63,7 @@ brew install bdw-gc
 ### Recommended Project Structure
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── MlirIR.fs        # Add MlirGlobal type; add Globals + ExternalFuncs to MlirModule;
 │                    # add LlvmCallOp + LlvmCallVoidOp to MlirOp
 ├── Printer.fs       # Emit globals before funcs; emit external llvm.func decls;

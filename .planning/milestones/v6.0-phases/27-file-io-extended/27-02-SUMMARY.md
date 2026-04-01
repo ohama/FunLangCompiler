@@ -40,7 +40,7 @@ key-files:
     - tests/compiler/27-09-read-lines-missing.flt
     - tests/compiler/27-10-get-env-missing.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "print/println: add inttoptr cast when strVal.Type = I64 — handles string values extracted from list cons cells (head stored as int64 per ABI)"
@@ -82,7 +82,7 @@ Each task was committed atomically:
 2. **Task 2: Add E2E tests for all 8 builtins** - `41c8de9` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - 8 elaboration arms, 16 ExternalFuncDecl entries, inttoptr fix in print/println
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - 8 elaboration arms, 16 ExternalFuncDecl entries, inttoptr fix in print/println
 - `tests/compiler/27-01-read-lines.flt` - read_lines reads file into string list
 - `tests/compiler/27-02-write-lines.flt` - write_lines writes string list to file
 - `tests/compiler/27-03-stdin-read-line.flt` - stdin_read_line reads one line from piped stdin
@@ -108,7 +108,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (27-01-read-lines.flt test debugging)
 - **Issue:** `println h` where `h` is extracted from list cons cell has type `I64` (raw pointer stored as int64). `LlvmGEPStructOp` requires `Ptr`, causing MLIR type error: "definition of SSA value '%t23#0' has type 'i64' / previously used here with type '!llvm.ptr'"
 - **Fix:** Modified `print` and `println` arms in Elaboration.fs to emit `LlvmIntToPtrOp` when `strVal.Type = I64` before doing GEP into the string struct
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** 27-01-read-lines test passes, all 108 pre-existing tests still pass
 - **Committed in:** 41c8de9 (Task 2 commit)
 

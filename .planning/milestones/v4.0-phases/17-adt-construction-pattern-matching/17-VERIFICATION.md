@@ -31,9 +31,9 @@ re_verification: false
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | Constructor elaboration (nullary + unary), AdtCtor emitCtorTest, scrutineeTypeForTag, ensureAdtFieldTypes | VERIFIED | 1297 lines; real IR emission code; no stub markers in ADT sections |
-| `src/LangBackend.Compiler/MatchCompiler.fs` | AdtCtor argAccessors with +1 slot offset, splitClauses | VERIFIED | Line 187: `AdtCtor _ -> List.init arity (fun i -> Field(selAcc, i + 1))`; substantive implementation |
-| `src/LangBackend.Cli/Program.fs` | IndentFilter wired into parseProgram | VERIFIED | Summary confirms `lexAndFilter` helper added; multi-line .lt tests now parse correctly |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Constructor elaboration (nullary + unary), AdtCtor emitCtorTest, scrutineeTypeForTag, ensureAdtFieldTypes | VERIFIED | 1297 lines; real IR emission code; no stub markers in ADT sections |
+| `src/FunLangCompiler.Compiler/MatchCompiler.fs` | AdtCtor argAccessors with +1 slot offset, splitClauses | VERIFIED | Line 187: `AdtCtor _ -> List.init arity (fun i -> Field(selAcc, i + 1))`; substantive implementation |
+| `src/FunLangCompiler.Cli/Program.fs` | IndentFilter wired into parseProgram | VERIFIED | Summary confirms `lexAndFilter` helper added; multi-line .lt tests now parse correctly |
 | `tests/compiler/17-01-nullary-ctor.flt` | Nullary constructor compiles (exit 1) | VERIFIED | Exists, 6 lines, `type Color = Red | Green | Blue; let c = Red in 1`, expected output: 1 |
 | `tests/compiler/17-02-unary-ctor.flt` | Unary constructor compiles (exit 1) | VERIFIED | Exists, 6 lines, `Some 42` construction, exit 1 |
 | `tests/compiler/17-03-multi-arg-ctor.flt` | Multi-arg constructor compiles (exit 1) | VERIFIED | Exists, 6 lines, `Pair(3, 4)` construction, exit 1 |

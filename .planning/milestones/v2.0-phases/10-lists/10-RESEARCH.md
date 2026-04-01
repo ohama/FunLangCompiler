@@ -8,7 +8,7 @@
 
 ## Summary
 
-Phase 10 implements list types in the LangBackend compiler. There are four concerns: (1) `[]` as a null pointer via `llvm.mlir.zero`, (2) cons cell allocation as a 16-byte `GC_malloc` with head/tail pointer stores, (3) list literal desugaring from `List [e1; e2; e3]` to nested `Cons(e1, Cons(e2, Cons(e3, EmptyList)))` in Elaboration, and (4) list pattern matching via a null-check then GEP load for `ConsPat(h, t)`.
+Phase 10 implements list types in the FunLangCompiler compiler. There are four concerns: (1) `[]` as a null pointer via `llvm.mlir.zero`, (2) cons cell allocation as a 16-byte `GC_malloc` with head/tail pointer stores, (3) list literal desugaring from `List [e1; e2; e3]` to nested `Cons(e1, Cons(e2, Cons(e3, EmptyList)))` in Elaboration, and (4) list pattern matching via a null-check then GEP load for `ConsPat(h, t)`.
 
 All four concerns are handled in a single plan (`10-01-PLAN.md`) because they share the same MlirIR primitive additions (two new ops: `LlvmNullOp` and `LlvmIcmpOp`) and the Elaboration changes are tightly coupled. The pattern matching for `[]` / `h :: t` in a `match` expression is handled entirely in the Elaboration pass using existing `CfCondBrOp` infrastructure.
 
@@ -52,7 +52,7 @@ The key MLIR primitive for the null pointer case is `llvm.mlir.zero : !llvm.ptr`
 ### Recommended Project Structure
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── MlirIR.fs        # Add LlvmNullOp + LlvmIcmpOp to MlirOp
 ├── Printer.fs       # Emit llvm.mlir.zero and llvm.icmp ops
 └── Elaboration.fs   # EmptyList → LlvmNullOp; Cons → GC_malloc+store; List → fold;
@@ -335,7 +335,7 @@ let bodyEnv : ElabEnv =
 
 For `let rec length lst = match lst with | [] -> 0 | h :: t -> ...`, `lst` must be typed as `Ptr` (list pointer). The return type can be inferred from the body after elaboration (Phase 4 already infers return from `bodyVal.Type`), but the parameter type must be known before elaborating the body.
 
-**Resolution:** Add an optional `paramType` hint to the `LetRec` elaboration. Since LangBackend has no full type system, use a heuristic: if the `LetRec` body is a `Match` expression and the scrutinee is the parameter variable, and any arm contains `EmptyListPat` or `ConsPat`, then the parameter is `Ptr`. Otherwise default to `I64`.
+**Resolution:** Add an optional `paramType` hint to the `LetRec` elaboration. Since FunLangCompiler has no full type system, use a heuristic: if the `LetRec` body is a `Match` expression and the scrutinee is the parameter variable, and any arm contains `EmptyListPat` or `ConsPat`, then the parameter is `Ptr`. Otherwise default to `I64`.
 
 Alternatively: Always elaborate `LetRec` parameters as `Ptr` when the function body uses `Match`. Or: add a `Ptr` type annotation in the FsLit test.
 

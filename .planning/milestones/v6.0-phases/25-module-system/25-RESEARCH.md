@@ -21,7 +21,7 @@ This phase adds no new packages. All tooling is already present.
 ### Core (already present)
 | Component | Location | Purpose | Notes |
 |-----------|----------|---------|-------|
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | Primary change target — prePassDecls, extractMainExpr, elaborateExpr | All 6 requirements land here |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Primary change target — prePassDecls, extractMainExpr, elaborateExpr | All 6 requirements land here |
 | `Ast.fs` (LangThree) | `../LangThree/src/LangThree/Ast.fs` | Reference for ModuleDecl, OpenDecl, NamespaceDecl, LetPatDecl AST nodes | Read-only |
 | `TypeCheck.fs` (LangThree) | `../LangThree/src/LangThree/TypeCheck.fs` | Reference for rewriteModuleAccess logic | Read-only |
 | `Eval.fs` (LangThree) | `../LangThree/src/LangThree/Eval.fs` | Reference implementation for module semantics | Read-only |
@@ -341,7 +341,7 @@ let rec private prePassDecls (decls: Ast.Decl list)   // NOTE: 'rec' added
 ### E2E Test Pattern for Module System
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 module Math =
     let add x y = x + y
@@ -393,14 +393,14 @@ let _ = println (to_string result)
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — Lines 2315-2400: prePassDecls, extractMainExpr, elaborateProgram; Line 1777: FieldAccess handler; Lines 538-600: LetPat handlers
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Lines 2315-2400: prePassDecls, extractMainExpr, elaborateProgram; Line 1777: FieldAccess handler; Lines 538-600: LetPat handlers
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` — Lines 1148-1281: evalModuleDecls reference implementation (ModuleDecl recursion, LetPatDecl, OpenDecl handling)
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/TypeCheck.fs` — Lines 512-593: rewriteModuleAccess; Lines 820-906: ModuleDecl/OpenDecl/NamespaceDecl type check handling
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — Lines 311-352: Decl DU definition (ModuleDecl, OpenDecl, NamespaceDecl, LetPatDecl)
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fsy` — Lines 491-545: Module syntax grammar
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/LangBackend/.planning/REQUIREMENTS.md` — MOD-01 through MOD-06 definitions
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/REQUIREMENTS.md` — MOD-01 through MOD-06 definitions
 
 ## Metadata
 

@@ -30,7 +30,7 @@ score: 5/5 must-haves verified
 
 | Artifact | Expected | Exists | Substantive | Wired | Status |
 |----------|----------|--------|-------------|-------|--------|
-| `src/LangBackend.Cli/Program.fs` | CLI driver with auto-named output, file-not-found handling, parse error handling | YES | YES (65 lines, no stubs, 0 warnings) | YES — called by `dotnet run` entrypoint; wires to `Pipeline.compile`, `Elaboration.elaborateModule`, `parseExpr` | VERIFIED |
+| `src/FunLangCompiler.Cli/Program.fs` | CLI driver with auto-named output, file-not-found handling, parse error handling | YES | YES (65 lines, no stubs, 0 warnings) | YES — called by `dotnet run` entrypoint; wires to `Pipeline.compile`, `Elaboration.elaborateModule`, `parseExpr` | VERIFIED |
 | `tests/compiler/06-01-cli-file-input.flt` | E2E test for file input producing correct binary | YES | YES (5 lines, correct FsLit format) | YES — `fslit` runner executes it; PASS | VERIFIED |
 | `tests/compiler/06-02-cli-error.flt` | E2E test for error handling (nonexistent file) | YES | YES (5 lines, correct FsLit format) | YES — `fslit` runner executes it; PASS | VERIFIED |
 

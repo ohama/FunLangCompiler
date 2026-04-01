@@ -31,7 +31,7 @@ key-files:
     - tests/compiler/06-01-cli-file-input.flt
     - tests/compiler/06-02-cli-error.flt
   modified:
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Cli/Program.fs
 
 key-decisions:
   - "-o flag becomes optional: when absent, output name derived via Path.GetFileNameWithoutExtension(inputPath)"
@@ -74,7 +74,7 @@ completed: 2026-03-26
 
 ## Files Created/Modified
 
-- `src/LangBackend.Cli/Program.fs` - Rewritten main: optional -o, auto-naming, file existence check, try/with
+- `src/FunLangCompiler.Cli/Program.fs` - Rewritten main: optional -o, auto-naming, file existence check, try/with
 - `tests/compiler/06-01-cli-file-input.flt` - E2E test: let expression via auto-named binary outputs 15
 - `tests/compiler/06-02-cli-error.flt` - E2E test: nonexistent file prints readable error and exits 1
 
@@ -100,7 +100,7 @@ None - no external service configuration required.
 
 ## Next Phase Readiness
 
-Phase 6 is complete. All 6 phases of the LangBackend compiler are done:
+Phase 6 is complete. All 6 phases of the FunLangCompiler compiler are done:
 - Phase 1: MlirIR Foundation + CLI scaffolding
 - Phase 2: Scalar codegen via Elaboration
 - Phase 3: Booleans, comparisons, control flow

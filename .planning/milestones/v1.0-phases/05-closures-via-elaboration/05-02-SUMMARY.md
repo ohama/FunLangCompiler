@@ -33,7 +33,7 @@ key-files:
     - tests/compiler/05-01-closure-basic.flt
     - tests/compiler/05-02-closure-no-capture.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "freeVars must use Set.singleton innerParam as bound set (not both params) so outerParam is recognized as a capture"
@@ -77,7 +77,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit below)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Fixed freeVars call: `Set.singleton innerParam` instead of `Set.ofList [outerParam; innerParam]`
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Fixed freeVars call: `Set.singleton innerParam` instead of `Set.ofList [outerParam; innerParam]`
 - `tests/compiler/05-01-closure-basic.flt` - E2E test for add_n closure (exits 8)
 - `tests/compiler/05-02-closure-no-capture.flt` - E2E test for zero-capture lambda (exits 5)
 
@@ -94,7 +94,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (App dispatch verification — running the add_n closure test)
 - **Issue:** `freeVars (Set.ofList [outerParam; innerParam]) innerBody` with `outerParam = "n"` and `innerParam = "x"` computed `freeVars {"n","x"} (x+n) = {}` (empty captures). So `n` was never stored in the closure struct. When the inner llvm.func body tried to elaborate `x + n`, there was no binding for `n` in the inner env → "unbound variable 'n'"
 - **Fix:** Changed to `freeVars (Set.singleton innerParam) innerBody` → `freeVars {"x"} (x+n) = {"n"}` → captures = ["n"]. The closure-maker now stores `n` at env[1], and the inner body loads it via GEP+Load.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** `let add_n n = fun x -> x + n in let add5 = add_n 5 in add5 3` compiles and exits 8; 11/11 prior tests still pass
 - **Committed in:** 0054bca (Task 1 commit)
 

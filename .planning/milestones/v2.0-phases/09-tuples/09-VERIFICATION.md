@@ -28,7 +28,7 @@ score: 3/3 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | Tuple, LetPat(TuplePat), Match(TuplePat), isListParamBody, freeVars extensions | VERIFIED | Tuple case lines 609-629, LetPat(TuplePat) lines 303-332, Match(TuplePat) lines 631-634, freeVars lines 100-107. 761 lines total. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Tuple, LetPat(TuplePat), Match(TuplePat), isListParamBody, freeVars extensions | VERIFIED | Tuple case lines 609-629, LetPat(TuplePat) lines 303-332, Match(TuplePat) lines 631-634, freeVars lines 100-107. 761 lines total. |
 | `tests/compiler/09-01-tuple-basic.flt` | (3,4) destructure exits 7 | VERIFIED | PASS confirmed by fslit run. |
 | `tests/compiler/09-02-tuple-nested.flt` | Nested inline TuplePat exits 6 | VERIFIED | PASS confirmed by fslit run. |
 | `tests/compiler/09-03-tuple-match.flt` | TuplePat in match exits 3 | VERIFIED | PASS confirmed by fslit run. |

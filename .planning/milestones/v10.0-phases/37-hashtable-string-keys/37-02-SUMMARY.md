@@ -35,7 +35,7 @@ key-files:
     - tests/compiler/37-01-hashtable-string-keys.flt
     - tests/compiler/37-02-hashtable-string-content-equality.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
     - Prelude/Hashtable.fun
 
 key-decisions:
@@ -85,7 +85,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Ptr-type dispatch in hashtable builtins, IndexGet/IndexSet _str dispatch, two new builtin arms, 9 entries in both externalFuncs lists
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Ptr-type dispatch in hashtable builtins, IndexGet/IndexSet _str dispatch, two new builtin arms, 9 entries in both externalFuncs lists
 - `Prelude/Hashtable.fun` - Added createStr() and keysStr() wrappers
 - `tests/compiler/37-01-hashtable-string-keys.flt` - E2E: string-key CRUD + keysStr via recursive len
 - `tests/compiler/37-02-hashtable-string-content-equality.flt` - E2E: string_concat result lookup (RT-01 verified)

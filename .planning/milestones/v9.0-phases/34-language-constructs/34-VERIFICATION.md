@@ -29,9 +29,9 @@ score: 4/4 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/lang_runtime.c` | `lang_string_slice`, `lang_list_comp`, `lang_for_in_hashset/queue/mlist/hashtable` | VERIFIED | All 6 functions present and substantive (lines 76-81, 520-584) |
-| `src/LangBackend.Compiler/lang_runtime.h` | Prototypes for all 6 new functions | VERIFIED | `lang_string_slice` at line 87; `lang_list_comp` at line 62; collection for-in at lines 166-169 |
-| `src/LangBackend.Compiler/Elaboration.fs` | `StringSliceExpr`, `ListCompExpr`, `ForInExpr` TuplePat arms; `CollectionKind`, `CollectionVars`, `detectCollectionKind`; externalFuncs in both lists | VERIFIED | All arms present (lines 2964, 2985, 2914); CollectionKind DU at line 24; externalFuncs in both lists confirmed |
+| `src/FunLangCompiler.Compiler/lang_runtime.c` | `lang_string_slice`, `lang_list_comp`, `lang_for_in_hashset/queue/mlist/hashtable` | VERIFIED | All 6 functions present and substantive (lines 76-81, 520-584) |
+| `src/FunLangCompiler.Compiler/lang_runtime.h` | Prototypes for all 6 new functions | VERIFIED | `lang_string_slice` at line 87; `lang_list_comp` at line 62; collection for-in at lines 166-169 |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | `StringSliceExpr`, `ListCompExpr`, `ForInExpr` TuplePat arms; `CollectionKind`, `CollectionVars`, `detectCollectionKind`; externalFuncs in both lists | VERIFIED | All arms present (lines 2964, 2985, 2914); CollectionKind DU at line 24; externalFuncs in both lists confirmed |
 | `tests/compiler/34-01-string-slice-bounded.flt` | Bounded slice E2E test | VERIFIED | PASS: `s.[0..4]`=hello, `s.[6..10]`=world |
 | `tests/compiler/34-02-string-slice-open.flt` | Open-ended slice E2E test | VERIFIED | PASS: `s.[6..]`=world, `t.[2..]`=cdef |
 | `tests/compiler/34-03-list-comp-coll.flt` | List comprehension over collection | VERIFIED | PASS: `[for x in [1;2;3] -> x*10]` = [10;20;30] |

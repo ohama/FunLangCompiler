@@ -29,8 +29,8 @@ score: 4/4 must-haves verified
 
 | Artifact                             | Expected                                     | Status      | Details                                                      |
 | ------------------------------------ | -------------------------------------------- | ----------- | ------------------------------------------------------------ |
-| `src/LangBackend.Cli/Program.fs`     | Separate Prelude/user parsing with AST merge | VERIFIED    | Lines 170-183: two-phase parse, `preludeDecls @ userDecls`   |
-| `src/LangBackend.Cli/Program.fs`     | Prelude parsed under `<prelude>` filename    | VERIFIED    | Line 173: `parseProgram preludeSrc "<prelude>"`              |
+| `src/FunLangCompiler.Cli/Program.fs`     | Separate Prelude/user parsing with AST merge | VERIFIED    | Lines 170-183: two-phase parse, `preludeDecls @ userDecls`   |
+| `src/FunLangCompiler.Cli/Program.fs`     | Prelude parsed under `<prelude>` filename    | VERIFIED    | Line 173: `parseProgram preludeSrc "<prelude>"`              |
 
 Both artifacts: EXISTS (221 lines), SUBSTANTIVE (no stubs), WIRED (used in main execution path).
 
@@ -38,8 +38,8 @@ Both artifacts: EXISTS (221 lines), SUBSTANTIVE (no stubs), WIRED (used in main 
 
 | From                             | To                  | Via                              | Status  | Details                                                        |
 | -------------------------------- | ------------------- | -------------------------------- | ------- | -------------------------------------------------------------- |
-| `src/LangBackend.Cli/Program.fs` | `parseProgram`      | Two separate parseProgram calls  | WIRED   | Line 173: `parseProgram preludeSrc "<prelude>"`, line 178: `parseProgram src inputPath` |
-| `src/LangBackend.Cli/Program.fs` | `elaborateProgram`  | Merged AST (`preludeDecls @ userDecls`) | WIRED | Line 183: `Ast.Module(preludeDecls @ userDecls, userSpan)`, passed to `elaborateProgram` at line 199 |
+| `src/FunLangCompiler.Cli/Program.fs` | `parseProgram`      | Two separate parseProgram calls  | WIRED   | Line 173: `parseProgram preludeSrc "<prelude>"`, line 178: `parseProgram src inputPath` |
+| `src/FunLangCompiler.Cli/Program.fs` | `elaborateProgram`  | Merged AST (`preludeDecls @ userDecls`) | WIRED | Line 183: `Ast.Module(preludeDecls @ userDecls, userSpan)`, passed to `elaborateProgram` at line 199 |
 
 ### Requirements Coverage
 

@@ -49,12 +49,12 @@ The MLIR arith dialect is verified working end-to-end on this system. Named SSA 
 ### Recommended Project Structure
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── MlirIR.fs          # Add ArithAddIOp, ArithSubIOp, ArithMulIOp, ArithDivSIOp cases
 ├── Printer.fs         # Add printOp cases for new ops
 ├── Elaboration.fs     # NEW: elaborateExpr and ElabEnv
 └── Pipeline.fs        # Unchanged
-src/LangBackend.Cli/
+src/FunLangCompiler.Cli/
 └── Program.fs         # Updated: parse input file, call Elaboration, compile
 tests/compiler/
 ├── 01-return42.flt    # Unchanged
@@ -363,7 +363,7 @@ let src = System.IO.File.ReadAllText(inputPath)
 let expr = LangThree.Program.parse src inputPath  // returns Ast.Expr
 ```
 
-Wait — `LangThree.Program.parse` may not be the right approach since `Program.fs` is a module named `Program`, not a library API. The safer approach is to replicate the minimal parse logic in `LangBackend.Cli/Program.fs`:
+Wait — `LangThree.Program.parse` may not be the right approach since `Program.fs` is a module named `Program`, not a library API. The safer approach is to replicate the minimal parse logic in `FunLangCompiler.Cli/Program.fs`:
 
 ```fsharp
 // Minimal expression parse: replicate parse logic from LangThree.Program.parse
@@ -394,10 +394,10 @@ This uses `Lexer.setInitialPos`, `Parser.start`, and `Lexer.tokenize` — all ac
 
 ## Open Questions
 
-1. **`Program.parse` accessibility from LangBackend**
+1. **`Program.parse` accessibility from FunLangCompiler**
    - What we know: `LangThree.Program` is a module compiled into `LangThree.fsproj`. F# does not have `internal` visibility — all top-level `let` bindings are public. However, `Program.fs` opens `Eval`, `Prelude`, `Argu`, and other modules that may trigger side effects on module initialization.
-   - What's unclear: Whether calling `Parser.start Lexer.tokenize lexbuf` directly in `LangBackend.Cli/Program.fs` (bypassing `LangThree.Program.parse`) avoids initialization of unused LangThree modules (Eval, Prelude).
-   - Recommendation: Replicate the 4-line parse logic in `LangBackend.Cli/Program.fs` using `Lexer` and `Parser` directly. This is the simplest and avoids Eval/Prelude initialization. The `parse` function in LangThree.Program does the same thing.
+   - What's unclear: Whether calling `Parser.start Lexer.tokenize lexbuf` directly in `FunLangCompiler.Cli/Program.fs` (bypassing `LangThree.Program.parse`) avoids initialization of unused LangThree modules (Eval, Prelude).
+   - Recommendation: Replicate the 4-line parse logic in `FunLangCompiler.Cli/Program.fs` using `Lexer` and `Parser` directly. This is the simplest and avoids Eval/Prelude initialization. The `parse` function in LangThree.Program does the same thing.
 
 2. **`Number` carries `int` but target is `i64` — range constraint**
    - What we know: LangThree `Number of int` uses .NET `int` (32-bit signed). The MLIR target is `i64`. Programs using values > 2^31-1 cannot be expressed in LangThree source.
@@ -426,9 +426,9 @@ This uses `Lexer.setInitialPos`, `Parser.start`, and `Lexer.tokenize` — all ac
 
 ### Secondary (HIGH confidence — project source code)
 
-- `src/LangBackend.Compiler/MlirIR.fs` — current `MlirOp` DU shape
-- `src/LangBackend.Compiler/Printer.fs` — existing printOp pattern to follow
-- `src/LangBackend.Compiler/Pipeline.fs` — unchanged; pipeline from Phase 1 handles all new ops
+- `src/FunLangCompiler.Compiler/MlirIR.fs` — current `MlirOp` DU shape
+- `src/FunLangCompiler.Compiler/Printer.fs` — existing printOp pattern to follow
+- `src/FunLangCompiler.Compiler/Pipeline.fs` — unchanged; pipeline from Phase 1 handles all new ops
 - `.planning/ROADMAP.md` — Phase 2 success criteria and planned plans
 - `.planning/STATE.md` — accumulated decisions including MlirOp extensibility rule
 

@@ -1,4 +1,4 @@
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -f $OUTBIN; echo $RC'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -f $OUTBIN; echo $RC'
 // --- Input:
 let p = path_combine "dir" "file.txt" in println p
 // --- Output:

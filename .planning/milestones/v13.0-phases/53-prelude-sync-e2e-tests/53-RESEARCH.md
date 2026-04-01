@@ -1,14 +1,14 @@
 # Phase 53: Prelude Sync & E2E Tests - Research
 
 **Researched:** 2026-04-01
-**Domain:** LangBackend Prelude file sync + typeclass E2E compilation
+**Domain:** FunLangCompiler Prelude file sync + typeclass E2E compilation
 **Confidence:** HIGH
 
 ## Summary
 
-Phase 53 has three distinct parts: (1) copy `Typeclass.fun` from LangThree's Prelude to LangBackend's Prelude, (2) register it in the CLI's ordered-load list, and (3) write E2E tests for `show`/`eq`/`deriving Show`. The first two parts are mechanical file operations. The third part requires that `show` and `eq` actually compile end-to-end — they do, because `elaborateTypeclasses` (Phase 52) already converts `InstanceDecl` methods into `LetDecl` bindings, so after Prelude loads, `show` and `eq` become ordinary functions available to user code.
+Phase 53 has three distinct parts: (1) copy `Typeclass.fun` from LangThree's Prelude to FunLangCompiler's Prelude, (2) register it in the CLI's ordered-load list, and (3) write E2E tests for `show`/`eq`/`deriving Show`. The first two parts are mechanical file operations. The third part requires that `show` and `eq` actually compile end-to-end — they do, because `elaborateTypeclasses` (Phase 52) already converts `InstanceDecl` methods into `LetDecl` bindings, so after Prelude loads, `show` and `eq` become ordinary functions available to user code.
 
-The `deriving Show` requirement is more complex. LangBackend has no TypeCheck pass; `elaborateTypeclasses` currently drops `DerivingDecl` nodes with `[]`. For `deriving Show MyType` to work, `elaborateTypeclasses` must be enhanced: it needs a first pass to collect constructor lists from `TypeDecl` nodes, then generate the `show` function body as a `LetDecl` on the second pass. This is exactly what LangThree's `TypeCheck.fs` does (lines 1153–1212), but LangBackend must replicate that AST-generation logic inside `elaborateTypeclasses` since it has no type checker.
+The `deriving Show` requirement is more complex. FunLangCompiler has no TypeCheck pass; `elaborateTypeclasses` currently drops `DerivingDecl` nodes with `[]`. For `deriving Show MyType` to work, `elaborateTypeclasses` must be enhanced: it needs a first pass to collect constructor lists from `TypeDecl` nodes, then generate the `show` function body as a `LetDecl` on the second pass. This is exactly what LangThree's `TypeCheck.fs` does (lines 1153–1212), but FunLangCompiler must replicate that AST-generation logic inside `elaborateTypeclasses` since it has no type checker.
 
 The `show` and `eq` function name collision is not a problem: the Prelude defines `show` for each primitive type as separate `LetDecl` bindings (the last one wins), and `deriving Show` for a user ADT generates another `show` binding that shadows the prelude-level `show`. This matches LangThree's evaluation semantics exactly.
 
@@ -22,14 +22,14 @@ This is an internal codebase change — no external libraries are involved.
 | File | Purpose | What Changes |
 |------|---------|--------------|
 | `Prelude/Typeclass.fun` | Typeclass prelude (new file, copied from LangThree) | Create |
-| `src/LangBackend.Cli/Program.fs` | Add `"Typeclass.fun"` to ordered prelude load list | ~1 line |
-| `src/LangBackend.Compiler/Elaboration.fs` | Enhance `elaborateTypeclasses` to handle `DerivingDecl` | ~30 lines |
+| `src/FunLangCompiler.Cli/Program.fs` | Add `"Typeclass.fun"` to ordered prelude load list | ~1 line |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Enhance `elaborateTypeclasses` to handle `DerivingDecl` | ~30 lines |
 | `tests/compiler/53-01-*.flt/.fun` through `53-05-*.flt/.fun` | E2E test files for show/eq/deriving | New files |
 
 ### Supporting
 | Tool | Purpose |
 |------|---------|
-| `dotnet build src/LangBackend.Cli/` | Verify full project compiles |
+| `dotnet build src/FunLangCompiler.Cli/` | Verify full project compiles |
 | `cd tests/compiler && flit 53-*.flt` (or equivalent runner) | Run the new E2E tests |
 
 ## Architecture Patterns
@@ -42,10 +42,10 @@ No new directories needed. Changes touch existing files plus new test files:
 Prelude/
 └── Typeclass.fun            # PRE-01: copied verbatim from LangThree/Prelude/Typeclass.fun
 
-src/LangBackend.Cli/
+src/FunLangCompiler.Cli/
 └── Program.fs               # PRE-02: "Typeclass.fun" added to ordered array
 
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 └── Elaboration.fs           # TEST-03 prerequisite: DerivingDecl expansion
 
 tests/compiler/
@@ -101,7 +101,7 @@ After `elaborateTypeclasses`, this becomes four `show` LetDecl bindings and four
 **When:** Typeclass.fun has no constructor dependencies (it uses only builtins: `to_string`, boolean comparisons, string comparisons). It can be loaded first.
 
 ```fsharp
-// Source: src/LangBackend.Cli/Program.fs lines 167-169
+// Source: src/FunLangCompiler.Cli/Program.fs lines 167-169
 let ordered = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun";
                  "Hashtable.fun"; "HashSet.fun"; "MutableList.fun"; "Queue.fun";
                  "StringBuilder.fun"; "List.fun"; "Array.fun" |]
@@ -202,7 +202,7 @@ let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
         | other -> [other])
 ```
 
-**Important:** Check the exact pattern constructor name used in LangBackend for nullary constructor patterns. In LangThree TypeCheck.fs it uses `Ast.ConstructorPat(ctorName, None, span)` for nullary. Verify via Ast.fs that this maps correctly.
+**Important:** Check the exact pattern constructor name used in FunLangCompiler for nullary constructor patterns. In LangThree TypeCheck.fs it uses `Ast.ConstructorPat(ctorName, None, span)` for nullary. Verify via Ast.fs that this maps correctly.
 
 ### Pattern 4: Test File Format (E2E Compilation Tests)
 
@@ -210,7 +210,7 @@ Tests use a `.flt` fixture file and a separate `.fun` source file. Successful co
 
 ```
 // Test: show on int from Prelude
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %S/53-01-show-int.fun -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %S/53-01-show-int.fun -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 // --- Output:
 42
@@ -254,7 +254,7 @@ The `%S` placeholder is the directory containing the `.flt` file.
 
 **What goes wrong:** `elaborateTypeclasses` currently returns `[]` for `DerivingDecl` nodes. If TEST-03 uses `deriving Show Color`, the `show` function is never generated, and the program will fail with an unbound variable error.
 
-**Why it happens:** Phase 52 comment says `"auto-derivation handled at parse time"` — this was a placeholder. In LangThree, deriving is handled at type-check time (not parse time). LangBackend has no type checker.
+**Why it happens:** Phase 52 comment says `"auto-derivation handled at parse time"` — this was a placeholder. In LangThree, deriving is handled at type-check time (not parse time). FunLangCompiler has no type checker.
 
 **How to avoid:** Implement DerivingDecl expansion in `elaborateTypeclasses` using the two-pass approach described above.
 
@@ -274,9 +274,9 @@ The `%S` placeholder is the directory containing the `.flt` file.
 
 **What goes wrong:** The `Prelude/Prelude` symlink (untracked, broken) resolves to a circular path. It's listed in `git status` as `?? Prelude/Prelude`.
 
-**Why it happens:** The symlink `Prelude/Prelude@ -> ../LangBackend/Prelude` was created previously and is broken.
+**Why it happens:** The symlink `Prelude/Prelude@ -> ../FunLangCompiler/Prelude` was created previously and is broken.
 
-**How to avoid:** Do NOT remove or modify this symlink in Phase 53 — it's untracked and irrelevant to the task. The Prelude loading in Program.fs uses `walkUp` from the input file's directory to find the `Prelude/` dir — it finds `/Users/ohama/vibe-coding/LangBackend/Prelude/` which is correct.
+**How to avoid:** Do NOT remove or modify this symlink in Phase 53 — it's untracked and irrelevant to the task. The Prelude loading in Program.fs uses `walkUp` from the input file's directory to find the `Prelude/` dir — it finds `/Users/ohama/vibe-coding/FunLangCompiler/Prelude/` which is correct.
 
 **Warning signs:** If the symlink interferes, directory listing would show `Typeclass.fun` not found even after copying.
 
@@ -284,9 +284,9 @@ The `%S` placeholder is the directory containing the `.flt` file.
 
 **What goes wrong:** In generated match arms for `deriving Show`, nullary constructors need the right pattern AST node. Using wrong pattern type causes pattern matching compilation to fail.
 
-**Why it happens:** LangThree TypeCheck.fs uses `Ast.ConstructorPat(ctorName, None, span)` for nullary constructors in patterns. This should also work in LangBackend's elaboration.
+**Why it happens:** LangThree TypeCheck.fs uses `Ast.ConstructorPat(ctorName, None, span)` for nullary constructors in patterns. This should also work in FunLangCompiler's elaboration.
 
-**How to avoid:** Verify against `Ast.fs` and existing LangBackend test fixtures that `ConstructorPat(name, None, span)` is the correct AST node for nullary constructor patterns. Existing tests like `35-08-list-tryfind-choose.fun` use `| Some v ->` and `| None ->` patterns which resolve to `ConstructorPat("Some", Some vPat, ...)` and `ConstructorPat("None", None, ...)`.
+**How to avoid:** Verify against `Ast.fs` and existing FunLangCompiler test fixtures that `ConstructorPat(name, None, span)` is the correct AST node for nullary constructor patterns. Existing tests like `35-08-list-tryfind-choose.fun` use `| Some v ->` and `| None ->` patterns which resolve to `ConstructorPat("Some", Some vPat, ...)` and `ConstructorPat("None", None, ...)`.
 
 **Warning signs:** DerivingDecl test compiles but produces wrong output (match falls through to wrong arm).
 
@@ -303,7 +303,7 @@ let _ = println s
 **Fixture** (`tests/compiler/53-01-show-int.flt`):
 ```
 // Test: show on int from Prelude
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %S/53-01-show-int.fun -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %S/53-01-show-int.fun -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 // --- Output:
 42
@@ -373,7 +373,7 @@ Ast.Decl.LetDecl("eq", Ast.Lambda("x", Ast.Lambda("y", Ast.Eq(Ast.Var("x"), Ast.
 ### Prelude Ordered Array (after change)
 
 ```fsharp
-// Source: src/LangBackend.Cli/Program.fs lines 167-169
+// Source: src/FunLangCompiler.Cli/Program.fs lines 167-169
 let ordered = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun";
                  "Hashtable.fun"; "HashSet.fun"; "MutableList.fun"; "Queue.fun";
                  "StringBuilder.fun"; "List.fun"; "Array.fun" |]
@@ -389,20 +389,20 @@ let ordered = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "Strin
 
 **Current state (before Phase 53):**
 - `DerivingDecl _ -> []` in `elaborateTypeclasses` (line 4232 of Elaboration.fs)
-- `Typeclass.fun` does NOT exist in `LangBackend/Prelude/`
+- `Typeclass.fun` does NOT exist in `FunLangCompiler/Prelude/`
 - ordered array does NOT include `"Typeclass.fun"`
 
 ## Open Questions
 
 1. **ConstructorPat nullary pattern in generated show match arms**
    - What we know: LangThree TypeCheck.fs uses `Ast.ConstructorPat(ctorName, None, span)` for nullary constructors in generated patterns.
-   - What's unclear: Whether LangBackend's Elaboration.fs handles `ConstructorPat("Red", None, span)` correctly in generated match expressions (it should — existing ADT tests use this).
+   - What's unclear: Whether FunLangCompiler's Elaboration.fs handles `ConstructorPat("Red", None, span)` correctly in generated match expressions (it should — existing ADT tests use this).
    - Recommendation: Verify by checking one existing test that has nullary constructor patterns, e.g., `Option.None` in any test. Elaborate the DerivingDecl Show generation; if any test fails, add a debug print to see what pattern type is generated.
 
 2. **show function shadowing: which instance wins**
    - What we know: After loading Typeclass.fun + user code with `deriving Show Color`, there will be multiple `let show = ...` bindings. The last binding wins.
    - What's unclear: For TEST-01 (show on int), the prelude defines Show int last... but Show char comes last in Typeclass.fun. So `show 42` would call the char's show function (which calls `to_string` too).
-   - Recommendation: This is actually fine since `to_string` works for both int and char in LangBackend (it dispatches on type). The test 53-01 expects `show 42` → `"42"`. Since all primitive Show instances call `to_string x`, they all produce the same result regardless of which binding is active. Verify empirically.
+   - Recommendation: This is actually fine since `to_string` works for both int and char in FunLangCompiler (it dispatches on type). The test 53-01 expects `show 42` → `"42"`. Since all primitive Show instances call `to_string x`, they all produce the same result regardless of which binding is active. Verify empirically.
    - If this is a problem: Test can instead define its own show inline to bypass the prelude shadowing issue.
 
 3. **GadtConstructorDecl in DerivingDecl expansion**
@@ -414,15 +414,15 @@ let ordered = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "Strin
 
 ### Primary (HIGH confidence)
 - `/Users/ohama/vibe-coding/LangThree/Prelude/Typeclass.fun` — exact content to copy (verified, 30 lines)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Cli/Program.fs` lines 167–174 — ordered prelude array (verified)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` line 4232 — `DerivingDecl _ -> []` current behavior (verified)
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` lines 167–174 — ordered prelude array (verified)
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` line 4232 — `DerivingDecl _ -> []` current behavior (verified)
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/TypeCheck.fs` lines 1153–1212 — reference implementation of DerivingDecl expansion
 - `/Users/ohama/vibe-coding/LangThree/tests/flt/file/typeclass/typeclass-deriving-show.flt` — verified expected outputs for deriving Show
 - `/Users/ohama/vibe-coding/LangThree/tests/flt/file/typeclass/typeclass-deriving-eq.flt` — verified expected outputs for deriving Eq
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/LangBackend/tests/compiler/35-08-list-tryfind-choose.flt` — verified OUTBIN test pattern for successful compilation tests
-- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs` lines 248–273 — confirms `DerivingDecl` is dropped in eval pipeline (type check handles it); LangBackend has no type check, so must handle here
+- `/Users/ohama/vibe-coding/FunLangCompiler/tests/compiler/35-08-list-tryfind-choose.flt` — verified OUTBIN test pattern for successful compilation tests
+- `/Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs` lines 248–273 — confirms `DerivingDecl` is dropped in eval pipeline (type check handles it); FunLangCompiler has no type check, so must handle here
 
 ## Metadata
 

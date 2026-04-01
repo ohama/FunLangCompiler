@@ -13,14 +13,14 @@ Compile, run, and debug LangThree (.fun/.lt) files using the native compiler.
 
 ## Compiler
 
-**Binary:** `/Users/ohama/vibe-coding/LangBackend/dist/LangBackend.Cli`
+**Binary:** `/Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli`
 
 ```bash
 # Compile
-LangBackend.Cli source.fun -o output_binary
+FunLangCompiler.Cli source.fun -o output_binary
 
 # Compile and run
-OUTBIN=$(mktemp /tmp/langback_XXXXXX) && LangBackend.Cli source.fun -o $OUTBIN && $OUTBIN; rm -f $OUTBIN
+OUTBIN=$(mktemp /tmp/langback_XXXXXX) && FunLangCompiler.Cli source.fun -o $OUTBIN && $OUTBIN; rm -f $OUTBIN
 ```
 
 Prelude (12 modules) auto-loads from `Prelude/` relative to source file.
@@ -32,14 +32,14 @@ When the user provides arguments:
 ### `/lt compile <file>`
 ```bash
 OUTBIN=$(mktemp /tmp/langback_XXXXXX)
-/Users/ohama/vibe-coding/LangBackend/dist/LangBackend.Cli "$FILE" -o "$OUTBIN" 2>&1
+/Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli "$FILE" -o "$OUTBIN" 2>&1
 echo "Compiled: $OUTBIN"
 ```
 
 ### `/lt run <file>`
 ```bash
 OUTBIN=$(mktemp /tmp/langback_XXXXXX)
-/Users/ohama/vibe-coding/LangBackend/dist/LangBackend.Cli "$FILE" -o "$OUTBIN" 2>&1 && "$OUTBIN"
+/Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli "$FILE" -o "$OUTBIN" 2>&1 && "$OUTBIN"
 RC=$?; rm -f "$OUTBIN"; exit $RC
 ```
 
@@ -48,7 +48,7 @@ RC=$?; rm -f "$OUTBIN"; exit $RC
 for f in *.fun; do
   echo -n "$f: "
   OUTBIN=$(mktemp /tmp/langback_XXXXXX)
-  if /Users/ohama/vibe-coding/LangBackend/dist/LangBackend.Cli "$f" -o "$OUTBIN" 2>&1; then
+  if /Users/ohama/vibe-coding/FunLangCompiler/dist/FunLangCompiler.Cli "$f" -o "$OUTBIN" 2>&1; then
     echo "OK"
   else
     echo "FAIL"

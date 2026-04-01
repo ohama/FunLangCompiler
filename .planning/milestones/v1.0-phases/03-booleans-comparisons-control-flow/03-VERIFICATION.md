@@ -29,9 +29,9 @@ score: 4/4 must-haves verified
 
 | Artifact | Expected | Status | Details |
 | -------- | -------- | ------ | ------- |
-| `src/LangBackend.Compiler/MlirIR.fs` | `ArithCmpIOp`, `CfCondBrOp`, `CfBrOp` DU cases | VERIFIED | Lines 25-27 — all three cases present with correct signatures |
-| `src/LangBackend.Compiler/Printer.fs` | `printOp` cases emitting `arith.cmpi`, `cf.cond_br`, `cf.br` | VERIFIED | Lines 27-44 — correct MLIR text for all three ops; `arith.cmpi` uses operand type (i64), not result type |
-| `src/LangBackend.Compiler/Elaboration.fs` | Bool/comparison elaboration, `If`/`And`/`Or` multi-block, dynamic `ReturnType` | VERIFIED | 162 lines; `Bool` (line 65), six comparison cases (lines 69-98), `If` (line 99), `And` (line 114), `Or` (line 125); `elaborateModule` uses `Some resultVal.Type` (line 157) |
+| `src/FunLangCompiler.Compiler/MlirIR.fs` | `ArithCmpIOp`, `CfCondBrOp`, `CfBrOp` DU cases | VERIFIED | Lines 25-27 — all three cases present with correct signatures |
+| `src/FunLangCompiler.Compiler/Printer.fs` | `printOp` cases emitting `arith.cmpi`, `cf.cond_br`, `cf.br` | VERIFIED | Lines 27-44 — correct MLIR text for all three ops; `arith.cmpi` uses operand type (i64), not result type |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Bool/comparison elaboration, `If`/`And`/`Or` multi-block, dynamic `ReturnType` | VERIFIED | 162 lines; `Bool` (line 65), six comparison cases (lines 69-98), `If` (line 99), `And` (line 114), `Or` (line 125); `elaborateModule` uses `Some resultVal.Type` (line 157) |
 | `tests/compiler/03-01-bool-literal.flt` | Bool literal E2E test | VERIFIED | Exists, runs `true` input, expects exit 1 |
 | `tests/compiler/03-02-comparison.flt` | Comparison operator E2E test | VERIFIED | Exists, runs `3 < 5`, expects exit 1 |
 | `tests/compiler/03-03-if-else.flt` | if-else E2E test | VERIFIED | Exists, runs `if 5 <= 0 then 0 else 1`, expects exit 1 |
@@ -83,8 +83,8 @@ No blocking gaps. All four ROADMAP success criteria are structurally present and
 
 ## Build Status
 
-`dotnet build src/LangBackend.Compiler/LangBackend.Compiler.fsproj` — 0 warnings, 0 errors
-`dotnet build src/LangBackend.Cli/LangBackend.Cli.fsproj` — 0 warnings, 0 errors
+`dotnet build src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` — 0 warnings, 0 errors
+`dotnet build src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj` — 0 warnings, 0 errors
 
 ## FsLit Test Results
 

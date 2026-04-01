@@ -32,13 +32,13 @@ tech-stack:
 
 key-files:
   created:
-    - src/LangBackend.Compiler/lang_runtime.c (6 sprintf wrappers added)
-    - src/LangBackend.Compiler/lang_runtime.h (6 declarations added)
+    - src/FunLangCompiler.Compiler/lang_runtime.c (6 sprintf wrappers added)
+    - src/FunLangCompiler.Compiler/lang_runtime.h (6 declarations added)
     - tests/compiler/39-01-sprintf-int.flt
     - tests/compiler/39-02-sprintf-multi.flt
     - tests/compiler/39-03-printfn.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs (FmtSpec, fmtSpecTypes, coerceToI64Arg, sprintf/printfn arms, ExternalFuncDecl in both lists)
+    - src/FunLangCompiler.Compiler/Elaboration.fs (FmtSpec, fmtSpecTypes, coerceToI64Arg, sprintf/printfn arms, ExternalFuncDecl in both lists)
 
 key-decisions:
   - "2-arg sprintf arms must come BEFORE 1-arg arms — outer App matches first (Pitfall 1)"
@@ -83,9 +83,9 @@ Each task was committed atomically:
 2. **Task 2: sprintf/printfn arms + E2E tests** - `70ca23e` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - 6 typed snprintf wrappers (lang_sprintf_1i/1s/2ii/2si/2is/2ss)
-- `src/LangBackend.Compiler/lang_runtime.h` - Declarations for all 6 wrappers
-- `src/LangBackend.Compiler/Elaboration.fs` - FmtSpec type, fmtSpecTypes, coerceToI64Arg, sprintf/printfn arms, ExternalFuncDecl in both lists
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - 6 typed snprintf wrappers (lang_sprintf_1i/1s/2ii/2si/2is/2ss)
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Declarations for all 6 wrappers
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - FmtSpec type, fmtSpecTypes, coerceToI64Arg, sprintf/printfn arms, ExternalFuncDecl in both lists
 - `tests/compiler/39-01-sprintf-int.flt` - E2E: %d, %x, %02x, %c specifiers
 - `tests/compiler/39-02-sprintf-multi.flt` - E2E: 2-arg %s=%d and %d+%d formats
 - `tests/compiler/39-03-printfn.flt` - E2E: printfn with format arg and plain string
@@ -105,7 +105,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (sprintf arms implementation)
 - **Issue:** Research example used `let dp1 = ...; let da1 = ...` on one line, which F# rejects inside match arms
 - **Fix:** Split into separate `let` bindings on separate lines
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Build succeeded, all 192 tests pass
 - **Committed in:** 70ca23e (Task 2 commit)
 

@@ -22,9 +22,9 @@ No new external libraries. All changes are internal to `lang_runtime.c`, `lang_r
 
 | Component | Location | Phase 39 Change |
 |-----------|----------|-----------------|
-| `lang_runtime.h` | `src/LangBackend.Compiler/` | Declare 6 sprintf wrappers (~12 LOC) |
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | Implement 6 sprintf wrappers via `snprintf` (~60 LOC) |
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | Add `sprintf` and `printfn` builtin arms with compile-time dispatch (~80 LOC delta) |
+| `lang_runtime.h` | `src/FunLangCompiler.Compiler/` | Declare 6 sprintf wrappers (~12 LOC) |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | Implement 6 sprintf wrappers via `snprintf` (~60 LOC) |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Add `sprintf` and `printfn` builtin arms with compile-time dispatch (~80 LOC delta) |
 
 ### No Changes Required
 
@@ -539,7 +539,7 @@ LangString* lang_sprintf_2ss(char* fmt, char* a, char* b);
 ### E2E Test Pattern (.flt)
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let s1 = sprintf "%d" 42
 let s2 = sprintf "%s=%d" "key" 99
@@ -555,7 +555,7 @@ ff
 ```
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let n = 5
 let _ = printfn "%d states" n
@@ -603,12 +603,12 @@ Phase 39 has a single clean boundary: all changes are in `lang_runtime.c/h` and 
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — Complete elaborateExpr function; `eprintfn` pattern arms (lines 1649-1659) as model for sprintf dispatch; both externalFuncs lists; `addStringGlobal`, `coerceToPtrArg`, `freshName` utilities; `LlvmAddressOfOp`, `LlvmGEPStructOp`, `LlvmLoadOp` usage patterns
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — `lang_to_string_int` (lines 29-38) as model for snprintf+GC_malloc pattern; `LangString` struct layout (lines 12-15); existing `snprintf` usage for length measurement (lines 31, 269)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.h` — All existing declarations; LangString forward declaration; Phase 38 pattern for declaration additions
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Printer.fs` — Confirmed vararg call syntax is only for `@printf` (lines 115-117); standard `LlvmCallOp` syntax for non-vararg calls (lines 118-120)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — `LlvmCallOp`, `LlvmGEPStructOp`, `LlvmLoadOp`, `LlvmAddressOfOp` all exist as MlirOp cases
-- `/Users/ohama/vibe-coding/LangBackend/.planning/phases/38-cli-arguments/38-RESEARCH.md` — Confirmed two-externalFuncs-list pitfall; %arg0/%arg1 naming; LangString/GC_malloc patterns
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Complete elaborateExpr function; `eprintfn` pattern arms (lines 1649-1659) as model for sprintf dispatch; both externalFuncs lists; `addStringGlobal`, `coerceToPtrArg`, `freshName` utilities; `LlvmAddressOfOp`, `LlvmGEPStructOp`, `LlvmLoadOp` usage patterns
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — `lang_to_string_int` (lines 29-38) as model for snprintf+GC_malloc pattern; `LangString` struct layout (lines 12-15); existing `snprintf` usage for length measurement (lines 31, 269)
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — All existing declarations; LangString forward declaration; Phase 38 pattern for declaration additions
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — Confirmed vararg call syntax is only for `@printf` (lines 115-117); standard `LlvmCallOp` syntax for non-vararg calls (lines 118-120)
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — `LlvmCallOp`, `LlvmGEPStructOp`, `LlvmLoadOp`, `LlvmAddressOfOp` all exist as MlirOp cases
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/38-cli-arguments/38-RESEARCH.md` — Confirmed two-externalFuncs-list pitfall; %arg0/%arg1 naming; LangString/GC_malloc patterns
 
 ### Secondary (MEDIUM confidence)
 - POSIX `snprintf` with NULL/0 returning required length: standard behavior, confirmed present in glibc and macOS libc

@@ -31,9 +31,9 @@ key-files:
     - tests/compiler/32-03-list-sort-by.flt
     - tests/compiler/32-04-list-of-seq.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "list_sort_by uses parallel int64_t arrays + insertion sort for simplicity and correctness"
@@ -79,9 +79,9 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.c` - Added lang_list_sort_by and lang_list_of_seq after lang_array_init
-- `src/LangBackend.Compiler/lang_runtime.h` - Added declarations for both new functions
-- `src/LangBackend.Compiler/Elaboration.fs` - Added two elaboration arms + externalFuncs entries in both lists
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added lang_list_sort_by and lang_list_of_seq after lang_array_init
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added declarations for both new functions
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added two elaboration arms + externalFuncs entries in both lists
 - `tests/compiler/32-03-list-sort-by.flt` - E2E test: sort [3;1;2] with identity key -> [1;2;3], verify a+b*10+c*100=321
 - `tests/compiler/32-04-list-of-seq.flt` - E2E test: list_of_seq [10;20] returns same list, a+b=30
 

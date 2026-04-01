@@ -72,7 +72,7 @@ Key .NET regex metacharacters that need escaping in CHECK-RE patterns:
 
 ```
 // Test: <description>
-// --- Command: bash -c 'cd %S && dotnet run --project .../LangBackend.Cli.fsproj -- filename.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project .../FunLangCompiler.Cli.fsproj -- filename.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
 CHECK-RE: <pattern>
@@ -285,7 +285,7 @@ CHECK-RE: \[Elaboration\] 44-02-error-location-pattern\.fun:\d+:\d+: Elaboration
 
 - `/Users/ohama/.local/bin/fslit --help` — authoritative CHECK-RE semantics, directive list
 - Direct test execution `fslit --verbose` on all 10 test files — confirmed current pass state
-- `src/LangBackend.Cli/Program.fs` — actual error formatting code, confirms output format
+- `src/FunLangCompiler.Cli/Program.fs` — actual error formatting code, confirms output format
 - `.planning/phases/47-prelude-separate-parsing/47-VERIFICATION.md` — confirms Phase 47 outcome (user line numbers correct)
 - `.planning/phases/48-parse-error-position/48-VERIFICATION.md` — confirms Phase 48 outcome (45-02 intentionally has no position)
 

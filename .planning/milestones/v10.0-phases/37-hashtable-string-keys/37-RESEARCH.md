@@ -24,9 +24,9 @@ No new external libraries. All changes are internal to `lang_runtime.c`, `lang_r
 
 | Component | Location | Phase 37 Change |
 |-----------|----------|-----------------|
-| `lang_runtime.h` | `src/LangBackend.Compiler/` | Add `LangHashEntryStr`, `LangHashtableStr` structs; declare 6 `_str` functions + 2 index `_str` functions (~25 LOC) |
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | Add `lang_ht_str_hash`, `lang_ht_str_find`, `lang_hashtable_create_str` (or reuse `create`), 6 `_str` operation functions, 2 index `_str` functions (~150 LOC) |
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | Update key coercion in 6 hashtable builtin arms + `IndexGet`/`IndexSet` to dispatch on key type; update both `externalFuncs` lists (~40 LOC delta) |
+| `lang_runtime.h` | `src/FunLangCompiler.Compiler/` | Add `LangHashEntryStr`, `LangHashtableStr` structs; declare 6 `_str` functions + 2 index `_str` functions (~25 LOC) |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | Add `lang_ht_str_hash`, `lang_ht_str_find`, `lang_hashtable_create_str` (or reuse `create`), 6 `_str` operation functions, 2 index `_str` functions (~150 LOC) |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Update key coercion in 6 hashtable builtin arms + `IndexGet`/`IndexSet` to dispatch on key type; update both `externalFuncs` lists (~40 LOC delta) |
 
 ### No Changes Required
 
@@ -220,7 +220,7 @@ LangHashtableStr* lang_hashtable_create_str(void) {
 
 ### Pitfall 3: ExternalFuncDecl Not Updated in Both Lists
 **What goes wrong:** `Elaboration.fs` has two `externalFuncs` lists (around line 3300 and line 3542). Adding a function declaration to only one list causes MLIR validation errors at runtime on programs using the module path.
-**Why it happens:** The two-list structure was introduced when LangBackend added a module-aware elaboration path. Both must be kept in sync.
+**Why it happens:** The two-list structure was introduced when FunLangCompiler added a module-aware elaboration path. Both must be kept in sync.
 **How to avoid:** Always update both `externalFuncs` lists. Search for the existing `@lang_hashtable_create` entry and duplicate the new entries in the same relative position in both lists.
 **Warning signs:** Tests pass in single-file mode but fail in module mode.
 
@@ -325,7 +325,7 @@ void lang_index_set_str(void* collection, LangString* key, int64_t value) {
 ### Test pattern (.flt)
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let ht = hashtable_create_str ()
 let _ = hashtable_set ht "hello" 42
@@ -390,12 +390,12 @@ let _ = println (to_string (hashtable_get ht s1))
 
 ### Primary (HIGH confidence)
 
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — Complete hashtable implementation, struct layouts, hashing, for-in
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.h` — All struct and function declarations
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — All hashtable builtin elaboration arms and ExternalFuncDecl lists
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — Available MlirOp cases
-- `/Users/ohama/vibe-coding/LangBackend/.planning/milestones/v9.0-phases/35-prelude-modules/35-01-SUMMARY.md` — Documents the original crash and root cause
-- `/Users/ohama/vibe-coding/LangBackend/.planning/STATE.md` — Confirms RT-01/RT-02 still open
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — Complete hashtable implementation, struct layouts, hashing, for-in
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — All struct and function declarations
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — All hashtable builtin elaboration arms and ExternalFuncDecl lists
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — Available MlirOp cases
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/milestones/v9.0-phases/35-prelude-modules/35-01-SUMMARY.md` — Documents the original crash and root cause
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/STATE.md` — Confirms RT-01/RT-02 still open
 
 ### Secondary (MEDIUM confidence)
 

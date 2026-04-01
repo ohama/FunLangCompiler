@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 12 adds five missing operators to the LangBackend compiler: Modulo (%), Char literals, PipeRight (|>), ComposeRight (>>), and ComposeLeft (<<). All five AST nodes already exist in LangThree's Ast.fs. The compiler pipeline (Elaboration.fs) has no cases for them, causing match exceptions at runtime.
+Phase 12 adds five missing operators to the FunLangCompiler compiler: Modulo (%), Char literals, PipeRight (|>), ComposeRight (>>), and ComposeLeft (<<). All five AST nodes already exist in LangThree's Ast.fs. The compiler pipeline (Elaboration.fs) has no cases for them, causing match exceptions at runtime.
 
 The work splits cleanly into three categories:
 1. **New MlirOp + one Elaboration case**: Modulo requires `ArithRemSIOp` added to MlirIR.fs, a print case in Printer.fs, and one elaboration case matching `Divide`'s pattern exactly.

@@ -43,9 +43,9 @@ key-files:
     - tests/compiler/26-07-eprintln.flt
     - tests/compiler/26-08-write-overwrite.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "lang_file_read throws via lang_throw on missing file (catchable by try/with), not lang_failwith (which exits)"
@@ -90,9 +90,9 @@ completed: 2026-03-27
 3. **Task 3: E2E tests + typedef fix** - `cbbe277` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - Added lang_file_read, lang_file_write, lang_file_append, lang_file_exists, lang_eprint, lang_eprintln; renamed struct to LangString_s
-- `src/LangBackend.Compiler/lang_runtime.h` - Forward declaration for LangString_s typedef + 6 function declarations
-- `src/LangBackend.Compiler/Elaboration.fs` - 6 ExternalFuncDecl entries in both lists + 6 elaborateExpr arms
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added lang_file_read, lang_file_write, lang_file_append, lang_file_exists, lang_eprint, lang_eprintln; renamed struct to LangString_s
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Forward declaration for LangString_s typedef + 6 function declarations
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - 6 ExternalFuncDecl entries in both lists + 6 elaborateExpr arms
 - `tests/compiler/26-01-write-read.flt` through `26-08-write-overwrite.flt` - 8 E2E tests
 
 ## Decisions Made

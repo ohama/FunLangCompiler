@@ -28,7 +28,7 @@ key-files:
   created:
     - tests/compiler/20-04-ho-ctor.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "General App case added for non-Var, non-Lambda function expressions (e.g., App(App(...), arg))"
@@ -73,7 +73,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - I64 dispatch arm, general App case, Ptr-to-I64 coercion
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - I64 dispatch arm, general App case, Ptr-to-I64 coercion
 - `tests/compiler/20-04-ho-ctor.flt` - E2E test: `apply Some 42` exits 42
 
 ## Decisions Made
@@ -89,7 +89,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (E2E test creation)
 - **Issue:** Plan specified only the I64 arm for the Var(name) branch, but `apply Some 42` produces `App(App(...), 42)` where the outer App has funcExpr = `App(Var "apply", Var "Some")` — hits `| _ -> failwithf` fallthrough
 - **Fix:** Added general `| _ ->` arm that elaborates funcExpr recursively, then dispatches by type (Ptr → indirect, I64 → inttoptr + indirect)
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** `apply Some 42` compiles and exits 42; all 66 existing tests pass
 - **Committed in:** `575254e`
 
@@ -97,7 +97,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (E2E test debugging)
 - **Issue:** `@apply` closure maker expects `(I64, Ptr)` but `Some` closure is Ptr-typed; MLIR type mismatch error
 - **Fix:** Added `LlvmPtrToIntOp` coercion before `DirectCallOp` when argVal.Type = Ptr
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** MLIR compiles cleanly; exit 42
 - **Committed in:** `575254e`
 

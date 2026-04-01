@@ -22,9 +22,9 @@ This phase introduces no new external libraries. All components already exist.
 
 | Component | Location | Purpose | v24 Change |
 |-----------|----------|---------|------------|
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | C runtime — add 4 HOF functions | Add ~80 LOC |
-| `lang_runtime.h` | `src/LangBackend.Compiler/` | C header — declare 4 HOF functions | Add ~6 LOC |
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | AST → MlirIR: add 4 HOF builtin cases + ExternalFuncDecl entries | Add ~60 LOC |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | C runtime — add 4 HOF functions | Add ~80 LOC |
+| `lang_runtime.h` | `src/FunLangCompiler.Compiler/` | C header — declare 4 HOF functions | Add ~6 LOC |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | AST → MlirIR: add 4 HOF builtin cases + ExternalFuncDecl entries | Add ~60 LOC |
 
 ### Existing MlirOp Cases Used (NO new DU cases needed)
 
@@ -478,7 +478,7 @@ int64_t* lang_array_init(int64_t n, void* closure) {
 ### E2E Test Format (following existing .flt conventions)
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let arr = array_of_list [1; 2; 3] in
 let sum = array_fold (fun acc x -> acc + x) 0 arr in
@@ -517,17 +517,17 @@ sum
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Printer.fs` lines 108-110 — confirmed `IndirectCallOp` ABI: `llvm.call %fnPtr(%envPtr, %arg) : !llvm.ptr, (!llvm.ptr, argType) -> resultType` — env ptr comes before arg
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` lines 40-79 — confirmed no loop ops (no ForOp, WhileOp, scf.for); confirmed `IndirectCallOp` signature
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` lines 446-451 — confirmed inner llvm.func signature `InputTypes = [Ptr; I64]; ReturnType = Some I64` (env first, arg second)
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` lines 1544-1548 — confirmed lambda body: `%arg0: Ptr = env`, `%arg1: I64 = arg`
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — confirmed array layout: `arr[0]=length, arr[1..n]=elements`; `GC_malloc` pattern; `lang_failwith` usage
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.h` — confirmed no HOF declarations exist; `LangClosureFn` typedef not yet present
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` lines 108-110 — confirmed `IndirectCallOp` ABI: `llvm.call %fnPtr(%envPtr, %arg) : !llvm.ptr, (!llvm.ptr, argType) -> resultType` — env ptr comes before arg
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` lines 40-79 — confirmed no loop ops (no ForOp, WhileOp, scf.for); confirmed `IndirectCallOp` signature
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` lines 446-451 — confirmed inner llvm.func signature `InputTypes = [Ptr; I64]; ReturnType = Some I64` (env first, arg second)
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` lines 1544-1548 — confirmed lambda body: `%arg0: Ptr = env`, `%arg1: I64 = arg`
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed array layout: `arr[0]=length, arr[1..n]=elements`; `GC_malloc` pattern; `lang_failwith` usage
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — confirmed no HOF declarations exist; `LangClosureFn` typedef not yet present
 - Direct code analysis of `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` lines 488-522 — confirmed LangThree HOF semantics: `array_fold` uses `callValue (callValue fVal acc) x` (two calls), `array_init` uses `Array.init n (fun i -> callValue fVal (IntValue i))` (zero-based index)
 - Direct code analysis of `Elaboration.fs` lines 2205 and 2348 — confirmed two `externalFuncs` lists exist; both must be updated
 
 ### Secondary (MEDIUM confidence)
-- Phase 22 RESEARCH.md (`/Users/ohama/vibe-coding/LangBackend/.planning/phases/22-array-core/22-RESEARCH.md`) — confirmed one-block array layout, GEP patterns, coercion requirements (Pitfall 4 re: Ptr-typed defVal); directly applicable
+- Phase 22 RESEARCH.md (`/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/22-array-core/22-RESEARCH.md`) — confirmed one-block array layout, GEP patterns, coercion requirements (Pitfall 4 re: Ptr-typed defVal); directly applicable
 
 ### Tertiary (LOW confidence)
 - None required — all findings sourced from direct code analysis

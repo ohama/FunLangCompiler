@@ -1,14 +1,14 @@
 # Phase 35: Prelude Modules - Research
 
 **Researched:** 2026-03-29
-**Domain:** LangBackend prelude .fun files — module-qualified wrappers over existing builtins
+**Domain:** FunLangCompiler prelude .fun files — module-qualified wrappers over existing builtins
 **Confidence:** HIGH
 
 ## Summary
 
 Phase 35 creates prelude module .fun source files for String, Hashtable, StringBuilder, Char, List, Array, Option, and Result. These files wrap existing compiler builtins (from Phases 31-34) with module-qualified names such as `String.endsWith`, `List.sort`, `Option.map`, etc. The compiler already handles module declarations via Phase 25 (module system): `module String = let endsWith s suffix = string_endswith s suffix` is flattened by the compiler so that `String.endsWith` → `FieldAccess(Constructor("String"), "endsWith")` → `Var("endsWith")`, which then resolves to the elaborated function body.
 
-The LangThree interpreter already has a working `Prelude/` directory with corresponding .fun files (`String.fun`, `Hashtable.fun`, `Char.fun`, `StringBuilder.fun`, `List.fun`, `Array.fun`, `Option.fun`, `Result.fun`). These are the canonical reference implementations. LangBackend Phase 35 creates a parallel `Prelude/` directory with adapted versions of these files.
+The LangThree interpreter already has a working `Prelude/` directory with corresponding .fun files (`String.fun`, `Hashtable.fun`, `Char.fun`, `StringBuilder.fun`, `List.fun`, `Array.fun`, `Option.fun`, `Result.fun`). These are the canonical reference implementations. FunLangCompiler Phase 35 creates a parallel `Prelude/` directory with adapted versions of these files.
 
 The key mechanism is **prelude concatenation in the CLI**: `Program.fs` is extended to discover a `Prelude/` directory (same 3-stage search as LangThree), read all `.fun` files in order, concatenate their source with the user's source, then parse the combined text. This avoids adding `FileImportDecl` support to the compiler (which would require AST changes). Each test `.flt` file in `tests/compiler/35-*.flt` inlines the relevant module definition because the test runner compiles single files. The prelude-loading in the CLI is validated by an E2E test that passes a bare program relying on prelude symbols.
 
@@ -21,9 +21,9 @@ The established components for this codebase:
 ### Core
 | Component | Location | Purpose | Why Standard |
 |-----------|----------|---------|--------------|
-| Prelude/*.fun | LangBackend root `Prelude/` (new) | Module wrapper .fun source files | Same approach as LangThree Prelude/ — .fun files compiled by LangBackend |
-| Program.fs | src/LangBackend.Cli/Program.fs | CLI entry point — add prelude loading | Existing single-file CLI; extend `main` to prepend prelude source |
-| Elaboration.fs | src/LangBackend.Compiler/Elaboration.fs | No changes needed | Phase 25 module flattening already handles module decls |
+| Prelude/*.fun | FunLangCompiler root `Prelude/` (new) | Module wrapper .fun source files | Same approach as LangThree Prelude/ — .fun files compiled by FunLangCompiler |
+| Program.fs | src/FunLangCompiler.Cli/Program.fs | CLI entry point — add prelude loading | Existing single-file CLI; extend `main` to prepend prelude source |
+| Elaboration.fs | src/FunLangCompiler.Compiler/Elaboration.fs | No changes needed | Phase 25 module flattening already handles module decls |
 | tests/compiler/35-*.flt | tests/compiler/ | E2E test files with inline module defs | Existing .flt format; tests are self-contained |
 
 ### Supporting
@@ -127,7 +127,7 @@ module Option =
 
 Critical: the compiler's `prePassDecls` will register `None` (tag 0, arity 0) and `Some` (tag 1, arity 1) in `TypeEnv`. The `typeParams` field of `TypeDecl` is ignored by `prePassDecls` (the wildcard `_` at line 3158). So generic types like `type Option 'a` compile fine.
 
-**Naming alignment required:** LangThree uses `optionMap`, `optionBind`, etc., but PRE-07/08 require `map`, `bind`, `defaultValue`, etc. The LangBackend Prelude files must use the short names.
+**Naming alignment required:** LangThree uses `optionMap`, `optionBind`, etc., but PRE-07/08 require `map`, `bind`, `defaultValue`, etc. The FunLangCompiler Prelude files must use the short names.
 
 ### Pattern 4: CLI Prelude Loading
 **What:** Before parsing user source, the CLI loads and prepends all Prelude/*.fun files.
@@ -169,7 +169,7 @@ let preludeFiles = [| "Core.fun"; "Option.fun"; "Result.fun"; "String.fun";
 ```
 
 ### Anti-Patterns to Avoid
-- **Using `open Option` in tests:** `OpenDecl` is a no-op in the compiler — `open Option` doesn't bring module members into scope at the compiler level. After flattening, all functions ARE already in the global scope since modules are flattened. So `open Option` is not needed and should not be included in LangBackend Prelude files.
+- **Using `open Option` in tests:** `OpenDecl` is a no-op in the compiler — `open Option` doesn't bring module members into scope at the compiler level. After flattening, all functions ARE already in the global scope since modules are flattened. So `open Option` is not needed and should not be included in FunLangCompiler Prelude files.
 - **Expecting type-checked Option:** The compiler is untyped. `Option.map` works by compiling the match patterns against tag 0/1, regardless of the type parameter.
 - **Name collisions with helper functions:** `List.fun` defines `_insert`, `_mapi_helper`, `_distinctBy_helper`. When the prelude is prepended to user source, these names become global. Users should not define variables with the same names. Since they start with `_`, this is an acceptable limitation.
 - **Mutual recursion in modules:** `LetRecDecl` in the compiler supports single-binding `let rec`. The `and` keyword for mutual recursion would create a multi-binding `LetRecDecl`. Prelude files should not use `let rec f = ... and g = ...`. All LangThree prelude files use only single `let rec`, so this is not an issue.
@@ -190,8 +190,8 @@ let preludeFiles = [| "Core.fun"; "Option.fun"; "Result.fun"; "String.fun";
 ### Pitfall 1: Open Module is a No-Op
 **What goes wrong:** Writing `open List` at the end of List.fun (as in LangThree) causes no problems in tests but also does nothing — `OpenDecl` is silently skipped by the compiler.
 **Why it happens:** `extractMainExpr` treats unknown decls as `| _ :: rest -> build rest` (line 3245 in Elaboration.fs). `OpenDecl` is a valid Decl but is not handled.
-**How to avoid:** Do NOT include `open Module` statements in LangBackend prelude files — they're harmless but confusing. The module is always flattened anyway.
-**Warning signs:** If `open List` were removed from LangThree prelude but LangBackend tests still pass, that confirms the compiler doesn't use it.
+**How to avoid:** Do NOT include `open Module` statements in FunLangCompiler prelude files — they're harmless but confusing. The module is always flattened anyway.
+**Warning signs:** If `open List` were removed from LangThree prelude but FunLangCompiler tests still pass, that confirms the compiler doesn't use it.
 
 ### Pitfall 2: Load Order for Option/Result Before List
 **What goes wrong:** `List.fun` uses `None` and `Some` constructors in `tryFind` and `choose`. If `List.fun` is loaded before `Option.fun`, `prePassDecls` hasn't registered `None`/`Some` tags yet. Pattern matching on `None`/`Some` fails with "unknown constructor".
@@ -216,8 +216,8 @@ BUT some functions like `let rec fold f = fun acc -> fun xs -> ...` have one exp
 **How to avoid:** Keep all recursive functions single-parameter (returning lambdas for additional args). All functions in LangThree prelude already follow this pattern.
 
 ### Pitfall 5: String.fun concat Uses string_concat_list
-**What goes wrong:** `LangThree/Prelude/String.fun` includes `let concat sep lst = string_concat_list sep lst`. If `string_concat_list` is not implemented in the LangBackend compiler (not in Phase 31 builtins), this would fail.
-**Why it happens:** The LangThree prelude was written for the full interpreter feature set; not all builtins may be in LangBackend yet.
+**What goes wrong:** `LangThree/Prelude/String.fun` includes `let concat sep lst = string_concat_list sep lst`. If `string_concat_list` is not implemented in the FunLangCompiler compiler (not in Phase 31 builtins), this would fail.
+**Why it happens:** The LangThree prelude was written for the full interpreter feature set; not all builtins may be in FunLangCompiler yet.
 **How to avoid:** Review which builtins each prelude function uses. Phase 31 adds: `string_endswith`, `string_startswith`, `string_trim`, `string_length` (from Phase 8), `string_contains` (from Phase 14), char builtins. `string_concat_list` may or may not be implemented. If not, omit `concat` from `String.fun` or implement the builtin as part of Phase 35.
 
 Let me verify: Phase 31 tests include `31-04-string-concat-list.flt`. Let me check if `string_concat_list` is in the compiler.
@@ -230,7 +230,7 @@ Let me verify: Phase 31 tests include `31-04-string-concat-list.flt`. Let me che
 
 ## Code Examples
 
-### String.fun (canonical form for LangBackend)
+### String.fun (canonical form for FunLangCompiler)
 ```
 // Prelude/String.fun
 module String =
@@ -242,7 +242,7 @@ module String =
     let contains s needle = string_contains s needle
 ```
 
-### Option.fun (LangBackend-specific names)
+### Option.fun (FunLangCompiler-specific names)
 ```
 // Prelude/Option.fun
 module Option =
@@ -256,7 +256,7 @@ module Option =
     let isNone opt = match opt with | Some _ -> false | None -> true
 ```
 
-### Result.fun (LangBackend-specific names)
+### Result.fun (FunLangCompiler-specific names)
 ```
 // Prelude/Result.fun
 module Result =
@@ -287,7 +287,7 @@ module List =
 
 ### Test .flt file format (inline module definition)
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 module String =
     let endsWith s suffix = string_endswith s suffix
@@ -339,7 +339,7 @@ let ast = parseProgram combinedSrc inputPath
 | Old Approach | Current Approach | When Changed | Impact |
 |--------------|------------------|--------------|--------|
 | Per-file module test (inline) | CLI auto-loads Prelude/ directory | Phase 35 | Users get String.endsWith etc. without defining the module |
-| LangThree function names (`optionMap`) | LangBackend names (`Option.map`) | Phase 35 | Cleaner API matching requirement spec |
+| LangThree function names (`optionMap`) | FunLangCompiler names (`Option.map`) | Phase 35 | Cleaner API matching requirement spec |
 
 ## Open Questions
 
@@ -363,9 +363,9 @@ let ast = parseProgram combinedSrc inputPath
 
 ### Primary (HIGH confidence)
 - `/Users/ohama/vibe-coding/LangThree/Prelude/` — 9 existing .fun prelude files, verified working
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — Phase 25 module flattening (lines 3189-3246), `prePassDecls` (3151-3187), FieldAccess desugar (2290-2296)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Cli/Program.fs` — single-file CLI, no prelude loading yet
-- `/Users/ohama/vibe-coding/LangBackend/tests/compiler/25-*.flt` — confirmed module system works (qualified vars, open, types, exceptions)
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Phase 25 module flattening (lines 3189-3246), `prePassDecls` (3151-3187), FieldAccess desugar (2290-2296)
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` — single-file CLI, no prelude loading yet
+- `/Users/ohama/vibe-coding/FunLangCompiler/tests/compiler/25-*.flt` — confirmed module system works (qualified vars, open, types, exceptions)
 
 ### Secondary (MEDIUM confidence)
 - LangThree Prelude.fs load order logic — basis for CLI prelude loading pattern

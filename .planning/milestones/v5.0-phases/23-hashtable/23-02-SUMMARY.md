@@ -35,7 +35,7 @@ key-files:
     - tests/compiler/23-07-ht-overwrite.flt
     - tests/compiler/23-08-ht-multi-ops.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "hashtable_create elaboration discards unit arg (_uVal) but still elaborates it to keep semantics consistent"
@@ -80,7 +80,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added 6 hashtable builtin match arms after array builtins, 6 ExternalFuncDecl entries in both lists
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added 6 hashtable builtin match arms after array builtins, 6 ExternalFuncDecl entries in both lists
 - `tests/compiler/23-01-ht-create.flt` - hashtable_create () → exit 42
 - `tests/compiler/23-02-ht-set-get.flt` - set then get round-trip
 - `tests/compiler/23-03-ht-missing-key.flt` - missing key raises exception catchable by try/with

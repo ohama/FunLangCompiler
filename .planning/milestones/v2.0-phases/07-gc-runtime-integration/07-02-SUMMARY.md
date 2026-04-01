@@ -31,7 +31,7 @@ key-files:
   created:
     - tests/compiler/07-01-gc-closure-escape.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Closure env byte count uses (numCaptures + 1) * 8 — slot 0 is fn ptr, slots 1..N are captures"
@@ -75,7 +75,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Change A: LlvmAllocaOp -> LlvmCallOp(@GC_malloc) with byte count; Change B: GC_init prepend to @main; Change C: ExternalFuncs populated
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Change A: LlvmAllocaOp -> LlvmCallOp(@GC_malloc) with byte count; Change B: GC_init prepend to @main; Change C: ExternalFuncs populated
 - `tests/compiler/07-01-gc-closure-escape.flt` - Escaped closure test: add5 10 = 15
 
 ## Decisions Made

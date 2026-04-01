@@ -30,10 +30,10 @@ score: 10/10 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/MlirIR.fs` | LlvmUnreachableOp in MlirOp DU | VERIFIED | Line 69: `\| LlvmUnreachableOp` present; 117 lines total |
-| `src/LangBackend.Compiler/Printer.fs` | Serialization of LlvmUnreachableOp as llvm.unreachable | VERIFIED | Lines 126-127: `\| LlvmUnreachableOp -> sprintf "%sllvm.unreachable" indent` |
-| `src/LangBackend.Compiler/Elaboration.fs` | General Match compiler + testPattern helper + ExternalFuncs | VERIFIED | 820 lines; testPattern at L128 (rec private); compileArms at L786; @lang_match_failure in ExternalFuncs at L871 |
-| `src/LangBackend.Compiler/lang_runtime.c` | lang_match_failure() C function | VERIFIED | Lines 47-50: void lang_match_failure() with fprintf(stderr) + exit(1); #include <stdlib.h> at L4 |
+| `src/FunLangCompiler.Compiler/MlirIR.fs` | LlvmUnreachableOp in MlirOp DU | VERIFIED | Line 69: `\| LlvmUnreachableOp` present; 117 lines total |
+| `src/FunLangCompiler.Compiler/Printer.fs` | Serialization of LlvmUnreachableOp as llvm.unreachable | VERIFIED | Lines 126-127: `\| LlvmUnreachableOp -> sprintf "%sllvm.unreachable" indent` |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | General Match compiler + testPattern helper + ExternalFuncs | VERIFIED | 820 lines; testPattern at L128 (rec private); compileArms at L786; @lang_match_failure in ExternalFuncs at L871 |
+| `src/FunLangCompiler.Compiler/lang_runtime.c` | lang_match_failure() C function | VERIFIED | Lines 47-50: void lang_match_failure() with fprintf(stderr) + exit(1); #include <stdlib.h> at L4 |
 | `tests/compiler/11-01-const-int-wildcard.flt` | E2E: 3-arm int match exits 1 | VERIFIED | File exists; FsLit PASS |
 | `tests/compiler/11-02-bool-pattern.flt` | E2E: bool const pattern exits 1 | VERIFIED | File exists; FsLit PASS |
 | `tests/compiler/11-03-nonexhaustive.flt` | E2E: non-exhaustive match exits 1 | VERIFIED | File exists; FsLit PASS |

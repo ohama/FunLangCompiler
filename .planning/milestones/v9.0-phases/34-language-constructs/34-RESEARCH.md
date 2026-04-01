@@ -1,7 +1,7 @@
 # Phase 34: Language Constructs - Research
 
 **Researched:** 2026-03-29
-**Domain:** LangBackend Elaboration.fs + C runtime — string slicing, list comprehension, ForInExpr tuple destructuring, and collection for-in
+**Domain:** FunLangCompiler Elaboration.fs + C runtime — string slicing, list comprehension, ForInExpr tuple destructuring, and collection for-in
 **Confidence:** HIGH
 
 ## Summary
@@ -17,9 +17,9 @@ The three sub-plans map cleanly to existing compiler patterns. Plan 34-01 (strin
 ### Core
 | Component | Location | Purpose | Why Standard |
 |-----------|----------|---------|--------------|
-| lang_runtime.c | src/LangBackend.Compiler/lang_runtime.c | New C helpers for slice and for-in variants | All runtime implementations live here (1024 lines) |
-| lang_runtime.h | src/LangBackend.Compiler/lang_runtime.h | Header declarations | All prototypes must be declared here |
-| Elaboration.fs | src/LangBackend.Compiler/Elaboration.fs | AST-to-MLIR translation | Pattern-match on new AST nodes, emit ops |
+| lang_runtime.c | src/FunLangCompiler.Compiler/lang_runtime.c | New C helpers for slice and for-in variants | All runtime implementations live here (1024 lines) |
+| lang_runtime.h | src/FunLangCompiler.Compiler/lang_runtime.h | Header declarations | All prototypes must be declared here |
+| Elaboration.fs | src/FunLangCompiler.Compiler/Elaboration.fs | AST-to-MLIR translation | Pattern-match on new AST nodes, emit ops |
 
 ### Supporting
 | Component | Purpose | When to Use |
@@ -45,7 +45,7 @@ The three sub-plans map cleanly to existing compiler patterns. Plan 34-01 (strin
 
 ### Recommended File Structure
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── lang_runtime.c    # Add: lang_string_slice, lang_list_comp, lang_for_in_hashset,
 │                     #      lang_for_in_queue, lang_for_in_mlist, lang_for_in_hashtable
 ├── lang_runtime.h    # Add: corresponding prototypes
@@ -408,7 +408,7 @@ This means the TuplePat ForInExpr arm cannot be handled purely by desugaring —
 
 ### E2E test pattern (established convention)
 ```flt
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let s = "hello world" in
 println (s.[0..4]);
@@ -453,9 +453,9 @@ world
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `StringSliceExpr`, `ListCompExpr`, `ForInExpr` AST node definitions
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` — Reference semantics for all four constructs
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fsy` — Parse rules confirming `ListCompExpr` range form desugars to `Range` node
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — All existing elaboration patterns (ForInExpr, LetPat TuplePat, Range, Tuple)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — All existing C runtime functions
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.h` — All struct definitions and prototypes
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — All existing elaboration patterns (ForInExpr, LetPat TuplePat, Range, Tuple)
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — All existing C runtime functions
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — All struct definitions and prototypes
 - `.planning/phases/33-collection-types/33-RESEARCH.md` — Patterns and pitfalls from immediately preceding phase
 
 ## Metadata

@@ -37,14 +37,14 @@ re_verification:
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | I64 closure dispatch arm in App Var(name) branch | VERIFIED | Lines 863-872: `closureVal.Type = I64` arm with `LlvmIntToPtrOp` + `LlvmLoadOp` + `IndirectCallOp`. Commit 5e93de9. |
-| `src/LangBackend.Compiler/Elaboration.fs` | General App case for non-Var function expressions | VERIFIED | Lines 881-902: `| _ ->` arm evaluates funcExpr, dispatches by type (Ptr direct, I64 inttoptr). Commit 575254e. |
-| `src/LangBackend.Compiler/Elaboration.fs` | Ptr-to-I64 coercion in closure-making DirectCallOp | VERIFIED | Lines 844-850: `if argVal.Type = Ptr then LlvmPtrToIntOp` coercion before DirectCallOp. Commit 575254e. |
-| `src/LangBackend.Compiler/Elaboration.fs` | Arity-aware Constructor(name, None, _) case | VERIFIED | Lines 1361-1369: `if info.Arity >= 1 then elaborateExpr env (Lambda(...))`. Present from 20-01. |
-| `src/LangBackend.Compiler/Elaboration.fs` | resolveAccessorTyped parent Ptr in Field branches | VERIFIED | Lines 978, 1009, 1021, 1657, 1678, 1690 all call `resolveAccessorTyped parent Ptr`. Present from 20-02. |
-| `src/LangBackend.Compiler/Elaboration.fs` | Conditional merge branch in emitDecisionTree/2 Leaf+Guard | VERIFIED | Lines 1192-1201 (Match Leaf), 1245-1253 (Match Guard), 1834-1843 (TryWith Leaf), 1880-1888 (TryWith Guard). Present from 20-02. |
-| `src/LangBackend.Compiler/MlirIR.fs` | LlvmIntToPtrOp and LlvmPtrToIntOp DU cases | VERIFIED | Lines 73-76: both DU cases present. Present from 20-01. |
-| `src/LangBackend.Compiler/Printer.fs` | llvm.inttoptr and llvm.ptrtoint emission | VERIFIED | Lines 135-138: both match arms emit correct MLIR text. Present from 20-01. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | I64 closure dispatch arm in App Var(name) branch | VERIFIED | Lines 863-872: `closureVal.Type = I64` arm with `LlvmIntToPtrOp` + `LlvmLoadOp` + `IndirectCallOp`. Commit 5e93de9. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | General App case for non-Var function expressions | VERIFIED | Lines 881-902: `| _ ->` arm evaluates funcExpr, dispatches by type (Ptr direct, I64 inttoptr). Commit 575254e. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Ptr-to-I64 coercion in closure-making DirectCallOp | VERIFIED | Lines 844-850: `if argVal.Type = Ptr then LlvmPtrToIntOp` coercion before DirectCallOp. Commit 575254e. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Arity-aware Constructor(name, None, _) case | VERIFIED | Lines 1361-1369: `if info.Arity >= 1 then elaborateExpr env (Lambda(...))`. Present from 20-01. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | resolveAccessorTyped parent Ptr in Field branches | VERIFIED | Lines 978, 1009, 1021, 1657, 1678, 1690 all call `resolveAccessorTyped parent Ptr`. Present from 20-02. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Conditional merge branch in emitDecisionTree/2 Leaf+Guard | VERIFIED | Lines 1192-1201 (Match Leaf), 1245-1253 (Match Guard), 1834-1843 (TryWith Leaf), 1880-1888 (TryWith Guard). Present from 20-02. |
+| `src/FunLangCompiler.Compiler/MlirIR.fs` | LlvmIntToPtrOp and LlvmPtrToIntOp DU cases | VERIFIED | Lines 73-76: both DU cases present. Present from 20-01. |
+| `src/FunLangCompiler.Compiler/Printer.fs` | llvm.inttoptr and llvm.ptrtoint emission | VERIFIED | Lines 135-138: both match arms emit correct MLIR text. Present from 20-01. |
 | `tests/compiler/20-01-firstclass-ctor.flt` | E2E test for first-class constructor via let-binding | VERIFIED | PASS. `let s = Some in match s 42 with`, exits 42. |
 | `tests/compiler/20-02-nested-adt-pat.flt` | E2E test for nested ADT pattern | VERIFIED | PASS. Nested Node pattern, exits 15. |
 | `tests/compiler/20-03-raise-in-handler.flt` | E2E test for raise inside handler arm | VERIFIED | PASS. Nested try-with with raise, exits 42. |

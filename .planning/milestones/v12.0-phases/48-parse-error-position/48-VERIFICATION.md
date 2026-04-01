@@ -31,7 +31,7 @@ notes:
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Cli/Program.fs` | Position-aware parse error via `lastParsedPos` mutable | VERIFIED | File exists, 228 lines, `lastParsedPos` declared at line 33, tracked at line 43, used at line 59 |
+| `src/FunLangCompiler.Cli/Program.fs` | Position-aware parse error via `lastParsedPos` mutable | VERIFIED | File exists, 228 lines, `lastParsedPos` declared at line 33, tracked at line 43, used at line 59 |
 | `tests/compiler/45-01-parse-error-preserved.flt` | Updated with `CHECK-RE` for file:line:col | VERIFIED | Uses `CHECK-RE: \[Parse\] .*45-01-parse-error-preserved\.fun:\d+:\d+: parse error`; matches actual output |
 | `tests/compiler/45-02-parse-error-position.flt` | Updated with file:line:col position | PARTIAL | Still contains `[Parse] parse error` (no position) — intentionally unchanged per SUMMARY, but contradicts must_haves truth #2 |
 | `tests/compiler/46-05-error-category-parse.flt` | Updated with `CHECK-RE` for file:line:col | VERIFIED | Uses `CHECK-RE: \[Parse\] 46-05-error-category-parse\.fun:\d+:\d+: parse error`; matches actual output |

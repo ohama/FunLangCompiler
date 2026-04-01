@@ -31,8 +31,8 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Cli/Program.fs
 
 key-decisions:
   - "parseModule fallback: try parseModule, if parse error fall back to parseExpr + synthetic Module wrapper — ensures all 45 bare-expression tests pass without reverting to Parser.start"
@@ -78,8 +78,8 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - TypeInfo type; TypeEnv/RecordEnv/ExnTags in ElabEnv; prePassDecls; extractMainExpr; elaborateProgram
-- `src/LangBackend.Cli/Program.fs` - parseProgram with parseModule + bare-expression fallback; main uses elaborateProgram
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - TypeInfo type; TypeEnv/RecordEnv/ExnTags in ElabEnv; prePassDecls; extractMainExpr; elaborateProgram
+- `src/FunLangCompiler.Cli/Program.fs` - parseProgram with parseModule + bare-expression fallback; main uses elaborateProgram
 
 ## Decisions Made
 
@@ -97,7 +97,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (Program.fs switch and E2E verification)
 - **Issue:** `Parser.parseModule` throws a parse error on bare expressions like `42`, `true`, `if...then...else`, `match...`, `let rec...in...`. Empirically verified 40 of 45 tests fail. Research doc said "parseModule produces Module([LetDecl...]) for bare expression inputs" — this is incorrect for the vast majority of inputs.
 - **Fix:** `parseProgram` tries `parseModule` first; on any exception, falls back to `parseExpr` and wraps the result in a synthetic `Ast.Module([LetDecl("_", expr, unknownSpan)], unknownSpan)`. The `elaborateProgram` function then processes this uniformly via `extractMainExpr`.
-- **Files modified:** `src/LangBackend.Cli/Program.fs`
+- **Files modified:** `src/FunLangCompiler.Cli/Program.fs`
 - **Verification:** All 45 E2E tests pass (Results: 45/45 passed)
 - **Committed in:** `745fa89` (Task 2 commit)
 

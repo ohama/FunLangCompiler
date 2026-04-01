@@ -32,10 +32,10 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
 
 key-decisions:
   - "lang_array_bounds_check uses lang_throw (not lang_failwith) so OOB is catchable by try/with"
@@ -80,10 +80,10 @@ Each task was committed atomically:
 **Plan metadata:** (see docs commit below)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added LlvmGEPDynamicOp DU case after LlvmGEPStructOp
-- `src/LangBackend.Compiler/Printer.fs` - Added printer arm for LlvmGEPDynamicOp
-- `src/LangBackend.Compiler/lang_runtime.c` - Added 4 array runtime functions
-- `src/LangBackend.Compiler/lang_runtime.h` - Added LangCons forward decl + 4 function prototypes
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added LlvmGEPDynamicOp DU case after LlvmGEPStructOp
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added printer arm for LlvmGEPDynamicOp
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added 4 array runtime functions
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added LangCons forward decl + 4 function prototypes
 
 ## Decisions Made
 - lang_array_bounds_check uses lang_throw (not lang_failwith) so OOB is catchable by try/with in user code

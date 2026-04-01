@@ -34,9 +34,9 @@ key-files:
     - tests/compiler/08-03-string-concat.flt
     - tests/compiler/08-04-to-string.flt
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "ArithExtuIOp (arith.extui) added to MlirIR/Printer to zero-extend I1→I64 for C ABI: @lang_to_string_bool takes int64_t, MLIR won't let i1 pass directly to i64 param"
@@ -79,9 +79,9 @@ completed: 2026-03-26
 3. **Task 3: Write FsLit tests + ArithExtuIOp fix** - `71394e4` (test)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added ArithExtuIOp case to MlirOp DU
-- `src/LangBackend.Compiler/Printer.fs` - Added printOp case for ArithExtuIOp (arith.extui)
-- `src/LangBackend.Compiler/Elaboration.fs` - strcmp equality, string_concat, to_string builtins
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added ArithExtuIOp case to MlirOp DU
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added printOp case for ArithExtuIOp (arith.extui)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - strcmp equality, string_concat, to_string builtins
 - `tests/compiler/08-02-string-equality.flt` - STR-02: "abc"="abc" true, "abc"="def" false → exit 1
 - `tests/compiler/08-03-string-concat.flt` - STR-04: string_concat "foo" "bar" → length 6
 - `tests/compiler/08-04-to-string.flt` - STR-05: to_string 42 → "42", to_string true → "true"
@@ -98,7 +98,7 @@ completed: 2026-03-26
 - **Found during:** Task 3 (writing STR-05 to_string test)
 - **Issue:** `@lang_to_string_bool` declared as `ExtParams = [I64]` in ExternalFuncs (matches C `int64_t`), but `to_string true` elaborates `true` to an I1 value. MLIR validation rejected `llvm.call @lang_to_string_bool(%t2) : (i1) -> !llvm.ptr` with error "operand type mismatch for operand 0: 'i1' != 'i64'"
 - **Fix:** Added `ArithExtuIOp` (arith.extui) to MlirIR and Printer; updated `to_string` I1 path to emit `ArithExtuIOp(extVal, argVal)` then pass `extVal : I64` to the call
-- **Files modified:** src/LangBackend.Compiler/MlirIR.fs, src/LangBackend.Compiler/Printer.fs, src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/MlirIR.fs, src/FunLangCompiler.Compiler/Printer.fs, src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** 08-04-to-string.flt passes; all 22 tests pass
 - **Committed in:** `71394e4` (Task 3 commit)
 

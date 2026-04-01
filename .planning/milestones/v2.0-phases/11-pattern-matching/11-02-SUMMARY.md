@@ -39,7 +39,7 @@ key-files:
     - tests/compiler/11-06-tuple-match.flt
     - tests/compiler/11-07-multiarm.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "testPattern made rec (let rec private) to support TuplePat recursive nesting — F# requires explicit rec for self-calls"
@@ -81,7 +81,7 @@ Each task was committed atomically:
 2. **Task 2: Write FsLit E2E tests and verify all pass** - `ef79a94` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added ConstPat(StringConst) and TuplePat cases to testPattern; made testPattern rec
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added ConstPat(StringConst) and TuplePat cases to testPattern; made testPattern rec
 - `tests/compiler/11-04-string-pattern.flt` - match "hello" with string const pattern exits 1 (PAT-03)
 - `tests/compiler/11-05-list-sum.flt` - sum [1;2;3] via EmptyListPat+ConsPat recursive match exits 6
 - `tests/compiler/11-06-tuple-match.flt` - match (1,2) with TuplePat exits 3
@@ -100,7 +100,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (build after adding recursive TuplePat)
 - **Issue:** `let private rec testPattern` is invalid F# syntax; produced FS0010 "Unexpected keyword 'rec'"
 - **Fix:** Changed to `let rec private testPattern` (correct F# order: let rec, then access modifier)
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Build succeeded with zero errors after fix
 - **Committed in:** 31ddc61 (Task 1 commit)
 

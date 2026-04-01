@@ -37,7 +37,7 @@ key-files:
     - tests/compiler/22-06-array-to-list.flt
     - tests/compiler/22-07-array-roundtrip.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "OOB test uses exit 42 (not 999) because shell $? truncates exit codes to 8 bits; 999 & 0xFF = 231 which looks like a crash"
@@ -81,7 +81,7 @@ Each task was committed atomically:
 **Plan metadata:** (see docs commit below)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added 6 builtin cases + 4 ExternalFuncDecl entries in both lists
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added 6 builtin cases + 4 ExternalFuncDecl entries in both lists
 - `tests/compiler/22-01-array-create.flt` - array_create + array_get (exit 0)
 - `tests/compiler/22-02-array-get-set.flt` - array_set + array_get roundtrip (exit 42)
 - `tests/compiler/22-03-array-length.flt` - array_length (exit 7)

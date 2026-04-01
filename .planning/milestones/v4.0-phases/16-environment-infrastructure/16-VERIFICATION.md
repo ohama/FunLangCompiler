@@ -33,9 +33,9 @@ score: 4/4 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | TypeInfo, ElabEnv with TypeEnv/RecordEnv/ExnTags, prePassDecls, extractMainExpr, elaborateProgram | VERIFIED | 1408 lines; all expected symbols present and substantive |
-| `src/LangBackend.Cli/Program.fs` | parseProgram with parseModule fallback; main calls elaborateProgram | VERIFIED | 78 lines; parseProgram uses try/catch parseModule-or-fallback; main calls Elaboration.elaborateProgram |
-| `src/LangBackend.Compiler/MatchCompiler.fs` | CtorTag with AdtCtor/RecordCtor; ctorArity; desugarPattern arms | VERIFIED | 265 lines; AdtCtor and RecordCtor in CtorTag DU; ctorArity handles both; desugarPattern has complete dispatch |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | TypeInfo, ElabEnv with TypeEnv/RecordEnv/ExnTags, prePassDecls, extractMainExpr, elaborateProgram | VERIFIED | 1408 lines; all expected symbols present and substantive |
+| `src/FunLangCompiler.Cli/Program.fs` | parseProgram with parseModule fallback; main calls elaborateProgram | VERIFIED | 78 lines; parseProgram uses try/catch parseModule-or-fallback; main calls Elaboration.elaborateProgram |
+| `src/FunLangCompiler.Compiler/MatchCompiler.fs` | CtorTag with AdtCtor/RecordCtor; ctorArity; desugarPattern arms | VERIFIED | 265 lines; AdtCtor and RecordCtor in CtorTag DU; ctorArity handles both; desugarPattern has complete dispatch |
 
 ### Key Link Verification
 

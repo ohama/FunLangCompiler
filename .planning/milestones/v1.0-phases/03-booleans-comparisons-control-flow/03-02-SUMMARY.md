@@ -36,7 +36,7 @@ key-files:
     - tests/compiler/03-04-short-circuit-and.flt
     - tests/compiler/03-05-short-circuit-or.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "env.Blocks ref accumulates side blocks in emission order; elaborateModule appends them after the entry block and patches ReturnOp onto the final merge block"
@@ -81,7 +81,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Added LabelCounter/Blocks to ElabEnv, freshLabel, If/And/Or cases, multi-block elaborateModule
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added LabelCounter/Blocks to ElabEnv, freshLabel, If/And/Or cases, multi-block elaborateModule
 - `tests/compiler/03-03-if-else.flt` - E2E: if 5 <= 0 then 0 else 1 exits 1
 - `tests/compiler/03-04-short-circuit-and.flt` - E2E: true && false exits 0
 - `tests/compiler/03-05-short-circuit-or.flt` - E2E: false || true exits 1

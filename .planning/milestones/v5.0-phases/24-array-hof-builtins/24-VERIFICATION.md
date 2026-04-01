@@ -30,9 +30,9 @@ re_verification: false
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/lang_runtime.h` | LangClosureFn typedef + 4 HOF prototypes | VERIFIED | Line 53: `typedef int64_t (*LangClosureFn)(void* env, int64_t arg);` + lines 54-57: all 4 prototypes present (59 lines total) |
-| `src/LangBackend.Compiler/lang_runtime.c` | 4 HOF function implementations | VERIFIED | Lines 345-391: all 4 implementations present (391 lines total), loop bodies non-trivial |
-| `src/LangBackend.Compiler/Elaboration.fs` | 4 HOF match arms + 8 ExternalFuncDecl entries (4 per list) | VERIFIED | Lines 974-1043: 4 match arms; lines 2308-2311 + 2455-2458: 8 ExternalFuncDecl entries across both lists; 16 total HOF references |
+| `src/FunLangCompiler.Compiler/lang_runtime.h` | LangClosureFn typedef + 4 HOF prototypes | VERIFIED | Line 53: `typedef int64_t (*LangClosureFn)(void* env, int64_t arg);` + lines 54-57: all 4 prototypes present (59 lines total) |
+| `src/FunLangCompiler.Compiler/lang_runtime.c` | 4 HOF function implementations | VERIFIED | Lines 345-391: all 4 implementations present (391 lines total), loop bodies non-trivial |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | 4 HOF match arms + 8 ExternalFuncDecl entries (4 per list) | VERIFIED | Lines 974-1043: 4 match arms; lines 2308-2311 + 2455-2458: 8 ExternalFuncDecl entries across both lists; 16 total HOF references |
 | `tests/compiler/24-01-array-iter.flt` | E2E test for array_iter | VERIFIED | 7 lines, uses `array_iter (fun x -> print (to_string x))`, expected output `1230` |
 | `tests/compiler/24-02-array-map.flt` | E2E test for array_map | VERIFIED | 7 lines, uses `array_map (fun x -> x * 2)` + fold verification, expected output `12` |
 | `tests/compiler/24-03-array-fold.flt` | E2E test for array_fold | VERIFIED | 6 lines, sums [1;2;3;4;5], expected output `15` |

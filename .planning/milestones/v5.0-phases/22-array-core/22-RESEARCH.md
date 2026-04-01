@@ -22,11 +22,11 @@ This phase introduces no new external libraries. All components already exist.
 
 | Component | Location | Purpose | v22 Change |
 |-----------|----------|---------|------------|
-| `MlirIR.fs` | `src/LangBackend.Compiler/` | DU for MlirOp — add `LlvmGEPDynamicOp` | Add 1 DU case |
-| `Printer.fs` | `src/LangBackend.Compiler/` | MlirIR → MLIR text — add printer for `LlvmGEPDynamicOp` | Add 1 match arm |
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | AST → MlirIR: add 6 builtin cases + ExternalFuncDecl entries | Add ~50 LOC |
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | C runtime — add array_create, bounds_check, of_list, to_list | Add ~60 LOC |
-| `lang_runtime.h` | `src/LangBackend.Compiler/` | C header — add array function declarations | Add ~8 LOC |
+| `MlirIR.fs` | `src/FunLangCompiler.Compiler/` | DU for MlirOp — add `LlvmGEPDynamicOp` | Add 1 DU case |
+| `Printer.fs` | `src/FunLangCompiler.Compiler/` | MlirIR → MLIR text — add printer for `LlvmGEPDynamicOp` | Add 1 match arm |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | AST → MlirIR: add 6 builtin cases + ExternalFuncDecl entries | Add ~50 LOC |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | C runtime — add array_create, bounds_check, of_list, to_list | Add ~60 LOC |
+| `lang_runtime.h` | `src/FunLangCompiler.Compiler/` | C header — add array function declarations | Add ~8 LOC |
 
 ### Existing MlirOp Cases Used (no new DU beyond LlvmGEPDynamicOp)
 
@@ -478,21 +478,21 @@ LangCons* lang_array_to_list(int64_t* arr) {
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — confirmed `LlvmGEPLinearOp` takes `int` (compile-time constant); no dynamic variant exists
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Printer.fs` — confirmed GEP printer output format; `LlvmGEPLinearOp` → `llvm.getelementptr %ptr[N]`
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — confirmed string_length inline GEP pattern; ExternalFuncDecl list locations (lines ~2036, ~2169); two-list requirement
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — confirmed LangCons struct layout; GC_malloc usage patterns; lang_range loop pattern
-- `/Users/ohama/vibe-coding/LangBackend/.planning/STATE.md` — authoritative project decision: one-block GC_malloc((n+1)*8) layout
-- `/Users/ohama/vibe-coding/LangBackend/.planning/REQUIREMENTS.md` — authoritative requirements: ARR-01 through ARR-07 specifications
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed `LlvmGEPLinearOp` takes `int` (compile-time constant); no dynamic variant exists
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — confirmed GEP printer output format; `LlvmGEPLinearOp` → `llvm.getelementptr %ptr[N]`
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — confirmed string_length inline GEP pattern; ExternalFuncDecl list locations (lines ~2036, ~2169); two-list requirement
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed LangCons struct layout; GC_malloc usage patterns; lang_range loop pattern
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/STATE.md` — authoritative project decision: one-block GC_malloc((n+1)*8) layout
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/REQUIREMENTS.md` — authoritative requirements: ARR-01 through ARR-07 specifications
 - Direct code analysis of `../LangThree/src/LangThree/Eval.fs` — confirmed array builtin semantics: bounds check + OOB exception; array_of_list/array_to_list round-trip behavior
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/LangBackend/.planning/research/ARCHITECTURE.md` — array section; note: C-runtime-only recommendation superseded by REQUIREMENTS.md inline GEP spec, but C function signatures remain accurate
-- `/Users/ohama/vibe-coding/LangBackend/.planning/research/PITFALLS.md` — M-17 (bounds check), M-18 (GC_malloc variant) confirmed
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/ARCHITECTURE.md` — array section; note: C-runtime-only recommendation superseded by REQUIREMENTS.md inline GEP spec, but C function signatures remain accurate
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/PITFALLS.md` — M-17 (bounds check), M-18 (GC_malloc variant) confirmed
 - WebSearch: MLIR `llvm.getelementptr` with SSA-value index syntax confirmed: `%r = llvm.getelementptr %ptr[%idx] : (!llvm.ptr, i64) -> !llvm.ptr, T` (https://mlir.llvm.org/docs/Dialects/LLVM/)
 
 ### Tertiary (LOW confidence)
-- `/Users/ohama/vibe-coding/LangBackend/.planning/research/FEATURES.md` — original two-vs-one-block analysis; superseded by STATE.md decision
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/FEATURES.md` — original two-vs-one-block analysis; superseded by STATE.md decision
 
 ## Metadata
 

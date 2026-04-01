@@ -24,7 +24,7 @@ key-files:
   created:
     - tests/compiler/35-08-list-tryfind-choose.fun
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
     - tests/compiler/35-08-list-tryfind-choose.flt
 
 key-decisions:
@@ -68,7 +68,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - LessThan/GreaterThan/LessEqual/GreaterEqual cases updated with coerceToI64 before ArithCmpIOp
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - LessThan/GreaterThan/LessEqual/GreaterEqual cases updated with coerceToI64 before ArithCmpIOp
 - `tests/compiler/35-08-list-tryfind-choose.fun` - Appended List.filter and List.choose with x > 2 predicate
 - `tests/compiler/35-08-list-tryfind-choose.flt` - Updated expected output: existing 5 lines + 3,4,3,4 + exit 0
 

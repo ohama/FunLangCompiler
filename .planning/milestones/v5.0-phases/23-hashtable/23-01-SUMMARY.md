@@ -34,8 +34,8 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/lang_runtime.c
 
 key-decisions:
   - "murmurhash3 fmix64 finalizer chosen for hash function — fast, good avalanche, no external dependency"
@@ -78,8 +78,8 @@ Each task was committed atomically:
 2. **Task 2: Implement 6 hashtable C functions in lang_runtime.c** - `4c1c2d8` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.h` - Added LangHashEntry, LangHashtable structs and 6 function declarations
-- `src/LangBackend.Compiler/lang_runtime.c` - Implemented lang_ht_hash (murmurhash3), lang_ht_find, lang_ht_rehash helpers and 6 public hashtable functions
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added LangHashEntry, LangHashtable structs and 6 function declarations
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Implemented lang_ht_hash (murmurhash3), lang_ht_find, lang_ht_rehash helpers and 6 public hashtable functions
 
 ## Decisions Made
 - **murmurhash3 fmix64 finalizer** for hashing: fast, no dependencies, good avalanche properties for i64 keys

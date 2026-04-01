@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 13 extends the LangBackend pattern matching compiler with three features that are already represented in the LangThree AST but not yet handled in the backend: `when` guards (PAT-06), `OrPat` (PAT-07), and `ConstPat(CharConst)` (PAT-08).
+Phase 13 extends the FunLangCompiler pattern matching compiler with three features that are already represented in the LangThree AST but not yet handled in the backend: `when` guards (PAT-06), `OrPat` (PAT-07), and `ConstPat(CharConst)` (PAT-08).
 
 The AST type `MatchClause = Pattern * Expr option * Expr` already includes the guard as the second element (`Expr option`). The current `Elaboration.fs` Match handler extracts `_guard` but ignores it (line 783). Similarly, `MatchCompiler.desugarPattern` raises `failwith` for both `OrPat` and `ConstPat(CharConst)` (lines 92–93, 120–121). All three features have clear, minimal implementation paths within the existing Jacobs decision tree infrastructure.
 
@@ -364,8 +364,8 @@ if first.Tests.IsEmpty then
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis: `src/LangBackend.Compiler/MatchCompiler.fs` — full Jacobs algorithm, all stubs
-- Direct code analysis: `src/LangBackend.Compiler/Elaboration.fs` lines 777–1007 — Match handler, emitDecisionTree, Leaf case
+- Direct code analysis: `src/FunLangCompiler.Compiler/MatchCompiler.fs` — full Jacobs algorithm, all stubs
+- Direct code analysis: `src/FunLangCompiler.Compiler/Elaboration.fs` lines 777–1007 — Match handler, emitDecisionTree, Leaf case
 - `.planning/research/FEATURES.md` — AST types for MatchClause, OrPat, ConstPat
 - `.planning/milestones/v2.0-phases/09-tuples/09-RESEARCH.md` — MatchClause type definition
 

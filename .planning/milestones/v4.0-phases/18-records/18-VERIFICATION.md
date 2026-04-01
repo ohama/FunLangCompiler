@@ -31,7 +31,7 @@ re_verification: false
 
 | Artifact                                              | Expected                                              | Status    | Details                                                               |
 |-------------------------------------------------------|-------------------------------------------------------|-----------|-----------------------------------------------------------------------|
-| `src/LangBackend.Compiler/Elaboration.fs`             | RecordExpr, FieldAccess, RecordUpdate, SetField cases + freeVars + RecordCtor pattern matching | VERIFIED | 1615 lines; all cases present at lines 1341, 1374, 1391, 1429; freeVars at lines 123-132; ensureRecordFieldTypes at line 1100 |
+| `src/FunLangCompiler.Compiler/Elaboration.fs`             | RecordExpr, FieldAccess, RecordUpdate, SetField cases + freeVars + RecordCtor pattern matching | VERIFIED | 1615 lines; all cases present at lines 1341, 1374, 1391, 1429; freeVars at lines 123-132; ensureRecordFieldTypes at line 1100 |
 | `tests/compiler/18-01-record-create.flt`              | E2E: record construction + p.x = 3                   | VERIFIED | Exists; correct input/output; PASS                                    |
 | `tests/compiler/18-02-field-access.flt`               | E2E: field access p.y = 4                            | VERIFIED | Exists; correct input/output; PASS                                    |
 | `tests/compiler/18-03-record-update.flt`              | E2E: functional update p2.x = 3 (independent)       | VERIFIED | Exists; correct input/output; PASS                                    |

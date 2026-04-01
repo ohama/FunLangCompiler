@@ -30,7 +30,7 @@ key-files:
   created:
     - tests/compiler/42-01-if-match-nested.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Phase 42: same FIX-02 pattern (blocksAfterX - 1 index) applied to both then AND else branches of If handler"
@@ -72,7 +72,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added blocksBeforeThen/AfterThen/BeforeElse/AfterElse tracking and isBranchTerminator helper; replaced unconditional block construction with terminator-aware patching for both then and else branches
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added blocksBeforeThen/AfterThen/BeforeElse/AfterElse tracking and isBranchTerminator helper; replaced unconditional block construction with terminator-aware patching for both then and else branches
 - `tests/compiler/42-01-if-match-nested.flt` - E2E tests for SC-1 (if-else-match), SC-2 (if-then-match-else), SC-3 (let rec take with if/match nesting)
 
 ## Decisions Made

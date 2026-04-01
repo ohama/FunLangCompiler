@@ -38,9 +38,9 @@ key-files:
     - tests/compiler/10-01-list-literal.flt
     - tests/compiler/10-02-list-length.flt
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "LlvmNullOp result.Type = Ptr, prints as llvm.mlir.zero : !llvm.ptr (not arith.constant 0 + cast)"
@@ -88,9 +88,9 @@ Each task was committed atomically:
 4. **Task 4: Write FsLit E2E tests and verify all pass** - `0b455c1` (test)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added LlvmNullOp and LlvmIcmpOp to MlirOp DU
-- `src/LangBackend.Compiler/Printer.fs` - Serialization of LlvmNullOp (llvm.mlir.zero) and LlvmIcmpOp (llvm.icmp)
-- `src/LangBackend.Compiler/Elaboration.fs` - isListParamBody helper; EmptyList/Cons/List/Match/LetRec list elaboration
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added LlvmNullOp and LlvmIcmpOp to MlirOp DU
+- `src/FunLangCompiler.Compiler/Printer.fs` - Serialization of LlvmNullOp (llvm.mlir.zero) and LlvmIcmpOp (llvm.icmp)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - isListParamBody helper; EmptyList/Cons/List/Match/LetRec list elaboration
 - `tests/compiler/10-01-list-literal.flt` - E2E test: [1; 2; 3] compiles, exits 42
 - `tests/compiler/10-02-list-length.flt` - E2E test: recursive length via match, exits 3
 

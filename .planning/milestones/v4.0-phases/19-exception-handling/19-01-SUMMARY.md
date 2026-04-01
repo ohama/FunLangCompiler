@@ -30,10 +30,10 @@ tech-stack:
 
 key-files:
   created:
-    - src/LangBackend.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/lang_runtime.h
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "returns_twice attribute on BOTH lang_try_enter declaration (header) and definition (c file) — required for correct callee-saved register handling across longjmp"
@@ -79,9 +79,9 @@ completed: 2026-03-27
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.h` - LangExnFrame struct, extern globals, 4 function declarations with returns_twice on lang_try_enter
-- `src/LangBackend.Compiler/lang_runtime.c` - Exception runtime: global handler stack, lang_try_enter (setjmp), lang_try_exit (pop), lang_throw (longjmp + unhandled exit), lang_current_exception
-- `src/LangBackend.Compiler/Elaboration.fs` - 4 new ExternalFuncDecl entries (both lists), prePassDecls TypeEnv fix, freeVars Raise/TryWith cases
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - LangExnFrame struct, extern globals, 4 function declarations with returns_twice on lang_try_enter
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Exception runtime: global handler stack, lang_try_enter (setjmp), lang_try_exit (pop), lang_throw (longjmp + unhandled exit), lang_current_exception
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - 4 new ExternalFuncDecl entries (both lists), prePassDecls TypeEnv fix, freeVars Raise/TryWith cases
 
 ## Decisions Made
 

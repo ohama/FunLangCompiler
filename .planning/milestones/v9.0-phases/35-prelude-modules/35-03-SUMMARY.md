@@ -20,8 +20,8 @@ file-tracking:
   created:
     - tests/compiler/35-10-cli-prelude.flt
   modified:
-    - src/LangBackend.Cli/Program.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Cli/Program.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
     - Prelude/List.fun
 
 decisions:
@@ -81,7 +81,7 @@ metrics:
 - **Found during:** Task 1 testing
 - **Issue:** Plan specified CWD-based discovery. When `fslit tests/compiler/` runs from the project root, every test invocation had CWD = project root, which contains `Prelude/`. This prepended all 8 prelude modules to every test, causing: (1) parse failures for bare-expression tests, (2) MLIR symbol collisions for tests with inline modules.
 - **Fix:** Changed to input-file-directory-based walk-up. Tests in `/tmp/` or `tests/compiler/` don't accidentally find `Prelude/`.
-- **Files modified:** `src/LangBackend.Cli/Program.fs`
+- **Files modified:** `src/FunLangCompiler.Cli/Program.fs`
 - **Commit:** 6bc035a
 
 **2. [Rule 1 - Bug] Module name collision: Option.map and Result.map both produce @map in MLIR**
@@ -89,7 +89,7 @@ metrics:
 - **Found during:** Task 1 testing — MLIR-opt reported `error: symbol 'map' is already defined`
 - **Issue:** `flattenDecls` stripped module wrappers and kept original names, causing duplicate function definitions when multiple modules define `map`, `bind`, `filter`, `iter`, `fold`, `defaultValue`.
 - **Fix:** Module-qualified naming in `flattenDecls` + FieldAccess desugar update.
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Commit:** 6bc035a
 
 **3. [Rule 1 - Bug] Internal recursive calls broken after renaming**
@@ -97,7 +97,7 @@ metrics:
 - **Found during:** Task 1 testing — `sort` called `_insert` which was renamed to `List__insert`
 - **Issue:** Body of `List_sort` called `sort t` (which became `List_sort t`) and `_insert h ...` (which looked up `_insert` in KnownFuncs but only `List__insert` was there).
 - **Fix:** Short-name alias in LetRec/Let/two-Lambda elaboration arms.
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Commit:** 6bc035a
 
 **4. [Rule 1 - Bug] take/drop/zip in List.fun trigger pre-existing if-else-match MLIR bug**

@@ -280,15 +280,15 @@ Phase 48 parse error format: `[Parse] file:line:col: parse error`
 
 ```bash
 # After implementing the code change, run each parse-error input:
-dotnet run --project src/LangBackend.Cli/LangBackend.Cli.fsproj -- tests/compiler/45-01-parse-error-preserved.fun 2>&1
+dotnet run --project src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- tests/compiler/45-01-parse-error-preserved.fun 2>&1
 # Observe: [Parse] tests/compiler/45-01-parse-error-preserved.fun:1:X: parse error
 # Update 45-01-parse-error-preserved.flt expected output accordingly
 
-dotnet run --project src/LangBackend.Cli/LangBackend.Cli.fsproj -- tests/compiler/45-02-parse-error-position.fun 2>&1
+dotnet run --project src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- tests/compiler/45-02-parse-error-position.fun 2>&1
 # Observe: [Parse] tests/compiler/45-02-parse-error-position.fun:Y:Z: parse error
 # Update 45-02-parse-error-position.flt expected output accordingly
 
-cd tests/compiler && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-05-error-category-parse.fun 2>&1
+cd tests/compiler && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 46-05-error-category-parse.fun 2>&1
 # Observe: [Parse] 46-05-error-category-parse.fun:1:X: parse error
 # Update 46-05-error-category-parse.flt expected output accordingly
 ```

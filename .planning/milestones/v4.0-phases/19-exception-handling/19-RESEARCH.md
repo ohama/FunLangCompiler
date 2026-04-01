@@ -23,10 +23,10 @@ This phase adds no new NuGet packages. All tooling is already present.
 ### Core (already present)
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | Add `LangExnFrame`, `lang_try_enter`, `lang_try_exit`, `lang_throw`, `lang_current_exception` |
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | Add `Raise` and `TryWith` cases to `elaborateExpr` |
-| `MlirIR.fs` | `src/LangBackend.Compiler/` | No new DU cases required; existing `LlvmAllocaOp`, `LlvmCallVoidOp`, `LlvmCallOp`, `CfCondBrOp`, `CfBrOp`, `LlvmUnreachableOp` cover everything |
-| `Pipeline.fs` | `src/LangBackend.Compiler/` | No changes — `lang_runtime.c` already compiled and linked via `runtimeSrc`/`runtimeObj` |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | Add `LangExnFrame`, `lang_try_enter`, `lang_try_exit`, `lang_throw`, `lang_current_exception` |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Add `Raise` and `TryWith` cases to `elaborateExpr` |
+| `MlirIR.fs` | `src/FunLangCompiler.Compiler/` | No new DU cases required; existing `LlvmAllocaOp`, `LlvmCallVoidOp`, `LlvmCallOp`, `CfCondBrOp`, `CfBrOp`, `LlvmUnreachableOp` cover everything |
+| `Pipeline.fs` | `src/FunLangCompiler.Compiler/` | No changes — `lang_runtime.c` already compiled and linked via `runtimeSrc`/`runtimeObj` |
 | `Boehm GC (libgc)` | system | Already linked; `GC_malloc` not needed for frame (stack alloca) |
 
 ### Installation
@@ -223,7 +223,7 @@ TryWith is the most complex elaboration in Phase 19. It uses the same multi-bloc
 ### Recommended Project Structure Changes
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── lang_runtime.h           # NEW — LangExnFrame typedef, static inline lang_try_enter
 ├── lang_runtime.c           # EXTENDED — lang_try_exit, lang_throw, lang_current_exception
 ├── Elaboration.fs           # EXTENDED — Raise and TryWith cases
@@ -370,7 +370,7 @@ let exnLoadOps = [
 ### Test File Format (for .flt E2E tests)
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 exception Failure of string
 let _ = try raise (Failure "x") with
@@ -409,10 +409,10 @@ let _ = try raise (Failure "x") with
 ## Sources
 
 ### Primary (HIGH confidence)
-- Codebase: `src/LangBackend.Compiler/Elaboration.fs` — `Match` elaboration pattern (lines 900-1216) is the direct template for `TryWith`
-- Codebase: `src/LangBackend.Compiler/lang_runtime.c` — existing runtime structure; `lang_match_failure` is the template for `lang_throw`
-- Codebase: `src/LangBackend.Compiler/MlirIR.fs` — all existing op types; no new types needed
-- Codebase: `src/LangBackend.Compiler/Pipeline.fs` — how `lang_runtime.c` is compiled and linked
+- Codebase: `src/FunLangCompiler.Compiler/Elaboration.fs` — `Match` elaboration pattern (lines 900-1216) is the direct template for `TryWith`
+- Codebase: `src/FunLangCompiler.Compiler/lang_runtime.c` — existing runtime structure; `lang_match_failure` is the template for `lang_throw`
+- Codebase: `src/FunLangCompiler.Compiler/MlirIR.fs` — all existing op types; no new types needed
+- Codebase: `src/FunLangCompiler.Compiler/Pipeline.fs` — how `lang_runtime.c` is compiled and linked
 
 ### Secondary (MEDIUM confidence)
 - [setjmp/longjmp in LLVM IR — folkertdev gist](https://gist.github.com/folkertdev/b5d330c0126c16b957b57a3c0cd89879) — confirmed LLVM intrinsics vs C stdlib difference; why C stdlib `setjmp` via wrapper is correct

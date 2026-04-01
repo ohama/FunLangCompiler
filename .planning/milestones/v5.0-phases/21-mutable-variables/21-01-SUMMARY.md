@@ -32,7 +32,7 @@ key-files:
     - tests/compiler/21-03-multiple-assign.flt
     - tests/compiler/21-04-let-mut-decl.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "GC ref cell approach: 8-byte GC_malloc'd cell; Var with name in MutableVars emits LlvmLoadOp transparently"
@@ -79,7 +79,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added MutableVars field, freeVars cases, LetMut/Assign/Var cases, LetMutDecl in extractMainExpr
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added MutableVars field, freeVars cases, LetMut/Assign/Var cases, LetMutDecl in extractMainExpr
 - `tests/compiler/21-01-let-mut-basic.flt` - `let mut x = 5 in x` → exit 5
 - `tests/compiler/21-02-assign-read.flt` - assign then read → exit 10
 - `tests/compiler/21-03-multiple-assign.flt` - multiple assigns → exit 3 (last value)

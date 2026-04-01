@@ -22,11 +22,11 @@ This phase introduces no new libraries or tools.
 
 | Component | Location | Purpose | Status |
 |-----------|----------|---------|--------|
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | AST → MlirIR: add LetMut/Assign/Var/LetMutDecl cases | Extend |
-| `MlirIR.fs` | `src/LangBackend.Compiler/` | DU: MlirType/MlirOp — no changes needed | Unchanged |
-| `Printer.fs` | `src/LangBackend.Compiler/` | MlirIR → MLIR text — no changes needed | Unchanged |
-| `Pipeline.fs` | `src/LangBackend.Compiler/` | Shell pipeline — no changes needed | Unchanged |
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | C runtime — no changes needed for Phase 21 | Unchanged |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | AST → MlirIR: add LetMut/Assign/Var/LetMutDecl cases | Extend |
+| `MlirIR.fs` | `src/FunLangCompiler.Compiler/` | DU: MlirType/MlirOp — no changes needed | Unchanged |
+| `Printer.fs` | `src/FunLangCompiler.Compiler/` | MlirIR → MLIR text — no changes needed | Unchanged |
+| `Pipeline.fs` | `src/FunLangCompiler.Compiler/` | Shell pipeline — no changes needed | Unchanged |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | C runtime — no changes needed for Phase 21 | Unchanged |
 | LangThree AST | `../LangThree/src/LangThree/Ast.fs` | Defines LetMut, Assign, LetMutDecl nodes | Read-only reference |
 
 ### Existing MlirOp Cases Used (no new cases needed)
@@ -349,10 +349,10 @@ Inside the closure inner function:
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — all existing patterns confirmed by reading the file
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — all existing patterns confirmed by reading the file
 - Direct code analysis of `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `LetMut`, `Assign`, `LetMutDecl` node shapes confirmed
-- `/Users/ohama/vibe-coding/LangBackend/.planning/research/ARCHITECTURE.md` — Feature 1 section on mutable variables (HIGH confidence, based on same code analysis)
-- `/Users/ohama/vibe-coding/LangBackend/.planning/research/PITFALLS.md` — Pitfalls C-17, C-18, M-19 (HIGH confidence)
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/ARCHITECTURE.md` — Feature 1 section on mutable variables (HIGH confidence, based on same code analysis)
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/PITFALLS.md` — Pitfalls C-17, C-18, M-19 (HIGH confidence)
 
 ### Secondary (MEDIUM confidence)
 - `MlirIR.fs` confirmed: existing `LlvmCallOp`, `LlvmStoreOp`, `LlvmLoadOp`, `ArithConstantOp` are sufficient — no new DU cases needed

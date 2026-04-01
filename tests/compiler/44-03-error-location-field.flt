@@ -1,5 +1,5 @@
 // Test: Error location for unknown field access includes file:line:col
-// --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 44-03-error-location-field.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 44-03-error-location-field.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
 CHECK-RE: \[Elaboration\] 44-03-error-location-field\.fun:\d+:\d+: FieldAccess: unknown field 'z'.*

@@ -27,9 +27,9 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "App(Lambda) inlines as env binding, not closure — no allocation for immediately-applied lambdas"
@@ -68,9 +68,9 @@ completed: 2026-03-26
 2. **Task 2: Add Modulo, Char, App(Lambda), and freeVars cases to Elaboration.fs** - `b9315d2` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added ArithRemSIOp DU case after ArithDivSIOp
-- `src/LangBackend.Compiler/Printer.fs` - Added arith.remsi print case
-- `src/LangBackend.Compiler/Elaboration.fs` - Char, Modulo, App(Lambda), freeVars fixes
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added ArithRemSIOp DU case after ArithDivSIOp
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added arith.remsi print case
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Char, Modulo, App(Lambda), freeVars fixes
 
 ## Decisions Made
 - App(Lambda) inline path binds the argument in env and elaborates the body directly, avoiding closure allocation for immediately-applied lambdas

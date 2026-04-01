@@ -30,7 +30,7 @@ score: 5/5 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Cli/Program.fs` | expandImports + resolveImportPath + pipeline integration | VERIFIED | 193 lines; `resolveImportPath` at line 49, `expandImports` at line 58, `expandedAst` integration at lines 163–177 |
+| `src/FunLangCompiler.Cli/Program.fs` | expandImports + resolveImportPath + pipeline integration | VERIFIED | 193 lines; `resolveImportPath` at line 49, `expandImports` at line 58, `expandedAst` integration at lines 163–177 |
 | `tests/compiler/40-01-basic-import.flt` | E2E test for basic file import (COMP-01) | VERIFIED | Exists; bash heredoc creates utils.fun + main.fun; passes with output `3\n0` |
 | `tests/compiler/40-02-recursive-import.flt` | E2E test for transitive imports A->B->C (COMP-02) | VERIFIED | Exists; creates c.fun, b.fun, a.fun; passes with output `5\n20\n0` |
 | `tests/compiler/40-03-circular-import.flt` | E2E test for circular import error (COMP-03) | VERIFIED | Exists; greps stderr for "Circular import detected"; passes with output `circular error detected\n1` |

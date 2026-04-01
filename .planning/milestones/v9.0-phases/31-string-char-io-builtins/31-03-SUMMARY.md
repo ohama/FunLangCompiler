@@ -27,7 +27,7 @@ key-files:
   created:
     - tests/compiler/31-11-eprintfn.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "eprintfn desugars to existing @lang_eprintln (no new C runtime code needed)"
@@ -72,7 +72,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Added two-arg and one-arg eprintfn pattern match arms after eprintln arm
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added two-arg and one-arg eprintfn pattern match arms after eprintln arm
 - `tests/compiler/31-11-eprintfn.flt` - E2E test: eprintfn writes to stderr; stdout clean; exit code 0
 
 ## Decisions Made
@@ -97,7 +97,7 @@ None - no external service configuration required.
 - Phase 31 complete: all 3 plans done (string builtins, char builtins, eprintfn)
 - 155 tests pass; no regressions
 - Phase 32 (array builtins) ready to execute
-- FunLexYacc lexer can now use `eprintfn "%s"` for stderr diagnostics when compiled through LangBackend
+- FunLexYacc lexer can now use `eprintfn "%s"` for stderr diagnostics when compiled through FunLangCompiler
 
 ---
 *Phase: 31-string-char-io-builtins*

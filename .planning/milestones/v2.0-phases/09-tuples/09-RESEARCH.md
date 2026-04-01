@@ -52,7 +52,7 @@ The LangThree AST encodes tuples as `Tuple(exprs, span)` and destructuring as `L
 ### Recommended Project Structure
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── MlirIR.fs       — NO CHANGES NEEDED (LlvmGEPLinearOp, LlvmStoreOp, LlvmLoadOp, LlvmCallOp already exist)
 ├── Printer.fs      — NO CHANGES NEEDED (all needed ops already serialized)
 ├── Elaboration.fs  — ADD: Tuple case + LetPat(TuplePat) case
@@ -309,7 +309,7 @@ llvm.store %innerTup, %os1 : !llvm.ptr, !llvm.ptr   // store Ptr, not i64!
 ### FsLit Test Format
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let t = (3, 4) in let (a, b) = t in a + b
 // --- Output:

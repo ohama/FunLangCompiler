@@ -1,5 +1,5 @@
 // Test: Error location for unsupported pattern includes file:line:col
-// --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 44-02-error-location-pattern.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 44-02-error-location-pattern.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
 CHECK-RE: \[Elaboration\] 44-02-error-location-pattern\.fun:\d+:\d+: Elaboration: unsupported sub-pattern in TuplePat: ConstPat \(IntConst 1, \{ FileName = "44-02-error-location-pattern\.fun"

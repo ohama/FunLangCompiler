@@ -52,7 +52,7 @@ The key architectural challenge is the transition from single-block elaboration 
 ### Recommended Project Structure
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── MlirIR.fs          # Add ArithCmpIOp, CfCondBrOp, CfBrOp cases
 ├── Printer.fs         # Add printOp cases for new ops
 ├── Elaboration.fs     # Extend: bool/cmpi in 03-01; multi-block + if/and/or in 03-02
@@ -533,10 +533,10 @@ All MLIR patterns below were tested with `mlir-opt 20.1.4` at `/opt/homebrew/opt
 
 ### Secondary (HIGH confidence — project source)
 
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — `MlirBlock.Label` and `MlirBlock.Args` already exist; `I1` type already in `MlirType`; `MlirOp` extensibility pattern confirmed
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Printer.fs` — `printBlock` already emits label+args; `printType` already handles `I1`
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — `ElabEnv` design, `freshName` pattern, `elaborateModule` single-block structure
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Pipeline.fs` — `--convert-cf-to-llvm` confirmed in `loweringPasses`
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — `MlirBlock.Label` and `MlirBlock.Args` already exist; `I1` type already in `MlirType`; `MlirOp` extensibility pattern confirmed
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — `printBlock` already emits label+args; `printType` already handles `I1`
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv` design, `freshName` pattern, `elaborateModule` single-block structure
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` — `--convert-cf-to-llvm` confirmed in `loweringPasses`
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `Bool`, `If`, `Equal`, `NotEqual`, `LessThan`, `GreaterThan`, `LessEqual`, `GreaterEqual`, `And`, `Or` all confirmed in `Ast.Expr` DU
 
 ---

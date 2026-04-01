@@ -38,9 +38,9 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Ptr added to MlirType as | Ptr case (represents !llvm.ptr, LLVM 20 opaque pointer convention)"
@@ -88,9 +88,9 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit below)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added Ptr to MlirType, 7 new MlirOp cases, IsLlvmFunc to FuncOp, updated return42Module
-- `src/LangBackend.Compiler/Printer.fs` - Added printType Ptr, 7 new printOp cases, IsLlvmFunc keyword switch in printFuncOp
-- `src/LangBackend.Compiler/Elaboration.fs` - Added ClosureInfo, FuncSignature.ClosureInfo, ClosureCounter, freeVars, Lambda in Let handler, extended App dispatch, updated LetRec FuncSignature
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added Ptr to MlirType, 7 new MlirOp cases, IsLlvmFunc to FuncOp, updated return42Module
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added printType Ptr, 7 new printOp cases, IsLlvmFunc keyword switch in printFuncOp
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added ClosureInfo, FuncSignature.ClosureInfo, ClosureCounter, freeVars, Lambda in Let handler, extended App dispatch, updated LetRec FuncSignature
 
 ## Decisions Made
 - Used `freeVars (Set.ofList [outerParam; innerParam]) innerBody` rather than reconstructing a Lambda AST node to avoid needing Span.empty (which doesn't exist on the Span type — only unknownSpan exists)
@@ -106,7 +106,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (after MlirIR changes)
 - **Issue:** Two existing FuncOp record literals in Elaboration.fs (LetRec handler and elaborateModule) did not include the new IsLlvmFunc field — F# compiler error FS0764
 - **Fix:** Added `IsLlvmFunc = false` to both sites
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Build succeeded with 0 errors after fix
 - **Committed in:** f18fd24 (Task 1 commit)
 
@@ -114,7 +114,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (build attempt)
 - **Issue:** Used `Lambda(innerParam, innerBody, Span.empty)` to reconstruct an AST node for freeVars — Span type has no `.empty` member (only `unknownSpan` exists as a let binding)
 - **Fix:** Computed freeVars directly as `freeVars (Set.ofList [outerParam; innerParam]) innerBody` which is mathematically equivalent without needing to reconstruct a Lambda node
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Build succeeded with 0 errors
 - **Committed in:** 3b9f23a (Task 2 commit)
 

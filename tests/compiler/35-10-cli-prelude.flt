@@ -1,4 +1,4 @@
-// --- Command: bash -c 'PROJROOT=%S/../.. && D=$(mktemp -d /tmp/langtest_XXXXXX) && ln -s "$PROJROOT/Prelude" "$D/Prelude" && cp %input "$D/test.lt" && OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project "$PROJROOT/src/LangBackend.Cli/LangBackend.Cli.fsproj" -- "$D/test.lt" -o "$OUTBIN" && "$OUTBIN"; echo $?; rm -rf "$D" "$OUTBIN"'
+// --- Command: bash -c 'PROJROOT=%S/../.. && D=$(mktemp -d /tmp/langtest_XXXXXX) && ln -s "$PROJROOT/Prelude" "$D/Prelude" && cp %input "$D/test.lt" && OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project "$PROJROOT/src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj" -- "$D/test.lt" -o "$OUTBIN" && "$OUTBIN"; echo $?; rm -rf "$D" "$OUTBIN"'
 // --- Input:
 let _ = println (to_string ((String.endsWith "hello.fun" ".fun") <> 0))
 let _ = println (to_string (String.length "test"))

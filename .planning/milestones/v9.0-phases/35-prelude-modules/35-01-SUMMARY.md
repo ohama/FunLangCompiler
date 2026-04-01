@@ -44,7 +44,7 @@ key-files:
     - tests/compiler/35-03-stringbuilder-module.flt
     - tests/compiler/35-04-char-module.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Prelude .fun files wrap builtins verbatim (same function signatures as builtins)"
@@ -101,7 +101,7 @@ completed: 2026-03-29
 - `tests/compiler/35-02-hashtable-module.flt` - E2E test for Hashtable module (create/set/get/tryGetValue/count)
 - `tests/compiler/35-03-stringbuilder-module.flt` - E2E test for StringBuilder module (create/add/toString)
 - `tests/compiler/35-04-char-module.flt` - E2E test for Char module (IsDigit/IsLetter/IsUpper/IsLower)
-- `src/LangBackend.Compiler/Elaboration.fs` - 3 compiler bug fixes (see deviations)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - 3 compiler bug fixes (see deviations)
 
 ## Decisions Made
 
@@ -119,7 +119,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (E2E test execution)
 - **Issue:** The `Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)))` arm computed free variables without filtering by `env.Vars`. Builtin names like `string_endswith` appeared as closure captures but weren't in `env.Vars`, causing "closure capture not found" error.
 - **Fix:** Added `|> Set.filter (fun name -> Map.containsKey name env.Vars || name = outerParam)` to the captures computation, matching the behavior of the one-param Lambda arm.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** String module tests compile without capture errors
 - **Committed in:** 6fabb6c
 
@@ -127,7 +127,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (testing String.endsWith)
 - **Issue:** Bool-returning builtins (string_endswith, etc.) produce I1 values. The two-param closure body's `LlvmReturnOp [bodyVal]` was emitting `llvm.return i1` in a function declared to return `i64`, causing MLIR validation error.
 - **Fix:** Added `coerceToI64` helper function; applied to both two-param arm and generic Lambda arm body return. Also added I64→I1 normalization for `if` conditions (when I64 bool used as condition, adds `ne 0` comparison).
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** String module tests produce correct MLIR and compile successfully
 - **Committed in:** 6fabb6c
 
@@ -135,7 +135,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (testing String.trim one-param wrapper)
 - **Issue:** Inside a closure, string arguments are stored/passed as I64 (ptrtoint, the uniform closure ABI). Builtins like `@lang_string_trim` expect `!llvm.ptr`. Calling with I64 argument caused MLIR type mismatch.
 - **Fix:** Added `coerceToPtrArg` helper function; applied to Ptr-expecting argument positions in all string, hashtable, and stringbuilder builtin patterns.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** All 4 new E2E tests compile and produce correct output
 - **Committed in:** 6fabb6c
 

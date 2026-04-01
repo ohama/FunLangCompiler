@@ -31,7 +31,7 @@ key-files:
     - tests/compiler/19-01-raise-unhandled.flt
     - tests/compiler/19-02-raise-payload.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Raise deadVal defined via ArithConstantOp(0L) before llvm.unreachable — MLIR SSA requires all referenced names be defined even if unreachable"
@@ -74,7 +74,7 @@ Each task was committed atomically:
 2. **Task 2: E2E tests + unreachable-before-return fix** - `add2f72` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Raise case in elaborateExpr, appendReturnIfNeeded helper, both elaborateModule and elaborateProgram updated
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Raise case in elaborateExpr, appendReturnIfNeeded helper, both elaborateModule and elaborateProgram updated
 - `tests/compiler/19-01-raise-unhandled.flt` - E2E: Failure "boom" aborts with "Fatal: unhandled exception", exit 1
 - `tests/compiler/19-02-raise-payload.flt` - E2E: user-defined ParseError exception also aborts correctly
 
@@ -91,7 +91,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (Raise elaboration case) — discovered during Task 2 testing
 - **Issue:** Plan specified `let deadVal = freshName; (deadVal, ops @ [call; unreachable])` without defining deadVal via an instruction. MLIR SSA validation rejects undefined SSA names even after llvm.unreachable.
 - **Fix:** Added `ArithConstantOp(deadVal, 0L)` before `LlvmCallVoidOp` in the op list.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** mlir-opt accepted the generated IR.
 - **Committed in:** add2f72
 
@@ -99,7 +99,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (E2E test execution)
 - **Issue:** elaborateModule and elaborateProgram unconditionally appended `ReturnOp [resultVal]` after entryOps. When Raise is the last expression, this generates `llvm.unreachable` followed by `return`, which mlir-opt rejects with "must be the last operation in the parent block".
 - **Fix:** Added `appendReturnIfNeeded` private helper that checks if the last op is LlvmUnreachableOp and skips ReturnOp if so. Applied to both elaborateModule and elaborateProgram entry-block and last-side-block paths.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** 59/59 E2E tests pass.
 - **Committed in:** add2f72
 

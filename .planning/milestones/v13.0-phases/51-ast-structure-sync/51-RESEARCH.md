@@ -1,7 +1,7 @@
 # Phase 51: AST Structure Sync - Research
 
 **Researched:** 2026-04-01
-**Domain:** F# discriminated union pattern matching — syncing LangBackend.Compiler patterns to updated LangThree AST
+**Domain:** F# discriminated union pattern matching — syncing FunLangCompiler.Compiler patterns to updated LangThree AST
 **Confidence:** HIGH
 
 ## Summary
@@ -22,13 +22,13 @@ This is an internal codebase change — no external libraries are involved.
 ### Core
 | File | Purpose | What Changes |
 |------|---------|--------------|
-| `src/LangBackend.Compiler/Elaboration.fs` | Main compiler elaboration pass | 1 pattern match site to update |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Main compiler elaboration pass | 1 pattern match site to update |
 | `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` | Source of truth for AST types | Read-only reference |
 
 ### Supporting
 | Tool | Purpose |
 |------|---------|
-| `dotnet build src/LangBackend.Compiler/` | Verify fix compiles |
+| `dotnet build src/FunLangCompiler.Compiler/` | Verify fix compiles |
 | `tests/compiler/*.flt` | E2E regression tests |
 
 ### Alternatives Considered
@@ -122,7 +122,7 @@ Adding explicit arms is optional (the existing `| _ -> ()` already handles them)
 **How to avoid:** `flattenDecls` already uses `| _ -> [d]` — it passes TypeClassDecl/InstanceDecl/DerivingDecl through unchanged. `extractMainExpr` filters to only LetDecl/LetRecDecl/LetMutDecl/LetPatDecl, so typeclass decls are naturally filtered out. No changes needed in either function for Phase 51.
 
 ### Pitfall 4: Verifying against wrong AST
-**What goes wrong:** Looking at `LangBackend.bak/src/FunLang.Compiler/Ast.fs` instead of LangThree.
+**What goes wrong:** Looking at `FunLangCompiler.bak/src/FunLang.Compiler/Ast.fs` instead of LangThree.
 **Why it happens:** Glob finds the backup copy.
 **How to avoid:** Always use `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` as the authoritative source.
 
@@ -171,7 +171,7 @@ No other changes are needed in Elaboration.fs for the build to succeed.
    - Recommendation: Add explicit arms in Phase 51 to document intent and prevent future FS0025 surprises.
 
 2. **Are there any other match sites in the codebase that pattern-match on TypeDecl?**
-   - What we know: `grep` across all LangBackend `.fs` files found only one site: `Elaboration.fs:4073`. Program.fs has no AST pattern matches on Decl subtypes.
+   - What we know: `grep` across all FunLangCompiler `.fs` files found only one site: `Elaboration.fs:4073`. Program.fs has no AST pattern matches on Decl subtypes.
    - What's unclear: Nothing — this was verified comprehensively.
    - Recommendation: Confident that line 4073 is the only change needed.
 
@@ -179,7 +179,7 @@ No other changes are needed in Elaboration.fs for the build to succeed.
 
 ### Primary (HIGH confidence)
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — authoritative AST type definitions, read directly
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — all pattern match sites, read directly
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — all pattern match sites, read directly
 - `dotnet build` output — confirms exactly 1 error (FS0727 at line 4073) and its cause
 
 ### Secondary (MEDIUM confidence)

@@ -31,7 +31,7 @@ gaps: []
 
 | Artifact                                            | Expected                                                                    | Status     | Details                                                                         |
 |-----------------------------------------------------|-----------------------------------------------------------------------------|------------|---------------------------------------------------------------------------------|
-| `src/LangBackend.Compiler/Elaboration.fs`           | ElabEnv.MutableVars field, LetMut/Assign/Var-deref/LetMutDecl elaboration   | VERIFIED   | 2189 lines; MutableVars at lines 38, 46, 350, 368, 411, 417, 702, 1387, 1391   |
+| `src/FunLangCompiler.Compiler/Elaboration.fs`           | ElabEnv.MutableVars field, LetMut/Assign/Var-deref/LetMutDecl elaboration   | VERIFIED   | 2189 lines; MutableVars at lines 38, 46, 350, 368, 411, 417, 702, 1387, 1391   |
 | `tests/compiler/21-01-let-mut-basic.flt`            | Basic let mut read test                                                      | VERIFIED   | Exists, substantive, passes: `let mut x = 5 in x` → 5                          |
 | `tests/compiler/21-02-assign-read.flt`              | Assign + read test                                                           | VERIFIED   | Exists, substantive, passes: `let mut x = 5 in let _ = x <- 10 in x` → 10     |
 | `tests/compiler/21-03-multiple-assign.flt`          | Multiple assignment test                                                     | VERIFIED   | Exists, substantive, passes: multiple assigns, last value 3                     |

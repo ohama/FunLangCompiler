@@ -31,9 +31,9 @@ key-files:
     - tests/compiler/33-01-stringbuilder.flt
     - tests/compiler/33-02-hashset.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Struct typedefs defined only in lang_runtime.h — the .c file includes the header so no redefinition; same as LangHashtable pattern"
@@ -75,9 +75,9 @@ completed: 2026-03-29
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.c` - LangStringBuilder and LangHashSet function implementations
-- `src/LangBackend.Compiler/lang_runtime.h` - Struct typedefs + 7 function declarations
-- `src/LangBackend.Compiler/Elaboration.fs` - 7 elaboration arms + 7 entries in both externalFuncs lists
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - LangStringBuilder and LangHashSet function implementations
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Struct typedefs + 7 function declarations
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - 7 elaboration arms + 7 entries in both externalFuncs lists
 - `tests/compiler/33-01-stringbuilder.flt` - E2E: append "hello" + " world" → "hello world"
 - `tests/compiler/33-02-hashset.flt` - E2E: add/contains/count with duplicate (1 returns 1/0/0/2)
 
@@ -96,7 +96,7 @@ completed: 2026-03-29
 - **Found during:** Task 1 first test run
 - **Issue:** Struct typedefs for LangStringBuilder, LangHashSetEntry, LangHashSet added to both lang_runtime.h and lang_runtime.c, causing clang "typedef redefinition" errors
 - **Fix:** Removed typedef blocks from lang_runtime.c — struct definitions stay only in the header (which the .c file includes)
-- **Files modified:** src/LangBackend.Compiler/lang_runtime.c
+- **Files modified:** src/FunLangCompiler.Compiler/lang_runtime.c
 - **Verification:** Compilation succeeded; 163/163 tests pass
 - **Committed in:** a1ca148 (Task 2 commit includes the fix)
 

@@ -32,7 +32,7 @@ key-files:
     - tests/compiler/41-02-open-operator.flt
     - tests/compiler/41-03-open-multi-module.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "collectModuleMembers is a separate first-pass function (not inline in flattenDecls) for clarity and testability"
@@ -77,7 +77,7 @@ Each task was committed atomically:
 3. **Task 2: E2E tests for OpenDecl** - `3be1983` (test)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added collectModuleMembers, updated flattenDecls signature with OpenDecl case, added KnownFuncs aliasing in elaborateExpr
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added collectModuleMembers, updated flattenDecls signature with OpenDecl case, added KnownFuncs aliasing in elaborateExpr
 - `tests/compiler/41-01-open-module.flt` - E2E test: open Core makes id and not callable without prefix
 - `tests/compiler/41-02-open-operator.flt` - E2E test: operator (^^) inside module compiles after open
 - `tests/compiler/41-03-open-multi-module.flt` - E2E test: multiple opens shadow correctly (last open wins)
@@ -95,7 +95,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (after implementing flattenDecls OpenDecl case)
 - **Issue:** `Ast.Var(qualifiedName, s)` as alias body works for single-lambda functions (stored in Vars as closure ptr), but fails for two-lambda functions (stored only in KnownFuncs, not Vars). `elaborateExpr (Var("Str_concat"))` throws "unbound variable" when `Str_concat` is a two-lambda direct-call function.
 - **Fix:** Added special case before general `Let` in `elaborateExpr`: `Let(name, Var(qualName), cont)` where `qualName` is in `KnownFuncs` but not `Vars` → add `name` as alias in `KnownFuncs`, continue with `cont`.
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Verification:** `open Str` with `let (^^) a b = string_concat a b` compiles and runs correctly. 200/200 tests pass.
 - **Committed in:** `8706499` (separate commit for clarity)
 

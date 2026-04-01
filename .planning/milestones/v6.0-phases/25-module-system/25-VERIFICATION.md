@@ -33,7 +33,7 @@ score: 8/8 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | prePassDecls recursion, flattenDecls, LetPatDecl support, FieldAccess guard, App-level desugar | VERIFIED | 2499 lines; all 5 required constructs present and wired |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | prePassDecls recursion, flattenDecls, LetPatDecl support, FieldAccess guard, App-level desugar | VERIFIED | 2499 lines; all 5 required constructs present and wired |
 | `tests/compiler/25-01-module-basic.flt` | Basic module + qualified names | VERIFIED | Exists, tests `Math.add Math.pi 4 = 7`, PASSES |
 | `tests/compiler/25-02-module-letpat.flt` | LetPatDecl inside module | VERIFIED | Exists, tests `let (a,b) = (10,32)` inside module, PASSES |
 | `tests/compiler/25-03-module-open.flt` | open M no-op | VERIFIED | Exists, tests `open Utils; add 10 32 = 42`, PASSES |

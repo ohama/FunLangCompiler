@@ -9,7 +9,7 @@ requires:
   - phase: 01-02
     provides: Printer.printModule (pure serializer) and Pipeline.compile (mlir-opt → mlir-translate → clang orchestration)
 provides:
-  - LangBackend.Cli console app accepting `-o <output> <input>` and calling Pipeline.compile with return42Module
+  - FunLangCompiler.Cli console app accepting `-o <output> <input>` and calling Pipeline.compile with return42Module
   - FsLit E2E smoke test verifying full MlirIR → Printer → mlir-opt → mlir-translate → clang → binary chain
   - Cross-platform LLVM tool path resolution (LLVM_BIN_DIR env var, Homebrew, Linux fallback)
 affects:
@@ -18,7 +18,7 @@ affects:
 
 # Tech tracking
 tech-stack:
-  added: [LangBackend.Cli (console app), FsLit (E2E test runner)]
+  added: [FunLangCompiler.Cli (console app), FsLit (E2E test runner)]
   patterns:
     - CLI arg parsing with recursive list match (-o flag extraction)
     - FsLit test pattern using %S relative paths and mktemp for output binary
@@ -26,11 +26,11 @@ tech-stack:
 
 key-files:
   created:
-    - src/LangBackend.Cli/LangBackend.Cli.fsproj
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj
+    - src/FunLangCompiler.Cli/Program.fs
     - tests/compiler/01-return42.flt
   modified:
-    - src/LangBackend.Compiler/Pipeline.fs
+    - src/FunLangCompiler.Compiler/Pipeline.fs
 
 key-decisions:
   - "Cross-platform LLVM tool paths via resolveTool helper checking LLVM_BIN_DIR, then Homebrew, then Linux paths"
@@ -46,7 +46,7 @@ completed: 2026-03-26
 
 # Plan 01-03: CLI + FsLit E2E Summary
 
-**LangBackend.Cli console app and FsLit smoke test verifying full MlirIR → binary pipeline exits 42**
+**FunLangCompiler.Cli console app and FsLit smoke test verifying full MlirIR → binary pipeline exits 42**
 
 ## Performance
 
@@ -61,15 +61,15 @@ completed: 2026-03-26
 
 ## Task Commits
 
-1. **Task 1: Create LangBackend.Cli console project** - `34e4735` (feat)
+1. **Task 1: Create FunLangCompiler.Cli console project** - `34e4735` (feat)
 2. **Task 2: Write and verify FsLit smoke test** - `2e6d10e` (test)
 3. **Auto-fix: Cross-platform LLVM tool paths** - `c5c4823` (fix)
 
 ## Files Created/Modified
-- `src/LangBackend.Cli/LangBackend.Cli.fsproj` - Console project referencing LangBackend.Compiler
-- `src/LangBackend.Cli/Program.fs` - Phase 1 CLI entry point (hardcoded return42Module)
+- `src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj` - Console project referencing FunLangCompiler.Compiler
+- `src/FunLangCompiler.Cli/Program.fs` - Phase 1 CLI entry point (hardcoded return42Module)
 - `tests/compiler/01-return42.flt` - FsLit E2E smoke test
-- `src/LangBackend.Compiler/Pipeline.fs` - Cross-platform tool path resolution
+- `src/FunLangCompiler.Compiler/Pipeline.fs` - Cross-platform tool path resolution
 
 ## Decisions Made
 - Cross-platform LLVM tool paths: resolveTool helper checks LLVM_BIN_DIR env var, then Homebrew path, then Linux path
@@ -82,7 +82,7 @@ completed: 2026-03-26
 - **Found during:** Task 2 (FsLit test verification)
 - **Issue:** Pipeline.fs had hardcoded `/usr/local/bin/` paths (Linux); macOS Homebrew has tools at `/opt/homebrew/opt/llvm/bin/`
 - **Fix:** Added `resolveTool` helper checking LLVM_BIN_DIR, Homebrew, Linux paths
-- **Files modified:** src/LangBackend.Compiler/Pipeline.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Pipeline.fs
 - **Verification:** FsLit test passes on macOS
 - **Committed in:** c5c4823
 

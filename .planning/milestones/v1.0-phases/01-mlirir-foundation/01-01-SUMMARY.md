@@ -7,7 +7,7 @@ tags: [fsharp, mlir, discriminated-union, ssa, ir]
 # Dependency graph
 requires: []
 provides:
-  - F# library project LangBackend.Compiler with LangThree project reference
+  - F# library project FunLangCompiler.Compiler with LangThree project reference
   - MlirIR discriminated union types (MlirType, MlirValue, MlirOp, MlirBlock, MlirRegion, FuncOp, MlirModule)
   - Hardcoded return42Module value representing a well-typed `return 42` program in MlirIR
 affects:
@@ -22,8 +22,8 @@ tech-stack:
 
 key-files:
   created:
-    - src/LangBackend.Compiler/LangBackend.Compiler.fsproj
-    - src/LangBackend.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj
+    - src/FunLangCompiler.Compiler/MlirIR.fs
     - .gitignore
   modified: []
 
@@ -57,7 +57,7 @@ completed: 2026-03-26
 
 ## Accomplishments
 
-- Created LangBackend.Compiler F# library project with ProjectReference to LangThree
+- Created FunLangCompiler.Compiler F# library project with ProjectReference to LangThree
 - Defined MlirIR discriminated union types covering the full Region > Block > Op hierarchy
 - Implemented `return42Module` as a well-typed MlirModule value (no string manipulation)
 
@@ -65,15 +65,15 @@ completed: 2026-03-26
 
 Each task was committed atomically:
 
-1. **Task 1: Scaffold LangBackend.Compiler library project** - `2ed2eea` (feat)
+1. **Task 1: Scaffold FunLangCompiler.Compiler library project** - `2ed2eea` (feat)
 2. **Task 2: Define MlirIR DU with return42Module** - `397dd05` (feat)
 
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/LangBackend.Compiler.fsproj` - F# classlib with LangThree ProjectReference and MlirIR.fs compile entry
-- `src/LangBackend.Compiler/MlirIR.fs` - MlirIR DU types and return42Module value
+- `src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` - F# classlib with LangThree ProjectReference and MlirIR.fs compile entry
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - MlirIR DU types and return42Module value
 - `.gitignore` - Covers bin/ and obj/ directories
 
 ## Decisions Made

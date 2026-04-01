@@ -23,10 +23,10 @@ This phase operates entirely within the existing compiler stack. No new dependen
 ### Core
 | Component | Location | Purpose | Role |
 |-----------|----------|---------|------|
-| Elaboration.fs | `src/LangBackend.Compiler/` | MLIR codegen from AST | All three fixes are here |
-| MlirIR.fs | `src/LangBackend.Compiler/` | MLIR op types | No changes needed |
-| Printer.fs | `src/LangBackend.Compiler/` | MLIR text output | No changes needed |
-| lang_runtime.c/h | `src/LangBackend.Compiler/` | C runtime | No changes needed |
+| Elaboration.fs | `src/FunLangCompiler.Compiler/` | MLIR codegen from AST | All three fixes are here |
+| MlirIR.fs | `src/FunLangCompiler.Compiler/` | MLIR op types | No changes needed |
+| Printer.fs | `src/FunLangCompiler.Compiler/` | MLIR text output | No changes needed |
+| lang_runtime.c/h | `src/FunLangCompiler.Compiler/` | C runtime | No changes needed |
 
 ### Supporting
 | Tool | Version | Purpose | When to Use |
@@ -36,7 +36,7 @@ This phase operates entirely within the existing compiler stack. No new dependen
 
 **Build and test:**
 ```bash
-dotnet run --project src/LangBackend.Cli/LangBackend.Cli.fsproj -- <input.flt> -o /tmp/out
+dotnet run --project src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- <input.flt> -o /tmp/out
 ```
 
 ## Architecture Patterns
@@ -44,14 +44,14 @@ dotnet run --project src/LangBackend.Cli/LangBackend.Cli.fsproj -- <input.flt> -
 ### Compiler Pipeline
 ```
 src/
-├── LangBackend.Compiler/
+├── FunLangCompiler.Compiler/
 │   ├── Elaboration.fs    # AST -> MlirModule (all bug fixes go here)
 │   ├── MlirIR.fs         # IR data types
 │   ├── Printer.fs        # MlirModule -> text
 │   ├── Pipeline.fs       # mlir-opt + translate + clang
 │   ├── lang_runtime.c    # C runtime
 │   └── lang_runtime.h    # C runtime headers
-├── LangBackend.Cli/
+├── FunLangCompiler.Cli/
 │   └── Program.fs        # Entry point
 tests/compiler/           # .flt E2E tests (shell script + input + expected output)
 ```

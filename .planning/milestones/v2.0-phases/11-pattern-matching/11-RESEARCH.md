@@ -8,7 +8,7 @@
 
 ## Summary
 
-Phase 11 implements full pattern matching compilation in LangBackend. The phase extends the `elaborateExpr` `Match` case (currently limited to the two-arm `EmptyListPat + ConsPat` form from Phase 10) into a general-purpose sequential decision chain that handles all six v2 pattern types: `VarPat`, `WildcardPat`, `ConstPat` (int/bool/string), `EmptyListPat`, `ConsPat`, and `TuplePat`. A `@lang_match_failure` fallback block is emitted as the final branch target when no arm matches.
+Phase 11 implements full pattern matching compilation in FunLangCompiler. The phase extends the `elaborateExpr` `Match` case (currently limited to the two-arm `EmptyListPat + ConsPat` form from Phase 10) into a general-purpose sequential decision chain that handles all six v2 pattern types: `VarPat`, `WildcardPat`, `ConstPat` (int/bool/string), `EmptyListPat`, `ConsPat`, and `TuplePat`. A `@lang_match_failure` fallback block is emitted as the final branch target when no arm matches.
 
 The compilation strategy is a linear decision chain — each arm is compiled to a condition test followed by `cf.cond_br`: true branch goes to the arm's body block, false branch falls through to the next arm's test. The last arm either accepts unconditionally (wildcard/variable) or falls through to the `@lang_match_failure` block. This reuses the same multi-block `cf.cond_br` mechanism already working for `if-else`, `&&`, `||`, and list match from Phases 3 and 10.
 

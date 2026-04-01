@@ -53,7 +53,7 @@ The elaboration extension requires: (1) free variable analysis for Lambda expres
 ### Recommended Project Structure
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── MlirIR.fs        # Add Ptr to MlirType; add 7 new MlirOp cases; add IsLlvmFunc to FuncOp
 ├── Printer.fs       # Add printType Ptr; add 7 new printOp cases; update printFuncOp for IsLlvmFunc
 ├── Elaboration.fs   # Add freeVars; handle Lambda in Let; extend App dispatch; extend FuncSignature
@@ -535,7 +535,7 @@ module {
 ### FsLit test file format (Phase 5)
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let add_n n = fun x -> x + n in let add5 = add_n 5 in add5 3
 // --- Output:
@@ -600,10 +600,10 @@ All patterns verified with `mlir-opt 20.1.4` + `mlir-translate` + `clang`, full 
 
 ### Secondary (HIGH confidence — project source)
 
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — existing `MlirOp` DU shape, `FuncOp` structure, `MlirType` variants
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — `ElabEnv`, `FuncSignature`, `freshName`, `LetRec` / `App` elaboration patterns from Phase 4
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Printer.fs` — `printOp`, `printFuncOp`, `printType` functions
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Pipeline.fs` — `loweringPasses` unchanged; no new passes needed
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — existing `MlirOp` DU shape, `FuncOp` structure, `MlirType` variants
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — `ElabEnv`, `FuncSignature`, `freshName`, `LetRec` / `App` elaboration patterns from Phase 4
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — `printOp`, `printFuncOp`, `printType` functions
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` — `loweringPasses` unchanged; no new passes needed
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — `Lambda of param: string * body: Expr * span: Span`, `App of func: Expr * arg: Expr * span: Span`
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fsy` — `let name params = body in inExpr` desugars to `Let(name, foldBack Lambda params body, inExpr)`. So `let add_n n = fun x -> x + n in ...` → `Let("add_n", Lambda("n", Lambda("x", ...)), ...)`.
 

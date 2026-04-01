@@ -33,7 +33,7 @@ key-files:
     - tests/compiler/25-04-module-namespace.flt
     - tests/compiler/25-05-module-exn.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "flattenDecls defined before extractMainExpr so it can be called at module entry point"
@@ -79,7 +79,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit to follow)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - prePassDecls made recursive with shared exnCounter; flattenDecls added; extractMainExpr updated for LetPatDecl
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - prePassDecls made recursive with shared exnCounter; flattenDecls added; extractMainExpr updated for LetPatDecl
 - `tests/compiler/25-01-module-basic.flt` - basic module with let binding
 - `tests/compiler/25-02-module-letpat.flt` - LetPatDecl inside module (tuple destructuring)
 - `tests/compiler/25-03-module-open.flt` - open directive (no-op, compiles cleanly)

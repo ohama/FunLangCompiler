@@ -19,8 +19,8 @@ This phase is entirely within the existing codebase — no new libraries.
 ### Core
 | File | Location | Purpose | Change Required |
 |------|----------|---------|-----------------|
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | AST-to-MLIR lowering | `flattenDecls` OpenDecl handling |
-| `Printer.fs` | `src/LangBackend.Compiler/` | MLIR serialization | `sanitizeMlirName` already integrated |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | AST-to-MLIR lowering | `flattenDecls` OpenDecl handling |
+| `Printer.fs` | `src/FunLangCompiler.Compiler/` | MLIR serialization | `sanitizeMlirName` already integrated |
 | `Prelude/*.fun` | `Prelude/` | Standard library source | Sync with LangThree |
 
 ### Supporting

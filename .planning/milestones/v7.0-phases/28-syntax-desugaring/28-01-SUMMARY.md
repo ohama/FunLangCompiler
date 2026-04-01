@@ -32,7 +32,7 @@ key-files:
     - tests/compiler/28-04-ite-basic.flt
     - tests/compiler/28-05-ite-unit.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Tuple([]) = unit as I64 0: avoids MLIR type mismatch between then-branch (I64 from print) and implicit else (was Ptr from GC_malloc)"
@@ -83,7 +83,7 @@ Note: Elaboration.fs fixes were committed as part of the concurrent 28-02 plan e
 - `tests/compiler/28-03-seq-side-effect.flt` - SEQ side effects: print calls execute in order
 - `tests/compiler/28-04-ite-basic.flt` - ITE-01: if true then sideEffect executes then-branch
 - `tests/compiler/28-05-ite-unit.flt` - ITE-02: if false then expr skips branch, returns unit (42)
-- `src/LangBackend.Compiler/Elaboration.fs` - Two bug fixes (Tuple[] unit + LetPat WildcardPat terminator)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Two bug fixes (Tuple[] unit + LetPat WildcardPat terminator)
 
 ## Decisions Made
 - ITE tests use `let _ = if cond then sideEffect in result` form (not bare `if true then ...;\n0`) because multi-line bare expressions without `let` don't parse through the module parser
@@ -97,7 +97,7 @@ Note: Elaboration.fs fixes were committed as part of the concurrent 28-02 plan e
 - **Found during:** Task 2 (ITE tests)
 - **Issue:** `Tuple([])` called `GC_malloc(0)` returning `Ptr`, but `print` returns `I64`. When used as implicit else in if-then-without-else, MLIR merge block got type mismatch (`!llvm.ptr` vs `i64`)
 - **Fix:** Added `if n = 0` guard in Tuple elaboration returning `ArithConstantOp(0L)` (I64) instead of allocating
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Verification:** `let _ = if true then print "yes" in 0` compiles and runs correctly
 - **Committed in:** `90835ef` (part of concurrent 28-02 execution)
 
@@ -105,7 +105,7 @@ Note: Elaboration.fs fixes were committed as part of the concurrent 28-02 plan e
 - **Found during:** Task 2 (ITE tests)
 - **Issue:** `e1; e2` desugars to `LetPat(WildcardPat, e1, e2)`. When `e1` is an if-then expression, its elaboration emits `CfCondBrOp` (a block terminator). The plain `bops @ rops` concat placed `rops` after a terminator, violating MLIR block structure
 - **Fix:** Added same `blocksBeforeBind`/`isTerminator`/merge-block-injection logic that `Let` already uses
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Verification:** All 128 tests pass including new ITE tests
 - **Committed in:** `90835ef` (part of concurrent 28-02 execution)
 

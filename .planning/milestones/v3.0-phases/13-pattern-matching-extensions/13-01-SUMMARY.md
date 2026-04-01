@@ -31,8 +31,8 @@ key-files:
     - tests/compiler/13-02-orpat.flt
     - tests/compiler/13-03-char-pattern.flt
   modified:
-    - src/LangBackend.Compiler/MatchCompiler.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MatchCompiler.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "OrPat expansion in Elaboration.fs (not MatchCompiler) — cleaner, MatchCompiler.desugarPattern failwith becomes unreachable safety net"
@@ -77,8 +77,8 @@ Each task was committed atomically:
 4. **Fix: .flt format headers** - `3b3883e` (test)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MatchCompiler.fs` - Clause.HasGuard, DecisionTree.Guard, genMatch Guard leaf, splitClauses HasGuard propagation, compile (Pattern * bool * int) list, ConstPat CharConst → IntLit
-- `src/LangBackend.Compiler/Elaboration.fs` - expandOrPats inline, arms 3-tuple, emitDecisionTree Guard case
+- `src/FunLangCompiler.Compiler/MatchCompiler.fs` - Clause.HasGuard, DecisionTree.Guard, genMatch Guard leaf, splitClauses HasGuard propagation, compile (Pattern * bool * int) list, ConstPat CharConst → IntLit
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - expandOrPats inline, arms 3-tuple, emitDecisionTree Guard case
 - `tests/compiler/13-01-when-guard.flt` - E2E: `match 5 with | n when n > 0 -> 1 | _ -> 0` exits 1
 - `tests/compiler/13-02-orpat.flt` - E2E: `match 3 with | 1 | 2 | 3 -> 10 | _ -> 0` exits 10
 - `tests/compiler/13-03-char-pattern.flt` - E2E: `match 'A' with | 'A' -> 1 | _ -> 0` exits 1

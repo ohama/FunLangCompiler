@@ -36,13 +36,13 @@ tech-stack:
 
 key-files:
   created:
-    - src/LangBackend.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.c
     - tests/compiler/08-01-string-literal.flt
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Elaboration.fs
-    - src/LangBackend.Compiler/Pipeline.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Pipeline.fs
 
 key-decisions:
   - "LlvmGEPStructOp hardcodes !llvm.struct<(i64, ptr)> — only string structs use struct GEP in Phase 8; generic StructType deferred to Phase 9 tuples"
@@ -87,11 +87,11 @@ completed: 2026-03-26
 5. **Task 5: Write STR-01 + STR-03 FsLit test** - `bb1539a` (test)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added LlvmGEPStructOp case to MlirOp DU
-- `src/LangBackend.Compiler/Printer.fs` - Added printOp case for LlvmGEPStructOp
-- `src/LangBackend.Compiler/lang_runtime.c` - New C runtime with string concat/to_string helpers
-- `src/LangBackend.Compiler/Pipeline.fs` - Compile runtime C file to temp .o, include in link
-- `src/LangBackend.Compiler/Elaboration.fs` - String elaboration, string_length, general print/println, new ExternalFuncs
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added LlvmGEPStructOp case to MlirOp DU
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added printOp case for LlvmGEPStructOp
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - New C runtime with string concat/to_string helpers
+- `src/FunLangCompiler.Compiler/Pipeline.fs` - Compile runtime C file to temp .o, include in link
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - String elaboration, string_length, general print/println, new ExternalFuncs
 - `tests/compiler/08-01-string-literal.flt` - E2E test: `string_length "hello"` exits with 5
 
 ## Decisions Made

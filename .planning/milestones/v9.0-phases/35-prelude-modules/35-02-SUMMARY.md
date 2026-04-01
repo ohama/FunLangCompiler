@@ -45,8 +45,8 @@ key-files:
     - tests/compiler/35-08-list-tryfind-choose.flt
     - tests/compiler/35-09-array-module.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
-    - src/LangBackend.Compiler/Pipeline.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Pipeline.fs
 
 key-decisions:
   - "Apply coerceToPtrArg to ALL array/list builtin call sites — when a collection is captured in a closure wrapper, it arrives as I64 (ptrtoint); C runtime functions need Ptr"
@@ -92,15 +92,15 @@ completed: 2026-03-29
 
 - `Prelude/Option.fun` — Option ADT + map, bind, defaultValue, iter, filter, isSome, isNone
 - `Prelude/Result.fun` — Result ADT + map, bind, mapError, defaultValue, toOption
-- `Prelude/List.fun` — 30+ list functions, adapted from LangThree with LangBackend builtin names
+- `Prelude/List.fun` — 30+ list functions, adapted from LangThree with FunLangCompiler builtin names
 - `Prelude/Array.fun` — Array module wrapping all array_* builtins
 - `tests/compiler/35-05-option-module.flt` — Option.map, bind, defaultValue, isSome, isNone
 - `tests/compiler/35-06-result-module.flt` — Result.map, bind, defaultValue, toOption
 - `tests/compiler/35-07-list-module.flt` — List.sort, length, isEmpty, head, exists, item
 - `tests/compiler/35-08-list-tryfind-choose.flt` — List.tryFind, List.choose (uses Option type)
 - `tests/compiler/35-09-array-module.flt` — Array.ofList, sort, toList, length
-- `src/LangBackend.Compiler/Elaboration.fs` — 10 compiler fixes (see Deviations)
-- `src/LangBackend.Compiler/Pipeline.fs` — Removed debug MLIR dump line
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — 10 compiler fixes (see Deviations)
+- `src/FunLangCompiler.Compiler/Pipeline.fs` — Removed debug MLIR dump line
 
 ## Decisions Made
 
@@ -116,7 +116,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (35-07 list module test)
 - **Issue:** `freeVars` had catch-all `| _ -> Set.empty` that matched `Cons`, `List`, `EmptyList` — closures inside list-building expressions didn't capture outer function parameters
 - **Fix:** Added explicit cases for Cons, List, EmptyList, Char in `freeVars`
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** List.map and filter closures capture `f` correctly
 - **Committed in:** 01c173f
 
@@ -124,7 +124,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (35-06 result module test with Ok/Error match)
 - **Issue:** `accessorCache` (shared mutable Dictionary) had values loaded in `ifMatch` branch; `ifNoMatch` branch found the cached values but that block didn't dominate the noMatch block — MLIR rejected `operand #0 does not dominate this use`
 - **Fix:** Take snapshot of `accessorCache` before `preloadOps`, restore it before processing `ifNoMatch` branch
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs (emitDecisionTree Switch, emitDecisionTree2 Switch)
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs (emitDecisionTree Switch, emitDecisionTree2 Switch)
 - **Verification:** Result module tests pass; no dominance errors
 - **Committed in:** 01c173f
 
@@ -132,7 +132,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (List.map recursive call type mismatch)
 - **Issue:** `LetRec` handler set initial `ReturnType = I64`, but when body is `fun xs -> ...`, the actual return is Ptr. Recursive calls inside the body used wrong return type in MLIR.
 - **Fix:** `preReturnType = match body with | Lambda _ -> Ptr | _ -> I64`
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** `@map: (ptr) -> ptr` correctly generated, recursive calls match
 - **Committed in:** 01c173f
 
@@ -140,7 +140,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (List.flatten calling List.append — "append is not a known function")
 - **Issue:** `bodyEnv.KnownFuncs = Map.ofList [(name, sig_)]` discarded all outer known functions; inner closures inside the body couldn't call sibling top-level functions
 - **Fix:** Changed to `KnownFuncs = Map.add name sig_ env.KnownFuncs`
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** flatten/append work together; all 30+ list functions compile
 - **Committed in:** 01c173f
 
@@ -148,7 +148,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (Ptr closure passed to function expecting I64)
 - **Issue:** Direct call path didn't coerce arg types; passed Ptr (closure) to function expecting I64, or I64 to function expecting Ptr — MLIR type mismatch
 - **Fix:** Added arg type coercion in `App (Var name)` direct call branch
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Direct calls with mismatched types now coerce correctly
 - **Committed in:** 01c173f
 
@@ -156,7 +156,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (then=Ptr/else=I64 merge block type mismatch)
 - **Issue:** `then` branch returned Ptr (cons cell), `else` branch returned I64 (closure call result); merge block argument type mismatch
 - **Fix:** Coerce both branches to uniform type when they differ (both to I64 if mismatch)
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Conditional list-building expressions compile correctly
 - **Committed in:** 01c173f
 
@@ -164,7 +164,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (35-09 array module test)
 - **Issue:** When array/list args are captured in closure wrappers (as in `Array.sort arr = array_sort arr`), they arrive as I64 (ptrtoint); all array C runtime functions expect Ptr
 - **Fix:** Applied `coerceToPtrArg` to arr/lst/seq argument in all 10+ array/list builtin handlers
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** 35-09 passes; all 182 tests pass
 - **Committed in:** 01c173f
 
@@ -172,7 +172,7 @@ completed: 2026-03-29
 - **Found during:** Task 2 (F# compiler warning appearing in test stdout causing false FAIL)
 - **Issue:** `coerceToI64` had no wildcard — F# emitted `FS0025` warning for I32 case; `dotnet run` wrote warning to stdout, contaminating test output
 - **Fix:** Added `| _ -> (v, [])` wildcard case
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** No more warnings; tests compare clean output
 - **Committed in:** 01c173f
 

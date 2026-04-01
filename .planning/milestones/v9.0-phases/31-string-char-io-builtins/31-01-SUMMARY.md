@@ -35,9 +35,9 @@ key-files:
     - tests/compiler/31-03-string-trim.flt
     - tests/compiler/31-04-string-concat-list.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Test format uses to_string(bool) + println rather than if/then/else to avoid two-sequential-if MLIR limitation"
@@ -80,9 +80,9 @@ Each task was committed atomically:
 2. **Task 2: Elaboration arms + externalFuncs + E2E tests** - `13002ba` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - Added 4 string functions; moved lang_string_concat_list after LangCons typedef
-- `src/LangBackend.Compiler/lang_runtime.h` - Added declarations for 4 new functions
-- `src/LangBackend.Compiler/Elaboration.fs` - Added 4 elaboration arms + externalFuncs entries in both lists; fixed ForInExpr Pattern bug
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added 4 string functions; moved lang_string_concat_list after LangCons typedef
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added declarations for 4 new functions
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added 4 elaboration arms + externalFuncs entries in both lists; fixed ForInExpr Pattern bug
 - `tests/compiler/31-01-string-endswith.flt` - E2E test: true/false cases via to_string
 - `tests/compiler/31-02-string-startswith.flt` - E2E test: true/false cases via to_string
 - `tests/compiler/31-03-string-trim.flt` - E2E test: whitespace stripping
@@ -100,7 +100,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 (build verification)
 - **Issue:** `ForInExpr (var, ...)` was changed in LangThree AST to use `var: Pattern` (not `string`). Elaboration.fs still used `var` (a `Pattern`) in `Set.add var` and `Lambda(var, ...)` which expect `string`. This broke all builds.
 - **Fix:** Added `let varName = match var with Ast.VarPat(n, _) -> n | _ -> "_"` in `freeVars` and `let varName = match var with Ast.VarPat(n, _) -> n | _ -> freshName env` in ForInExpr elaboration
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Verification:** Build succeeded; all 30 existing for-in tests pass
 - **Committed in:** `a40dc0b` (Task 1 commit)
 
@@ -108,7 +108,7 @@ Each task was committed atomically:
 - **Found during:** Task 2 (E2E test execution)
 - **Issue:** `lang_string_concat_list` used `LangCons*` but was placed before the `LangCons` typedef, causing clang compilation errors
 - **Fix:** Moved `lang_string_concat_list` to after the `LangCons` typedef declaration
-- **Files modified:** `src/LangBackend.Compiler/lang_runtime.c`
+- **Files modified:** `src/FunLangCompiler.Compiler/lang_runtime.c`
 - **Verification:** Clang compilation succeeds; E2E test 31-04 passes
 - **Committed in:** `13002ba` (Task 2 commit)
 

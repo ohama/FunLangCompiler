@@ -29,9 +29,9 @@ re_verification: false
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/lang_runtime.h` | `lang_init_args` and `lang_get_args` declarations | VERIFIED | Lines 196-197: `void lang_init_args(int64_t argc, char** argv)` and `LangCons* lang_get_args(void)` |
-| `src/LangBackend.Compiler/lang_runtime.c` | `lang_init_args` and `lang_get_args` implementations | VERIFIED | 1276 lines; `lang_init_args` at :1253, `lang_get_args` at :1258, static globals `s_argc`/`s_argv` at :1250-1251; forward-cursor list from `i=1` |
-| `src/LangBackend.Compiler/Elaboration.fs` | `@main InputTypes=[I64;Ptr]`, `initArgsOp` prepend, `get_args` builtin arm, `ExternalFuncDecl` entries in both lists | VERIFIED | 3724 lines; InputTypes at :598,:3352,:3610; initArgsOp::gcInitOp prepend at :3349,:3607; get_args arm at :1713; ExternalFuncDecl in both lists at :3463-3464 and :3721-3722 |
+| `src/FunLangCompiler.Compiler/lang_runtime.h` | `lang_init_args` and `lang_get_args` declarations | VERIFIED | Lines 196-197: `void lang_init_args(int64_t argc, char** argv)` and `LangCons* lang_get_args(void)` |
+| `src/FunLangCompiler.Compiler/lang_runtime.c` | `lang_init_args` and `lang_get_args` implementations | VERIFIED | 1276 lines; `lang_init_args` at :1253, `lang_get_args` at :1258, static globals `s_argc`/`s_argv` at :1250-1251; forward-cursor list from `i=1` |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | `@main InputTypes=[I64;Ptr]`, `initArgsOp` prepend, `get_args` builtin arm, `ExternalFuncDecl` entries in both lists | VERIFIED | 3724 lines; InputTypes at :598,:3352,:3610; initArgsOp::gcInitOp prepend at :3349,:3607; get_args arm at :1713; ExternalFuncDecl in both lists at :3463-3464 and :3721-3722 |
 | `tests/compiler/38-01-cli-args.flt` | E2E test for CLI argument passing | VERIFIED | 15 lines; command runs binary with `foo bar baz`; expected output `foo\nbar\nbaz\n0`; passes via fslit |
 
 ### Key Link Verification

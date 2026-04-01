@@ -33,11 +33,11 @@ score: 4/4 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | Elaboration pass with ElabEnv, freshName, elaborateExpr, elaborateModule | VERIFIED | 82 lines, substantive — all Expr cases handled, no stubs; `elaborateModule` wires into `MlirModule` with `@main` func |
-| `src/LangBackend.Compiler/MlirIR.fs` | MlirOp DU with ArithAddIOp, ArithSubIOp, ArithMulIOp, ArithDivSIOp | VERIFIED | Lines 21-24 — all four binary arith cases present in DU; 6 total MlirOp cases |
-| `src/LangBackend.Compiler/Printer.fs` | printOp cases for all four binary arith ops | VERIFIED | Lines 15-26 — exhaustive match on all 6 MlirOp cases; emits `arith.addi`, `arith.subi`, `arith.muli`, `arith.divsi` |
-| `src/LangBackend.Compiler/LangBackend.Compiler.fsproj` | Elaboration.fs added after Printer.fs | VERIFIED | Line 11 — `Elaboration.fs` between `Printer.fs` and `Pipeline.fs` |
-| `src/LangBackend.Cli/Program.fs` | Parses .lt file, calls Elaboration.elaborateModule | VERIFIED | Lines 33-35 — reads file, calls `parseExpr`, calls `Elaboration.elaborateModule`; no hardcoded module |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Elaboration pass with ElabEnv, freshName, elaborateExpr, elaborateModule | VERIFIED | 82 lines, substantive — all Expr cases handled, no stubs; `elaborateModule` wires into `MlirModule` with `@main` func |
+| `src/FunLangCompiler.Compiler/MlirIR.fs` | MlirOp DU with ArithAddIOp, ArithSubIOp, ArithMulIOp, ArithDivSIOp | VERIFIED | Lines 21-24 — all four binary arith cases present in DU; 6 total MlirOp cases |
+| `src/FunLangCompiler.Compiler/Printer.fs` | printOp cases for all four binary arith ops | VERIFIED | Lines 15-26 — exhaustive match on all 6 MlirOp cases; emits `arith.addi`, `arith.subi`, `arith.muli`, `arith.divsi` |
+| `src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` | Elaboration.fs added after Printer.fs | VERIFIED | Line 11 — `Elaboration.fs` between `Printer.fs` and `Pipeline.fs` |
+| `src/FunLangCompiler.Cli/Program.fs` | Parses .lt file, calls Elaboration.elaborateModule | VERIFIED | Lines 33-35 — reads file, calls `parseExpr`, calls `Elaboration.elaborateModule`; no hardcoded module |
 | `tests/compiler/02-01-literal.flt` | FsLit test for integer literal end-to-end | VERIFIED | Input `7`, expected output `7`; test passes |
 | `tests/compiler/02-02-arith.flt` | FsLit test for arithmetic expression end-to-end | VERIFIED | Input `1 + 2 * 3 - 4 / 2`, expected output `5`; test passes |
 | `tests/compiler/02-03-let.flt` | FsLit test for let binding with variable references | VERIFIED | Input `let x = 5 in let y = x + 3 in y`, expected output `8`; test passes |
@@ -81,8 +81,8 @@ None. All four success criteria are verified via FsLit end-to-end tests that com
 ### Build Verification
 
 Both projects build with 0 warnings and 0 errors:
-- `dotnet build src/LangBackend.Compiler/LangBackend.Compiler.fsproj` — Build succeeded, 0 Warning(s), 0 Error(s)
-- `dotnet build src/LangBackend.Cli/LangBackend.Cli.fsproj` — Build succeeded, 0 Warning(s), 0 Error(s)
+- `dotnet build src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` — Build succeeded, 0 Warning(s), 0 Error(s)
+- `dotnet build src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj` — Build succeeded, 0 Warning(s), 0 Error(s)
 
 ### FsLit Test Results
 

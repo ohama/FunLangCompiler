@@ -1,16 +1,16 @@
-# LangBackend Feature Requests for FunLexYacc Compilation
+# FunLangCompiler Feature Requests for FunLexYacc Compilation
 
 **Date:** 2026-03-28
-**Author:** Generated from source analysis of LangThree, LangBackend, and FunLexYacc
-**Purpose:** Enumerate every feature gap in LangBackend (the compiler) that prevents it from compiling FunLexYacc source files
+**Author:** Generated from source analysis of LangThree, FunLangCompiler, and FunLexYacc
+**Purpose:** Enumerate every feature gap in FunLangCompiler (the compiler) that prevents it from compiling FunLexYacc source files
 
 ## Context
 
 - **LangThree** (`../LangThree/`) is the interpreter. It already supports all features FunLexYacc uses.
-- **LangBackend** (`../LangBackend/`) is the AOT compiler (AST -> MLIR -> LLVM -> native binary). It currently has 144 E2E tests and reaches LangThree v5.0 feature parity for simple programs, but is missing several features required by FunLexYacc.
+- **FunLangCompiler** (`../FunLangCompiler/`) is the AOT compiler (AST -> MLIR -> LLVM -> native binary). It currently has 144 E2E tests and reaches LangThree v5.0 feature parity for simple programs, but is missing several features required by FunLexYacc.
 - **FunLexYacc** is a lexer/parser generator written entirely in LangThree `.fun` files. It uses .NET interop, sprintf, file import, list comprehensions, advanced List/Array functions, StringBuilder, Dictionary, HashSet, Queue, and System.IO.
 
-LangBackend's `PROJECT.md` explicitly lists three items as "Out of Scope":
+FunLangCompiler's `PROJECT.md` explicitly lists three items as "Out of Scope":
 1. `printf/sprintf` format strings
 2. `FileImportDecl` (multi-file import)
 3. `get_args` (CLI argument access)
@@ -21,7 +21,7 @@ All three are **required** by FunLexYacc.
 
 ## Summary Table
 
-| # | Feature | Category | LangThree | LangBackend | FunLexYacc Files | Priority | Effort |
+| # | Feature | Category | LangThree | FunLangCompiler | FunLexYacc Files | Priority | Effort |
 |---|---------|----------|-----------|-------------|------------------|----------|--------|
 | 1 | `sprintf` format strings | Language construct | Supported (Eval.fs:266) | Missing (Out of Scope) | DfaMin.fun:373, ParserTables.fun:496+ | P0 | HIGH |
 | 2 | `printfn` format strings | Language construct | Supported (Eval.fs:258) | Missing (Out of Scope) | ParserTables.fun:490+ | P0 | HIGH |
@@ -91,7 +91,7 @@ All three are **required** by FunLexYacc.
 
 **LangThree interpreter status:** Fully supported. Defined in `Eval.fs` line 266 as a `BuiltinValue`. Handles `%d`, `%s`, `%b`, `%%`, and width-specifier variants like `%02x`, `%8s`, `%3d`.
 
-**LangBackend compiler status:** Missing. Explicitly listed in `PROJECT.md` line 96 as "Out of Scope" with note "complexity high." The compiler uses libc `printf` for print/println but has no format-string parser for the LangThree `%d`/`%s` format mini-language.
+**FunLangCompiler compiler status:** Missing. Explicitly listed in `PROJECT.md` line 96 as "Out of Scope" with note "complexity high." The compiler uses libc `printf` for print/println but has no format-string parser for the LangThree `%d`/`%s` format mini-language.
 
 **FunLexYacc usage:**
 - `src/funlex/DfaMin.fun:373` — `sprintf "%02x" c` for hex formatting in table printing
@@ -117,7 +117,7 @@ All three are **required** by FunLexYacc.
 
 **LangThree interpreter status:** Fully supported. Defined in `Eval.fs` line 258.
 
-**LangBackend compiler status:** Missing. The compiler supports `print`/`println` with plain strings (Elaboration.fs lines 1234-1300) but not format-string variants.
+**FunLangCompiler compiler status:** Missing. The compiler supports `print`/`println` with plain strings (Elaboration.fs lines 1234-1300) but not format-string variants.
 
 **FunLexYacc usage:**
 - `src/funyacc/ParserTables.fun:490` — `printfn "ACTION table (%d states x %d terminals):" tables.nStates tables.nTerminals`
@@ -141,7 +141,7 @@ All three are **required** by FunLexYacc.
 
 **LangThree interpreter status:** Fully supported since v2.0. Implemented in `Eval.fs` line 1342 (`FileImportDecl` arm). Uses a file evaluator callback registered at line 587-597.
 
-**LangBackend compiler status:** Missing. Explicitly listed in `PROJECT.md` line 97 as "Out of Scope" with note "requires recursive parser calls." The `FileImportDecl` AST node is not handled in `Elaboration.fs`.
+**FunLangCompiler compiler status:** Missing. Explicitly listed in `PROJECT.md` line 97 as "Out of Scope" with note "requires recursive parser calls." The `FileImportDecl` AST node is not handled in `Elaboration.fs`.
 
 **FunLexYacc usage:** Every single `.fun` file in FunLexYacc uses `open ModuleName` to reference other modules:
 - `src/funlex/LexParser.fun:21-22` — `open ErrorInfo`, `open LexSyntax`
@@ -153,7 +153,7 @@ All three are **required** by FunLexYacc.
 
 Note: FunLexYacc uses `open ModuleName` (module open, not file import), but these modules are defined in separate files. The compiler needs either (a) multi-file compilation where all `.fun` files are parsed together, or (b) `open "file.fun"` file import support, or (c) a build system that concatenates files in dependency order.
 
-**Implementation hint:** The simplest approach: add a `--multi-file` mode to LangBackend CLI that accepts multiple `.fun` files, parses all of them, merges their AST declarations (respecting module namespaces), and elaborates the combined AST. Alternatively, implement `FileImportDecl` handling in Elaboration.fs that recursively calls the parser on the imported file path. The LangThree frontend already handles `FileImportDecl` in the parser; LangBackend just needs to handle it during elaboration.
+**Implementation hint:** The simplest approach: add a `--multi-file` mode to FunLangCompiler CLI that accepts multiple `.fun` files, parses all of them, merges their AST declarations (respecting module namespaces), and elaborates the combined AST. Alternatively, implement `FileImportDecl` handling in Elaboration.fs that recursively calls the parser on the imported file path. The LangThree frontend already handles `FileImportDecl` in the parser; FunLangCompiler just needs to handle it during elaboration.
 
 **Test suggestion:** Create a two-file test: `lib.fun` defines `module Lib` with `let add x y = x + y`, `main.fun` does `open Lib` then `println (to_string (add 1 2))`. Compile `main.fun` and verify output is `"3"`.
 
@@ -168,7 +168,7 @@ Note: FunLexYacc uses `open ModuleName` (module open, not file import), but thes
 
 **LangThree interpreter status:** Fully supported. Defined in `Eval.fs` line 378.
 
-**LangBackend compiler status:** Missing. Explicitly listed in `PROJECT.md` line 98 as "Out of Scope" with note "requires @main signature change (argc/argv)."
+**FunLangCompiler compiler status:** Missing. Explicitly listed in `PROJECT.md` line 98 as "Out of Scope" with note "requires @main signature change (argc/argv)."
 
 **FunLexYacc usage:**
 - `src/funlex/FunlexMain.fun:117` — `match parseArgs (Array.toList argv) with` (where `argv` comes from `main` parameter)
@@ -191,7 +191,7 @@ Note: FunLexYacc's `main` function takes `argv : string array` as a parameter, w
 
 **LangThree interpreter status:** Fully supported since v5.0 (indexing syntax).
 
-**LangBackend compiler status:** Missing. LangBackend v7.0 added `arr.[i]` indexing for arrays and hashtables, but not string slicing with `..` ranges.
+**FunLangCompiler compiler status:** Missing. FunLangCompiler v7.0 added `arr.[i]` indexing for arrays and hashtables, but not string slicing with `..` ranges.
 
 **FunLexYacc usage:**
 - `src/funlex/FunlexMain.fun:39` — `input.[0 .. input.Length - 6]`
@@ -218,7 +218,7 @@ Note: FunLexYacc's `main` function takes `argv : string array` as a parameter, w
 
 **LangThree interpreter status:** Fully supported since v5.0.
 
-**LangBackend compiler status:** Missing. LangBackend handles `for i = start to end do body` loops (v7.0) and `for x in list/array do body` (v8.0), but not the `[ for ... -> ... ]` list-building comprehension syntax.
+**FunLangCompiler compiler status:** Missing. FunLangCompiler handles `for i = start to end do body` loops (v7.0) and `for x in list/array do body` (v8.0), but not the `[ for ... -> ... ]` list-building comprehension syntax.
 
 **FunLexYacc usage:**
 - `src/common/Symtab.fun:58` — `[ for kv in st.nameToId -> (kv.Key, kv.Value) ]`
@@ -240,9 +240,9 @@ Note: FunLexYacc's `main` function takes `argv : string array` as a parameter, w
 
 ### Category 2: .NET Interop (Collections and Methods)
 
-This is the largest gap. FunLexYacc uses .NET BCL types directly (not through LangThree's builtin hashtable/array). LangBackend has no .NET interop — it compiles to native code via LLVM, so .NET types are unavailable.
+This is the largest gap. FunLexYacc uses .NET BCL types directly (not through LangThree's builtin hashtable/array). FunLangCompiler has no .NET interop — it compiles to native code via LLVM, so .NET types are unavailable.
 
-**Strategy decision required:** The LangBackend team must choose one of:
+**Strategy decision required:** The FunLangCompiler team must choose one of:
 1. **Rewrite FunLexYacc** to use only LangThree builtins (Hashtable, Array) instead of .NET types
 2. **Implement .NET interop stubs** — for each .NET type used, provide a C runtime equivalent
 3. **Add a LangThree-native standard library** with StringBuilder, Dictionary, HashSet, Queue implemented in C runtime
@@ -257,7 +257,7 @@ Option 2/3 is recommended since FunLexYacc uses these types pervasively (384 cal
 
 **LangThree interpreter status:** Supported via .NET interop (the interpreter runs on .NET).
 
-**LangBackend compiler status:** Missing entirely. No StringBuilder concept in the native compiler.
+**FunLangCompiler compiler status:** Missing entirely. No StringBuilder concept in the native compiler.
 
 **FunLexYacc usage (51 call sites across 6 files):**
 - `src/funlex/LexParser.fun:156-167` — `StringBuilder()` + `.Append(char)` + `.ToString()` for identifier reading
@@ -289,7 +289,7 @@ In Elaboration.fs, recognize `System.Text.StringBuilder()` constructor and `.App
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** LangBackend has `hashtable_*` builtins, but these are a different type with different API. The .NET `Dictionary<K,V>` has methods like `.TryGetValue()` that return `(bool, V)` tuple-via-out-parameter — not present in LangThree hashtable builtins.
+**FunLangCompiler compiler status:** FunLangCompiler has `hashtable_*` builtins, but these are a different type with different API. The .NET `Dictionary<K,V>` has methods like `.TryGetValue()` that return `(bool, V)` tuple-via-out-parameter — not present in LangThree hashtable builtins.
 
 **FunLexYacc usage (extensive — 60+ call sites):**
 - `src/common/Symtab.fun:16-18` — `Dictionary<string, int>` and `Dictionary<int, string>`
@@ -307,7 +307,7 @@ Key methods used:
 - `.[key] <- value` set — Symtab.fun:33-34, DfaMin.fun:181+
 - `.Keys` — DfaMin.fun:250
 
-**Implementation hint:** Map `System.Collections.Generic.Dictionary` to the existing LangThree hashtable runtime. The `.[key]` and `.[key] <- value` syntax already works for hashtables in LangBackend v7.0. The missing piece is `.TryGetValue()` which returns a `(bool * V)` tuple. Add a C runtime function `lang_hashtable_try_get(ht, key, out_value) -> bool` and emit a two-value return.
+**Implementation hint:** Map `System.Collections.Generic.Dictionary` to the existing LangThree hashtable runtime. The `.[key]` and `.[key] <- value` syntax already works for hashtables in FunLangCompiler v7.0. The missing piece is `.TryGetValue()` which returns a `(bool * V)` tuple. Add a C runtime function `lang_hashtable_try_get(ht, key, out_value) -> bool` and emit a two-value return.
 
 **Test suggestion:** `.flt` test: create a Dictionary, set key "a" to 1, call TryGetValue("a") and verify `(true, 1)`, call TryGetValue("b") and verify `(false, _)`.
 
@@ -322,7 +322,7 @@ Key methods used:
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Missing entirely. No set type in the native compiler.
+**FunLangCompiler compiler status:** Missing entirely. No set type in the native compiler.
 
 **FunLexYacc usage (30+ call sites):**
 - `src/funlex/Dfa.fun:69` — `HashSet<int>()` for epsilon closure visited set
@@ -361,7 +361,7 @@ int64_t lang_hashset_count(LangHashSet* hs);
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Missing entirely.
+**FunLangCompiler compiler status:** Missing entirely.
 
 **FunLexYacc usage:**
 - `src/funlex/Dfa.fun:70-73+218` — BFS worklist for epsilon closure and subset construction
@@ -389,7 +389,7 @@ int64_t lang_queue_count(LangQueue* q);
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Missing. LangBackend has immutable functional lists and mutable arrays, but not the .NET `List<T>` resizable list.
+**FunLangCompiler compiler status:** Missing. FunLangCompiler has immutable functional lists and mutable arrays, but not the .NET `List<T>` resizable list.
 
 **FunLexYacc usage:**
 - `src/funyacc/Lalr.fun:83,90,188,212` — mutable lists for closure computation
@@ -419,7 +419,7 @@ int64_t lang_mlist_count(LangMutableList* ml);
 
 **LangThree interpreter status:** Supported (strings are .NET strings with `.Length` property).
 
-**LangBackend compiler status:** Missing. LangBackend has `string_length s` as a function call, but not the `.Length` property syntax on strings.
+**FunLangCompiler compiler status:** Missing. FunLangCompiler has `string_length s` as a function call, but not the `.Length` property syntax on strings.
 
 **FunLexYacc usage (20+ sites):**
 - `src/funlex/LexParser.fun:137` — `while i < s.Length`
@@ -443,7 +443,7 @@ int64_t lang_mlist_count(LangMutableList* ml);
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/common/Symtab.fun:31+48` — `st.nameToId.TryGetValue(name, &id)`
@@ -469,7 +469,7 @@ Note: Some uses follow the F# out-parameter pattern `TryGetValue(key, &outVar)`,
 
 **LangThree interpreter status:** Supported (interprets .NET IEnumerable).
 
-**LangBackend compiler status:** Partial. v8.0 supports `for x in list do` and `for x in array do` via C runtime closure callbacks, but not for .NET collection types (Dictionary, HashSet).
+**FunLangCompiler compiler status:** Partial. v8.0 supports `for x in list do` and `for x in array do` via C runtime closure callbacks, but not for .NET collection types (Dictionary, HashSet).
 
 **FunLexYacc usage (40+ sites):**
 - `src/funyacc/Lr0.fun:87` — `for rule in spec.rules do` (iterating a list — already supported)
@@ -500,7 +500,7 @@ void lang_mlist_iter(LangMutableList* ml, LangClosureFn callback);
 
 **LangThree interpreter status:** Supported via .NET interop method dispatch.
 
-**LangBackend compiler status:** Missing. LangBackend has no concept of method calls — all operations are function calls or field access.
+**FunLangCompiler compiler status:** Missing. FunLangCompiler has no concept of method calls — all operations are function calls or field access.
 
 **FunLexYacc usage:** 100+ method call sites across all files (see features 7-11 for details).
 
@@ -523,7 +523,7 @@ Option 1 is simpler and sufficient for the finite set of collection types used.
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/common/Symtab.fun:58` — `kv.Key`, `kv.Value`
@@ -546,7 +546,7 @@ Option 1 is simpler and sufficient for the finite set of collection types used.
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/funyacc/YaccEmit.fun:307+310` — `System.Char.IsDigit(action.[i])`
@@ -572,7 +572,7 @@ In Elaboration.fs, recognize `System.Char.IsDigit` and `System.Char.ToUpper` as 
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Has equivalent builtins: `read_file`, `write_file`, `file_exists`. But does NOT recognize the `System.IO.File.X()` syntax.
+**FunLangCompiler compiler status:** Has equivalent builtins: `read_file`, `write_file`, `file_exists`. But does NOT recognize the `System.IO.File.X()` syntax.
 
 **FunLexYacc usage:**
 - `src/funlex/FunlexMain.fun:126` — `System.IO.File.ReadAllText(inputPath)`
@@ -597,7 +597,7 @@ In Elaboration.fs, recognize `System.Char.IsDigit` and `System.Char.ToUpper` as 
 
 **LangThree interpreter status:** Supported via .NET string interop.
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/funlex/FunlexMain.fun:38+69` — `.EndsWith(".funl")`, `.EndsWith(".fun")`
@@ -624,7 +624,7 @@ LangString* lang_string_trim(LangString* s);
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/funyacc/Lalr.fun:125` — `Unchecked.defaultof<System.Collections.Generic.HashSet<string>>`
@@ -641,7 +641,7 @@ LangString* lang_string_trim(LangString* s);
 
 ### Category 3: Prelude/Stdlib Functions
 
-These are functions defined in LangThree's Prelude (`.fun` files) or available as builtins. They work in the interpreter but LangBackend needs to either compile the Prelude files or provide native implementations.
+These are functions defined in LangThree's Prelude (`.fun` files) or available as builtins. They work in the interpreter but FunLangCompiler needs to either compile the Prelude files or provide native implementations.
 
 ---
 
@@ -651,7 +651,7 @@ These are functions defined in LangThree's Prelude (`.fun` files) or available a
 
 **LangThree interpreter status:** Supported (these are likely Prelude functions or .NET interop).
 
-**LangBackend compiler status:** Missing. The Prelude files are not compiled by LangBackend. These functions are not builtins in Elaboration.fs.
+**FunLangCompiler compiler status:** Missing. The Prelude files are not compiled by FunLangCompiler. These functions are not builtins in Elaboration.fs.
 
 **FunLexYacc usage:**
 - `src/funlex/DfaMin.fun:250` — `List.sort [ for g in ... ]`
@@ -678,7 +678,7 @@ LangList* lang_list_distinct_by(LangList* lst, LangClosureFn key_fn);
 
 **LangThree interpreter status:** Supported (Prelude or interpreter).
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/funlex/LexEmit.fun:226` — `List.mapi emitCase`
@@ -704,7 +704,7 @@ let mapi f xs = mapi_aux f 0 xs
 
 **LangThree interpreter status:** Supported as `nth` in Prelude (`Prelude/List.fun:16`).
 
-**LangBackend compiler status:** Missing. Not in Elaboration.fs.
+**FunLangCompiler compiler status:** Missing. Not in Elaboration.fs.
 
 **FunLexYacc usage:**
 - `src/funlex/DfaMin.fun:366+369` — `List.item i trans`, `List.item c row`
@@ -729,7 +729,7 @@ let mapi f xs = mapi_aux f 0 xs
 
 **LangThree interpreter status:** Supported. `exists` = `any` in Prelude (`Prelude/List.fun:13`).
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/funyacc/YaccEmit.fun:73+140` — `List.exists (fun t -> t.name = "EOF")`
@@ -755,7 +755,7 @@ let rec choose f xs = match xs with | [] -> [] | h :: t -> match f h with | Some
 
 **LangThree interpreter status:** Supported in Prelude (`hd`, `tl` at `Prelude/List.fun:8-9`).
 
-**LangBackend compiler status:** Missing as qualified `List.isEmpty` etc., though the underlying operations (pattern match on `[]` vs `h :: t`) work.
+**FunLangCompiler compiler status:** Missing as qualified `List.isEmpty` etc., though the underlying operations (pattern match on `[]` vs `h :: t`) work.
 
 **FunLexYacc usage:**
 - `src/funlex/LexEmit.fun:203` — `List.isEmpty rule.args`
@@ -778,7 +778,7 @@ let rec choose f xs = match xs with | [] -> [] | h :: t -> match f h with | Some
 
 **LangThree interpreter status:** Supported via .NET interop.
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/funlex/DfaMin.fun:160` — `List.ofSeq kvp.Value` (converting .NET List<int> to functional list)
@@ -800,12 +800,12 @@ let rec choose f xs = match xs with | [] -> [] | h :: t -> match f h with | Some
 
 **LangThree interpreter status:** Supported (interpreter, .NET Array.Sort).
 
-**LangBackend compiler status:** Missing.
+**FunLangCompiler compiler status:** Missing.
 
 **FunLexYacc usage:**
 - `src/funlex/Dfa.fun:79` — `Array.sort arr` (sort NFA state ID array for canonical form)
 
-**Implementation hint:** Call libc `qsort` on the array data. Since LangBackend arrays are `{length, slot0, slot1, ...}` in a flat GC block, `qsort(&array[1], length, 8, compare_i64)`. Add a C runtime wrapper:
+**Implementation hint:** Call libc `qsort` on the array data. Since FunLangCompiler arrays are `{length, slot0, slot1, ...}` in a flat GC block, `qsort(&array[1], length, 8, compare_i64)`. Add a C runtime wrapper:
 ```c
 void lang_array_sort(int64_t* arr); // sorts in-place using the length in slot 0
 ```
@@ -823,7 +823,7 @@ void lang_array_sort(int64_t* arr); // sorts in-place using the length in slot 0
 
 **LangThree interpreter status:** Supported (Prelude operator `^^` for binary concat, plus `String.concat` as module function).
 
-**LangBackend compiler status:** `string_concat` (binary, two strings) is supported. Module-qualified `String.concat sep list` is missing.
+**FunLangCompiler compiler status:** `string_concat` (binary, two strings) is supported. Module-qualified `String.concat sep list` is missing.
 
 **FunLexYacc usage (15+ sites):**
 - `src/funlex/DfaMin.fun:59` — `String.concat "," (List.map string sortedIds)`
@@ -851,7 +851,7 @@ Walk the list, calculate total length, allocate result string, copy segments wit
 
 **LangThree interpreter status:** Supported (interpreter).
 
-**LangBackend compiler status:** `eprint` exists (Elaboration.fs line 1161) but not `eprintfn` (formatted stderr output).
+**FunLangCompiler compiler status:** `eprint` exists (Elaboration.fs line 1161) but not `eprintfn` (formatted stderr output).
 
 **FunLexYacc usage:**
 - `src/common/Diagnostics.fun:56` — `eprintfn "%s" (formatError err)`
@@ -871,17 +871,17 @@ Walk the list, calculate total length, allocate result string, copy segments wit
 
 #### Feature 30: Prelude Auto-Loading
 
-**Description:** LangThree automatically loads `Prelude/*.fun` files at startup, making Option, Result, List, Core, Array, Hashtable modules available. LangBackend needs to either compile these Prelude files alongside user code or provide native implementations of all Prelude functions.
+**Description:** LangThree automatically loads `Prelude/*.fun` files at startup, making Option, Result, List, Core, Array, Hashtable modules available. FunLangCompiler needs to either compile these Prelude files alongside user code or provide native implementations of all Prelude functions.
 
 **LangThree interpreter status:** Fully automatic. Files in `Prelude/` are loaded in order.
 
-**LangBackend compiler status:** Missing. No Prelude loading mechanism.
+**FunLangCompiler compiler status:** Missing. No Prelude loading mechanism.
 
 **FunLexYacc dependency:** FunLexYacc defines its own `ErrorInfo.Result` type (not using Prelude's), but uses:
 - `List.map`, `List.filter`, `List.fold`, `List.length`, `List.head`, `List.tail`, etc.
 - `Option` type (`Some`/`None`)
 - `string_concat`, `to_string`, `failwith`
-- `|>` pipe operator (already handled in LangBackend v3.0)
+- `|>` pipe operator (already handled in FunLangCompiler v3.0)
 
 **Implementation hint:** Two approaches:
 1. **Compile Prelude:** Requires Feature 3 (file import). Concatenate Prelude files + user code, compile together.
@@ -974,7 +974,7 @@ If implementing full .NET interop is too costly, an alternative is to rewrite Fu
 | `System.Char.*` | `char_to_int` + manual comparison |
 | `s.[a..b]` | `string_sub s a (b - a + 1)` |
 
-This rewrite affects approximately 384 call sites across 14 files but keeps LangBackend's scope manageable.
+This rewrite affects approximately 384 call sites across 14 files but keeps FunLangCompiler's scope manageable.
 
 ---
 
@@ -991,4 +991,4 @@ This rewrite affects approximately 384 call sites across 14 files but keeps Lang
 
 Estimated total development effort: **3-5 weeks** for a single developer, assuming the "implement C runtime" approach for .NET collections.
 
-If the "rewrite FunLexYacc" approach is taken instead, the LangBackend work reduces to: file import + sprintf/printfn + get_args + string slicing + list comprehension + Prelude compilation + a few List/Array extras = **approximately 1-2 weeks**.
+If the "rewrite FunLexYacc" approach is taken instead, the FunLangCompiler work reduces to: file import + sprintf/printfn + get_args + string slicing + list comprehension + Prelude compilation + a few List/Array extras = **approximately 1-2 weeks**.

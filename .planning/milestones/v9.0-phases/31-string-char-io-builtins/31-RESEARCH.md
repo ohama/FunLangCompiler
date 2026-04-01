@@ -1,7 +1,7 @@
 # Phase 31: String, Char & IO Builtins - Research
 
 **Researched:** 2026-03-29
-**Domain:** LangBackend builtin implementation (lang_runtime.c + Elaboration.fs)
+**Domain:** FunLangCompiler builtin implementation (lang_runtime.c + Elaboration.fs)
 **Confidence:** HIGH
 
 ## Summary
@@ -21,9 +21,9 @@ The established tools for this codebase:
 ### Core
 | Component | Location | Purpose | Why Standard |
 |-----------|----------|---------|--------------|
-| lang_runtime.c | src/LangBackend.Compiler/lang_runtime.c | C runtime library | All builtins that need C stdlib calls live here |
-| lang_runtime.h | src/LangBackend.Compiler/lang_runtime.h | Header declarations | Declares LangString typedef and all runtime function signatures |
-| Elaboration.fs | src/LangBackend.Compiler/Elaboration.fs | AST-to-MLIR translation | Pattern-matches on App(Var("builtin_name")) nodes, emits MLIR ops |
+| lang_runtime.c | src/FunLangCompiler.Compiler/lang_runtime.c | C runtime library | All builtins that need C stdlib calls live here |
+| lang_runtime.h | src/FunLangCompiler.Compiler/lang_runtime.h | Header declarations | Declares LangString typedef and all runtime function signatures |
+| Elaboration.fs | src/FunLangCompiler.Compiler/Elaboration.fs | AST-to-MLIR translation | Pattern-matches on App(Var("builtin_name")) nodes, emits MLIR ops |
 
 ### Supporting
 | Component | Version | Purpose | When to Use |
@@ -334,7 +334,7 @@ int64_t lang_string_contains(LangString* s, LangString* sub) {
 
 ### E2E test template for bool-returning builtins
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 if string_endswith "hello.fun" ".fun" then 1 else 0
 // --- Output:
@@ -344,7 +344,7 @@ if string_endswith "hello.fun" ".fun" then 1 else 0
 
 ### E2E test template for eprintfn (stderr redirect required)
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN 2>/dev/null; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN 2>/dev/null; echo $?; rm -f $OUTBIN'
 // --- Input:
 let _ = eprintfn "%s" "error msg" in println "ok"
 // --- Output:
@@ -377,9 +377,9 @@ ok
 ## Sources
 
 ### Primary (HIGH confidence)
-- `src/LangBackend.Compiler/lang_runtime.c` — all existing C runtime patterns examined
-- `src/LangBackend.Compiler/lang_runtime.h` — LangString typedef, all declared functions
-- `src/LangBackend.Compiler/Elaboration.fs` — string_contains (line 789), char_to_int (line 1225), eprint (line 1160), eprintln (line 1167), external declarations (lines 2677-2729 and 2867-2919)
+- `src/FunLangCompiler.Compiler/lang_runtime.c` — all existing C runtime patterns examined
+- `src/FunLangCompiler.Compiler/lang_runtime.h` — LangString typedef, all declared functions
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — string_contains (line 789), char_to_int (line 1225), eprint (line 1160), eprintln (line 1167), external declarations (lines 2677-2729 and 2867-2919)
 - `../LangThree/src/LangThree/Eval.fs` — reference implementations of all 13 new builtins (lines 237-388)
 - `tests/compiler/26-06-eprint.flt`, `26-07-eprintln.flt` — E2E test pattern for stderr builtins
 - `tests/compiler/14-03-string-contains.flt` — E2E test pattern for bool-returning two-arg string builtin

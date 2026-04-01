@@ -15,7 +15,7 @@
 
 ### Task 1 — Add `lang_range` to C runtime
 
-**File:** `src/LangBackend.Compiler/lang_runtime.c`
+**File:** `src/FunLangCompiler.Compiler/lang_runtime.c`
 
 Add after `lang_match_failure`:
 
@@ -63,7 +63,7 @@ LangCons* lang_range(int64_t start, int64_t stop, int64_t step) {
 
 ### Task 2 — Declare `@lang_range` in Elaboration.fs external funcs
 
-**File:** `src/LangBackend.Compiler/Elaboration.fs`
+**File:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 
 In the `externalFuncs` list (around line 1038–1047), add:
 
@@ -90,7 +90,7 @@ let externalFuncs = [
 
 ### Task 3 — Elaborate `Range` AST node in Elaboration.fs
 
-**File:** `src/LangBackend.Compiler/Elaboration.fs`
+**File:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 
 In `elaborateExpr`, add a new case after the `List` case (~line 772). Insert:
 
@@ -123,7 +123,7 @@ In `elaborateExpr`, add a new case after the `List` case (~line 772). Insert:
 **File:** `tests/compiler/15-01-range-sum.flt`
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let rec sum lst = match lst with | [] -> 0 | h :: t -> h + sum t in sum [1..5]
 // --- Output:
@@ -139,7 +139,7 @@ let rec sum lst = match lst with | [] -> 0 | h :: t -> h + sum t in sum [1..5]
 **File:** `tests/compiler/15-02-range-step.flt`
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let rec length lst = match lst with | [] -> 0 | _ :: t -> 1 + length t in length [1..2..10]
 // --- Output:
@@ -169,8 +169,8 @@ Tasks 1 and 2 can be done in either order. Task 3 must follow Task 2. Tests foll
 
 | File | Change |
 |------|--------|
-| `src/LangBackend.Compiler/lang_runtime.c` | Add `LangCons` typedef + `lang_range` function |
-| `src/LangBackend.Compiler/Elaboration.fs` | Add `@lang_range` to `externalFuncs`; add `Range` case in `elaborateExpr` |
+| `src/FunLangCompiler.Compiler/lang_runtime.c` | Add `LangCons` typedef + `lang_range` function |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Add `@lang_range` to `externalFuncs`; add `Range` case in `elaborateExpr` |
 | `tests/compiler/15-01-range-sum.flt` | New test: `sum [1..5]` = 15 |
 | `tests/compiler/15-02-range-step.flt` | New test: `length [1..2..10]` = 5 |
 

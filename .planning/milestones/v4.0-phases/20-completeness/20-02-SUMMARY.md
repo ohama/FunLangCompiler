@@ -32,7 +32,7 @@ key-files:
     - tests/compiler/20-02-nested-adt-pat.flt
     - tests/compiler/20-03-raise-in-handler.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "ADT-12 root cause: resolveAccessorTyped false,_ and true,v Field branches called resolveAccessor parent (may return cached I64) then used it as GEP base (Ptr required). Fix: use resolveAccessorTyped parent Ptr in all Field branches of both resolveAccessorTyped and resolveAccessorTyped2"
@@ -77,7 +77,7 @@ completed: 2026-03-27
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Four fixes: resolveAccessorTyped/2 parent Ptr, emitDecisionTree/2 Leaf+Guard conditional terminator, tryBodyBlock dead merge detection
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Four fixes: resolveAccessorTyped/2 parent Ptr, emitDecisionTree/2 Leaf+Guard conditional terminator, tryBodyBlock dead merge detection
 - `tests/compiler/20-02-nested-adt-pat.flt` - E2E test for nested ADT pattern (exit 15)
 - `tests/compiler/20-03-raise-in-handler.flt` - E2E test for raise inside handler arm (exit 42)
 
@@ -97,7 +97,7 @@ completed: 2026-03-27
 - **Found during:** Task 1 (implementation)
 - **Issue:** Plan stated fix was in `ensureAdtFieldTypes` (I64→Ptr preload). Analysis showed the actual bug is in `resolveAccessorTyped false,_` and `true,v` Field branches using `resolveAccessor parent` (returns cached I64) as GEP base.
 - **Fix:** Changed both Field branches of `resolveAccessorTyped` and `resolveAccessorTyped2` to use `resolveAccessorTyped parent Ptr` instead of `resolveAccessor parent`.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** 17-05-unary-match.flt (previously broken by plan's approach) passes; nested ADT test returns 15.
 - **Committed in:** d03cbae (Task 1 commit)
 
@@ -105,7 +105,7 @@ completed: 2026-03-27
 - **Found during:** Task 1 (testing EXN-08)
 - **Issue:** After fixing the Leaf/Guard conditional terminator, mlir-translate still failed with "Dialect cf not found for cf.br" in the lowered MLIR. The TryWith tryBodyBlock CfBrOp patching code appended `cf.br ^inner_merge(bodyVal)` to the inner TryWith's merge block, which was dead (no predecessors) when all handler arms raised.
 - **Fix:** Added predecessor check before patching inner merge block. If no predecessor found, emit `LlvmUnreachableOp` instead of `CfBrOp`.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** 20-03-raise-in-handler test compiles and returns 42.
 - **Committed in:** d03cbae (Task 1 commit)
 

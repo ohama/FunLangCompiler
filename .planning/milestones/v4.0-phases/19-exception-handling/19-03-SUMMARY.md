@@ -38,12 +38,12 @@ key-files:
     - tests/compiler/19-05-try-payload.flt
     - tests/compiler/19-06-try-fallthrough.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Pipeline.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Pipeline.fs
 
 key-decisions:
   - "Use _setjmp inline (not lang_try_enter wrapper) to fix ARM64 PAC setjmp stack-frame issue"
@@ -91,12 +91,12 @@ Each task was committed atomically:
 **Plan metadata:** (this commit) (docs: complete plan)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - TryWith case, Let nested-terminator fix, updated external decls
-- `src/LangBackend.Compiler/MlirIR.fs` - Added Attrs field to ExternalFuncDecl
-- `src/LangBackend.Compiler/Printer.fs` - Emit attributes string for external decls
-- `src/LangBackend.Compiler/lang_runtime.c` - lang_try_push (no setjmp), lang_throw uses _longjmp
-- `src/LangBackend.Compiler/lang_runtime.h` - Updated declarations
-- `src/LangBackend.Compiler/Pipeline.fs` - Removed debug WriteAllText
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - TryWith case, Let nested-terminator fix, updated external decls
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added Attrs field to ExternalFuncDecl
+- `src/FunLangCompiler.Compiler/Printer.fs` - Emit attributes string for external decls
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - lang_try_push (no setjmp), lang_throw uses _longjmp
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Updated declarations
+- `src/FunLangCompiler.Compiler/Pipeline.fs` - Removed debug WriteAllText
 - `tests/compiler/19-03-try-basic.flt` - Basic catch test
 - `tests/compiler/19-04-try-nested.flt` - Nested try-with test
 - `tests/compiler/19-05-try-payload.flt` - Payload extraction test

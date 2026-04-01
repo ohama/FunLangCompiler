@@ -35,7 +35,7 @@ key-files:
     - tests/compiler/07-02-print-basic.flt
     - tests/compiler/07-03-println-basic.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "print/println cases placed BEFORE general App arm — F# pattern matching is top-to-bottom, must match first"
@@ -84,7 +84,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Changes A-D: ElabEnv Globals fields, addStringGlobal helper, print/println special cases, LetPat cases, elaborateModule globals transfer + @printf ExternalFunc
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Changes A-D: ElabEnv Globals fields, addStringGlobal helper, print/println special cases, LetPat cases, elaborateModule globals transfer + @printf ExternalFunc
 - `tests/compiler/07-02-print-basic.flt` - print + println combined output test
 - `tests/compiler/07-03-println-basic.flt` - two println calls producing two lines
 
@@ -104,7 +104,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 verification
 - **Issue:** `let _ = println "hello" in 0` parses as `LetPat(WildcardPat, App(Var("println")...), ...)` — Elaboration had no LetPat case and would throw "unsupported expression LetPat"
 - **Fix:** Added `LetPat(WildcardPat)` (eval bind for side effects, discard, eval body) and `LetPat(VarPat)` (like Let) cases in elaborateExpr
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Commit:** `b4159f5`
 
 ## Issues Encountered

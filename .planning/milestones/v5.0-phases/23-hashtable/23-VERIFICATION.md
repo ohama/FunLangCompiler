@@ -31,9 +31,9 @@ re_verification: false
 
 | Artifact                                              | Expected                                              | Status      | Details                                               |
 | ----------------------------------------------------- | ----------------------------------------------------- | ----------- | ----------------------------------------------------- |
-| `src/LangBackend.Compiler/lang_runtime.h`             | LangHashEntry + LangHashtable typedefs + 6 decls      | VERIFIED    | L34-51: both structs + 6 function declarations present |
-| `src/LangBackend.Compiler/lang_runtime.c`             | 6 C functions, ~120 LOC, GC_malloc discipline         | VERIFIED    | L239-339: 101 LOC of hashtable code, 30 GC_malloc/hash usages |
-| `src/LangBackend.Compiler/Elaboration.fs`             | 6 match arms + coercion + 2x ExternalFuncDecl lists   | VERIFIED    | 24 lang_hashtable references; arms at L885-969; ExternalFuncDecls at L2228-2233 and L2371-2376 |
+| `src/FunLangCompiler.Compiler/lang_runtime.h`             | LangHashEntry + LangHashtable typedefs + 6 decls      | VERIFIED    | L34-51: both structs + 6 function declarations present |
+| `src/FunLangCompiler.Compiler/lang_runtime.c`             | 6 C functions, ~120 LOC, GC_malloc discipline         | VERIFIED    | L239-339: 101 LOC of hashtable code, 30 GC_malloc/hash usages |
+| `src/FunLangCompiler.Compiler/Elaboration.fs`             | 6 match arms + coercion + 2x ExternalFuncDecl lists   | VERIFIED    | 24 lang_hashtable references; arms at L885-969; ExternalFuncDecls at L2228-2233 and L2371-2376 |
 | `tests/compiler/23-01-ht-create.flt`                  | E2E test for hashtable_create                         | VERIFIED    | Exists, 4 lines, output "42", test passes             |
 | `tests/compiler/23-02-ht-set-get.flt`                 | E2E test for set+get round-trip                       | VERIFIED    | Exists, 5 lines, output "42", test passes             |
 | `tests/compiler/23-03-ht-missing-key.flt`             | E2E test for missing key exception                    | VERIFIED    | Exists, 5 lines, output "99", test passes             |

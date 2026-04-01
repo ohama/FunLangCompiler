@@ -32,9 +32,9 @@ key-files:
     - tests/compiler/04-01-fact.flt
     - tests/compiler/04-02-fib.flt
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Fresh body env for LetRec has Blocks = ref [] (not shared) — function body blocks are isolated from caller"
@@ -79,9 +79,9 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit to follow)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added DirectCallOp case to MlirOp DU
-- `src/LangBackend.Compiler/Printer.fs` - Added func.call serialization for DirectCallOp
-- `src/LangBackend.Compiler/Elaboration.fs` - FuncSignature type, KnownFuncs/Funcs in ElabEnv, LetRec/App cases, elaborateModule update
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added DirectCallOp case to MlirOp DU
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added func.call serialization for DirectCallOp
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - FuncSignature type, KnownFuncs/Funcs in ElabEnv, LetRec/App cases, elaborateModule update
 - `tests/compiler/04-01-fact.flt` - E2E test: `let rec fact n = ... in fact 5` exits 120
 - `tests/compiler/04-02-fib.flt` - E2E test: `let rec fib n = ... in fib 10` exits 55
 

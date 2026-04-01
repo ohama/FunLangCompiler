@@ -29,9 +29,9 @@ key-files:
     - tests/compiler/33-03-queue.flt
     - tests/compiler/33-04-mutablelist.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "queue_dequeue elaboration: two-arg App(App(Var, q), unit) — unit elaborated and discarded; C function lang_queue_dequeue takes only the queue pointer"
@@ -76,9 +76,9 @@ completed: 2026-03-29
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.c` - LangQueue (create/enqueue/dequeue/count) and LangMutableList (create/add/get/set/count) implementations
-- `src/LangBackend.Compiler/lang_runtime.h` - LangQueueNode, LangQueue, LangMutableList struct typedefs + 9 function declarations
-- `src/LangBackend.Compiler/Elaboration.fs` - 9 new elaboration arms + 9 externalFuncs entries in each of 2 lists
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - LangQueue (create/enqueue/dequeue/count) and LangMutableList (create/add/get/set/count) implementations
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - LangQueueNode, LangQueue, LangMutableList struct typedefs + 9 function declarations
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - 9 new elaboration arms + 9 externalFuncs entries in each of 2 lists
 - `tests/compiler/33-03-queue.flt` - E2E: enqueue 10/20/30, dequeue twice → 10, 20, count=1
 - `tests/compiler/33-04-mutablelist.flt` - E2E: add 100/200, set index 0 to 999 → count=2, get(0)=999, get(1)=200
 

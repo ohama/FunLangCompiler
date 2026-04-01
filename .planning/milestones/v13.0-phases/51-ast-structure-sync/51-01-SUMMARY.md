@@ -24,7 +24,7 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "TypeDecl 5th field is Span (not deriving: the order is name, typeParams, ctors, deriving, span)"
@@ -67,7 +67,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Updated TypeDecl pattern match (line 4073) and added 3 explicit skip arms (lines 4101-4103)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Updated TypeDecl pattern match (line 4073) and added 3 explicit skip arms (lines 4101-4103)
 
 ## Decisions Made
 

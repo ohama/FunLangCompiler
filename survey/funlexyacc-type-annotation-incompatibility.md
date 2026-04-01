@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-30 (updated 2026-03-31)
 **Context:** Phase 8 (08-07) compilation verification — `make funlex` fails with "parse error"
-**Original Root Cause:** ~~LangBackend 문법이 함수 파라미터/반환값 타입 어노테이션을 지원하지 않음~~
+**Original Root Cause:** ~~FunLangCompiler 문법이 함수 파라미터/반환값 타입 어노테이션을 지원하지 않음~~
 **Revised Root Cause (Section 8):** LangThree 파서는 모든 타입 어노테이션을 이미 지원함. 실제 문제는 Elaboration.fs의 패턴 매칭이 `Annot`/`LambdaAnnot` AST 래퍼를 투과하지 못하는 것임.
 
 ---
@@ -10,7 +10,7 @@
 ## 1. 문제 요약
 
 FunLexYacc 소스 코드는 F# 스타일 타입 어노테이션을 광범위하게 사용하지만,
-LangBackend의 문법(AbstractGrammar.md)에서는 이를 지원하지 않는다.
+FunLangCompiler의 문법(AbstractGrammar.md)에서는 이를 지원하지 않는다.
 
 **영향 범위:** src/ 내 18개 파일, 총 ~656개 어노테이션
 
@@ -33,7 +33,7 @@ let bind (r : Result<'a>) (f : 'a -> Result<'b>) : Result<'b> =
 //        param 타입 어노테이션    param 타입 어노테이션    반환 타입 어노테이션
 ```
 
-**LangBackend 호환 코드:**
+**FunLangCompiler 호환 코드:**
 ```fsharp
 let bind r f =
 ```
@@ -171,7 +171,7 @@ type Result 'a =
 
 ### 5.3 주의사항
 
-1. **타입 어노테이션 제거 시 의미 변화 없음** — LangBackend는 타입 추론 기반이므로 어노테이션은 문서화 목적
+1. **타입 어노테이션 제거 시 의미 변화 없음** — FunLangCompiler는 타입 추론 기반이므로 어노테이션은 문서화 목적
 2. **코드 가독성 저하** — 타입 정보가 사라지면 코드 이해가 어려워짐. 주석으로 보완 권장
 3. **`private` 키워드** — AbstractGrammar.md에 `let private` 구문이 없으므로 이것도 제거 필요할 수 있음
 4. **named DU fields** — `of loc: SrcLoc * msg: string` 형식은 ErrorInfo.fun에서만 사용, `of SrcLoc * string`으로 변환 필요
@@ -186,15 +186,15 @@ FunLexYacc에서 `let private` 사용 현황 확인 필요:
 // F# 스타일
 let private parseArgs (argv : string list) : Result<string * string> =
 
-// LangBackend 문법에 'private'가 없다면:
+// FunLangCompiler 문법에 'private'가 없다면:
 let parseArgs argv =
 ```
 
 ---
 
-## 7. 대안: LangBackend 파서 확장 — ⚠️ OUTDATED: 파서는 이미 지원함, Section 8 참조
+## 7. 대안: FunLangCompiler 파서 확장 — ⚠️ OUTDATED: 파서는 이미 지원함, Section 8 참조
 
-타입 어노테이션 제거 대신 LangBackend 파서를 확장하는 방안:
+타입 어노테이션 제거 대신 FunLangCompiler 파서를 확장하는 방안:
 
 ```
 // 현재
@@ -206,7 +206,7 @@ param ::= IDENT
 ```
 
 **장점:** FunLexYacc 소스 수정 불필요, F# 호환성 유지
-**단점:** LangBackend 파서/AST 수정 필요, 타입 정보 처리 로직 추가
+**단점:** FunLangCompiler 파서/AST 수정 필요, 타입 정보 처리 로직 추가
 
 반환 타입 어노테이션도 유사하게 확장 가능:
 ```
@@ -223,9 +223,9 @@ decl ::= 'let' IDENT param+ ':' type_expr '=' expr    // 반환 타입 포함
 
 ### 8.1 핵심 발견: 파서는 이미 모든 형태를 지원한다
 
-**이 문서의 전제 — "LangBackend 문법이 타입 어노테이션을 지원하지 않음" — 는 틀렸다.**
+**이 문서의 전제 — "FunLangCompiler 문법이 타입 어노테이션을 지원하지 않음" — 는 틀렸다.**
 
-LangBackend는 LangThree의 파서(`Parser.fsy`)를 그대로 재사용하며, LangThree 파서는 이미 아래 구문을 **완전히** 지원한다:
+FunLangCompiler는 LangThree의 파서(`Parser.fsy`)를 그대로 재사용하며, LangThree 파서는 이미 아래 구문을 **완전히** 지원한다:
 
 | 구문 | Parser.fsy 위치 | AST 노드 | 지원 여부 |
 |------|----------------|----------|----------|
@@ -315,7 +315,7 @@ body가 `Annot(Match(...))` 이면 → `false` 반환
 ### 8.4 수정 전략 (재평가)
 
 ~~Section 5의 "FunLexYacc 소스 코드에서 656개 어노테이션 제거" 전략은 불필요하다.~~
-~~Section 7의 "LangBackend 파서 확장" 전략도 불필요하다 — 파서는 이미 지원한다.~~
+~~Section 7의 "FunLangCompiler 파서 확장" 전략도 불필요하다 — 파서는 이미 지원한다.~~
 
 **실제 필요한 수정: Elaboration.fs에 `Annot`/`LambdaAnnot` 투과 로직 추가**
 
@@ -373,7 +373,7 @@ let rec stripAnnot (expr: Expr) : Expr =
 **이 문서의 Section 2 (문법 근거) 와 Section 5 (마이그레이션 전략) 는 더 이상 유효하지 않다.**
 
 1. LangThree 파서는 파라미터 타입, 반환 타입, 앵글 브래킷 제네릭을 **이미 완전히 지원**한다.
-2. LangBackend의 `Annot`/`LambdaAnnot` 핸들러도 존재하지만 (Phase 30, v8.0에서 추가), **단순 pass-through만 하고 주변 패턴 매칭과의 상호작용은 처리하지 않는다.**
+2. FunLangCompiler의 `Annot`/`LambdaAnnot` 핸들러도 존재하지만 (Phase 30, v8.0에서 추가), **단순 pass-through만 하고 주변 패턴 매칭과의 상호작용은 처리하지 않는다.**
 3. 수정은 Elaboration.fs에 `stripAnnot` 헬퍼를 추가하고 핵심 패턴 매칭 6~8곳에 적용하는 것으로 충분하다.
 4. 이 수정이 완료되면 FunLexYacc 소스 코드의 656개 타입 어노테이션을 **그대로 유지**한 채 컴파일할 수 있다.
 

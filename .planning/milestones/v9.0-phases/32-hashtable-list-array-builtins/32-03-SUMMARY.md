@@ -31,9 +31,9 @@ key-files:
     - tests/compiler/32-05-array-sort.flt
     - tests/compiler/32-06-array-of-seq.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "array_sort elaboration uses LlvmCallVoidOp (not LlvmCallOp) — C function returns void"
@@ -76,9 +76,9 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - Added static lang_compare_i64, lang_array_sort, lang_array_of_seq
-- `src/LangBackend.Compiler/lang_runtime.h` - Added declarations for lang_array_sort and lang_array_of_seq
-- `src/LangBackend.Compiler/Elaboration.fs` - Added elaboration arms and externalFuncs entries for both functions
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added static lang_compare_i64, lang_array_sort, lang_array_of_seq
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added declarations for lang_array_sort and lang_array_of_seq
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added elaboration arms and externalFuncs entries for both functions
 - `tests/compiler/32-05-array-sort.flt` - E2E test: [3;1;2] sorts to [1;2;3] in place
 - `tests/compiler/32-06-array-of-seq.flt` - E2E test: list [10;20;30] converts to array with length 3
 

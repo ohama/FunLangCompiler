@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LangBackend.Compiler\LangBackend.Compiler.fsproj" />
+    <ProjectReference Include="..\FunLangCompiler.Compiler\FunLangCompiler.Compiler.fsproj" />
   </ItemGroup>
 
 </Project>

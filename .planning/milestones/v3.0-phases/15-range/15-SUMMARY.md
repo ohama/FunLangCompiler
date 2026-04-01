@@ -29,8 +29,8 @@ key-files:
     - tests/compiler/15-01-range-sum.flt
     - tests/compiler/15-02-range-step.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "lang_range returns ptr to cons list; same Phase 10 layout — no new MLIR constructs needed"
@@ -71,8 +71,8 @@ completed: 2026-03-26
 4. **Tasks 4+5: Add RNG-01 and RNG-02 tests** - `716fed4` (test)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - Added `LangCons` typedef + `lang_range` function (36 lines)
-- `src/LangBackend.Compiler/Elaboration.fs` - Added `@lang_range` to `externalFuncs`; added `Range` case in `elaborateExpr` (16 lines)
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added `LangCons` typedef + `lang_range` function (36 lines)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added `@lang_range` to `externalFuncs`; added `Range` case in `elaborateExpr` (16 lines)
 - `tests/compiler/15-01-range-sum.flt` - RNG-01: `sum [1..5]` exits 15
 - `tests/compiler/15-02-range-step.flt` - RNG-02: `length [1..2..10]` exits 5
 

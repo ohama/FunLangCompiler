@@ -32,7 +32,7 @@ key-files:
     - tests/compiler/18-05-record-pat.flt
     - tests/compiler/18-06-record-pat-ordering.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "ensureRecordFieldTypes resolves the record type from RecordEnv by field-set superset match (same strategy as RecordExpr type resolution)"
@@ -78,7 +78,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - scrutineeTypeForTag RecordCtor, emitCtorTest RecordCtor, ensureRecordFieldTypes, preloadOps dispatch
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - scrutineeTypeForTag RecordCtor, emitCtorTest RecordCtor, ensureRecordFieldTypes, preloadOps dispatch
 - `tests/compiler/18-05-record-pat.flt` - Basic RecordPat field extraction (exits 4)
 - `tests/compiler/18-06-record-pat-ordering.flt` - Declaration order != alphabetical (exits 20 for x from Pair{y=10,x=20})
 

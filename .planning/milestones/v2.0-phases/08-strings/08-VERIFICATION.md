@@ -29,11 +29,11 @@ score: 4/4 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/MlirIR.fs` | LlvmGEPStructOp + ArithExtuIOp cases | VERIFIED | Both DU cases present (lines 55, 45). 123 lines total. |
-| `src/LangBackend.Compiler/Printer.fs` | Print cases for LlvmGEPStructOp + ArithExtuIOp | VERIFIED | Lines 88-90 (GEPStruct), 46-48 (ExtuI). 173 lines total. |
-| `src/LangBackend.Compiler/Elaboration.fs` | elaborateStringLiteral, string_length, string_concat, to_string, strcmp equality | VERIFIED | All cases present at lines 57-75, 501-510, 482-486, 489-499, 337-361. 761 lines total. |
-| `src/LangBackend.Compiler/lang_runtime.c` | lang_string_concat, lang_to_string_int, lang_to_string_bool using GC_malloc | VERIFIED | All three functions present. 44 lines. GC_malloc used throughout. |
-| `src/LangBackend.Compiler/Pipeline.fs` | Compile lang_runtime.c to .runtime.o and link into binary | VERIFIED | Steps 4-5 in compile function (lines 98-109). |
+| `src/FunLangCompiler.Compiler/MlirIR.fs` | LlvmGEPStructOp + ArithExtuIOp cases | VERIFIED | Both DU cases present (lines 55, 45). 123 lines total. |
+| `src/FunLangCompiler.Compiler/Printer.fs` | Print cases for LlvmGEPStructOp + ArithExtuIOp | VERIFIED | Lines 88-90 (GEPStruct), 46-48 (ExtuI). 173 lines total. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | elaborateStringLiteral, string_length, string_concat, to_string, strcmp equality | VERIFIED | All cases present at lines 57-75, 501-510, 482-486, 489-499, 337-361. 761 lines total. |
+| `src/FunLangCompiler.Compiler/lang_runtime.c` | lang_string_concat, lang_to_string_int, lang_to_string_bool using GC_malloc | VERIFIED | All three functions present. 44 lines. GC_malloc used throughout. |
+| `src/FunLangCompiler.Compiler/Pipeline.fs` | Compile lang_runtime.c to .runtime.o and link into binary | VERIFIED | Steps 4-5 in compile function (lines 98-109). |
 | `tests/compiler/08-01-string-literal.flt` | string_length "hello" exits 5 | VERIFIED | PASS confirmed by fslit run. |
 | `tests/compiler/08-02-string-equality.flt` | strcmp equality, exits 1 | VERIFIED | PASS confirmed by fslit run. |
 | `tests/compiler/08-03-string-concat.flt` | string_concat length 6 | VERIFIED | PASS confirmed by fslit run. |

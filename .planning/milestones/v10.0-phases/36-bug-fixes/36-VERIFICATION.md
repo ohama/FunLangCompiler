@@ -28,7 +28,7 @@ score: 3/3 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | FIX-02 sequential-if + FIX-03 And/Or/While coercion | VERIFIED | 3639 lines; `blocksAfterBind`, `coerceLeftOps`, `coerceRightOps`, `coerceCondOps` all present |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | FIX-02 sequential-if + FIX-03 And/Or/While coercion | VERIFIED | 3639 lines; `blocksAfterBind`, `coerceLeftOps`, `coerceRightOps`, `coerceCondOps` all present |
 | `tests/compiler/36-01-forin-mutable-capture.flt` | FIX-01 E2E test | VERIFIED | 10 lines; proper `// --- Input:` / `// --- Output:` format |
 | `tests/compiler/36-02-sequential-if.flt` | FIX-02 E2E test | VERIFIED | 11 lines; proper format |
 | `tests/compiler/36-03-bool-and-or-while.flt` | FIX-03 E2E test | VERIFIED | 19 lines; proper format |
@@ -66,7 +66,7 @@ None — all three behavioral truths were verified by compiling and executing th
 
 ## Verification Method
 
-Tests were run by extracting the `// --- Input:` section from each `.flt` file into a temp file, compiling with `dotnet run --project src/LangBackend.Cli/LangBackend.Cli.fsproj`, executing the output binary, and comparing stdout against the `// --- Output:` section. All three 36-* tests matched expected output exactly. Exit code was 0 for all.
+Tests were run by extracting the `// --- Input:` section from each `.flt` file into a temp file, compiling with `dotnet run --project src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj`, executing the output binary, and comparing stdout against the `// --- Output:` section. All three 36-* tests matched expected output exactly. Exit code was 0 for all.
 
 The `blocksAfterBind` pattern exists in both `Let` and `LetPat` cases. The I64->I1 coercion pattern (`ArithConstantOp` zero + `ArithCmpIOp "ne"`) exists in `And`, `Or`, `WhileExpr` (both conditions), and `If` (for And/Or-as-condition deviation fix).
 

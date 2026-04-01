@@ -1,5 +1,5 @@
 // Test: Unknown function error shows in-scope function names
-// --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-03-function-hint.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 46-03-function-hint.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
 CHECK-RE: \[Elaboration\] 46-03-function-hint\.fun:\d+:\d+: Elaboration: unsupported App.*

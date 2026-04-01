@@ -1,7 +1,7 @@
 # LangThree Span Zeroing Bug — 수정 가이드
 
 **Date:** 2026-03-31
-**Context:** LangBackend v11.0 Phase 44에서 발견. `failWithSpan`이 `:0:0:` 출력.
+**Context:** FunLangCompiler v11.0 Phase 44에서 발견. `failWithSpan`이 `:0:0:` 출력.
 **Root Cause:** `parseModuleFromString`이 새 lexbuf를 생성하여 파서에 전달. 토큰의 위치 정보가 전파되지 않음.
 
 ---
@@ -10,7 +10,7 @@
 
 LangThree 파서가 생성하는 AST 노드의 Span이 모두 `{FileName=""; StartLine=0; StartColumn=0}` 또는 `{FileName=filename; StartLine=1; StartColumn=0}`으로 채워짐. 실제 소스 코드의 행/열 위치가 반영되지 않음.
 
-**영향:** LangBackend의 에러 메시지에 소스 위치를 표시할 수 없음.
+**영향:** FunLangCompiler의 에러 메시지에 소스 위치를 표시할 수 없음.
 
 ---
 
@@ -172,22 +172,22 @@ let lexAndFilterWithPositions (input: string) (filename: string) =
 
 ## 6. 검증 방법
 
-수정 후 LangBackend에서 확인:
+수정 후 FunLangCompiler에서 확인:
 
 ```bash
 # 1. 에러 메시지에 실제 위치가 나오는지 확인
 echo 'let x = 42
 let _ = println (to_string y)' > /tmp/test_span.lt
-dotnet run --project src/LangBackend.Cli/LangBackend.Cli.fsproj -- /tmp/test_span.lt 2>&1
+dotnet run --project src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- /tmp/test_span.lt 2>&1
 # 예상: /tmp/test_span.lt:2:26: Elaboration: unbound variable 'y'
 # 현재: :0:0: Elaboration: unbound variable 'y'
 ```
 
 ---
 
-## 7. 참고: LangBackend 측 인프라는 완성
+## 7. 참고: FunLangCompiler 측 인프라는 완성
 
-LangBackend의 `failWithSpan` (Elaboration.fs:63)은 Span 필드를 올바르게 읽음:
+FunLangCompiler의 `failWithSpan` (Elaboration.fs:63)은 Span 필드를 올바르게 읽음:
 ```fsharp
 let inline failWithSpan (span: Ast.Span) fmt =
     Printf.ksprintf (fun msg ->
@@ -195,9 +195,9 @@ let inline failWithSpan (span: Ast.Span) fmt =
     ) fmt
 ```
 
-LangThree가 Span에 올바른 값을 채우면, LangBackend의 에러 메시지에 자동으로 정확한 위치가 표시됨.
+LangThree가 Span에 올바른 값을 채우면, FunLangCompiler의 에러 메시지에 자동으로 정확한 위치가 표시됨.
 
 ---
 
-*이 문서는 LangBackend v11.0 Phase 44 검증 과정에서 작성됨.*
+*이 문서는 FunLangCompiler v11.0 Phase 44 검증 과정에서 작성됨.*
 *LangThree 수정 시 이 가이드를 참조할 것.*

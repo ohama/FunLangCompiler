@@ -30,7 +30,7 @@ key-files:
     - tests/compiler/24-03-array-fold.flt
     - tests/compiler/24-04-array-init.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "LangThree parser does not support multi-param fun (fun x y -> ...); use fun x -> fun y -> ... in test closures"
@@ -72,7 +72,7 @@ Each task was committed atomically:
 2. **Task 2: Create 4 E2E test files for HOF builtins** - `60141aa` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - 4 HOF match arms + 8 ExternalFuncDecl entries (both lists)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - 4 HOF match arms + 8 ExternalFuncDecl entries (both lists)
 - `tests/compiler/24-01-array-iter.flt` - array_iter E2E: prints each element in order
 - `tests/compiler/24-02-array-map.flt` - array_map E2E: double elements, fold-sum = 12
 - `tests/compiler/24-03-array-fold.flt` - array_fold E2E: sum [1..5] = 15

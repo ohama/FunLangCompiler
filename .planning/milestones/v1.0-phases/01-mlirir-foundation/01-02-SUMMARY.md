@@ -27,10 +27,10 @@ tech-stack:
 
 key-files:
   created:
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Pipeline.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Pipeline.fs
   modified:
-    - src/LangBackend.Compiler/LangBackend.Compiler.fsproj
+    - src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj
 
 key-decisions:
   - "Printer is pure (no I/O) — caller writes .mlir text to disk; enables unit testing without file system"
@@ -75,9 +75,9 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Printer.fs` - Pure serializer: MlirModule → MLIR 20 text string
-- `src/LangBackend.Compiler/Pipeline.fs` - Shell pipeline wrapping mlir-opt, mlir-translate, clang via Process
-- `src/LangBackend.Compiler/LangBackend.Compiler.fsproj` - Added Printer.fs and Pipeline.fs as ordered Compile entries
+- `src/FunLangCompiler.Compiler/Printer.fs` - Pure serializer: MlirModule → MLIR 20 text string
+- `src/FunLangCompiler.Compiler/Pipeline.fs` - Shell pipeline wrapping mlir-opt, mlir-translate, clang via Process
+- `src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` - Added Printer.fs and Pipeline.fs as ordered Compile entries
 
 ## Decisions Made
 

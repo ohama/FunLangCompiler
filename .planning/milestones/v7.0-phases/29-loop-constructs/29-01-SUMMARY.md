@@ -31,7 +31,7 @@ key-files:
     - tests/compiler/29-03-while-nested.flt
     - tests/compiler/29-04-while-no-exec.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Header-block CFG pattern (3 side blocks) chosen over dual-elaboration pattern for clarity"
@@ -74,7 +74,7 @@ completed: 2026-03-28
 2. **Task 2: Add WhileExpr E2E test fixtures + nested while fix** - `0eb2b3d` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - WhileExpr freeVars case + WhileExpr elaborateExpr case
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - WhileExpr freeVars case + WhileExpr elaborateExpr case
 - `tests/compiler/29-01-while-basic.flt` - Basic while counter 0→5
 - `tests/compiler/29-02-while-mutable.flt` - Sum accumulation 1+...+10=55
 - `tests/compiler/29-03-while-nested.flt` - Nested loops 3×4=12
@@ -94,7 +94,7 @@ completed: 2026-03-28
 - **Found during:** Task 2 (running first test)
 - **Issue:** Initial implementation placed `ArithConstantOp(unitConst, 0L)` in both the entry fragment AND the body block body. MLIR SSA requires each value name to be defined exactly once.
 - **Fix:** Removed the redundant `ArithConstantOp(unitConst, 0L)` from the body block body. The entry fragment's definition dominates the body block, so it's accessible there without redefinition.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Test 29-01 passes (exit=5 correct)
 - **Committed in:** `0eb2b3d`
 
@@ -102,7 +102,7 @@ completed: 2026-03-28
 - **Found during:** Task 2 (running nested while test 29-03)
 - **Issue:** When the while body itself contains a nested while, `bodyOps` ends with `CfBrOp(innerHeader)` (a terminator). Appending `condOps2 @ [CfCondBrOp(...)]` after this terminator produces invalid MLIR ("block with no terminator" or "ops after terminator").
 - **Fix:** Added terminator detection in WhileExpr case. When `bodyOps` ends with a terminator and new side blocks were added, the back-edge ops are patched into the inner last block (at `env.Blocks.Value.Length - 4` after pushing the 3 while blocks: header/body/exit).
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Test 29-03 passes (exit=12 correct for 3×4 nested loops)
 - **Committed in:** `0eb2b3d`
 

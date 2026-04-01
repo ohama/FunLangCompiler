@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 27 adds eight builtins to the LangBackend compiler: `read_lines`, `write_lines`, `stdin_read_line`, `stdin_read_all`, `get_env`, `get_cwd`, `path_combine`, and `dir_files`. This is a direct continuation of Phase 26 and follows the identical three-layer pattern: C helper in `lang_runtime.c`, declaration in `lang_runtime.h`, `ExternalFuncDecl` in both `externalFuncs` lists in `Elaboration.fs`, and pattern-match arms in `elaborateExpr`. All eight builtins are already implemented in LangThree's `Eval.fs` (reference interpreter), so exact behavior is known.
+Phase 27 adds eight builtins to the FunLangCompiler compiler: `read_lines`, `write_lines`, `stdin_read_line`, `stdin_read_all`, `get_env`, `get_cwd`, `path_combine`, and `dir_files`. This is a direct continuation of Phase 26 and follows the identical three-layer pattern: C helper in `lang_runtime.c`, declaration in `lang_runtime.h`, `ExternalFuncDecl` in both `externalFuncs` lists in `Elaboration.fs`, and pattern-match arms in `elaborateExpr`. All eight builtins are already implemented in LangThree's `Eval.fs` (reference interpreter), so exact behavior is known.
 
 The primary new complexity versus Phase 26 is list-handling. Three builtins return `string list` (`read_lines`, `dir_files`) or consume one (`write_lines`). In the MLIR ABI, a `string list` is a `LangCons*` linked list where each `cell->head` (an `int64_t`) stores a `LangString*` cast to `int64_t`. This is the same pointer-cast-to-i64 pattern used by `lang_hashtable_keys` (which stores keys as `int64_t`) — except here the head value is a pointer. The second new complexity is new POSIX headers: `<dirent.h>` for `dir_files` and `<unistd.h>` for `get_cwd` must be added to `lang_runtime.c`.
 
@@ -57,7 +57,7 @@ This phase uses no external libraries. All implementation is in the existing pro
 No new files needed. Changes span three existing files plus new test files:
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── lang_runtime.c    # ADD: 8 new C functions + 2 new #include headers
 ├── lang_runtime.h    # ADD: declarations for the 8 new C functions
 └── Elaboration.fs    # ADD: 8 elaborateExpr arms + ExternalFuncDecl entries in both lists
@@ -493,7 +493,7 @@ Both `externalFuncs` lists in `Elaboration.fs` (around lines 2376 and 2553) must
 ### E2E Test Format (from Phase 26)
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -f /tmp/lang_test_27_NN.txt $OUTBIN; echo $RC'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; RC=$?; rm -f /tmp/lang_test_27_NN.txt $OUTBIN; echo $RC'
 // --- Input:
 let path = "/tmp/lang_test_27_NN.txt" in
 write_lines path ["hello"; "world"];
@@ -509,7 +509,7 @@ hello
 ### E2E Test for stdin_read_line (pipe stdin)
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && echo "hello" | $OUTBIN; RC=$?; rm -f $OUTBIN; echo $RC'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && echo "hello" | $OUTBIN; RC=$?; rm -f $OUTBIN; echo $RC'
 // --- Input:
 let line = stdin_read_line () in println line
 // --- Output:
@@ -520,7 +520,7 @@ hello
 ### E2E Test for get_env
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && HOME=/testval $OUTBIN; RC=$?; rm -f $OUTBIN; echo $RC'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && HOME=/testval $OUTBIN; RC=$?; rm -f $OUTBIN; echo $RC'
 // --- Input:
 let v = get_env "HOME" in println v
 // --- Output:
@@ -531,7 +531,7 @@ let v = get_env "HOME" in println v
 ### E2E Test for get_cwd
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && (cd /tmp && $OUTBIN); RC=$?; rm -f $OUTBIN; echo $RC'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && (cd /tmp && $OUTBIN); RC=$?; rm -f $OUTBIN; echo $RC'
 // --- Input:
 let cwd = get_cwd () in println cwd
 // --- Output:

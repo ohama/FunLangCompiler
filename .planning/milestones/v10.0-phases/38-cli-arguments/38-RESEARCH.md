@@ -22,9 +22,9 @@ No new external libraries. All changes are internal to `lang_runtime.c`, `lang_r
 
 | Component | Location | Phase 38 Change |
 |-----------|----------|-----------------|
-| `lang_runtime.h` | `src/LangBackend.Compiler/` | Declare `lang_init_args(int64_t argc, char** argv)` and `lang_get_args(void)` returning `LangCons*` (~6 LOC) |
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | Add static globals for argc/argv; implement `lang_init_args` and `lang_get_args` (~25 LOC) |
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | Change `@main InputTypes = []` to `[I64; Ptr]`; prepend `lang_init_args` call; add `get_args` builtin arm; add ExternalFuncDecl in both lists (~20 LOC delta) |
+| `lang_runtime.h` | `src/FunLangCompiler.Compiler/` | Declare `lang_init_args(int64_t argc, char** argv)` and `lang_get_args(void)` returning `LangCons*` (~6 LOC) |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | Add static globals for argc/argv; implement `lang_init_args` and `lang_get_args` (~25 LOC) |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Change `@main InputTypes = []` to `[I64; Ptr]`; prepend `lang_init_args` call; add `get_args` builtin arm; add ExternalFuncDecl in both lists (~20 LOC delta) |
 
 ### No Changes Required
 
@@ -293,7 +293,7 @@ let mainFunc : FuncOp =
 ### E2E test pattern (.flt)
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN foo bar baz; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN foo bar baz; echo $?; rm -f $OUTBIN'
 // --- Input:
 let args = get_args ()
 let rec printList lst =
@@ -342,13 +342,13 @@ baz
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — Complete elaborateProgram function, mainFunc construction (lines 3340, 3591), all existing builtin arms, both externalFuncs lists
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — LangString/LangCons struct layouts, GC_malloc usage, lang_range/lang_read_lines as list-building reference patterns
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.h` — All existing function declarations; confirms `LangCons` forward-declared at line 28
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Printer.fs` — `printFuncOp` (lines 165-177): confirms `%arg{i}` naming, `func.func` keyword, InputTypes rendering
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — `FuncOp`, `MlirBlock`, `MlirValue` type definitions; confirms `InputTypes: MlirType list` and `LlvmCallVoidOp`/`LlvmCallOp` exist
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Pipeline.fs` — Confirmed lang_runtime.c is compiled and linked automatically; no Pipeline changes needed
-- `/Users/ohama/vibe-coding/LangBackend/.planning/phases/37-hashtable-string-keys/37-RESEARCH.md` — Documents the two-externalFuncs-list pitfall and LangCons head ptr-as-i64 convention
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Complete elaborateProgram function, mainFunc construction (lines 3340, 3591), all existing builtin arms, both externalFuncs lists
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — LangString/LangCons struct layouts, GC_malloc usage, lang_range/lang_read_lines as list-building reference patterns
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — All existing function declarations; confirms `LangCons` forward-declared at line 28
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Printer.fs` — `printFuncOp` (lines 165-177): confirms `%arg{i}` naming, `func.func` keyword, InputTypes rendering
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — `FuncOp`, `MlirBlock`, `MlirValue` type definitions; confirms `InputTypes: MlirType list` and `LlvmCallVoidOp`/`LlvmCallOp` exist
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Pipeline.fs` — Confirmed lang_runtime.c is compiled and linked automatically; no Pipeline changes needed
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/37-hashtable-string-keys/37-RESEARCH.md` — Documents the two-externalFuncs-list pitfall and LangCons head ptr-as-i64 convention
 
 ### Secondary (MEDIUM confidence)
 - LLVM opaque pointer ABI: `!llvm.ptr` in MLIR lowers to `ptr` in LLVM IR, which is ABI-compatible with `char**` — standard knowledge, no external source needed

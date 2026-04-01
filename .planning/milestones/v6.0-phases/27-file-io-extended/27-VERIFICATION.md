@@ -31,9 +31,9 @@ re_verification: false
 
 | Artifact                                        | Expected                                               | Status      | Details                                                                         |
 | ----------------------------------------------- | ------------------------------------------------------ | ----------- | ------------------------------------------------------------------------------- |
-| `src/LangBackend.Compiler/lang_runtime.c`       | 8 new C functions for extended file I/O                | VERIFIED    | 8 functions at lines 459–660; 661 total lines; GC_malloc only; lang_throw for errors |
-| `src/LangBackend.Compiler/lang_runtime.h`       | 8 function declarations                                | VERIFIED    | Declarations at lines 69–76, all correct signatures                             |
-| `src/LangBackend.Compiler/Elaboration.fs`       | 8 elaboration arms + 16 ExternalFuncDecl entries       | VERIFIED    | 24 matches confirmed; arms at lines 1094–1143; ExternalFuncDecl at lines 2446–2453 and 2631–2638 |
+| `src/FunLangCompiler.Compiler/lang_runtime.c`       | 8 new C functions for extended file I/O                | VERIFIED    | 8 functions at lines 459–660; 661 total lines; GC_malloc only; lang_throw for errors |
+| `src/FunLangCompiler.Compiler/lang_runtime.h`       | 8 function declarations                                | VERIFIED    | Declarations at lines 69–76, all correct signatures                             |
+| `src/FunLangCompiler.Compiler/Elaboration.fs`       | 8 elaboration arms + 16 ExternalFuncDecl entries       | VERIFIED    | 24 matches confirmed; arms at lines 1094–1143; ExternalFuncDecl at lines 2446–2453 and 2631–2638 |
 | `tests/compiler/27-01-read-lines.flt`           | E2E test for read_lines                                | VERIFIED    | Substantive test, passes in suite                                               |
 | `tests/compiler/27-02-write-lines.flt`          | E2E test for write_lines                               | VERIFIED    | Substantive test, passes in suite                                               |
 | `tests/compiler/27-03-stdin-read-line.flt`      | E2E test for stdin_read_line                           | VERIFIED    | Pipes "hello" to stdin, expects "hello", passes                                 |

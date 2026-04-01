@@ -28,9 +28,9 @@ key-files:
     - tests/compiler/32-01-hashtable-trygetvalue.flt
     - tests/compiler/32-02-hashtable-count.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "hashtable_count uses inline GEP at LangHashtable field index 2 (size), no C function needed"
@@ -76,9 +76,9 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.c` - Added lang_hashtable_trygetvalue after lang_ht_find
-- `src/LangBackend.Compiler/lang_runtime.h` - Added lang_hashtable_trygetvalue declaration
-- `src/LangBackend.Compiler/Elaboration.fs` - Added two elaboration arms + externalFuncs entries
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added lang_hashtable_trygetvalue after lang_ht_find
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added lang_hashtable_trygetvalue declaration
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added two elaboration arms + externalFuncs entries
 - `tests/compiler/32-01-hashtable-trygetvalue.flt` - E2E test: trygetvalue found/not-found cases
 - `tests/compiler/32-02-hashtable-count.flt` - E2E test: hashtable_count after 2 inserts
 

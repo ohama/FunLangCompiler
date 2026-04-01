@@ -29,9 +29,9 @@ key-files:
   created:
     - tests/compiler/20-01-firstclass-ctor.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
 
 key-decisions:
   - "Constructor(name, None, _) arity>=1 re-elaborates as Lambda(param, Constructor(name, Some(Var(param))))"
@@ -78,9 +78,9 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Constructor(name, None, _) arity branch; Lambda ptrtoint fix; resolveAccessorTyped inttoptr fix
-- `src/LangBackend.Compiler/MlirIR.fs` - LlvmIntToPtrOp and LlvmPtrToIntOp DU cases
-- `src/LangBackend.Compiler/Printer.fs` - llvm.inttoptr and llvm.ptrtoint MLIR emission
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Constructor(name, None, _) arity branch; Lambda ptrtoint fix; resolveAccessorTyped inttoptr fix
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - LlvmIntToPtrOp and LlvmPtrToIntOp DU cases
+- `src/FunLangCompiler.Compiler/Printer.fs` - llvm.inttoptr and llvm.ptrtoint MLIR emission
 - `tests/compiler/20-01-firstclass-ctor.flt` - E2E test: let s = Some in match s 42 with Some n -> n exits 42
 
 ## Decisions Made

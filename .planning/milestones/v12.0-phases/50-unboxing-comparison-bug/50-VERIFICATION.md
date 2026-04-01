@@ -38,7 +38,7 @@ notes:
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/Elaboration.fs` | Ptr-to-I64 coercion in ordinal comparison cases | ✓ VERIFIED | Lines 1084–1108: all 4 operators have `coerceToI64 env lv` + `coerceToI64 env rv`; op order is `lops @ rops @ lCoerce @ rCoerce @ [ArithCmpIOp]` as planned; file is 4359 lines, committed as of 1093c32 |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Ptr-to-I64 coercion in ordinal comparison cases | ✓ VERIFIED | Lines 1084–1108: all 4 operators have `coerceToI64 env lv` + `coerceToI64 env rv`; op order is `lops @ rops @ lCoerce @ rCoerce @ [ArithCmpIOp]` as planned; file is 4359 lines, committed as of 1093c32 |
 | `tests/compiler/35-08-list-tryfind-choose.fun` | Test cases for comparison predicates on boxed-ptr params (contains `List.filter`) | ✓ VERIFIED | Lines 11–14: `List.filter (fun x -> x > 2) [1;2;3;4]`, `List.choose (fun x -> if x > 2 then Some x else None) [1;2;3;4]`, for-loop prints |
 | `tests/compiler/35-08-list-tryfind-choose.flt` | Expected output including `3\n4\n3\n4` | ✓ VERIFIED | Lines 10–13 of output: `3\n4\n3\n4`; exit code `0`; committed as of cf1041e |
 
@@ -54,7 +54,7 @@ notes:
 | `Elaboration.fs GreaterEqual` | `coerceToI64` | function call before `ArithCmpIOp` | ✓ WIRED | Lines 1105–1106 |
 | `coerceToI64` | `LlvmPtrToIntOp` | Ptr match branch | ✓ WIRED | Lines 270–272: `| Ptr -> let r = ...; (r, [LlvmPtrToIntOp(r, v)])` |
 | `Equal/NotEqual` | strcmp path | `if lv.Type = Ptr then` guard | ✓ WIRED (correctly excluded from coercion) | Lines 1034–1055: Ptr uses GEP+load+strcmp; no `coerceToI64` |
-| `dist/LangBackend.Cli` | source fix | rebuild | ✗ NOT WIRED | Binary timestamp `Apr 1 09:27` predates fix commit `10:06:45`; stale binary still fails with `arith.cmpi sgt, %t0, %t1 : !llvm.ptr` |
+| `dist/FunLangCompiler.Cli` | source fix | rebuild | ✗ NOT WIRED | Binary timestamp `Apr 1 09:27` predates fix commit `10:06:45`; stale binary still fails with `arith.cmpi sgt, %t0, %t1 : !llvm.ptr` |
 
 ---
 
@@ -81,7 +81,7 @@ No TODO/FIXME, no placeholder content, no empty returns in the modified comparis
 
 ## Environment Gap (not a code gap)
 
-The `dist/` binary was built before phase 50's fix and has NOT been rebuilt. The E2E test runner calls `dotnet run --project .../LangBackend.Cli.fsproj`, which compiles from source — but the source depends on LangThree, which currently has 8 files of uncommitted in-progress changes that break compilation:
+The `dist/` binary was built before phase 50's fix and has NOT been rebuilt. The E2E test runner calls `dotnet run --project .../FunLangCompiler.Cli.fsproj`, which compiles from source — but the source depends on LangThree, which currently has 8 files of uncommitted in-progress changes that break compilation:
 
 - `LangThree/src/LangThree/Ast.fs` — adds `deriving: string list` field to `TypeDecl` (5-field) and `superclasses` to `TypeClassDecl`, adds `DerivingDecl`
 - `LangThree/src/LangThree/Parser.fsy`, `Format.fs`, `Prelude.fs`, `Elaborate.fs`, `Eval.fs`, `TypeCheck.fs`, `Lexer.fsl` — reference the new 5-field `TypeDecl`

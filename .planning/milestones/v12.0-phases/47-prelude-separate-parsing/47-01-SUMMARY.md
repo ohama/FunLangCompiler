@@ -22,7 +22,7 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Cli/Program.fs
     - tests/compiler/44-01-error-location-unbound.flt
     - tests/compiler/44-02-error-location-pattern.flt
     - tests/compiler/44-03-error-location-field.flt
@@ -73,7 +73,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Cli/Program.fs` - Replaced combinedSrc with two-phase parseProgram calls and AST merge
+- `src/FunLangCompiler.Cli/Program.fs` - Replaced combinedSrc with two-phase parseProgram calls and AST merge
 - `tests/compiler/44-01-error-location-unbound.flt` - 175:17 -> 2:17
 - `tests/compiler/44-02-error-location-pattern.flt` - 174:4 -> 1:4 (including StartLine/EndLine)
 - `tests/compiler/44-03-error-location-field.flt` - 176:17 -> 3:17

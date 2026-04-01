@@ -28,7 +28,7 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "ComposeRight/Left produce a Lambda node that hits a new bare-Lambda closure case (not the two-arg closure-maker path)"
@@ -68,7 +68,7 @@ completed: 2026-03-26
 1. **Task 1: PipeRight, ComposeRight, ComposeLeft + bare Lambda closure** - `8822630` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - PipeRight/ComposeRight/ComposeLeft cases + bare Lambda closure case
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - PipeRight/ComposeRight/ComposeLeft cases + bare Lambda closure case
 
 ## Decisions Made
 - The plan's note about adding a bare `Lambda` case was correct: ComposeRight/Left produce a Lambda that binds to `let composed = ...`, which doesn't match the two-arg `Let(name, Lambda(outer, Lambda(inner, body)))` pattern. A new bare Lambda case was needed.
@@ -83,7 +83,7 @@ completed: 2026-03-26
 - **Found during:** Task 1 verification (ComposeRight test)
 - **Issue:** `inc >> dbl` desugars to `Lambda("__comp_0", App(dbl, App(inc, ...)))` which the plan said to call `elaborateExpr env (Lambda(...))`. But the existing elaborator had no `Lambda` case as a standalone expression — it would hit the catch-all with "unsupported expression Lambda"
 - **Fix:** Added a `| Lambda(param, body, _)` case to `elaborateExpr` that creates an inline closure: computes free vars (filtered to `env.Vars`), emits an `llvm.func` for the body, inline-allocates a closure struct, stores fn_ptr and captures
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Verification:** `(inc >> dbl) 3` exits 8, `(dbl << inc) 3` exits 8
 - **Committed in:** `8822630` (Task 1 commit)
 

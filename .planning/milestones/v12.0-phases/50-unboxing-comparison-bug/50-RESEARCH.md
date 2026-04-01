@@ -22,7 +22,7 @@ This phase is a pure compiler bug fix. No new libraries or tools are needed.
 
 | File | Role | What changes |
 |------|------|--------------|
-| `src/LangBackend.Compiler/Elaboration.fs` | Main compiler — `elaborateExpr` | Add Ptr→I64 coercion in LessThan/GreaterThan/LessEqual/GreaterEqual cases |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Main compiler — `elaborateExpr` | Add Ptr→I64 coercion in LessThan/GreaterThan/LessEqual/GreaterEqual cases |
 | `tests/compiler/35-08-list-tryfind-choose.fun` | Test source | Add `List.choose` and `List.filter` with comparison predicates |
 | `tests/compiler/35-08-list-tryfind-choose.flt` | Test oracle | Update expected output |
 
@@ -213,11 +213,11 @@ let _ = List.filter (fun x -> x > 2) [3;4]
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code inspection of `src/LangBackend.Compiler/Elaboration.fs` — `elaborateExpr`, `isPtrParamBody`, `hasParamPtrUse`, `coerceToI64`
-- Direct code inspection of `src/LangBackend.Compiler/Printer.fs` — `ArithCmpIOp` printer, `IndirectCallOp` printer
-- Direct code inspection of `src/LangBackend.Compiler/MlirIR.fs` — type definitions
-- Direct code inspection of `src/LangBackend.Compiler/lang_runtime.h` — `LangClosureFn` typedef
-- Direct code inspection of `src/LangBackend.Compiler/lang_runtime.c` — `LangCons` layout, closure ABI
+- Direct code inspection of `src/FunLangCompiler.Compiler/Elaboration.fs` — `elaborateExpr`, `isPtrParamBody`, `hasParamPtrUse`, `coerceToI64`
+- Direct code inspection of `src/FunLangCompiler.Compiler/Printer.fs` — `ArithCmpIOp` printer, `IndirectCallOp` printer
+- Direct code inspection of `src/FunLangCompiler.Compiler/MlirIR.fs` — type definitions
+- Direct code inspection of `src/FunLangCompiler.Compiler/lang_runtime.h` — `LangClosureFn` typedef
+- Direct code inspection of `src/FunLangCompiler.Compiler/lang_runtime.c` — `LangCons` layout, closure ABI
 - Direct code inspection of `Prelude/List.fun` — `filter`, `choose`, `_insert` implementations
 - Direct code inspection of `tests/compiler/35-08-list-tryfind-choose.fun` and `.flt` — current test state
 

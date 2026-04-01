@@ -31,15 +31,15 @@ tech-stack:
 
 key-files:
   created:
-    - src/LangBackend.Compiler/lang_runtime.h (modified - added tag + declarations)
-    - src/LangBackend.Compiler/lang_runtime.c (modified - tag init + dispatch funcs)
+    - src/FunLangCompiler.Compiler/lang_runtime.h (modified - added tag + declarations)
+    - src/FunLangCompiler.Compiler/lang_runtime.c (modified - tag init + dispatch funcs)
     - tests/compiler/28-06-idx-array-get.flt
     - tests/compiler/28-07-idx-array-set.flt
     - tests/compiler/28-08-idx-ht-get.flt
     - tests/compiler/28-09-idx-ht-set.flt
     - tests/compiler/28-10-idx-array-roundtrip.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs (IndexGet/IndexSet + freeVars + externals)
+    - src/FunLangCompiler.Compiler/Elaboration.fs (IndexGet/IndexSet + freeVars + externals)
 
 key-decisions:
   - "LangHashtable tag field added as FIRST field (before capacity) so void* dispatch works by checking [0] offset"
@@ -85,9 +85,9 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.h` - Added tag field to LangHashtable + lang_index_get/set declarations
-- `src/LangBackend.Compiler/lang_runtime.c` - tag=-1 init in lang_hashtable_create + dispatch functions
-- `src/LangBackend.Compiler/Elaboration.fs` - IndexGet/IndexSet elaboration + freeVars cases + 2 external decl lists updated
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added tag field to LangHashtable + lang_index_get/set declarations
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - tag=-1 init in lang_hashtable_create + dispatch functions
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - IndexGet/IndexSet elaboration + freeVars cases + 2 external decl lists updated
 - `tests/compiler/28-06-idx-array-get.flt` - IDX-01: arr.[i] read
 - `tests/compiler/28-07-idx-array-set.flt` - IDX-02: arr.[i] <- v write
 - `tests/compiler/28-08-idx-ht-get.flt` - IDX-03: ht.[key] read

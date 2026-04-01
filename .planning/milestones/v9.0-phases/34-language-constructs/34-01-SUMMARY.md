@@ -27,9 +27,9 @@ key-files:
     - tests/compiler/34-01-string-slice-bounded.flt
     - tests/compiler/34-02-string-slice-open.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "lang_string_slice uses stop<0 sentinel for open-ended slices (not a separate lang_string_slice_open function)"
@@ -68,9 +68,9 @@ completed: 2026-03-29
 2. **Task 2: Add StringSliceExpr elaboration arm + externalFuncs + E2E tests** - `73cc607` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - Added lang_string_slice after lang_string_sub
-- `src/LangBackend.Compiler/lang_runtime.h` - Added lang_string_slice prototype near other lang_string_* declarations
-- `src/LangBackend.Compiler/Elaboration.fs` - Added StringSliceExpr arm + @lang_string_slice in both externalFuncs lists
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added lang_string_slice after lang_string_sub
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added lang_string_slice prototype near other lang_string_* declarations
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added StringSliceExpr arm + @lang_string_slice in both externalFuncs lists
 - `tests/compiler/34-01-string-slice-bounded.flt` - E2E test: s.[0..4] = "hello", s.[6..10] = "world"
 - `tests/compiler/34-02-string-slice-open.flt` - E2E test: s.[6..] = "world", t.[2..] = "cdef"
 

@@ -32,8 +32,8 @@ key-files:
     - tests/compiler/17-05-unary-match.flt
     - tests/compiler/17-06-multi-arg-match.flt
   modified:
-    - src/LangBackend.Compiler/MatchCompiler.fs
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Compiler/MatchCompiler.fs
+    - src/FunLangCompiler.Cli/Program.fs
 
 key-decisions:
   - "MatchCompiler AdtCtor argAccessors offset by +1: slot 0 is reserved for tag, payload at slot 1..N"
@@ -75,8 +75,8 @@ completed: 2026-03-27
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/MatchCompiler.fs` — AdtCtor argAccessors now `Field(selAcc, i+1)` to skip tag slot
-- `src/LangBackend.Cli/Program.fs` — `lexAndFilter` helper + IndentFilter integrated into `parseProgram`; debug eprintfn removed
+- `src/FunLangCompiler.Compiler/MatchCompiler.fs` — AdtCtor argAccessors now `Field(selAcc, i+1)` to skip tag slot
+- `src/FunLangCompiler.Cli/Program.fs` — `lexAndFilter` helper + IndentFilter integrated into `parseProgram`; debug eprintfn removed
 - `tests/compiler/17-04-nullary-match.flt` — `Green -> 2` (non-trivially "1" output, genuinely passing)
 - `tests/compiler/17-05-unary-match.flt` — `Some 42 -> 42` (payload extraction verified)
 - `tests/compiler/17-06-multi-arg-match.flt` — `Pair(7,5) -> b=5` (second field extraction verified)
@@ -95,14 +95,14 @@ completed: 2026-03-27
 - **Found during:** Task 2 debugging (MLIR dump showed `GEP[0]` for payload, should be `GEP[1]`)
 - **Issue:** `splitClauses` was generating `Field(selAcc, i)` for all ctor types; for `AdtCtor`, slot 0 is the tag, so `n` in `Some n -> n` bound to the tag value (1) not the payload (42)
 - **Fix:** Added match on `selTag`: `AdtCtor _ -> List.init arity (fun i -> Field(selAcc, i + 1))`
-- **Files modified:** `src/LangBackend.Compiler/MatchCompiler.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/MatchCompiler.fs`
 - **Commit:** `29fffdb`
 
 **2. [Rule 1 - Bug] parseProgram bypassing IndentFilter — multi-line inputs failing**
 - **Found during:** Task 2 test creation (17-04 and 17-05 tests failed to compile)
 - **Issue:** `Program.fs` was calling `Parser.parseModule Lexer.tokenize lexbuf` directly; raw `NEWLINE col` tokens are unknown to the parser grammar. All type declarations spanning multiple lines caused parse errors. Tests 17-01, 17-02, 17-03 were "passing by accident" — exit code 1 from parse error matched expected output "1".
 - **Fix:** Added `lexAndFilter` helper (mirrors LangThree's `lexAndFilter`) and updated `parseProgram` to use filtered tokens via custom tokenizer function
-- **Files modified:** `src/LangBackend.Cli/Program.fs`
+- **Files modified:** `src/FunLangCompiler.Cli/Program.fs`
 - **Commit:** `29fffdb`
 
 ---

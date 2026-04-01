@@ -26,8 +26,8 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
 
 key-decisions:
   - "lang_dir_files skips . and .. by name prefix check, skips non-regular files by d_type != DT_REG && d_type != DT_UNKNOWN (allows DT_UNKNOWN for filesystems that don't provide d_type)"
@@ -73,8 +73,8 @@ Each task was committed atomically:
 2. **Task 2: Add declarations to lang_runtime.h** - `80f4c10` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - Added 2 POSIX includes and 8 new C functions (~208 lines)
-- `src/LangBackend.Compiler/lang_runtime.h` - Added 8 function declarations before #endif guard
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added 2 POSIX includes and 8 new C functions (~208 lines)
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added 8 function declarations before #endif guard
 
 ## Decisions Made
 - `lang_dir_files` allows `DT_UNKNOWN` in addition to `DT_REG` to handle filesystems (e.g., some Linux ext4 mounts) that don't populate `d_type` — prevents silently empty results on those systems

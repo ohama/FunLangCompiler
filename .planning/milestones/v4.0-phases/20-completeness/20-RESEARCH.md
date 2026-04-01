@@ -25,10 +25,10 @@ This phase adds no new libraries. All tooling is from prior phases.
 ### Core (already present)
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | Main fix target: `elaborateExpr` App/Lambda/Constructor cases, `emitDecisionTree` Leaf/Guard cases, `ensureAdtFieldTypes` |
-| `MatchCompiler.fs` | `src/LangBackend.Compiler/` | No changes needed — `splitClauses`/`desugarPattern` already handle nested ADtCtor correctly |
-| `MlirIR.fs` | `src/LangBackend.Compiler/` | No changes needed — all required ops exist |
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | No changes needed — `lang_try_exit`/`lang_throw` already correct |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Main fix target: `elaborateExpr` App/Lambda/Constructor cases, `emitDecisionTree` Leaf/Guard cases, `ensureAdtFieldTypes` |
+| `MatchCompiler.fs` | `src/FunLangCompiler.Compiler/` | No changes needed — `splitClauses`/`desugarPattern` already handle nested ADtCtor correctly |
+| `MlirIR.fs` | `src/FunLangCompiler.Compiler/` | No changes needed — all required ops exist |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | No changes needed — `lang_try_exit`/`lang_throw` already correct |
 
 ### Installation
 No new packages. Build with `dotnet build`.

@@ -29,9 +29,9 @@ score: 4/4 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/MlirIR.fs` | DirectCallOp case in MlirOp DU | VERIFIED | Line 28: `DirectCallOp of result: MlirValue * callee: string * args: MlirValue list` |
-| `src/LangBackend.Compiler/Printer.fs` | func.call text serialization | VERIFIED | Lines 45–49: DirectCallOp case emits `func.call @callee(%args) : (argTypes) -> retType` |
-| `src/LangBackend.Compiler/Elaboration.fs` | LetRec/App elaboration with KnownFuncs/Funcs in ElabEnv | VERIFIED | FuncSignature type (lines 6–10), KnownFuncs/Funcs in ElabEnv (lines 17–18), LetRec (line 145), App (line 171), elaborateModule (line 186+) |
+| `src/FunLangCompiler.Compiler/MlirIR.fs` | DirectCallOp case in MlirOp DU | VERIFIED | Line 28: `DirectCallOp of result: MlirValue * callee: string * args: MlirValue list` |
+| `src/FunLangCompiler.Compiler/Printer.fs` | func.call text serialization | VERIFIED | Lines 45–49: DirectCallOp case emits `func.call @callee(%args) : (argTypes) -> retType` |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | LetRec/App elaboration with KnownFuncs/Funcs in ElabEnv | VERIFIED | FuncSignature type (lines 6–10), KnownFuncs/Funcs in ElabEnv (lines 17–18), LetRec (line 145), App (line 171), elaborateModule (line 186+) |
 | `tests/compiler/04-01-fact.flt` | FsLit E2E test for factorial | VERIFIED | File exists, uses `fact 5`, expects output `120`, PASS confirmed |
 | `tests/compiler/04-02-fib.flt` | FsLit E2E test for fibonacci | VERIFIED | File exists, uses `fib 10`, expects output `55`, PASS confirmed |
 

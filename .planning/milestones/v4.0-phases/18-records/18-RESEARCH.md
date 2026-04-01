@@ -21,9 +21,9 @@ This phase adds no new libraries or tools. All components are from prior phases.
 ### Core (already present)
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `MlirIR.fs` | `LangBackend.Compiler` | All MLIR ops needed already exist: `LlvmGEPLinearOp`, `LlvmStoreOp`, `LlvmLoadOp`, `LlvmCallOp`, `ArithConstantOp` |
-| `Elaboration.fs` | `LangBackend.Compiler` | `elaborateExpr` (add new cases), `freeVars` (add new cases), `scrutineeTypeForTag`/`emitCtorTest` (fill stubs) |
-| `MatchCompiler.fs` | `LangBackend.Compiler` | `RecordCtor fields` DU case already present; `desugarPattern` for `RecordPat` already wired; `splitClauses` uses `Field(selAcc, i)` for non-ADT records (no +1 offset) |
+| `MlirIR.fs` | `FunLangCompiler.Compiler` | All MLIR ops needed already exist: `LlvmGEPLinearOp`, `LlvmStoreOp`, `LlvmLoadOp`, `LlvmCallOp`, `ArithConstantOp` |
+| `Elaboration.fs` | `FunLangCompiler.Compiler` | `elaborateExpr` (add new cases), `freeVars` (add new cases), `scrutineeTypeForTag`/`emitCtorTest` (fill stubs) |
+| `MatchCompiler.fs` | `FunLangCompiler.Compiler` | `RecordCtor fields` DU case already present; `desugarPattern` for `RecordPat` already wired; `splitClauses` uses `Field(selAcc, i)` for non-ADT records (no +1 offset) |
 | `ElabEnv.RecordEnv` | `Elaboration.fs` | `Map<string, Map<string, int>>` — type name → (field name → slot index), populated by `prePassDecls` |
 
 ### Installation
@@ -440,11 +440,11 @@ let preloadOps =
 ## Sources
 
 ### Primary (HIGH confidence)
-- Codebase: `src/LangBackend.Compiler/Elaboration.fs` — direct inspection of all existing patterns, stubs, and helper functions
-- Codebase: `src/LangBackend.Compiler/MatchCompiler.fs` — direct inspection of `RecordCtor`, `desugarPattern`, `splitClauses`
+- Codebase: `src/FunLangCompiler.Compiler/Elaboration.fs` — direct inspection of all existing patterns, stubs, and helper functions
+- Codebase: `src/FunLangCompiler.Compiler/MatchCompiler.fs` — direct inspection of `RecordCtor`, `desugarPattern`, `splitClauses`
 - Codebase: `LangThree/src/LangThree/Ast.fs` — direct inspection of `RecordExpr`, `RecordPat`, `RecordFieldDecl`, `RecordDecl` definitions
 - Codebase: `LangThree/src/LangThree/Parser.fsy` — confirmed parser always produces `RecordExpr(typeName = None, ...)`
-- Codebase: `src/LangBackend.Compiler/MlirIR.fs` — confirmed all needed ops are present
+- Codebase: `src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed all needed ops are present
 
 ### Secondary (MEDIUM confidence)
 - `.planning/phases/17-adt-construction-pattern-matching/17-RESEARCH.md` — prior phase's patterns (ADT layout, GEP ops, decision tree emission) directly applicable

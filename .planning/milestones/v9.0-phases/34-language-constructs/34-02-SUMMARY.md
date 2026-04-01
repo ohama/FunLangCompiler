@@ -35,9 +35,9 @@ key-files:
     - tests/compiler/34-03-list-comp-coll.flt
     - tests/compiler/34-04-list-comp-range.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "ListCompExpr var is a string (not a Pattern) — Lambda(var, bodyExpr, span) works directly"
@@ -77,9 +77,9 @@ completed: 2026-03-29
 2. **Task 2: Add ListCompExpr elaboration arm + externalFuncs + E2E tests** - `de45191` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.c` - Added `lang_list_comp` function after `lang_for_in`
-- `src/LangBackend.Compiler/lang_runtime.h` - Added `LangCons* lang_list_comp(void*, void*)` prototype near `lang_for_in_*`
-- `src/LangBackend.Compiler/Elaboration.fs` - Added `ListCompExpr` arm before catch-all; added `@lang_list_comp` to both externalFuncs lists
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added `lang_list_comp` function after `lang_for_in`
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added `LangCons* lang_list_comp(void*, void*)` prototype near `lang_for_in_*`
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added `ListCompExpr` arm before catch-all; added `@lang_list_comp` to both externalFuncs lists
 - `tests/compiler/34-03-list-comp-coll.flt` - E2E test: list comprehension over collection `[1;2;3]`
 - `tests/compiler/34-04-list-comp-range.flt` - E2E test: list comprehension over range `0..4`
 

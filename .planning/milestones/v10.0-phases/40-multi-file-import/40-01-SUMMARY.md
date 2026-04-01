@@ -30,7 +30,7 @@ key-files:
     - tests/compiler/40-04-relative-path.flt
     - tests/compiler/40-05-diamond-import.flt
   modified:
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Cli/Program.fs
 
 key-decisions:
   - "expandImports in Program.fs (not Elaboration.fs) — keeps I/O at CLI boundary, elaboration stays pure"
@@ -75,7 +75,7 @@ Each task was committed atomically:
 **Plan metadata:** (docs commit follows)
 
 ## Files Created/Modified
-- `src/LangBackend.Cli/Program.fs` - Added resolveImportPath, expandImports, and expandedAst integration
+- `src/FunLangCompiler.Cli/Program.fs` - Added resolveImportPath, expandImports, and expandedAst integration
 - `tests/compiler/40-01-basic-import.flt` - COMP-01: open "utils.fun", use add function
 - `tests/compiler/40-02-recursive-import.flt` - COMP-02: transitive A->B->C, all bindings visible
 - `tests/compiler/40-03-circular-import.flt` - COMP-03: circular import error (grep-based stable output)

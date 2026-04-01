@@ -26,7 +26,7 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Cli/Program.fs
     - tests/compiler/45-01-parse-error-preserved.flt
     - tests/compiler/46-05-error-category-parse.flt
 
@@ -72,7 +72,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Cli/Program.fs` - Added lastParsedPos mutable, tracking in tokenizer, positioned posMsg in with handler
+- `src/FunLangCompiler.Cli/Program.fs` - Added lastParsedPos mutable, tracking in tokenizer, positioned posMsg in with handler
 - `tests/compiler/45-01-parse-error-preserved.flt` - Updated to CHECK-RE for file:line:col match
 - `tests/compiler/46-05-error-category-parse.flt` - Updated to CHECK-RE for file:line:col match
 

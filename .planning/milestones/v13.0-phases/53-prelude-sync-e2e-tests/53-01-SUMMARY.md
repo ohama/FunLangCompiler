@@ -40,17 +40,17 @@ key-files:
     - tests/compiler/53-05-deriving-show.flt
     - tests/compiler/53-05-deriving-show.fun
   modified:
-    - src/LangBackend.Cli/Program.fs
-    - src/LangBackend.Compiler/Elaboration.fs
-    - src/LangBackend.Compiler/LangBackend.Compiler.fsproj
+    - src/FunLangCompiler.Cli/Program.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj
 
 key-decisions:
-  - "show/eq implemented as elaborator builtins (not purely through Prelude functions) because LangBackend lacks type dispatch"
+  - "show/eq implemented as elaborator builtins (not purely through Prelude functions) because FunLangCompiler lacks type dispatch"
   - "show builtin: string literals handled by identity, ints by lang_to_string_int, Ptr-arg fallthrough to user-defined show (enables deriving Show)"
   - "eq builtin: string literals use strcmp, non-string literals use integer comparison; falls through to Prelude eq when eq is in KnownFuncs"
   - "replace-if-exists for redefined MLIR functions: avoids symbol redefinition when Prelude loads 4 show and 4 eq instances"
   - "to_string Ptr passthrough: to_string on a string pointer returns the string unchanged (extends to_string to handle strings)"
-  - "LangBackend.Compiler.fsproj project reference updated from LangThree/LangThree.fsproj to LangThree/FunLang/FunLang.fsproj (LangThree was renamed)"
+  - "FunLangCompiler.Compiler.fsproj project reference updated from LangThree/LangThree.fsproj to LangThree/FunLang/FunLang.fsproj (LangThree was renamed)"
   - "Program.fs namespace import updated from LangThree.IndentFilter to FunLang.IndentFilter"
 
 patterns-established:
@@ -82,7 +82,7 @@ completed: 2026-04-01
 - Added `show`/`eq` as elaborator builtins with static argument type dispatch (string literals, ints, bools)
 - Added replace-if-exists logic for MLIR function redefinition (4 show + 4 eq instances from Prelude no longer conflict)
 - Fixed `to_string` to handle Ptr (string) arguments by returning string unchanged
-- Fixed LangBackend.Compiler.fsproj project reference (LangThree was renamed to FunLang)
+- Fixed FunLangCompiler.Compiler.fsproj project reference (LangThree was renamed to FunLang)
 - Created 5 E2E test pairs; all 5 pass with correct output
 
 ## Task Commits
@@ -94,14 +94,14 @@ completed: 2026-04-01
 ## Files Created/Modified
 
 - `Prelude/Typeclass.fun` - Show/Eq typeclass declarations and instances (copied from LangThree)
-- `src/LangBackend.Cli/Program.fs` - Added Typeclass.fun as first entry in ordered array; fixed namespace import
-- `src/LangBackend.Compiler/Elaboration.fs` - Two-pass DerivingDecl expansion, show/eq builtins, replace-if-exists, to_string Ptr fix
-- `src/LangBackend.Compiler/LangBackend.Compiler.fsproj` - Fixed project reference to FunLang.fsproj
+- `src/FunLangCompiler.Cli/Program.fs` - Added Typeclass.fun as first entry in ordered array; fixed namespace import
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Two-pass DerivingDecl expansion, show/eq builtins, replace-if-exists, to_string Ptr fix
+- `src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj` - Fixed project reference to FunLang.fsproj
 - `tests/compiler/53-0{1-5}-*.flt/.fun` - 5 E2E test pairs
 
 ## Decisions Made
 
-- **show/eq as builtins not pure Prelude functions**: LangBackend has no type dispatch at runtime. show 42 needs to_string, show "hello" needs identity, and show Red needs the derived match. Solved by: string literals caught by builtin cases, integers/bools use lang_to_string_int/bool, ADT values fall through to derived show in KnownFuncs.
+- **show/eq as builtins not pure Prelude functions**: FunLangCompiler has no type dispatch at runtime. show 42 needs to_string, show "hello" needs identity, and show Red needs the derived match. Solved by: string literals caught by builtin cases, integers/bools use lang_to_string_int/bool, ADT values fall through to derived show in KnownFuncs.
 - **replace-if-exists MLIR function replacement**: The 4 Prelude show instances each compile to @show MLIR function. Rather than deduplicating at the AST level, the elaborator's "Single-arg Let-Lambda" and "Two-arg closure" cases now replace existing functions with the same name.
 - **to_string Ptr passthrough**: Extended to_string to return Ptr arguments unchanged. This enables show "hello" via the Show char instance's to_string x, since to_string on a string now returns the string.
 
@@ -109,11 +109,11 @@ completed: 2026-04-01
 
 ### Auto-fixed Issues
 
-**1. [Rule 3 - Blocking] LangBackend.Compiler.fsproj referenced missing LangThree.fsproj**
+**1. [Rule 3 - Blocking] FunLangCompiler.Compiler.fsproj referenced missing LangThree.fsproj**
 - **Found during:** Task 1 (build verification)
 - **Issue:** Project referenced `LangThree/src/LangThree/LangThree.fsproj` but LangThree was renamed to FunLang. Build had 100+ errors.
 - **Fix:** Updated project reference to `LangThree/src/FunLang/FunLang.fsproj` and namespace import from LangThree.IndentFilter to FunLang.IndentFilter
-- **Files modified:** src/LangBackend.Compiler/LangBackend.Compiler.fsproj, src/LangBackend.Cli/Program.fs
+- **Files modified:** src/FunLangCompiler.Compiler/FunLangCompiler.Compiler.fsproj, src/FunLangCompiler.Cli/Program.fs
 - **Verification:** `dotnet build` succeeds with 0 errors
 - **Committed in:** d028952 (Task 1 commit)
 
@@ -121,15 +121,15 @@ completed: 2026-04-01
 - **Found during:** Task 3 (E2E test verification)
 - **Issue:** Prelude's 4 InstanceDecl for Show and 4 for Eq each generated @show and @eq MLIR functions. MLIR rejected duplicate symbols.
 - **Fix:** Added replace-if-exists logic in both single-arg and two-arg Lambda elaboration paths.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** All 5 E2E tests compile without MLIR errors
 - **Committed in:** 10f96b6 (Task 2 extended commit)
 
 **3. [Rule 2 - Missing Critical] show/eq polymorphic dispatch without type system**
 - **Found during:** Task 3 (E2E test verification)
-- **Issue:** LangBackend has no type dispatch. The surviving show/eq definition (last Prelude instance) couldn't handle all argument types correctly. show "hello" produced garbage, eq "hello" "hello" returned false.
+- **Issue:** FunLangCompiler has no type dispatch. The surviving show/eq definition (last Prelude instance) couldn't handle all argument types correctly. show "hello" produced garbage, eq "hello" "hello" returned false.
 - **Fix:** Added show/eq as elaborator builtins with static argument type detection. String literals handled specially (identity for show, strcmp for eq). Ints/bools use lang_to_string_int/bool. ADT values fall through to derived show in KnownFuncs.
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** All 5 tests pass; existing tests unaffected
 - **Committed in:** 10f96b6 (Task 2 extended commit)
 
@@ -141,7 +141,7 @@ completed: 2026-04-01
 ## Issues Encountered
 
 - LangThree renamed its root namespace from `LangThree` to `FunLang` (parallel development). Updated both project reference and namespace import.
-- LangBackend's lack of type dispatch required adding show/eq as elaborator builtins rather than relying purely on Prelude functions. This is the pragmatic solution given LangBackend's untyped compilation model.
+- FunLangCompiler's lack of type dispatch required adding show/eq as elaborator builtins rather than relying purely on Prelude functions. This is the pragmatic solution given FunLangCompiler's untyped compilation model.
 
 ## Next Phase Readiness
 

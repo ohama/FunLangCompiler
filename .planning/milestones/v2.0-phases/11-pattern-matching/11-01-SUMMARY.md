@@ -37,10 +37,10 @@ key-files:
     - tests/compiler/11-02-bool-pattern.flt
     - tests/compiler/11-03-nonexhaustive.flt
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Elaboration.fs
-    - src/LangBackend.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
 
 key-decisions:
   - "LlvmUnreachableOp is zero-operand — emits llvm.unreachable with no arguments"
@@ -88,10 +88,10 @@ Each task was committed atomically:
 4. **Task 4: Write FsLit E2E tests + fix regression** - `d0df3df` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/MlirIR.fs` - Added LlvmUnreachableOp to MlirOp DU
-- `src/LangBackend.Compiler/Printer.fs` - Emit llvm.unreachable for LlvmUnreachableOp
-- `src/LangBackend.Compiler/Elaboration.fs` - testPattern helper + general compileMatchArms + @lang_match_failure in ExternalFuncs
-- `src/LangBackend.Compiler/lang_runtime.c` - lang_match_failure() + #include <stdlib.h>
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added LlvmUnreachableOp to MlirOp DU
+- `src/FunLangCompiler.Compiler/Printer.fs` - Emit llvm.unreachable for LlvmUnreachableOp
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - testPattern helper + general compileMatchArms + @lang_match_failure in ExternalFuncs
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - lang_match_failure() + #include <stdlib.h>
 - `tests/compiler/11-01-const-int-wildcard.flt` - 3-arm int match exits 1
 - `tests/compiler/11-02-bool-pattern.flt` - bool false/true match exits 1
 - `tests/compiler/11-03-nonexhaustive.flt` - non-exhaustive match exits 1
@@ -109,7 +109,7 @@ Each task was committed atomically:
 - **Found during:** Task 4 (FsLit E2E test run)
 - **Issue:** Replacing Phase 10 Match case with general compiler caused `10-02-list-length.flt` to fail — `testPattern` called `failwithf` for EmptyListPat/ConsPat
 - **Fix:** Extended `testPattern` to handle `EmptyListPat` (null-check eq) and `ConsPat` (null-check ne + bodySetupOps for head/tail loads); 4-tuple return added to carry `bodySetupOps`
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Verification:** 30/30 FsLit tests pass
 - **Committed in:** `d0df3df` (Task 4 commit)
 

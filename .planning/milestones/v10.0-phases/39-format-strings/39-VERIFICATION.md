@@ -29,9 +29,9 @@ score: 4/4 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/lang_runtime.c` | 6 typed snprintf wrapper functions | VERIFIED | All 6 at lines 1251–1315; two-pass snprintf idiom with GC_malloc; substantive (18+ lines each) |
-| `src/LangBackend.Compiler/lang_runtime.h` | Declarations for all 6 wrappers | VERIFIED | All 6 declarations at lines 200–205 |
-| `src/LangBackend.Compiler/Elaboration.fs` | FmtSpec DU, fmtSpecTypes, coerceToI64Arg, sprintf/printfn arms, ExternalFuncDecl in both lists | VERIFIED | FmtSpec at line 269; fmtSpecTypes at lines 273–301; coerceToI64Arg at lines 305–316; printfn arms lines 1698–1713; sprintf arms lines 1715–1795; ExternalFuncDecl in both lists (lines ~3617–3622 and ~3882–3887) |
+| `src/FunLangCompiler.Compiler/lang_runtime.c` | 6 typed snprintf wrapper functions | VERIFIED | All 6 at lines 1251–1315; two-pass snprintf idiom with GC_malloc; substantive (18+ lines each) |
+| `src/FunLangCompiler.Compiler/lang_runtime.h` | Declarations for all 6 wrappers | VERIFIED | All 6 declarations at lines 200–205 |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | FmtSpec DU, fmtSpecTypes, coerceToI64Arg, sprintf/printfn arms, ExternalFuncDecl in both lists | VERIFIED | FmtSpec at line 269; fmtSpecTypes at lines 273–301; coerceToI64Arg at lines 305–316; printfn arms lines 1698–1713; sprintf arms lines 1715–1795; ExternalFuncDecl in both lists (lines ~3617–3622 and ~3882–3887) |
 | `tests/compiler/39-01-sprintf-int.flt` | E2E test: %d, %x, %02x, %c specifiers | VERIFIED | Exists, substantive, executed and passed (output: `42 / ff / 0a / A / 0`) |
 | `tests/compiler/39-02-sprintf-multi.flt` | E2E test: 2-arg format strings | VERIFIED | Exists, substantive, executed and passed (output: `key=99 / 10+20 / 0`) |
 | `tests/compiler/39-03-printfn.flt` | E2E test: printfn with format arg and plain string | VERIFIED | Exists, substantive, executed and passed (output: `5 states / hello / 0`) |

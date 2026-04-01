@@ -29,8 +29,8 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/lang_runtime.c
 
 key-decisions:
   - "LangClosureFn typedef placed in lang_runtime.h alongside existing array/hashtable declarations for visibility across all translation units"
@@ -72,8 +72,8 @@ Each task was committed atomically:
 2. **Task 2: Implement 4 HOF functions in lang_runtime.c** - `1c4c426` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.h` - Added `LangClosureFn` typedef and 4 HOF prototypes
-- `src/LangBackend.Compiler/lang_runtime.c` - Implemented `lang_array_iter`, `lang_array_map`, `lang_array_fold`, `lang_array_init`
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added `LangClosureFn` typedef and 4 HOF prototypes
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Implemented `lang_array_iter`, `lang_array_map`, `lang_array_fold`, `lang_array_init`
 
 ## Decisions Made
 - `lang_array_fold` uses the two-call curried pattern: `partial = fn(closure, acc)` then cast `partial` as `void*` to get `fn2` and call `fn2(partial_ptr, arr[i])`. This matches the curried binary closure ABI where fold functions are applied one argument at a time.

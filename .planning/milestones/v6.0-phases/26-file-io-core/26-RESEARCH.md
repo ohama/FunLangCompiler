@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 26 adds five file I/O builtins (read_file, write_file, append_file, file_exists, eprint/eprintln) to the LangBackend compiler. The domain is fully understood — this is a pure codebase extension following the established builtin pattern used in phases 22 (arrays), 23 (hashtables), and 24 (array HOFs).
+Phase 26 adds five file I/O builtins (read_file, write_file, append_file, file_exists, eprint/eprintln) to the FunLangCompiler compiler. The domain is fully understood — this is a pure codebase extension following the established builtin pattern used in phases 22 (arrays), 23 (hashtables), and 24 (array HOFs).
 
 The pattern is: implement C helper functions in `lang_runtime.c`, declare them in `lang_runtime.h`, add `ExternalFuncDecl` entries to both `externalFuncs` lists in `Elaboration.fs`, and add pattern-match arms in `elaborateExpr`. All functions operate on `LangString*` pointers (struct `{i64 length, char* data}`), which is already the established string ABI.
 
@@ -53,7 +53,7 @@ This phase uses no external libraries. All implementation is in the existing pro
 No new files needed. Changes span three existing files:
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── lang_runtime.c    # ADD: lang_file_read, lang_file_write, lang_file_append,
 │                     #      lang_file_exists, lang_eprint, lang_eprintln
 ├── lang_runtime.h    # ADD: declarations for the 6 new C functions
@@ -288,7 +288,7 @@ Note: `fopen` to check existence is portable and consistent with POSIX. `access(
 
 ```
 // Source: tests/compiler/ — follows established .flt format
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let path = "/tmp/lang_test_write.txt" in
 write_file path "hello";

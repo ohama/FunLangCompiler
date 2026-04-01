@@ -1,7 +1,7 @@
 # Phase 32: Hashtable & List/Array Builtins - Research
 
 **Researched:** 2026-03-29
-**Domain:** LangBackend builtin implementation (lang_runtime.c + Elaboration.fs)
+**Domain:** FunLangCompiler builtin implementation (lang_runtime.c + Elaboration.fs)
 **Confidence:** HIGH
 
 ## Summary
@@ -19,9 +19,9 @@ The established tools for this codebase:
 ### Core
 | Component | Location | Purpose | Why Standard |
 |-----------|----------|---------|--------------|
-| lang_runtime.c | src/LangBackend.Compiler/lang_runtime.c | C runtime library | All builtins that require C stdlib or struct access live here |
-| lang_runtime.h | src/LangBackend.Compiler/lang_runtime.h | Header declarations | Declares all runtime function signatures and structs |
-| Elaboration.fs | src/LangBackend.Compiler/Elaboration.fs | AST-to-MLIR translation | Pattern-matches on `App(Var("builtin_name"))`, emits MLIR ops |
+| lang_runtime.c | src/FunLangCompiler.Compiler/lang_runtime.c | C runtime library | All builtins that require C stdlib or struct access live here |
+| lang_runtime.h | src/FunLangCompiler.Compiler/lang_runtime.h | Header declarations | Declares all runtime function signatures and structs |
+| Elaboration.fs | src/FunLangCompiler.Compiler/Elaboration.fs | AST-to-MLIR translation | Pattern-matches on `App(Var("builtin_name"))`, emits MLIR ops |
 
 ### Supporting
 | Component | Purpose | When to Use |
@@ -496,9 +496,9 @@ match ys with | a :: b :: [] -> a + b | _ -> 0
 ## Sources
 
 ### Primary (HIGH confidence)
-- `src/LangBackend.Compiler/lang_runtime.c` — all existing runtime patterns (hashtable CRUD, array layout, LangCons, array_of_list, array_to_list, array_map closure ABI). Lines 134-535 examined in detail.
-- `src/LangBackend.Compiler/lang_runtime.h` — LangHashtable struct layout confirmed (tag=0, capacity=1, size=2), LangClosureFn typedef
-- `src/LangBackend.Compiler/Elaboration.fs` — array_length (line 954), array_map closure pattern (line 1133), array_iter void pattern (line 1117), Tuple construction (line 1513), LetPat TuplePat (line 601), externalFuncs both lists (lines 2796 and 2996)
+- `src/FunLangCompiler.Compiler/lang_runtime.c` — all existing runtime patterns (hashtable CRUD, array layout, LangCons, array_of_list, array_to_list, array_map closure ABI). Lines 134-535 examined in detail.
+- `src/FunLangCompiler.Compiler/lang_runtime.h` — LangHashtable struct layout confirmed (tag=0, capacity=1, size=2), LangClosureFn typedef
+- `src/FunLangCompiler.Compiler/Elaboration.fs` — array_length (line 954), array_map closure pattern (line 1133), array_iter void pattern (line 1117), Tuple construction (line 1513), LetPat TuplePat (line 601), externalFuncs both lists (lines 2796 and 2996)
 - `../LangThree/src/LangThree/Eval.fs` — reference implementations confirmed: hashtable_trygetvalue returns TupleValue [BoolValue; val], list_sort_by uses key extractor (not comparator), array_sort is in-place
 - `../LangThree/src/LangThree/Ast.fs` — valueCompare is integer comparison for int values
 

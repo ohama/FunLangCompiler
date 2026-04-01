@@ -51,11 +51,11 @@ No new external libraries. All work is pure F# within the existing project.
 No new files are created. Changes are surgical:
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 ├── Elaboration.fs    # ElabEnv gains 3 fields; add elaborateProgram; add prePassDecls
 ├── MatchCompiler.fs  # CtorTag gains 2 variants; desugarPattern gains 2 arms
 └── (all others)      # unchanged
-src/LangBackend.Cli/
+src/FunLangCompiler.Cli/
 └── Program.fs        # switch parseExpr->parseModule, elaborateModule->elaborateProgram
 ```
 
@@ -469,9 +469,9 @@ Note: The `TuplePat` implementation has dead code (the first expression with `|>
 
 ### Primary (HIGH confidence)
 
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` (lines 20-35, 1226-1268) — `ElabEnv` definition, `emptyEnv`, `elaborateModule` — direct inspection
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MatchCompiler.fs` (lines 29-126) — `CtorTag` DU, `ctorArity`, `desugarPattern` with `failwith` stubs — direct inspection
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Cli/Program.fs` — current `parseExpr`/`elaborateModule` call site — direct inspection
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` (lines 20-35, 1226-1268) — `ElabEnv` definition, `emptyEnv`, `elaborateModule` — direct inspection
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MatchCompiler.fs` (lines 29-126) — `CtorTag` DU, `ctorArity`, `desugarPattern` with `failwith` stubs — direct inspection
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` — current `parseExpr`/`elaborateModule` call site — direct inspection
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` (lines 161-338) — `TypeDecl`, `ConstructorDecl`, `RecordDecl`, `RecordFieldDecl`, `Decl`, `Module` — direct inspection
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Parser.fs` (lines 3764-3767) — `parseModule` and `start` signatures — direct inspection
 - `.planning/research/SUMMARY.md` — project-level research confirming architecture approach and ElabEnv extension design

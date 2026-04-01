@@ -30,9 +30,9 @@ key-files:
   created:
     - tests/compiler/38-01-cli-args.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "lang_get_args starts from argv[1] to skip program name — argv[0] excluded per RT-03 spec"
@@ -76,9 +76,9 @@ Each task was committed atomically:
 2. **Task 2: E2E test for CLI argument passing** - `4485510` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/lang_runtime.h` - Added lang_init_args and lang_get_args declarations
-- `src/LangBackend.Compiler/lang_runtime.c` - Implemented lang_init_args (stores argc/argv) and lang_get_args (builds LangCons* from argv[1..])
-- `src/LangBackend.Compiler/Elaboration.fs` - InputTypes=[I64;Ptr] in both mainFunc; initArgsOp prepend; get_args arm; ExternalFuncDecl entries in both lists
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added lang_init_args and lang_get_args declarations
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Implemented lang_init_args (stores argc/argv) and lang_get_args (builds LangCons* from argv[1..])
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - InputTypes=[I64;Ptr] in both mainFunc; initArgsOp prepend; get_args arm; ExternalFuncDecl entries in both lists
 - `tests/compiler/38-01-cli-args.flt` - E2E test: compile get_args program, run with "foo bar baz", verify output
 
 ## Decisions Made

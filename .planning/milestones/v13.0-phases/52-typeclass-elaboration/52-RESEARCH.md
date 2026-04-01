@@ -6,11 +6,11 @@
 
 ## Summary
 
-Phase 52 implements `elaborateTypeclasses` in LangBackend, which is a pre-processing step that transforms typeclass-related AST nodes into plain `LetDecl` bindings before `elaborateProgram` sees the AST. The canonical reference implementation already exists in LangThree's `Elaborate.fs` (lines 243–273). The transformation is a direct structural traversal with no type inference or name resolution — it is a purely syntactic rewrite.
+Phase 52 implements `elaborateTypeclasses` in FunLangCompiler, which is a pre-processing step that transforms typeclass-related AST nodes into plain `LetDecl` bindings before `elaborateProgram` sees the AST. The canonical reference implementation already exists in LangThree's `Elaborate.fs` (lines 243–273). The transformation is a direct structural traversal with no type inference or name resolution — it is a purely syntactic rewrite.
 
-The LangThree implementation handles four cases: `TypeClassDecl` → `[]` (removed), `InstanceDecl` → one `LetDecl` per method, `ModuleDecl` → recurse + hoist instance bindings to outer scope, `NamespaceDecl` → recurse in-place, `DerivingDecl` → `[]` (removed). LangBackend's `Elaboration.fs` already has stub comments at lines 4101–4103 noting that TypeClassDecl/InstanceDecl/DerivingDecl will be handled here. The `elaborateProgram` function in `Program.fs` (line 206) calls `Elaboration.elaborateProgram expandedAst` — the new `elaborateTypeclasses` call must be inserted between `expandImports` and `elaborateProgram`.
+The LangThree implementation handles four cases: `TypeClassDecl` → `[]` (removed), `InstanceDecl` → one `LetDecl` per method, `ModuleDecl` → recurse + hoist instance bindings to outer scope, `NamespaceDecl` → recurse in-place, `DerivingDecl` → `[]` (removed). FunLangCompiler's `Elaboration.fs` already has stub comments at lines 4101–4103 noting that TypeClassDecl/InstanceDecl/DerivingDecl will be handled here. The `elaborateProgram` function in `Program.fs` (line 206) calls `Elaboration.elaborateProgram expandedAst` — the new `elaborateTypeclasses` call must be inserted between `expandImports` and `elaborateProgram`.
 
-The LangBackend uses LangThree's `Ast` module directly (via project reference), so all AST types — `Ast.Decl.TypeClassDecl`, `Ast.Decl.InstanceDecl`, `Ast.Decl.DerivingDecl`, `Ast.Decl.LetDecl`, `Ast.Decl.ModuleDecl`, `Ast.Decl.NamespaceDecl` — are shared. No new type definitions are needed.
+The FunLangCompiler uses LangThree's `Ast` module directly (via project reference), so all AST types — `Ast.Decl.TypeClassDecl`, `Ast.Decl.InstanceDecl`, `Ast.Decl.DerivingDecl`, `Ast.Decl.LetDecl`, `Ast.Decl.ModuleDecl`, `Ast.Decl.NamespaceDecl` — are shared. No new type definitions are needed.
 
 **Primary recommendation:** Add `elaborateTypeclasses` to `Elaboration.fs` as a public function (verbatim copy of LangThree's logic adapted for the `Ast.Decl.` prefix style), then wire it in `Program.fs` between `expandImports` and `elaborateProgram`.
 
@@ -21,13 +21,13 @@ This is an internal codebase transformation — no external libraries are involv
 ### Core
 | File | Purpose | What Changes |
 |------|---------|--------------|
-| `src/LangBackend.Compiler/Elaboration.fs` | Add `elaborateTypeclasses` function (public) | New function, ~25 lines |
-| `src/LangBackend.Cli/Program.fs` | Wire `elaborateTypeclasses` into compile pipeline | Add one call at line ~206 |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | Add `elaborateTypeclasses` function (public) | New function, ~25 lines |
+| `src/FunLangCompiler.Cli/Program.fs` | Wire `elaborateTypeclasses` into compile pipeline | Add one call at line ~206 |
 
 ### Supporting
 | Tool | Purpose |
 |------|---------|
-| `dotnet build src/LangBackend.Cli/` | Verify the full project compiles |
+| `dotnet build src/FunLangCompiler.Cli/` | Verify the full project compiles |
 | `tests/compiler/52-*.flt + *.fun` | E2E tests confirming the transformation |
 
 ### Alternatives Considered
@@ -43,10 +43,10 @@ This is an internal codebase transformation — no external libraries are involv
 No new files needed. Changes touch exactly two existing files:
 
 ```
-src/LangBackend.Compiler/
+src/FunLangCompiler.Compiler/
 └── Elaboration.fs      # Add elaborateTypeclasses before elaborateProgram
 
-src/LangBackend.Cli/
+src/FunLangCompiler.Cli/
 └── Program.fs          # Wire elaborateTypeclasses between expandImports and elaborateProgram
 ```
 
@@ -83,7 +83,7 @@ let rec elaborateTypeclasses (decls: Decl list) : Decl list =
         | other -> [other])
 ```
 
-In LangBackend's `Elaboration.fs`, use the `Ast.Decl.` prefix:
+In FunLangCompiler's `Elaboration.fs`, use the `Ast.Decl.` prefix:
 
 ```fsharp
 // Source: adapated from /Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs
@@ -179,8 +179,8 @@ If only recursing (without hoisting), `let result = show Red` at top scope fails
 **Warning signs:** Test `typeclass-module-instance.flt` fails (LangThree test: module-scoped instance accessible globally).
 
 ### Pitfall 3: Ast.Decl. Qualification
-**What goes wrong:** LangThree's `Elaborate.fs` uses `open Ast` and thus writes bare names like `LetDecl(...)`. In LangBackend's `Elaboration.fs`, the module opens `Ast` at line 3 — so bare names like `LetDecl` refer to the expression-level `Ast.LetDecl`, NOT to `Ast.Decl.LetDecl`. Using the wrong qualifier will cause a compile error or wrong DU case.
-**Why it happens:** LangThree's `Decl` type has both an `Ast.Expr` and `Ast.Decl` (the module-level DU). In LangThree `Elaborate.fs`, `open Ast` imports both. In LangBackend `Elaboration.fs`, `open Ast` brings `Expr` cases into scope, but `Decl` cases require `Ast.Decl.` prefix (or `open Ast.Decl`).
+**What goes wrong:** LangThree's `Elaborate.fs` uses `open Ast` and thus writes bare names like `LetDecl(...)`. In FunLangCompiler's `Elaboration.fs`, the module opens `Ast` at line 3 — so bare names like `LetDecl` refer to the expression-level `Ast.LetDecl`, NOT to `Ast.Decl.LetDecl`. Using the wrong qualifier will cause a compile error or wrong DU case.
+**Why it happens:** LangThree's `Decl` type has both an `Ast.Expr` and `Ast.Decl` (the module-level DU). In LangThree `Elaborate.fs`, `open Ast` imports both. In FunLangCompiler `Elaboration.fs`, `open Ast` brings `Expr` cases into scope, but `Decl` cases require `Ast.Decl.` prefix (or `open Ast.Decl`).
 **How to avoid:** Use `Ast.Decl.TypeClassDecl`, `Ast.Decl.InstanceDecl`, `Ast.Decl.LetDecl`, etc. throughout the implementation. Verify by checking existing patterns at lines 4095–4103 in `Elaboration.fs` (they already use `Ast.Decl.` prefix).
 **Warning signs:** F# compile error "This expression was expected to have type 'Expr' but here has type 'Decl'".
 
@@ -192,7 +192,7 @@ If only recursing (without hoisting), `let result = show Red` at top scope fails
 
 ## Code Examples
 
-### elaborateTypeclasses — Complete Implementation for LangBackend
+### elaborateTypeclasses — Complete Implementation for FunLangCompiler
 
 ```fsharp
 // Source: adapted from /Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs:248
@@ -296,7 +296,7 @@ Expected output: `rendered:42`
 
 **Not needed (deferred to Phase 53):**
 - Prelude typeclass definitions (Show, Eq, etc.) — Phase 53 syncs Prelude/Typeclass.fun
-- Type inference for typeclass constraints — LangThree handles this; LangBackend is compilation only
+- Type inference for typeclass constraints — LangThree handles this; FunLangCompiler is compilation only
 
 ## Open Questions
 
@@ -315,8 +315,8 @@ Expected output: `rendered:42`
 ### Primary (HIGH confidence)
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Elaborate.fs` lines 243–273 — exact `elaborateTypeclasses` implementation
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` lines 368–371 — `TypeClassDecl`, `InstanceDecl`, `DerivingDecl` field layouts
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Cli/Program.fs` lines 191–206 — current pipeline structure
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` lines 4095–4103, 4208–4218 — existing stub comments and `elaborateProgram` entry point
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Cli/Program.fs` lines 191–206 — current pipeline structure
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` lines 4095–4103, 4208–4218 — existing stub comments and `elaborateProgram` entry point
 
 ### Secondary (MEDIUM confidence)
 - LangThree typeclass test files in `/Users/ohama/vibe-coding/LangThree/tests/flt/file/typeclass/` — verified transformation behavior and expected outputs for test design

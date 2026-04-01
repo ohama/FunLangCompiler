@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 8 extends the LangBackend compiler to compile LangThree string literals into heap-allocated
+Phase 8 extends the FunLangCompiler compiler to compile LangThree string literals into heap-allocated
 two-field structs (`{i64 length, ptr data}`) and wire up the string builtins `string_length`,
 `string_concat`, `to_string`, and `=`/`<>` for strings. The codebase already supports string
 globals (Phase 7 print/println), GC_malloc heap allocation, and LlvmCallOp/LlvmCallVoidOp — all
@@ -162,7 +162,7 @@ These are simpler to implement in C than inline MLIR.
 
 ### Pattern 6: C Runtime File
 
-Create `src/LangBackend.Compiler/lang_runtime.c` with:
+Create `src/FunLangCompiler.Compiler/lang_runtime.c` with:
 - `lang_string_struct` type alias = `{int64_t length; char* data;}`
 - `lang_string_concat(struct*, struct*) -> struct*`
 - `lang_to_string_int(int64_t) -> struct*`

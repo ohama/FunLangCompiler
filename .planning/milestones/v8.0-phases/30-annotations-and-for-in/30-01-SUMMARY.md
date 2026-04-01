@@ -26,7 +26,7 @@ key-files:
     - tests/compiler/30-01-annot-basic.flt
     - tests/compiler/30-02-annot-lambda.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "LambdaAnnot rewrites to Lambda(param, body, span) and re-elaborates rather than duplicating Lambda logic"
@@ -65,7 +65,7 @@ Each task was committed atomically:
 2. **Task 2: Add E2E tests for annotations** - `8375ccb` (test)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added 4 new match cases (2 in freeVars, 2 in elaborateExpr)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added 4 new match cases (2 in freeVars, 2 in elaborateExpr)
 - `tests/compiler/30-01-annot-basic.flt` - E2E test: `(42 : int)` produces same output as `42`
 - `tests/compiler/30-02-annot-lambda.flt` - E2E test: `fun (x : int) -> x + 1` works like `fun x -> x + 1`
 

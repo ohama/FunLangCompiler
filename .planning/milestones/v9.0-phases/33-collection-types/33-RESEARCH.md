@@ -1,7 +1,7 @@
 # Phase 33: Collection Types - Research
 
 **Researched:** 2026-03-29
-**Domain:** LangBackend C runtime + Elaboration.fs — four new collection types (StringBuilder, HashSet, Queue, MutableList)
+**Domain:** FunLangCompiler C runtime + Elaboration.fs — four new collection types (StringBuilder, HashSet, Queue, MutableList)
 **Confidence:** HIGH
 
 ## Summary
@@ -19,9 +19,9 @@ The dominant pattern is: create-function returns `Ptr`, most mutating functions 
 ### Core
 | Component | Location | Purpose | Why Standard |
 |-----------|----------|---------|--------------|
-| lang_runtime.c | src/LangBackend.Compiler/lang_runtime.c | C runtime — new structs + functions | All collection implementations live here; 880 lines established |
-| lang_runtime.h | src/LangBackend.Compiler/lang_runtime.h | Header declarations for new types | All structs and function prototypes must be declared here |
-| Elaboration.fs | src/LangBackend.Compiler/Elaboration.fs | AST-to-MLIR translation | Pattern-matches on `App(Var("builtin_name"))`, emits MLIR ops; 3126 lines |
+| lang_runtime.c | src/FunLangCompiler.Compiler/lang_runtime.c | C runtime — new structs + functions | All collection implementations live here; 880 lines established |
+| lang_runtime.h | src/FunLangCompiler.Compiler/lang_runtime.h | Header declarations for new types | All structs and function prototypes must be declared here |
+| Elaboration.fs | src/FunLangCompiler.Compiler/Elaboration.fs | AST-to-MLIR translation | Pattern-matches on `App(Var("builtin_name"))`, emits MLIR ops; 3126 lines |
 
 ### Supporting
 | Component | Purpose | When to Use |
@@ -430,7 +430,7 @@ int64_t lang_mlist_count(LangMutableList* ml) { return ml->len; }
 ### Test file pattern (E2E .flt)
 ```
 // COL-01 test
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let sb = stringbuilder_create () in
 let _ = stringbuilder_append sb "hello" in
@@ -546,12 +546,12 @@ println (to_string (mutablelist_get ml 1))
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — lines 297–430 (LangHashtable pattern), 550–612 (Phase 32 additions), all struct and function layout patterns
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.h` — current declarations (103 lines), no Phase 33 types present
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — lines 1086–1222 (Phase 32 patterns), 2853–2920 and 3058–3125 (both externalFuncs lists)
-- `/Users/ohama/vibe-coding/LangBackend/../LangThree/src/LangThree/Eval.fs` — lines 684–797 (all four collection types, exact semantics, confirmed builtin names)
-- `/Users/ohama/vibe-coding/LangBackend/langbackend-feature-requests.md` — lines 254–420 (Feature 7–11: C struct hints, FunLexYacc usage, test suggestions)
-- `/Users/ohama/vibe-coding/LangBackend/tests/compiler/32-*.flt` — test file format and naming conventions
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — lines 297–430 (LangHashtable pattern), 550–612 (Phase 32 additions), all struct and function layout patterns
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.h` — current declarations (103 lines), no Phase 33 types present
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — lines 1086–1222 (Phase 32 patterns), 2853–2920 and 3058–3125 (both externalFuncs lists)
+- `/Users/ohama/vibe-coding/FunLangCompiler/../LangThree/src/LangThree/Eval.fs` — lines 684–797 (all four collection types, exact semantics, confirmed builtin names)
+- `/Users/ohama/vibe-coding/FunLangCompiler/langbackend-feature-requests.md` — lines 254–420 (Feature 7–11: C struct hints, FunLexYacc usage, test suggestions)
+- `/Users/ohama/vibe-coding/FunLangCompiler/tests/compiler/32-*.flt` — test file format and naming conventions
 
 ### Secondary (MEDIUM confidence)
 - Phase 32 RESEARCH.md (`.planning/phases/32-hashtable-list-array-builtins/32-RESEARCH.md`) — confirmed externalFuncs duplication pitfall, GEP patterns, void-return pattern

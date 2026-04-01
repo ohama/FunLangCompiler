@@ -33,7 +33,7 @@ key-files:
     - tests/compiler/09-02-tuple-nested.flt
     - tests/compiler/09-03-tuple-match.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Tuple field load type uses typeOfPat heuristic: TuplePat sub-pattern → Ptr, VarPat/WildcardPat → I64 (untyped compiler convention)"
@@ -76,7 +76,7 @@ completed: 2026-03-26
 2. **Task 2: Create FsLit E2E tests for TUP-01, TUP-02, TUP-03** - `1d1b7fe` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added Tuple, LetPat(TuplePat), Match(TuplePat) cases and freeVars extensions (+67 lines)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added Tuple, LetPat(TuplePat), Match(TuplePat) cases and freeVars extensions (+67 lines)
 - `tests/compiler/09-01-tuple-basic.flt` - TUP-01+TUP-02: `let (a,b) = (3,4) in a+b` → exits 7
 - `tests/compiler/09-02-tuple-nested.flt` - TUP-02 nested: `let (x,(y,z)) = (1,(2,3)) in x+y+z` → exits 6
 - `tests/compiler/09-03-tuple-match.flt` - TUP-03: `match (1,2) with |(a,b) -> a+b` → exits 3

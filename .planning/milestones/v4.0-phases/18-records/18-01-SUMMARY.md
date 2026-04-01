@@ -38,7 +38,7 @@ key-files:
     - tests/compiler/18-03-record-update.flt
     - tests/compiler/18-04-setfield.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Field-name search across all RecordEnv types (no explicit type annotation at FieldAccess/SetField sites) — field names must be unique across types in v4.0"
@@ -79,7 +79,7 @@ Each task was committed atomically:
 2. **Task 2: Add elaborateExpr cases + E2E tests** - `aa18d0e` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added freeVars cases (Task 1) and four elaborateExpr cases (Task 2)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added freeVars cases (Task 1) and four elaborateExpr cases (Task 2)
 - `tests/compiler/18-01-record-create.flt` - E2E: record construction + p.x access, expects 3
 - `tests/compiler/18-02-field-access.flt` - E2E: field access p.y, expects 4
 - `tests/compiler/18-03-record-update.flt` - E2E: functional update p2.x copied from p, expects 3

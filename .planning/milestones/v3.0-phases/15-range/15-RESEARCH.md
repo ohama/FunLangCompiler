@@ -174,7 +174,7 @@ trivial and keeps the MLIR output simple (one `llvm.call`).
 
 ### Test file pattern (matches existing .flt format)
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let rec sum lst = match lst with | [] -> 0 | h :: t -> h + sum t in sum [1..5]
 // --- Output:
@@ -208,8 +208,8 @@ let rec sum lst = match lst with | [] -> 0 | h :: t -> h + sum t in sum [1..5]
 ### Primary (HIGH confidence)
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — Range node definition confirmed
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` — Range evaluation semantics confirmed
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — Cons/List elaboration, externalFuncs list, LlvmCallOp pattern
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — Runtime helper structure confirmed
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Cons/List elaboration, externalFuncs list, LlvmCallOp pattern
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — Runtime helper structure confirmed
 
 ### Secondary (MEDIUM confidence)
 - Existing test files (`10-02-list-length.flt`, `11-05-list-sum.flt`) — test format and list-processing idioms

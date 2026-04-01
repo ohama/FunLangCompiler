@@ -22,9 +22,9 @@ Phase 23 introduces no new external libraries. All components already exist in t
 
 | Component | Location | Phase 23 Change |
 |-----------|----------|-----------------|
-| `lang_runtime.c` | `src/LangBackend.Compiler/` | Add `LangHashEntry`, `LangHashtable` structs + 6 functions (~120 LOC) |
-| `lang_runtime.h` | `src/LangBackend.Compiler/` | Add struct typedefs + 6 function declarations (~20 LOC) |
-| `Elaboration.fs` | `src/LangBackend.Compiler/` | Add 6 builtin match arms + `coerceToI64` helper + 6 ExternalFuncDecl entries |
+| `lang_runtime.c` | `src/FunLangCompiler.Compiler/` | Add `LangHashEntry`, `LangHashtable` structs + 6 functions (~120 LOC) |
+| `lang_runtime.h` | `src/FunLangCompiler.Compiler/` | Add struct typedefs + 6 function declarations (~20 LOC) |
+| `Elaboration.fs` | `src/FunLangCompiler.Compiler/` | Add 6 builtin match arms + `coerceToI64` helper + 6 ExternalFuncDecl entries |
 
 ### No Changes Required
 
@@ -332,7 +332,7 @@ Add to BOTH `externalFuncs` lists in `Elaboration.fs` (there are two identical l
 Follow the existing test file format (e.g., `22-01-array-create.flt`):
 
 ```
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/langback_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 [lang source]
 // --- Output:
@@ -548,15 +548,15 @@ LangCons* lang_hashtable_keys(LangHashtable* ht) {
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/lang_runtime.c` — confirmed `LangString`, `LangCons` layouts; `lang_throw` pattern; `GC_malloc` usage; `lang_array_create` pattern
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — confirmed `App`-chain matching order; ExternalFuncDecl two-list structure at lines ~2115 and ~2252; `lang_string_contains` I64→I1 pattern; `LlvmPtrToIntOp` usage; `elaborateExpr` dispatch shape
-- Direct code analysis of `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — confirmed all needed ops exist: `LlvmCallOp`, `LlvmCallVoidOp`, `ArithCmpIOp`, `LlvmPtrToIntOp`, `ArithConstantOp`
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/lang_runtime.c` — confirmed `LangString`, `LangCons` layouts; `lang_throw` pattern; `GC_malloc` usage; `lang_array_create` pattern
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — confirmed `App`-chain matching order; ExternalFuncDecl two-list structure at lines ~2115 and ~2252; `lang_string_contains` I64→I1 pattern; `LlvmPtrToIntOp` usage; `elaborateExpr` dispatch shape
+- Direct code analysis of `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — confirmed all needed ops exist: `LlvmCallOp`, `LlvmCallVoidOp`, `ArithCmpIOp`, `LlvmPtrToIntOp`, `ArithConstantOp`
 - Direct code analysis of `/Users/ohama/vibe-coding/LangThree/src/LangThree/Eval.fs` lines 526-571 — authoritative source for hashtable semantics: `hashtable_create`, `get` (raises on miss), `set`, `containsKey`, `keys`, `remove`
-- `/Users/ohama/vibe-coding/LangBackend/.planning/research/STACK.md` sections 3.1-3.5 — chaining rationale; C function signatures; ExternalFuncDecl templates; coerceToI64 helper design
-- `/Users/ohama/vibe-coding/LangBackend/.planning/research/ARCHITECTURE.md` lines 325-469 — hashtable memory layout options; key type handling; builtin dispatch patterns
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/STACK.md` sections 3.1-3.5 — chaining rationale; C function signatures; ExternalFuncDecl templates; coerceToI64 helper design
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/research/ARCHITECTURE.md` lines 325-469 — hashtable memory layout options; key type handling; builtin dispatch patterns
 
 ### Secondary (MEDIUM confidence)
-- `/Users/ohama/vibe-coding/LangBackend/.planning/phases/22-array-core/22-RESEARCH.md` — direct precedent for the array implementation; hashtable follows same pattern
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/22-array-core/22-RESEARCH.md` — direct precedent for the array implementation; hashtable follows same pattern
 
 ### Tertiary (LOW confidence)
 - None

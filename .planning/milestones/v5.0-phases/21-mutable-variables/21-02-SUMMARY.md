@@ -30,7 +30,7 @@ key-files:
     - tests/compiler/21-05-closure-capture-mut.flt
     - tests/compiler/21-06-closure-mut-counter.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "freeVars LetPat fix is a correctness bug: without it, let _ = mutVar <- ... patterns inside closures fail to detect captured vars"
@@ -73,7 +73,7 @@ completed: 2026-03-27
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Three changes: MutableVars propagation (2 sites), conditional capType (2 sites), freeVars LetPat cases
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Three changes: MutableVars propagation (2 sites), conditional capType (2 sites), freeVars LetPat cases
 - `tests/compiler/21-05-closure-capture-mut.flt` - E2E test: `let mut x = 5 in let f = fun z -> x in let _ = x <- 99 in f 0` → exit 99
 - `tests/compiler/21-06-closure-mut-counter.flt` - E2E test: counter closure with 3 increments → exit 3
 
@@ -91,7 +91,7 @@ completed: 2026-03-27
 - **Found during:** Task 1 (fix closure capture for mutable variables)
 - **Issue:** `freeVars` function fell through to `_ -> Set.empty` for `LetPat(WildcardPat, ...)` and `LetPat(VarPat, ...)`. This caused closures whose bodies contained `let _ = mutVar <- expr in rest` to compute empty capture sets, leaving `mutVar` unbound inside the closure.
 - **Fix:** Added explicit cases for both patterns before the TuplePat case
-- **Files modified:** `src/LangBackend.Compiler/Elaboration.fs`
+- **Files modified:** `src/FunLangCompiler.Compiler/Elaboration.fs`
 - **Verification:** Counter closure test now produces correct output (3)
 - **Committed in:** a559850 (Task 1 commit)
 

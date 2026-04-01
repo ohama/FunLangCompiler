@@ -30,8 +30,8 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/lang_runtime.c
 
 key-decisions:
   - "tag=-2 for LangHashtableStr — separates it from int-key hashtable (tag=-1) so existing index_get/index_set dispatch is unaffected"
@@ -72,8 +72,8 @@ completed: 2026-03-30
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.h` - Added LangHashEntryStr, LangHashtableStr structs and 9 _str function declarations
-- `src/LangBackend.Compiler/lang_runtime.c` - Added 147 lines: 3 static helpers + 9 public string-key hashtable functions
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added LangHashEntryStr, LangHashtableStr structs and 9 _str function declarations
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added 147 lines: 3 static helpers + 9 public string-key hashtable functions
 
 ## Decisions Made
 

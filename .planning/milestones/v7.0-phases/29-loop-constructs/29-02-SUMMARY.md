@@ -35,7 +35,7 @@ key-files:
     - tests/compiler/29-09-for-immutable-var.flt
     - tests/compiler/29-10-for-nested.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Block-argument pattern for loop counter: ^for_header(%i : i64) carries counter SSA-correctly without duplication"
@@ -80,7 +80,7 @@ completed: 2026-03-28
 2. **Task 2: Add 6 ForExpr E2E test fixtures + full regression pass** - `fcd72fc` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - ForExpr freeVars case + ForExpr elaborateExpr case (3-block CFG)
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - ForExpr freeVars case + ForExpr elaborateExpr case (3-block CFG)
 - `tests/compiler/29-05-for-to-basic.flt` - Ascending for 1..5 sum = 15
 - `tests/compiler/29-06-for-to-sum.flt` - Ascending for 1..10 sum = 55
 - `tests/compiler/29-07-for-downto.flt` - Descending for 10..1, last = 1

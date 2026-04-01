@@ -43,9 +43,9 @@ key-files:
     - tests/compiler/30-05-forin-closure-capture.flt
     - tests/compiler/30-06-forin-empty.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Use two C functions (lang_for_in_list + lang_for_in_array) instead of GC_size runtime dispatch — GC_size rounds up to block boundaries (GC_malloc(16) returns 32), making cons cells and 1-2 element arrays indistinguishable at runtime"
@@ -93,9 +93,9 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.c` - Added lang_for_in_list, lang_for_in_array, lang_for_in (compat alias)
-- `src/LangBackend.Compiler/lang_runtime.h` - Declared all three lang_for_in functions
-- `src/LangBackend.Compiler/Elaboration.fs` - ForInExpr elaboration, freeVars case, ArrayVars tracking, extern decls
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added lang_for_in_list, lang_for_in_array, lang_for_in (compat alias)
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Declared all three lang_for_in functions
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - ForInExpr elaboration, freeVars case, ArrayVars tracking, extern decls
 - `tests/compiler/30-03-forin-list.flt` - E2E: for-in over 3-element list prints "123"
 - `tests/compiler/30-04-forin-array.flt` - E2E: for-in over 3-element array prints "102030"
 - `tests/compiler/30-05-forin-closure-capture.flt` - E2E: loop body captures outer variable

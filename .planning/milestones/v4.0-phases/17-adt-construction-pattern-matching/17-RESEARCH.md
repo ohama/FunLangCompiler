@@ -21,9 +21,9 @@ This phase does not add new libraries. All tools are from prior phases.
 ### Core (already present)
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `MlirIR.fs` | `LangBackend.Compiler` | All MLIR op types already exist |
-| `Elaboration.fs` | `LangBackend.Compiler` | `elaborateExpr`, `scrutineeTypeForTag`, `emitCtorTest` with Phase-17 stubs |
-| `MatchCompiler.fs` | `LangBackend.Compiler` | `AdtCtor(name, tag=0, arity)` placeholder in `desugarPattern` |
+| `MlirIR.fs` | `FunLangCompiler.Compiler` | All MLIR op types already exist |
+| `Elaboration.fs` | `FunLangCompiler.Compiler` | `elaborateExpr`, `scrutineeTypeForTag`, `emitCtorTest` with Phase-17 stubs |
+| `MatchCompiler.fs` | `FunLangCompiler.Compiler` | `AdtCtor(name, tag=0, arity)` placeholder in `desugarPattern` |
 | `ElabEnv.TypeEnv` | `Elaboration.fs` | `Map<string, TypeInfo>` where `TypeInfo = { Tag: int; Arity: int }` |
 
 ### Installation
@@ -755,11 +755,11 @@ For field 1 payload extraction in patterns: `resolveAccessor` for `Field(scrutAc
 ## Sources
 
 ### Primary (HIGH confidence)
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/Elaboration.fs` — Full file read; all patterns, stubs, and infrastructure confirmed
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MatchCompiler.fs` — Full file read; AdtCtor placeholder at line 128, ctorArity at 81, desugarPattern at 90
-- `/Users/ohama/vibe-coding/LangBackend/src/LangBackend.Compiler/MlirIR.fs` — Full file read; all available ops confirmed
-- `/Users/ohama/vibe-coding/LangBackend/.planning/STATE.md` — Design decisions C-11, C-12 confirmed
-- `/Users/ohama/vibe-coding/LangBackend/.planning/phases/16-environment-infrastructure/16-02-SUMMARY.md` — Phase 16 completion state confirmed
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/Elaboration.fs` — Full file read; all patterns, stubs, and infrastructure confirmed
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MatchCompiler.fs` — Full file read; AdtCtor placeholder at line 128, ctorArity at 81, desugarPattern at 90
+- `/Users/ohama/vibe-coding/FunLangCompiler/src/FunLangCompiler.Compiler/MlirIR.fs` — Full file read; all available ops confirmed
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/STATE.md` — Design decisions C-11, C-12 confirmed
+- `/Users/ohama/vibe-coding/FunLangCompiler/.planning/phases/16-environment-infrastructure/16-02-SUMMARY.md` — Phase 16 completion state confirmed
 
 ### Secondary (MEDIUM confidence)
 - `/Users/ohama/vibe-coding/LangThree/src/LangThree/Ast.fs` — Constructor and ConstructorPat AST nodes confirmed at lines 91 and 129

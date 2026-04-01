@@ -1,5 +1,5 @@
 // Test: Record type error shows available record types as hint
-// --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-01-record-type-hint.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 46-01-record-type-hint.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
 CHECK-RE: \[Elaboration\] 46-01-record-type-hint\.fun:\d+:\d+: RecordExpr: cannot resolve record type for fields.*

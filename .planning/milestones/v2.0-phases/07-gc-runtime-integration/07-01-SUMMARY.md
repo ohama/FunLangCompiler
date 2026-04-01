@@ -32,10 +32,10 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/MlirIR.fs
-    - src/LangBackend.Compiler/Printer.fs
-    - src/LangBackend.Compiler/Pipeline.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MlirIR.fs
+    - src/FunLangCompiler.Compiler/Printer.fs
+    - src/FunLangCompiler.Compiler/Pipeline.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "GC symbol is @GC_init (lowercase i) — GC_INIT is a C macro, not a linkable symbol"
@@ -81,10 +81,10 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/MlirIR.fs` - Added MlirGlobal, ExternalFuncDecl types; LlvmCallOp + LlvmCallVoidOp op cases; extended MlirModule with Globals + ExternalFuncs fields
-- `src/LangBackend.Compiler/Printer.fs` - Added printGlobal, printExternalDecl; new op cases; updated printModule to emit globals -> extern decls -> funcs
-- `src/LangBackend.Compiler/Pipeline.fs` - Added gcLinkFlags with RuntimeInformation.IsOSPlatform detection; threaded into clang invocation
-- `src/LangBackend.Compiler/Elaboration.fs` - Updated MlirModule construction to supply empty Globals and ExternalFuncs fields (deviation fix)
+- `src/FunLangCompiler.Compiler/MlirIR.fs` - Added MlirGlobal, ExternalFuncDecl types; LlvmCallOp + LlvmCallVoidOp op cases; extended MlirModule with Globals + ExternalFuncs fields
+- `src/FunLangCompiler.Compiler/Printer.fs` - Added printGlobal, printExternalDecl; new op cases; updated printModule to emit globals -> extern decls -> funcs
+- `src/FunLangCompiler.Compiler/Pipeline.fs` - Added gcLinkFlags with RuntimeInformation.IsOSPlatform detection; threaded into clang invocation
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Updated MlirModule construction to supply empty Globals and ExternalFuncs fields (deviation fix)
 
 ## Decisions Made
 
@@ -101,7 +101,7 @@ Each task was committed atomically:
 - **Found during:** Task 1 build verification
 - **Issue:** Elaboration.fs line 395 constructed `{ Funcs = ... }` without the new `Globals` and `ExternalFuncs` fields, causing FS0764 compile error
 - **Fix:** Added `Globals = []; ExternalFuncs = []` to the MlirModule record expression in `elaborateModule`
-- **Files modified:** src/LangBackend.Compiler/Elaboration.fs
+- **Files modified:** src/FunLangCompiler.Compiler/Elaboration.fs
 - **Verification:** Build succeeded with zero errors after fix; Task 1 build re-run confirmed clean
 - **Committed in:** `72278dd` (Task 1 commit)
 

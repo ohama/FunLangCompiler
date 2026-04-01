@@ -21,8 +21,8 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
-    - src/LangBackend.Cli/Program.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Cli/Program.fs
 
 key-decisions:
   - "elaborateTypeclasses placed in Elaboration.fs (not Program.fs) — correct home for compiler passes"
@@ -62,12 +62,12 @@ Each task was committed atomically:
 2. **Task 2: Wire elaborateTypeclasses into compiler pipeline** - `0a0fd96` (feat)
 
 ## Files Created/Modified
-- `src/LangBackend.Compiler/Elaboration.fs` - Added `elaborateTypeclasses` function (~27 lines) before `elaborateProgram`
-- `src/LangBackend.Cli/Program.fs` - Added pipeline step calling `elaborateTypeclasses` on all Module variants
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added `elaborateTypeclasses` function (~27 lines) before `elaborateProgram`
+- `src/FunLangCompiler.Cli/Program.fs` - Added pipeline step calling `elaborateTypeclasses` on all Module variants
 
 ## Decisions Made
 - Instance methods use original method names (no mangling) — `show` not `show_Int`
-- `Ast.Decl.` prefix used consistently throughout, matching LangBackend conventions
+- `Ast.Decl.` prefix used consistently throughout, matching FunLangCompiler conventions
 - Direct port from LangThree `Elaborate.fs` reference implementation
 
 ## Deviations from Plan

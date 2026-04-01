@@ -1,5 +1,5 @@
 // Test: Elaboration errors start with [Elaboration] prefix
-// --- Command: bash -c 'cd %S && dotnet run --project ../../src/LangBackend.Cli/LangBackend.Cli.fsproj -- 46-04-error-category-elab.fun 2>&1; echo $?'
+// --- Command: bash -c 'cd %S && dotnet run --project ../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- 46-04-error-category-elab.fun 2>&1; echo $?'
 // --- Input:
 // --- Output:
 CHECK-RE: \[Elaboration\] 46-04-error-category-elab\.fun:\d+:\d+: Elaboration: unbound variable 'z'

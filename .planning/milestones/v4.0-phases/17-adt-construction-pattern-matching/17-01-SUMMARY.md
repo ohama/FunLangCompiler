@@ -35,7 +35,7 @@ key-files:
     - tests/compiler/17-02-unary-ctor.flt
     - tests/compiler/17-03-multi-arg-ctor.flt
   modified:
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Store argVal directly at ADT slot 1 (no extra indirection heap block): I64 and Ptr payloads both work; resolveAccessor default I64 load is correct for integer payloads"
@@ -87,7 +87,7 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/Elaboration.fs` - Constructor elaboration cases, freeVars cases, AdtCtor IR emission stubs replaced, ensureAdtFieldTypes added
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Constructor elaboration cases, freeVars cases, AdtCtor IR emission stubs replaced, ensureAdtFieldTypes added
 - `tests/compiler/17-01-nullary-ctor.flt` - E2E test: nullary constructor (Red in Color = Red|Green|Blue)
 - `tests/compiler/17-02-unary-ctor.flt` - E2E test: unary constructor (Some 42 in Option = None|Some of int)
 - `tests/compiler/17-03-multi-arg-ctor.flt` - E2E test: multi-arg constructor (Pair(3,4) in Pair = Pair of int * int)

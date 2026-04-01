@@ -32,9 +32,9 @@ key-files:
     - tests/compiler/31-09-char-to-upper.flt
     - tests/compiler/31-10-char-to-lower.flt
   modified:
-    - src/LangBackend.Compiler/lang_runtime.c
-    - src/LangBackend.Compiler/lang_runtime.h
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/lang_runtime.c
+    - src/FunLangCompiler.Compiler/lang_runtime.h
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "Char predicate E2E tests use to_string(bool) + println pattern (not if/then/else + %d) to avoid two-sequential-if MLIR limitation"
@@ -80,9 +80,9 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/lang_runtime.c` - Added #include <ctype.h> + 6 char functions
-- `src/LangBackend.Compiler/lang_runtime.h` - Added 6 char function declarations
-- `src/LangBackend.Compiler/Elaboration.fs` - Added 6 elaboration arms + 12 externalFuncs entries (6 per list)
+- `src/FunLangCompiler.Compiler/lang_runtime.c` - Added #include <ctype.h> + 6 char functions
+- `src/FunLangCompiler.Compiler/lang_runtime.h` - Added 6 char function declarations
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added 6 elaboration arms + 12 externalFuncs entries (6 per list)
 - `tests/compiler/31-05-char-is-digit.flt` - E2E test: true/false cases via to_string
 - `tests/compiler/31-06-char-is-letter.flt` - E2E test: true/false cases via to_string
 - `tests/compiler/31-07-char-is-upper.flt` - E2E test: true/false cases via to_string

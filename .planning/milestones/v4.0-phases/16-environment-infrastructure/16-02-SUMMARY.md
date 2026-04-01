@@ -31,8 +31,8 @@ tech-stack:
 key-files:
   created: []
   modified:
-    - src/LangBackend.Compiler/MatchCompiler.fs
-    - src/LangBackend.Compiler/Elaboration.fs
+    - src/FunLangCompiler.Compiler/MatchCompiler.fs
+    - src/FunLangCompiler.Compiler/Elaboration.fs
 
 key-decisions:
   - "AdtCtor carries name (for structural equality in splitClauses), tag placeholder 0 (Phase 17 fills real tag), and arity"
@@ -78,8 +78,8 @@ Each task was committed atomically:
 
 ## Files Created/Modified
 
-- `src/LangBackend.Compiler/MatchCompiler.fs` - Added AdtCtor/RecordCtor variants, updated ctorArity, implemented desugarPattern arms
-- `src/LangBackend.Compiler/Elaboration.fs` - Added failwith placeholder arms in scrutineeTypeForTag and emitCtorTest for new CtorTag variants
+- `src/FunLangCompiler.Compiler/MatchCompiler.fs` - Added AdtCtor/RecordCtor variants, updated ctorArity, implemented desugarPattern arms
+- `src/FunLangCompiler.Compiler/Elaboration.fs` - Added failwith placeholder arms in scrutineeTypeForTag and emitCtorTest for new CtorTag variants
 
 ## Decisions Made
 

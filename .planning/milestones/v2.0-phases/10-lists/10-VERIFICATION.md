@@ -29,9 +29,9 @@ score: 4/4 must-haves verified
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `src/LangBackend.Compiler/MlirIR.fs` | LlvmNullOp + LlvmIcmpOp DU cases | VERIFIED | Lines 62-66. LlvmNullOp result.Type=Ptr; LlvmIcmpOp result.Type=I1. |
-| `src/LangBackend.Compiler/Printer.fs` | Serialization of LlvmNullOp + LlvmIcmpOp | VERIFIED | Lines 120-124. `llvm.mlir.zero` and `llvm.icmp` emitted correctly. |
-| `src/LangBackend.Compiler/Elaboration.fs` | EmptyList, Cons, List, Match(list), isListParamBody, LetRec Ptr param | VERIFIED | EmptyList (637-639), Cons (641-655), List (657-660), Match (662-721), isListParamBody (112-119), LetRec Ptr path (445). |
+| `src/FunLangCompiler.Compiler/MlirIR.fs` | LlvmNullOp + LlvmIcmpOp DU cases | VERIFIED | Lines 62-66. LlvmNullOp result.Type=Ptr; LlvmIcmpOp result.Type=I1. |
+| `src/FunLangCompiler.Compiler/Printer.fs` | Serialization of LlvmNullOp + LlvmIcmpOp | VERIFIED | Lines 120-124. `llvm.mlir.zero` and `llvm.icmp` emitted correctly. |
+| `src/FunLangCompiler.Compiler/Elaboration.fs` | EmptyList, Cons, List, Match(list), isListParamBody, LetRec Ptr param | VERIFIED | EmptyList (637-639), Cons (641-655), List (657-660), Match (662-721), isListParamBody (112-119), LetRec Ptr path (445). |
 | `tests/compiler/10-01-list-literal.flt` | [1;2;3] compiles, exits 42 | VERIFIED | PASS confirmed by fslit run. |
 | `tests/compiler/10-02-list-length.flt` | recursive length exits 3 | VERIFIED | PASS confirmed by fslit run. |
 
