@@ -14,7 +14,12 @@
 **Approach:**
 - Elaboration.fs의 NamespaceDecl 패턴 매치 4곳 제거
 - NamespacedModule 패턴 1곳 제거
+- Program.fs의 NamespaceDecl/NamespacedModule 참조 7곳 제거
 - 관련 주석 정리
+
+**Plans:** 1 plan
+Plans:
+- [ ] 58-01-PLAN.md — Remove all NamespaceDecl/NamespacedModule references from Elaboration.fs and Program.fs
 
 ---
 
