@@ -2,9 +2,11 @@
 
 ## 소개
 
-이 문서는 FunLangCompiler 컴파일러가 지원하는 추상 문법을 정의한다.
+이 문서는 FunLangCompiler(`fnc`) 컴파일러가 지원하는 추상 문법을 정의한다.
 FunLangCompiler는 FunLang의 파서/AST를 재사용하며, `Elaboration.fs`에서 AST를 MLIR IR로 변환한다.
 따라서 **파싱 가능한 문법은 FunLang와 동일**하며, 이 문서는 컴파일러가 실제로 코드 생성하는 범위를 기술한다.
+
+**CLI:** `fnc <file.fun> [-o <output>]` — FunLang 소스를 네이티브 바이너리로 컴파일
 
 ---
 
@@ -447,7 +449,7 @@ type ('a, 'b) Result = Ok of 'a | Error of 'b
 
 ## 7. 내장 함수 (Built-in Functions)
 
-FunLangCompiler는 89개의 내장 함수를 `elaborateExpr`에서 직접 패턴 매치하여 컴파일한다.
+FunLangCompiler(`fnc`)는 99개의 내장 함수를 `elaborateExpr`에서 직접 패턴 매치하여 컴파일한다.
 
 ### 7.1 문자열 연산 (String Operations)
 
@@ -576,6 +578,7 @@ FunLangCompiler는 89개의 내장 함수를 `elaborateExpr`에서 직접 패턴
 | 모든 표현식 문법 | 47개 Expr 변형 전부 지원 |
 | 모든 패턴 문법 | 9개 Pattern 타입 전부 지원 |
 | 모든 선언 문법 | `module`, `open`, `type`, `exception`, `let rec`, `let mut`, `typeclass`, `instance`, `deriving` 등 |
+| 중첩 모듈 | `Outer.Inner.value` qualified access, `open Outer.Inner` 지원 |
 | 연산자 우선순위 | 13단계 전부 동일 |
 
 ### 다른 부분 (Differences)
@@ -610,7 +613,7 @@ FunLangCompiler는 89개의 내장 함수를 `elaborateExpr`에서 직접 패턴
 | 기능 | 설명 |
 |------|------|
 | 클로저 ABI | `{fn_ptr, env}` 구조체, 균일 `(ptr, i64) -> i64` 시그니처 |
-| 모듈 평탄화 | `flattenDecls`로 `M.f` → `M_f` 변환, 런타임 모듈 없음 |
+| 모듈 평탄화 | `flattenDecls`로 `M.f` → `M_f`, `M.N.f` → `M_N_f` 변환, 런타임 모듈 없음 |
 | 연산자 심볼명 | `sanitizeMlirName`으로 `^^` → `_caret__caret_` 등 변환 |
 | 블록 패칭 | FIX-02/FIX-04 패턴으로 중첩된 if/match의 CFG 블록 올바르게 연결 |
 | 2-lambda 함수 | maker + inner 함수 쌍으로 커링 구현, `KnownFuncs` 직접 호출 최적화 |
