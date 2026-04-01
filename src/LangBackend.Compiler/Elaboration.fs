@@ -4070,7 +4070,7 @@ let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
     let mutable exnTags  = Map.empty<string, int>
     for decl in decls do
         match decl with
-        | Ast.Decl.TypeDecl (Ast.TypeDecl(_, _, ctors, _)) ->
+        | Ast.Decl.TypeDecl (Ast.TypeDecl(_, _, ctors, _, _)) ->
             ctors |> List.iteri (fun idx ctor ->
                 match ctor with
                 | Ast.ConstructorDecl(name, dataType, _) ->
@@ -4098,6 +4098,9 @@ let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
             typeEnv   <- Map.fold (fun acc k v -> Map.add k v acc) typeEnv   innerTypeEnv
             recordEnv <- Map.fold (fun acc k v -> Map.add k v acc) recordEnv innerRecordEnv
             exnTags   <- Map.fold (fun acc k v -> Map.add k v acc) exnTags   innerExnTags
+        | Ast.Decl.TypeClassDecl _ -> ()   // Phase 52: typeclasses handled in elaborateTypeclasses
+        | Ast.Decl.InstanceDecl _ -> ()    // Phase 52: instances handled in elaborateTypeclasses
+        | Ast.Decl.DerivingDecl _ -> ()    // Phase 52: deriving handled in elaborateTypeclasses
         | _ -> ()
     (typeEnv, recordEnv, exnTags)
 
