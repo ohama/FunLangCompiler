@@ -4212,6 +4212,15 @@ let private extractMainExpr (decls: Ast.Decl list) : Expr =
 // - ModuleDecl: recurse into inner decls; hoist instance bindings to outer scope
 // - NamespaceDecl: recurse into inner decls
 let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
+    // Pass 1: collect constructor info for DerivingDecl expansion
+    let ctorMap =
+        decls |> List.collect (fun d ->
+            match d with
+            | Ast.Decl.TypeDecl(Ast.TypeDecl(name, _, ctors, _, _)) ->
+                [(name, ctors)]
+            | _ -> [])
+        |> Map.ofList
+    // Pass 2: transform decls
     decls |> List.collect (fun decl ->
         match decl with
         | Ast.Decl.TypeClassDecl _ -> []
@@ -4229,7 +4238,59 @@ let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
             [Ast.Decl.ModuleDecl(name, elaborateTypeclasses innerDecls, span)] @ instanceBindings
         | Ast.Decl.NamespaceDecl(path, innerDecls, span) ->
             [Ast.Decl.NamespaceDecl(path, elaborateTypeclasses innerDecls, span)]
-        | Ast.Decl.DerivingDecl _ -> []
+        | Ast.Decl.DerivingDecl(typeName, classNames, span) ->
+            classNames |> List.collect (fun className ->
+                match className with
+                | "Show" ->
+                    match Map.tryFind typeName ctorMap with
+                    | None -> []  // Unknown type: skip silently
+                    | Some ctors ->
+                        let clauses =
+                            ctors |> List.map (fun ctor ->
+                                match ctor with
+                                | Ast.ConstructorDecl(ctorName, None, _) ->
+                                    (Ast.ConstructorPat(ctorName, None, span), None,
+                                     Ast.String(ctorName, span))
+                                | Ast.ConstructorDecl(ctorName, Some _, _) ->
+                                    let vPat = Ast.VarPat("__v", span)
+                                    let body = Ast.Add(Ast.String(ctorName + " ", span),
+                                                       Ast.App(Ast.Var("show", span), Ast.Var("__v", span), span),
+                                                       span)
+                                    (Ast.ConstructorPat(ctorName, Some vPat, span), None, body)
+                                | Ast.GadtConstructorDecl(ctorName, [], _, _) ->
+                                    (Ast.ConstructorPat(ctorName, None, span), None,
+                                     Ast.String(ctorName, span))
+                                | Ast.GadtConstructorDecl(ctorName, _, _, _) ->
+                                    let vPat = Ast.VarPat("__v", span)
+                                    let body = Ast.Add(Ast.String(ctorName + " ", span),
+                                                       Ast.App(Ast.Var("show", span), Ast.Var("__v", span), span),
+                                                       span)
+                                    (Ast.ConstructorPat(ctorName, Some vPat, span), None, body))
+                        let matchExpr = Ast.Match(Ast.Var("__x", span), clauses, span)
+                        let showBody = Ast.Lambda("__x", matchExpr, span)
+                        [Ast.Decl.LetDecl("show", showBody, span)]
+                | "Eq" ->
+                    match Map.tryFind typeName ctorMap with
+                    | None -> []
+                    | Some ctors ->
+                        let clauses =
+                            ctors |> List.map (fun ctor ->
+                                match ctor with
+                                | Ast.ConstructorDecl(ctorName, None, _) ->
+                                    let pat = Ast.TuplePat([Ast.ConstructorPat(ctorName, None, span); Ast.ConstructorPat(ctorName, None, span)], span)
+                                    (pat, None, Ast.Bool(true, span))
+                                | Ast.ConstructorDecl(ctorName, Some _, _) ->
+                                    let pat = Ast.TuplePat([Ast.ConstructorPat(ctorName, Some(Ast.VarPat("__a", span)), span);
+                                                             Ast.ConstructorPat(ctorName, Some(Ast.VarPat("__b", span)), span)], span)
+                                    let body = Ast.App(Ast.App(Ast.Var("eq", span), Ast.Var("__a", span), span), Ast.Var("__b", span), span)
+                                    (pat, None, body)
+                                | _ -> (Ast.WildcardPat span, None, Ast.Bool(false, span)))
+                        let wildcard = (Ast.WildcardPat span, None, Ast.Bool(false, span))
+                        let matchExpr = Ast.Match(Ast.Tuple([Ast.Var("__x", span); Ast.Var("__y", span)], span),
+                                                   clauses @ [wildcard], span)
+                        let eqBody = Ast.Lambda("__x", Ast.Lambda("__y", matchExpr, span), span)
+                        [Ast.Decl.LetDecl("eq", eqBody, span)]
+                | _ -> [])
         | other -> [other])
 
 // Phase 16: elaborateProgram — new entry point accepting Ast.Module.
