@@ -47,7 +47,7 @@ Plans:
   3. elaborateTypeclasses removes DerivingDecl nodes from the declaration list
   4. elaborateTypeclasses recurses into ModuleDecl and NamespacedModule so nested typeclasses are handled
   5. The compiler pipeline calls elaborateTypeclasses after parseProgram and before elaborateProgram
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 52-01-PLAN.md — Implement elaborateTypeclasses and wire into compiler pipeline
@@ -75,5 +75,5 @@ Plans:
 | 45. Error Preservation | v11.0 | 1/1 | Complete | 2026-03-31 |
 | 46. Context Hints & Unified Format | v11.0 | 1/1 | Complete | 2026-03-31 |
 | 51. AST Structure Sync | v13.0 | 1/1 | ✓ Complete | 2026-04-01 |
-| 52. Typeclass Elaboration | v13.0 | 0/TBD | Not started | - |
+| 52. Typeclass Elaboration | v13.0 | 0/1 | Planned | - |
 | 53. Prelude Sync & E2E Tests | v13.0 | 0/TBD | Not started | - |
