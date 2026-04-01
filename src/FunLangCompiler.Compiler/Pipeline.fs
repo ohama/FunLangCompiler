@@ -72,9 +72,11 @@ let private runTool (program: string) (args: string) : Result<unit, int * string
 let private loweringPasses =
     "--convert-arith-to-llvm --convert-cf-to-llvm --convert-func-to-llvm --reconcile-unrealized-casts"
 
-/// Compile an MlirModule to a native ELF binary at outputPath.
+/// Compile an MlirModule to a native binary at outputPath.
+/// optimizationLevel: 0=none, 1=basic, 2=default, 3=aggressive (maps to clang -O0/-O1/-O2/-O3)
 /// Uses temp files for intermediate stages; cleans them up on success or failure.
-let compile (m: MlirModule) (outputPath: string) : Result<unit, CompileError> =
+let compile (m: MlirModule) (outputPath: string) (optimizationLevel: int) : Result<unit, CompileError> =
+    let optFlag = sprintf "-O%d" (max 0 (min 3 optimizationLevel))
     let mlirFile  = Path.GetTempFileName() + ".mlir"
     let lowered   = Path.GetTempFileName() + ".mlir"
     let llFile    = Path.GetTempFileName() + ".ll"
@@ -106,17 +108,17 @@ let compile (m: MlirModule) (outputPath: string) : Result<unit, CompileError> =
         Error (TranslateFailed (code, err, mlirFile))
     | Ok () ->
 
-    // Step 4: Compile lang_runtime.c to a temp object file
+    // Step 4: Compile lang_runtime.c to a temp object file (with optimization)
     let runtimeObj = Path.ChangeExtension(llFile, ".runtime.o")
-    let compileRuntimeArgs = sprintf "-c %s %s -o %s" runtimeSrc gcIncludeFlag runtimeObj
+    let compileRuntimeArgs = sprintf "-c %s %s %s -o %s" optFlag runtimeSrc gcIncludeFlag runtimeObj
     match runTool Clang compileRuntimeArgs with
     | Error (code, err) ->
         cleanup false
         Error (ClangFailed (code, err))
     | Ok () ->
 
-    // Step 5: Compile to native binary (link Boehm GC and runtime object)
-    let clangArgs = sprintf "-Wno-override-module %s %s %s -o %s" llFile runtimeObj gcLinkFlags outputPath
+    // Step 5: Compile to native binary (link Boehm GC and runtime object, with optimization)
+    let clangArgs = sprintf "%s -Wno-override-module %s %s %s -o %s" optFlag llFile runtimeObj gcLinkFlags outputPath
     match runTool Clang clangArgs with
     | Error (code, err) ->
         cleanup false

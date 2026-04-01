@@ -100,20 +100,24 @@ let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<
 let main argv =
     let args = argv |> Array.toList
 
-    // Parse -o flag if present
-    let rec parseArgs args =
+    // Parse flags: -o <output>, -O0/-O1/-O2/-O3
+    let rec parseArgs args outputOpt optLevel =
         match args with
-        | "-o" :: out :: rest -> (Some out, rest)
+        | "-o" :: out :: rest -> parseArgs rest (Some out) optLevel
+        | "-O0" :: rest -> parseArgs rest outputOpt 0
+        | "-O1" :: rest -> parseArgs rest outputOpt 1
+        | "-O2" :: rest -> parseArgs rest outputOpt 2
+        | "-O3" :: rest -> parseArgs rest outputOpt 3
         | x :: rest ->
-            let (o, r) = parseArgs rest
-            (o, x :: r)
-        | [] -> (None, [])
+            let (o, ol, r) = parseArgs rest outputOpt optLevel
+            (o, ol, x :: r)
+        | [] -> (outputOpt, optLevel, [])
 
-    let (outputOpt, remaining) = parseArgs args
+    let (outputOpt, optLevel, remaining) = parseArgs args None 2
 
     match remaining with
     | [] ->
-        eprintfn "Usage: fnc <file.fun> [-o <output>]"
+        eprintfn "Usage: fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3]"
         1
     | inputPath :: _ ->
         // Derive output path: explicit -o takes priority, else strip .lt from filename
@@ -205,7 +209,7 @@ let main argv =
                 | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, Elaboration.elaborateTypeclasses ds, s)
                 | Ast.EmptyModule s -> Ast.EmptyModule s
             let mlirMod = Elaboration.elaborateProgram tcAst
-            match Pipeline.compile mlirMod outputPath with
+            match Pipeline.compile mlirMod outputPath optLevel with
             | Ok () ->
                 0
             | Error (Pipeline.MlirOptFailed (code, err, mlirFile)) ->
