@@ -15,6 +15,16 @@ v17.0 shipped. 239+ E2E tests. 13 Prelude modules.
 `fnc build`/`fnc test` 프로젝트 빌드 시스템 (funproj.toml).
 Nested module qualified access (Outer.Inner.value) 지원.
 
+## Current Milestone: v18.0 Closure ABI 통일
+
+**Goal:** 클로저 %arg1을 항상 !llvm.ptr로 선언하여 isPtrParamBody 휴리스틱 의존성 제거 (Issue #1 해결)
+
+**Target features:**
+- 클로저 함수 시그니처: (%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i64
+- body에서 i64 필요 시 ptrtoint 코어션 삽입
+- isPtrParamBody의 클로저 사용 제거
+- Issue #1 재현 케이스 E2E 테스트
+
 ## Requirements
 
 ### Validated (v1.0)
