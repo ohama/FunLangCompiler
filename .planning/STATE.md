@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-04-01)
 ## Current Position
 
 Phase: 49 (3 of 4 in v12.0) — Error Tests CHECK-RE
-Plan: 0/? (not yet planned)
-Status: Phase not started
-Last activity: 2026-04-01 — Phase 48 complete, verified ✓
+Plan: 1/1 complete
+Status: Phase complete
+Last activity: 2026-04-01 — Completed 49-01-PLAN.md (Error Tests CHECK-RE)
 
-Progress: v1.0-v11.0 complete (46 phases). v12.0: [█████░░░░░] 50%
+Progress: v1.0-v11.0 complete (46 phases). v12.0: [███████░░░] 75%
 
 ## Performance Metrics
 
@@ -32,6 +32,7 @@ Progress: v1.0-v11.0 complete (46 phases). v12.0: [█████░░░░�
 - v12.0: fslit CHECK-RE 사용으로 에러 테스트 안정화
 - v12.0 Phase 47: two-phase parsing 구현 — preludeDecls @ userDecls, userSpan 사용, "<prelude>" 파일명으로 Prelude 오류 식별 가능
 - v12.0 Phase 48: lastParsedPos mutable (try 블록 전 선언) → parse 오류에 file:line:col 위치 포함, CHECK-RE로 경로 무관 테스트
+- v12.0 Phase 49: fslit CHECK-RE는 라인별 적용 — CHECK-RE: 접두사 라인만 정규식, 나머지는 exact match. 44-02 멀티라인: 첫 줄만 CHECK-RE, 나머지 exact
 
 ### Pending Todos
 
@@ -44,5 +45,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: Phase 48 complete, Phase 49 계획 대기
+Stopped at: Completed 49-01-PLAN.md — Phase 49 complete, Phase 50 대기
 Resume file: None
