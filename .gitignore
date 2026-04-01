@@ -1,7 +1,15 @@
+# Build output
 bin/
 obj/
+
+# IDE
 *.user
 .vs/
+
+# Dist (build artifacts only, keep claude config)
 dist/*
 !dist/claude-skill/
 !dist/claude-commands/
+
+# Claude Code
+.claude/
