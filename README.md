@@ -83,6 +83,7 @@ fnc test unit          # 특정 테스트만
 | Lists | `[]`, `h :: t` cons, `[e1; e2; ...]` literals, recursive processing |
 | Pattern Matching | `match` compiled via [Jacobs decision tree algorithm](#pattern-matching-compilation); constant, wildcard, variable, tuple, list, string patterns; non-exhaustive match runtime error |
 | I/O | `print`, `println` builtins |
+| Debugging | `dbg expr` — prints `[file:line] value` to stderr, returns value (pass-through) |
 | GC | Boehm GC (`libgc`) for all heap allocation |
 
 ## Architecture
@@ -193,6 +194,11 @@ let (a, b) = (3, 4) in a + b
 (* Strings *)
 let _ = println (string_concat "hello " "world") in 0
 (* -> prints "hello world" *)
+
+(* Debugging — dbg is pass-through, prints to stderr *)
+let x = dbg (3 + 4)
+(* stderr: [file.fun:1] 7 *)
+(* x = 7 — value unchanged *)
 ```
 
 ## Pattern Matching Compilation

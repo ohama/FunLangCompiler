@@ -2222,6 +2222,23 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         ]
         (boolVal, pathOps @ ops)
 
+    // dbg — pass-through debug: prints "[file:line] value" to stderr, returns value unchanged
+    | App (Var ("dbg", _), argExpr, dbgSpan) ->
+        let (argVal, argOps) = elaborateExpr env argExpr
+        // Build "[file:line] " prefix as LangString
+        let locStr = sprintf "[%s:%d] " dbgSpan.FileName dbgSpan.StartLine
+        let (locVal, locOps) = elaborateExpr env (String(locStr, dbgSpan))
+        // Convert argVal to displayable string via lang_to_string_int
+        let strVal = { Name = freshName env; Type = Ptr }
+        let toStrOps =
+            if argVal.Type = Ptr then
+                let i64Val = { Name = freshName env; Type = I64 }
+                [LlvmPtrToIntOp(i64Val, argVal); LlvmCallOp(strVal, "@lang_to_string_int", [i64Val])]
+            else
+                [LlvmCallOp(strVal, "@lang_to_string_int", [argVal])]
+        // eprint("[file:line] "); eprintln(to_string(arg)); return original value
+        (argVal, argOps @ locOps @ toStrOps @ [LlvmCallVoidOp("@lang_eprint", [locVal]); LlvmCallVoidOp("@lang_eprintln", [strVal])])
+
     // eprint — one-arg, void return
     | App (Var ("eprint", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr

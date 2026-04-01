@@ -1,0 +1,7 @@
+// Test: dbg builtin — pass-through debug printing to stderr with [file:line]
+// --- Command: bash %S/63-03-dbg-builtin.sh
+// --- Input:
+// --- Output:
+43
+dbg1: ok
+dbg2: ok

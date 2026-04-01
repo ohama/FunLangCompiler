@@ -34,6 +34,16 @@ fnc test unit          # 특정 테스트만
 
 See [PROJECTFILE.md](PROJECTFILE.md) for funproj.toml format.
 
+## Debugging
+
+`dbg expr` — prints `[file:line] value` to stderr, returns value unchanged (pass-through).
+
+```fsharp
+let x = dbg (expensive_computation 42)
+// stderr: [file.fun:1] 1764
+// x = 1764
+```
+
 ## Binary Names
 
 | Binary | Repo | Description |
