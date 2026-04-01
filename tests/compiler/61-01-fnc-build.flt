@@ -1,4 +1,4 @@
-// --- Command: bash -c 'PROJROOT=%S/../.. && D=$(mktemp -d /tmp/fncbuild_XXXXXX) && ln -s "$PROJROOT/Prelude" "$D/Prelude" && printf "[project]\nname = \"test\"\n\n[[executable]]\nname = \"hello\"\nmain = \"hello.fun\"\n" > "$D/funproj.toml" && printf "let _ = println \"hello from build\"\n" > "$D/hello.fun" && cd "$D" && dotnet run --project "$PROJROOT/src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj" -- build 2>&1 | sed "s/ ([0-9.]*s)//" && ./build/hello; EC=$?; rm -rf "$D"; exit $EC'
+// --- Command: bash %S/61-01-fnc-build.sh
 // --- Input:
 // --- Output:
 OK: hello -> build/hello

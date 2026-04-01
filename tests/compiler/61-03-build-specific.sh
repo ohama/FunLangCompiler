@@ -1,0 +1,15 @@
+#!/bin/bash
+set -e
+PROJROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+D=$(mktemp -d /tmp/fncbuild_XXXXXX)
+ln -s "$PROJROOT/Prelude" "$D/Prelude"
+printf '[project]\nname = "test"\n\n[[executable]]\nname = "hello"\nmain = "hello.fun"\n\n[[executable]]\nname = "goodbye"\nmain = "goodbye.fun"\n' > "$D/funproj.toml"
+printf 'let _ = println "hello from build"\n' > "$D/hello.fun"
+printf 'let _ = println "goodbye from build"\n' > "$D/goodbye.fun"
+cd "$D"
+dotnet run --project "$PROJROOT/src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj" -- build hello 2>&1 | sed 's/ ([0-9.]*s)//'
+./build/hello
+test ! -f ./build/goodbye && echo "build/goodbye not created"
+EC=$?
+rm -rf "$D"
+exit $EC
