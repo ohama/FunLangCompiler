@@ -4234,8 +4234,7 @@ let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
             exnTags <- Map.add name tag exnTags
             let arity = match dataTypeOpt with Some _ -> 1 | None -> 0
             typeEnv <- Map.add name { Tag = tag; Arity = arity } typeEnv
-        | Ast.Decl.ModuleDecl(_, innerDecls, _)
-        | Ast.Decl.NamespaceDecl(_, innerDecls, _) ->
+        | Ast.Decl.ModuleDecl(_, innerDecls, _) ->
             let (innerTypeEnv, innerRecordEnv, innerExnTags) = prePassDecls exnCounter innerDecls
             typeEnv   <- Map.fold (fun acc k v -> Map.add k v acc) typeEnv   innerTypeEnv
             recordEnv <- Map.fold (fun acc k v -> Map.add k v acc) recordEnv innerRecordEnv
@@ -4269,7 +4268,7 @@ let private collectModuleMembers (decls: Ast.Decl list) : Map<string, string lis
     scan "" decls
     result
 
-// Phase 25: flattenDecls — recursively flatten ModuleDecl/NamespaceDecl into a single Decl list.
+// Phase 25: flattenDecls — recursively flatten ModuleDecl into a single Decl list.
 // This allows extractMainExpr to see all let bindings regardless of nesting depth.
 // Phase 35: Module-qualified naming — when flattening a ModuleDecl, prefix all LetDecl/LetRecDecl
 // names with the module name (e.g., `module Option = let map f opt = ...` → `let Option_map f opt = ...`).
@@ -4280,7 +4279,6 @@ let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName:
     decls |> List.collect (fun d ->
         match d with
         | Ast.Decl.ModuleDecl(name, innerDecls, _) -> flattenDecls moduleMembers name innerDecls
-        | Ast.Decl.NamespaceDecl(_, innerDecls, _) -> flattenDecls moduleMembers modName innerDecls
         | Ast.Decl.LetDecl(name, body, s) when modName <> "" && name <> "_" ->
             [Ast.Decl.LetDecl(modName + "_" + name, body, s)]
         | Ast.Decl.LetRecDecl(bindings, s) when modName <> "" ->
@@ -4303,7 +4301,7 @@ let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName:
 // LetDecl(name, body) → wrap in Let(name, body, continuation).
 // Non-expression decls (TypeDecl, RecordTypeDecl, ExceptionDecl) are skipped.
 // LetRecDecl bindings are wrapped in LetRec expressions.
-// Phase 25: Flattens ModuleDecl/NamespaceDecl before processing; handles LetPatDecl;
+// Phase 25: Flattens ModuleDecl before processing; handles LetPatDecl;
 // Phase 41: OpenDecl is handled by flattenDecls (two-pass: collect members first, then flatten).
 let private extractMainExpr (moduleSpan: Ast.Span) (decls: Ast.Decl list) : Expr =
     let s = moduleSpan
@@ -4351,7 +4349,6 @@ let private extractMainExpr (moduleSpan: Ast.Span) (decls: Ast.Decl list) : Expr
 // - InstanceDecl: each method becomes a plain LetDecl binding
 // - DerivingDecl: removed (auto-derivation handled at parse time)
 // - ModuleDecl: recurse into inner decls; hoist instance bindings to outer scope
-// - NamespaceDecl: recurse into inner decls
 let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
     // Pass 1: collect constructor info for DerivingDecl expansion
     let ctorMap =
@@ -4377,8 +4374,6 @@ let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
                             Ast.Decl.LetDecl(methodName, methodBody, ispan))
                     | _ -> [])
             [Ast.Decl.ModuleDecl(name, elaborateTypeclasses innerDecls, span)] @ instanceBindings
-        | Ast.Decl.NamespaceDecl(path, innerDecls, span) ->
-            [Ast.Decl.NamespaceDecl(path, elaborateTypeclasses innerDecls, span)]
         | Ast.Decl.DerivingDecl(typeName, classNames, span) ->
             classNames |> List.collect (fun className ->
                 match className with
@@ -4439,7 +4434,7 @@ let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
 let elaborateProgram (ast: Ast.Module) : MlirModule =
     let decls =
         match ast with
-        | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) | Ast.NamespacedModule(_, decls, _) -> decls
+        | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) -> decls
         | Ast.EmptyModule _ -> []
     let (typeEnv, recordEnv, exnTags) = prePassDecls (ref 0) decls
     let mainExpr = extractMainExpr (Ast.moduleSpanOf ast) decls
