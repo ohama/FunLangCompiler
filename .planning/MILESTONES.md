@@ -420,6 +420,27 @@
 
 ---
 
+### v20.0 — Caller-Side Closure Env Population (2026-04-02)
+
+**Goal:** 3+ arg curried function + outer capture의 SSA scope violation 근본 해결
+
+**Phases:** 64 (1 plan)
+**Requirements:** 7/7 complete
+**Tests:** 246 FsLit E2E tests (2 new)
+**Issue:** ohama/FunLangCompiler#5 closed
+
+**What shipped:**
+- ClosureInfo에 CaptureNames/OuterParamName 추가
+- Maker func.func는 fn_ptr + outerParam만 store
+- Call site에서 나머지 captures store (SSA 값이 caller scope에서 유효)
+- 3+ lambda guard 제거 — 모든 multi-lambda가 2-lambda KnownFuncs 경로
+
+**Key decisions validated:**
+- Caller-side env population (maker가 outer SSA 참조 안 함) ✓
+- v19.0 guard 제거 + 구조적 수정으로 근본 해결 ✓
+
+---
+
 ## Current
 
 Planning next milestone
