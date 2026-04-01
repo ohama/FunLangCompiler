@@ -48,7 +48,8 @@ let parseProgram (src: string) (filename: string) : Ast.Module =
         // parseModule failed — try falling back to single-expression mode
         try
             let expr = parseExpr src filename
-            Ast.Module([Ast.Decl.LetDecl("_", expr, Ast.unknownSpan)], Ast.unknownSpan)
+            let exprSpan = Ast.spanOf expr
+            Ast.Module([Ast.Decl.LetDecl("_", expr, exprSpan)], exprSpan)
         with _ ->
             // Both parseModule and parseExpr failed — surface the original error
             // with position information from the last consumed token
