@@ -9,8 +9,8 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 62-01-PLAN.md — Closure ABI change: %arg1 always Ptr + reversed coercion
-- [ ] 62-02-PLAN.md — Issue #1 E2E test + gh issue close
+- [x] 62-01-PLAN.md — Closure ABI change: %arg1 always Ptr + reversed coercion
+- [x] 62-02-PLAN.md — Issue #1 E2E test + gh issue close
 
 **Success Criteria:**
 1. Issue #1 재현 케이스 (mutable record + string curried function) 컴파일 성공

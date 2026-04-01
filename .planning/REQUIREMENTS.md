@@ -8,21 +8,21 @@
 
 ### Closure ABI 변경
 
-- [ ] **ABI-01**: 클로저 함수 시그니처를 `(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i64`로 변경 (기존: %arg1: i64)
-- [ ] **ABI-02**: 클로저 body에서 i64 파라미터 필요 시 `ptrtoint` 코어션 삽입 (기존: inttoptr)
-- [ ] **ABI-03**: 2-lambda (maker+inner) 패턴의 inner 클로저도 동일하게 %arg1: !llvm.ptr로 변경
-- [ ] **ABI-04**: 단독 Lambda 클로저 (line ~3087)도 동일하게 변경
+- [x] **ABI-01**: 클로저 함수 시그니처를 `(%arg0: !llvm.ptr, %arg1: !llvm.ptr) -> i64`로 변경 (기존: %arg1: i64)
+- [x] **ABI-02**: 클로저 body에서 i64 파라미터 필요 시 `ptrtoint` 코어션 삽입 (기존: inttoptr)
+- [x] **ABI-03**: 2-lambda (maker+inner) 패턴의 inner 클로저도 동일하게 %arg1: !llvm.ptr로 변경
+- [x] **ABI-04**: 단독 Lambda 클로저 (line ~3087)도 동일하게 변경
 
 ### isPtrParamBody 정리
 
-- [ ] **CLEAN-01**: 클로저 생성 코드에서 isPtrParamBody 호출 제거 (불필요해짐)
-- [ ] **CLEAN-02**: isPtrParamBody 자체는 유지 (KnownFuncs 등록 시 사용)
+- [x] **CLEAN-01**: 클로저 생성 코드에서 isPtrParamBody 호출 제거 (불필요해짐)
+- [x] **CLEAN-02**: isPtrParamBody 자체는 유지 (KnownFuncs 등록 시 사용)
 
 ### 테스트
 
-- [ ] **TEST-01**: Issue #1 재현 케이스 E2E 테스트 (mutable record + string 클로저)
-- [ ] **TEST-02**: 기존 239+ E2E 테스트 전부 통과 (regression 없음)
-- [ ] **TEST-03**: Issue #1 자동 종료 (gh issue close)
+- [x] **TEST-01**: Issue #1 재현 케이스 E2E 테스트 (mutable record + string 클로저)
+- [x] **TEST-02**: 기존 239+ E2E 테스트 전부 통과 (regression 없음)
+- [x] **TEST-03**: Issue #1 자동 종료 (gh issue close)
 
 ## Future Requirements
 
@@ -38,15 +38,15 @@ None.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ABI-01 | Phase 62 | Pending |
-| ABI-02 | Phase 62 | Pending |
-| ABI-03 | Phase 62 | Pending |
-| ABI-04 | Phase 62 | Pending |
-| CLEAN-01 | Phase 62 | Pending |
-| CLEAN-02 | Phase 62 | Pending |
-| TEST-01 | Phase 62 | Pending |
-| TEST-02 | Phase 62 | Pending |
-| TEST-03 | Phase 62 | Pending |
+| ABI-01 | Phase 62 | Complete |
+| ABI-02 | Phase 62 | Complete |
+| ABI-03 | Phase 62 | Complete |
+| ABI-04 | Phase 62 | Complete |
+| CLEAN-01 | Phase 62 | Complete |
+| CLEAN-02 | Phase 62 | Complete |
+| TEST-01 | Phase 62 | Complete |
+| TEST-02 | Phase 62 | Complete |
+| TEST-03 | Phase 62 | Complete |
 
 **Coverage:**
 - v18.0 requirements: 9 total
