@@ -15,15 +15,15 @@
 
 ### 중첩 모듈 (Nested Module)
 
-- [ ] **NEST-01**: flattenDecls에서 중첩 모듈 prefix를 전체 경로로 변경 (Inner_foo → Outer_Inner_foo)
-- [ ] **NEST-02**: collectModuleMembers에서 중첩 모듈을 전체 경로 키로 등록 (e.g., "Outer.Inner")
-- [ ] **NEST-03**: FieldAccess에서 중첩 qualified access 지원 (Outer.Inner.foo → Outer_Inner_foo)
-- [ ] **NEST-04**: open multi-segment에서 전체 경로 키로 lookup (open Outer.Inner → "Outer.Inner" 키 사용)
+- [x] **NEST-01**: flattenDecls에서 중첩 모듈 prefix를 전체 경로로 변경 (Inner_foo → Outer_Inner_foo)
+- [x] **NEST-02**: collectModuleMembers에서 중첩 모듈을 전체 경로 키로 등록 (e.g., "Outer.Inner")
+- [x] **NEST-03**: FieldAccess에서 중첩 qualified access 지원 (Outer.Inner.foo → Outer_Inner_foo)
+- [x] **NEST-04**: open multi-segment에서 전체 경로 키로 lookup (open Outer.Inner → "Outer.Inner" 키 사용)
 
 ### 테스트
 
 - [x] **TEST-01**: 빌드 성공 + 기존 232 E2E 테스트 통과
-- [ ] **TEST-02**: 중첩 모듈 E2E 테스트 — Outer.Inner.value qualified access + open Outer.Inner
+- [x] **TEST-02**: 중첩 모듈 E2E 테스트 — Outer.Inner.value qualified access + open Outer.Inner
 
 ## Future Requirements
 
@@ -44,12 +44,12 @@ None.
 | NS-03 | Phase 58 | Complete |
 | NS-04 | Phase 58 | Complete |
 | NS-05 | Phase 58 | Complete |
-| NEST-01 | Phase 59 | Pending |
-| NEST-02 | Phase 59 | Pending |
-| NEST-03 | Phase 59 | Pending |
-| NEST-04 | Phase 59 | Pending |
+| NEST-01 | Phase 59 | Complete |
+| NEST-02 | Phase 59 | Complete |
+| NEST-03 | Phase 59 | Complete |
+| NEST-04 | Phase 59 | Complete |
 | TEST-01 | Phase 58 | Complete |
-| TEST-02 | Phase 59 | Pending |
+| TEST-02 | Phase 59 | Complete |
 
 **Coverage:**
 - v16.0 requirements: 11 total
