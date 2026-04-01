@@ -6,6 +6,11 @@
 
 **Requirements:** FIX-01 ~ FIX-03, TEST-01 ~ TEST-04
 
+**Plans:** 1 plan
+
+Plans:
+- [ ] 64-01-PLAN.md -- Caller-side capture stores + guard removal + E2E tests
+
 **Success Criteria:**
 1. 3-arg curried function + outer variable capture가 정상 컴파일
 2. LetRec body에서 위 함수 호출 가능
@@ -15,8 +20,8 @@
 
 **Approach:**
 - Research 필수: 2-lambda maker body의 capture store를 caller 측으로 이동하는 방법 분석
-- 현재: maker func.func 내부에서 capture GEP+store → outer SSA 참조 (SSA leak)
-- 목표: caller가 env 할당 + capture store → maker는 fn_ptr만 store + return env
+- 현재: maker func.func 내부에서 capture GEP+store -> outer SSA 참조 (SSA leak)
+- 목표: caller가 env 할당 + capture store -> maker는 fn_ptr만 store + return env
 
 ---
 *Created: 2026-04-02*
