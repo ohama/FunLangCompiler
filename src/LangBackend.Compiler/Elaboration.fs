@@ -354,14 +354,28 @@ let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
             | _ -> false)
     | _ -> false
 
+/// Detect whether a function-call expression likely returns a string (Ptr).
+/// Used to accumulate known-string variables from let-bindings.
+let private isStringReturningExpr (expr: Expr) : bool =
+    match stripAnnot expr with
+    | App(Var(fname, _), _, _) ->
+        fname = "readIdent" || fname = "lexeme" || fname = "to_string" ||
+        fname.Contains("toString") || fname.Contains("string") ||
+        fname = "string_concat" || fname = "String.concat" || fname = "String.sub"
+    | App(App(Var(fname, _), _, _), _, _) ->
+        fname = "string_concat" || fname = "String.concat" || fname = "^"
+    | String _ -> true
+    | _ -> false
+
 /// Phase 43-fix: Detect whether a param needs Ptr type (list OR record OR string access in body).
 /// Used to correctly type function parameters in the single-arg Lambda case.
 let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
     // First check the existing list-pattern detection
     if isListParamBody paramName bodyExpr then true
     else
-    // Also check if body accesses param as a record or uses it in string ops (needs Ptr)
-    let rec hasParamPtrUse (expr: Expr) : bool =
+    // Also check if body accesses param as a record or uses it in string ops (needs Ptr).
+    // strVars: set of let-bound variable names known to hold string values.
+    let rec hasParamPtrUse (strVars: Set<string>) (expr: Expr) : bool =
         match stripAnnot expr with
         // Record field access on param directly → param must be Ptr
         | FieldAccess(Var(v, _), _, _) when v = paramName -> true
@@ -370,6 +384,9 @@ let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
         | App(App(Var("string_concat", _), _, _), Var(v, _), _) when v = paramName -> true
         | App(Var("string_length", _), Var(v, _), _) when v = paramName -> true
         | App(Var("to_string", _), Var(v, _), _) when v = paramName -> false  // to_string works on I64 too
+        // fst/snd on param → param is a tuple (Ptr)
+        | App(Var("fst", _), Var(v, _), _) when v = paramName -> true
+        | App(Var("snd", _), Var(v, _), _) when v = paramName -> true
         // Passing param to eprintfn/eprintln/println/printfn → param is likely a string (Ptr)
         | App(Var("eprintln", _), Var(v, _), _) when v = paramName -> true
         | App(Var("eprint", _), Var(v, _), _) when v = paramName -> true
@@ -383,17 +400,41 @@ let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
             clauses |> List.exists (fun (pat, _, arm) ->
                 match pat with
                 | WildcardPat _ | VarPat _ -> false  // neutral patterns
-                | _ -> false)  // don't recurse here to avoid over-detection
-        // Recurse through let/match/if bodies
-        | Let(_, bindE, bodyE, _) -> hasParamPtrUse bindE || hasParamPtrUse bodyE
+                | ConstructorPat _ -> true  // ADT constructor pattern → param is Ptr
+                | ConstPat(StringConst _, _) -> true  // string constant pattern → param is string (Ptr)
+                | _ -> false)
+        // Constructor call with param as argument → param is ADT/Ptr
+        | Constructor(_, Some(Var(v, _)), _) when v = paramName -> true
+        | Constructor(_, Some arg, _) -> hasParamPtrUse strVars arg
+        // Equality comparison on param with a string literal → param is Ptr
+        | Equal(Var(v, _), String(_, _), _) when v = paramName -> true
+        | Equal(String(_, _), Var(v, _), _) when v = paramName -> true
+        | NotEqual(Var(v, _), String(_, _), _) when v = paramName -> true
+        | NotEqual(String(_, _), Var(v, _), _) when v = paramName -> true
+        // Equality comparison on param with a known-string variable → param is Ptr
+        | Equal(Var(v, _), Var(w, _), _) when v = paramName && Set.contains w strVars -> true
+        | Equal(Var(w, _), Var(v, _), _) when v = paramName && Set.contains w strVars -> true
+        | NotEqual(Var(v, _), Var(w, _), _) when v = paramName && Set.contains w strVars -> true
+        | NotEqual(Var(w, _), Var(v, _), _) when v = paramName && Set.contains w strVars -> true
+        // param compared to non-string var — recurse in case there are other hints
+        | Equal(Var(v, _), other, _) when v = paramName -> hasParamPtrUse strVars other
+        | Equal(other, Var(v, _), _) when v = paramName -> hasParamPtrUse strVars other
+        | NotEqual(Var(v, _), other, _) when v = paramName -> hasParamPtrUse strVars other
+        | NotEqual(other, Var(v, _), _) when v = paramName -> hasParamPtrUse strVars other
+        // Recurse through let bindings; accumulate known-string vars
+        | Let(name, bindE, bodyE, _) ->
+            let strVars' = if isStringReturningExpr bindE then Set.add name strVars else strVars
+            hasParamPtrUse strVars bindE || hasParamPtrUse strVars' bodyE
         | Match(scrut, clauses, _) ->
-            hasParamPtrUse scrut || clauses |> List.exists (fun (_, _, arm) -> hasParamPtrUse arm)
-        | If(c, t, e, _) -> hasParamPtrUse c || hasParamPtrUse t || hasParamPtrUse e
-        | App(f, a, _) -> hasParamPtrUse f || hasParamPtrUse a
-        | Lambda(p, b, _) when p <> paramName -> hasParamPtrUse b
-        | Annot(inner, _, _) -> hasParamPtrUse inner
+            hasParamPtrUse strVars scrut || clauses |> List.exists (fun (_, _, arm) -> hasParamPtrUse strVars arm)
+        | If(c, t, e, _) -> hasParamPtrUse strVars c || hasParamPtrUse strVars t || hasParamPtrUse strVars e
+        | Equal(l, r, _) -> hasParamPtrUse strVars l || hasParamPtrUse strVars r
+        | NotEqual(l, r, _) -> hasParamPtrUse strVars l || hasParamPtrUse strVars r
+        | App(f, a, _) -> hasParamPtrUse strVars f || hasParamPtrUse strVars a
+        | Lambda(p, b, _) when p <> paramName -> hasParamPtrUse strVars b
+        | Annot(inner, _, _) -> hasParamPtrUse strVars inner
         | _ -> false
-    hasParamPtrUse bodyExpr
+    hasParamPtrUse Set.empty bodyExpr
 
 /// Phase 43: Detect whether an expression statically produces a boolean value.
 /// Used to populate BoolVars for correct to_string dispatch.
@@ -654,12 +695,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let closureFnName = sprintf "@closure_fn_%d" closureFnIdx
 
         // Step 3: Compile inner lambda body (llvm.func)
-        // Build the initial vars: %arg0 = env ptr, %arg1 = innerParam
+        // Build the initial vars: %arg0 = env ptr, %arg1 = innerParam (always i64 for uniform ABI)
+        // If innerParam needs Ptr type (list, record, tuple, string), insert inttoptr coercion.
         let arg0Val = { Name = "%arg0"; Type = Ptr }
+        let innerParamIsPtr = isPtrParamBody innerParam innerBody
         let arg1Val = { Name = "%arg1"; Type = I64 }
+        // If innerParam needs Ptr type, coerce i64 arg1 to ptr via inttoptr.
+        // The coerced value gets name %t0 (first SSA name after captures).
+        let (innerParamVal, paramCoerceOps, captureStartIdx) =
+            if innerParamIsPtr then
+                let ptrVal = { Name = "%t0"; Type = Ptr }
+                (ptrVal, [LlvmIntToPtrOp(ptrVal, arg1Val)], 1)
+            else
+                (arg1Val, [], 0)
         let innerEnv : ElabEnv =
-            { Vars = Map.ofList [(innerParam, arg1Val)]
-              Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
+            { Vars = Map.ofList [(innerParam, innerParamVal)]
+              Counter = ref captureStartIdx; LabelCounter = ref 0; Blocks = ref []
               KnownFuncs = env.KnownFuncs
               Funcs = env.Funcs
               ClosureCounter = env.ClosureCounter
@@ -672,9 +723,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
-                let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
+                let gepVal = { Name = sprintf "%%t%d" (captureStartIdx + i); Type = Ptr }
                 let capType = if Set.contains capName env.MutableVars then Ptr else I64
-                let capVal = { Name = sprintf "%%t%d" (i + numCaptures); Type = capType }
+                let capVal = { Name = sprintf "%%t%d" (captureStartIdx + i + numCaptures); Type = capType }
                 (gepVal, capVal, capName, i)
             )
             |> List.fold (fun (opsAcc, envAcc: ElabEnv) (gepVal, capVal, capName, i) ->
@@ -685,8 +736,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (opsAcc @ [gepOp; loadOp], envAcc')
             ) ([], innerEnv)
 
-        // Advance inner env counter past the pre-allocated GEP/load SSA names
-        innerEnvWithCaptures.Counter.Value <- numCaptures * 2
+        // Advance inner env counter past the pre-allocated coerce + GEP/load SSA names
+        innerEnvWithCaptures.Counter.Value <- captureStartIdx + numCaptures * 2
 
         // Elaborate inner body
         let (bodyVal, bodyEntryOps) = elaborateExpr innerEnvWithCaptures innerBody
@@ -696,9 +747,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
         let allBodyBlocks =
             if bodySideBlocks.IsEmpty then
-                [ { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps @ coerceRetOps @ [LlvmReturnOp [finalBodyVal]] } ]
+                [ { Label = None; Args = []; Body = paramCoerceOps @ captureLoadOps @ bodyEntryOps @ coerceRetOps @ [LlvmReturnOp [finalBodyVal]] } ]
             else
-                let entryBlock = { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps }
+                let entryBlock = { Label = None; Args = []; Body = paramCoerceOps @ captureLoadOps @ bodyEntryOps }
                 let lastBlock = List.last bodySideBlocks
                 let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ coerceRetOps @ [LlvmReturnOp [finalBodyVal]] }
                 let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
@@ -1030,23 +1081,31 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | LessThan (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
+        let (lv64, lCoerce) = coerceToI64 env lv
+        let (rv64, rCoerce) = coerceToI64 env rv
         let result = { Name = freshName env; Type = I1 }
-        (result, lops @ rops @ [ArithCmpIOp(result, "slt", lv, rv)])
+        (result, lops @ rops @ lCoerce @ rCoerce @ [ArithCmpIOp(result, "slt", lv64, rv64)])
     | GreaterThan (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
+        let (lv64, lCoerce) = coerceToI64 env lv
+        let (rv64, rCoerce) = coerceToI64 env rv
         let result = { Name = freshName env; Type = I1 }
-        (result, lops @ rops @ [ArithCmpIOp(result, "sgt", lv, rv)])
+        (result, lops @ rops @ lCoerce @ rCoerce @ [ArithCmpIOp(result, "sgt", lv64, rv64)])
     | LessEqual (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
+        let (lv64, lCoerce) = coerceToI64 env lv
+        let (rv64, rCoerce) = coerceToI64 env rv
         let result = { Name = freshName env; Type = I1 }
-        (result, lops @ rops @ [ArithCmpIOp(result, "sle", lv, rv)])
+        (result, lops @ rops @ lCoerce @ rCoerce @ [ArithCmpIOp(result, "sle", lv64, rv64)])
     | GreaterEqual (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
+        let (lv64, lCoerce) = coerceToI64 env lv
+        let (rv64, rCoerce) = coerceToI64 env rv
         let result = { Name = freshName env; Type = I1 }
-        (result, lops @ rops @ [ArithCmpIOp(result, "sge", lv, rv)])
+        (result, lops @ rops @ lCoerce @ rCoerce @ [ArithCmpIOp(result, "sge", lv64, rv64)])
     | If (condExpr, thenExpr, elseExpr, _) ->
         let blocksBeforeCond = env.Blocks.Value.Length
         let (condVal, condOps) = elaborateExpr env condExpr
@@ -2867,11 +2926,19 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let closureFnName = sprintf "@closure_fn_%d" closureFnIdx
 
         // Build inner llvm.func: (%arg0: !llvm.ptr, %arg1: i64) -> i64
+        // If param needs Ptr type (list, record, tuple, string), insert inttoptr coercion.
         let arg0Val = { Name = "%arg0"; Type = Ptr }
+        let lambdaParamIsPtr = isPtrParamBody param body
         let arg1Val = { Name = "%arg1"; Type = I64 }
+        let (lambdaParamVal, lambdaParamCoerceOps, lambdaCaptureStart) =
+            if lambdaParamIsPtr then
+                let ptrVal = { Name = "%t0"; Type = Ptr }
+                (ptrVal, [LlvmIntToPtrOp(ptrVal, arg1Val)], 1)
+            else
+                (arg1Val, [], 0)
         let innerEnv : ElabEnv =
-            { Vars = Map.ofList [(param, arg1Val)]
-              Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
+            { Vars = Map.ofList [(param, lambdaParamVal)]
+              Counter = ref lambdaCaptureStart; LabelCounter = ref 0; Blocks = ref []
               KnownFuncs = env.KnownFuncs
               Funcs = env.Funcs
               ClosureCounter = env.ClosureCounter
@@ -2882,9 +2949,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               BoolVars = Set.empty }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
-                let gepVal = { Name = sprintf "%%t%d" i; Type = Ptr }
+                let gepVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i); Type = Ptr }
                 let capType = if Set.contains capName env.MutableVars then Ptr else I64
-                let capVal = { Name = sprintf "%%t%d" (i + numCaptures); Type = capType }
+                let capVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i + numCaptures); Type = capType }
                 (gepVal, capVal, capName, i)
             )
             |> List.fold (fun (opsAcc, envAcc: ElabEnv) (gepVal, capVal, capName, i) ->
@@ -2893,16 +2960,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let envAcc' = { envAcc with Vars = Map.add capName capVal envAcc.Vars }
                 (opsAcc @ [gepOp; loadOp], envAcc')
             ) ([], innerEnv)
-        innerEnvWithCaptures.Counter.Value <- numCaptures * 2
+        innerEnvWithCaptures.Counter.Value <- lambdaCaptureStart + numCaptures * 2
         let (bodyVal, bodyEntryOps) = elaborateExpr innerEnvWithCaptures body
         // Phase 20/35: Normalize body return to I64 (Ptr→ptrtoint, I1→zext) for uniform closure return type.
         let (finalRetVal, normalizeRetOps) = coerceToI64 innerEnvWithCaptures bodyVal
         let bodySideBlocks = innerEnvWithCaptures.Blocks.Value
         let allBodyBlocks =
             if bodySideBlocks.IsEmpty then
-                [ { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps @ normalizeRetOps @ [LlvmReturnOp [finalRetVal]] } ]
+                [ { Label = None; Args = []; Body = lambdaParamCoerceOps @ captureLoadOps @ bodyEntryOps @ normalizeRetOps @ [LlvmReturnOp [finalRetVal]] } ]
             else
-                let entryBlock = { Label = None; Args = []; Body = captureLoadOps @ bodyEntryOps }
+                let entryBlock = { Label = None; Args = []; Body = lambdaParamCoerceOps @ captureLoadOps @ bodyEntryOps }
                 let lastBlock = List.last bodySideBlocks
                 let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ normalizeRetOps @ [LlvmReturnOp [finalRetVal]] }
                 let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
