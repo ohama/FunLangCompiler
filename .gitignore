@@ -2,4 +2,6 @@ bin/
 obj/
 *.user
 .vs/
-dist/
+dist/*
+!dist/claude-skill/
+!dist/claude-commands/
