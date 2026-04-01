@@ -87,15 +87,13 @@ let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<
                 let importedModule = parseProgram src resolvedPath
                 let importedDecls =
                     match importedModule with
-                    | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) | Ast.NamespacedModule(_, ds, _) -> ds
+                    | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) -> ds
                     | Ast.EmptyModule _ -> []
                 expandImports visitedFiles resolvedPath importedDecls
             finally
                 visitedFiles.Remove resolvedPath |> ignore
         | Ast.Decl.ModuleDecl(name, innerDecls, s) ->
             [Ast.Decl.ModuleDecl(name, expandImports visitedFiles currentFile innerDecls, s)]
-        | Ast.Decl.NamespaceDecl(name, innerDecls, s) ->
-            [Ast.Decl.NamespaceDecl(name, expandImports visitedFiles currentFile innerDecls, s)]
         | other -> [other])
 
 [<EntryPoint>]
@@ -181,12 +179,12 @@ let main argv =
                     let preludeAst = parseProgram preludeSrc "<prelude>"
                     let preludeDecls =
                         match preludeAst with
-                        | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) | Ast.NamespacedModule(_, ds, _) -> ds
+                        | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) -> ds
                         | Ast.EmptyModule _ -> []
                     let userAst = parseProgram src inputPath
                     let (userDecls, userSpan) =
                         match userAst with
-                        | Ast.Module(ds, s) | Ast.NamedModule(_, ds, s) | Ast.NamespacedModule(_, ds, s) -> (ds, s)
+                        | Ast.Module(ds, s) | Ast.NamedModule(_, ds, s) -> (ds, s)
                         | Ast.EmptyModule s -> ([], s)
                     Ast.Module(preludeDecls @ userDecls, userSpan)
             let expandedAst =
@@ -199,17 +197,12 @@ let main argv =
                     let visited = System.Collections.Generic.HashSet<string>()
                     visited.Add(System.IO.Path.GetFullPath(inputPath)) |> ignore
                     Ast.NamedModule(nm, expandImports visited inputPath ds, s)
-                | Ast.NamespacedModule(nm, ds, s) ->
-                    let visited = System.Collections.Generic.HashSet<string>()
-                    visited.Add(System.IO.Path.GetFullPath(inputPath)) |> ignore
-                    Ast.NamespacedModule(nm, expandImports visited inputPath ds, s)
                 | other -> other
             // Phase 52: Transform typeclass declarations before elaboration
             let tcAst =
                 match expandedAst with
                 | Ast.Module(ds, s) -> Ast.Module(Elaboration.elaborateTypeclasses ds, s)
                 | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, Elaboration.elaborateTypeclasses ds, s)
-                | Ast.NamespacedModule(p, ds, s) -> Ast.NamespacedModule(p, Elaboration.elaborateTypeclasses ds, s)
                 | Ast.EmptyModule s -> Ast.EmptyModule s
             let mlirMod = Elaboration.elaborateProgram tcAst
             match Pipeline.compile mlirMod outputPath with
