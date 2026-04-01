@@ -19,15 +19,11 @@ v18.0: Closure ABI 통일 — %arg1 항상 !llvm.ptr, Issue #1 해결. 240 E2E t
 
 v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 
-## Current Milestone: v21.0 Partial Env Pattern
+## Current State
 
-**Goal:** Issue #5 완전 해결 — definition site에서 env+captures 미리 생성하여 LetRec body에서도 3+ arg curried function 정상 동작
-
-**Target features:**
-- Definition site에서 env 할당 + captures 즉시 store
-- Call site에서 outerParam만 store (captures는 이미 env에 있음)
-- LetRec body에서 3+ arg curried function + outer capture 정상 동작
-- 기존 2-arg curried function / capture 없는 케이스 regression 없음
+v21.0 shipped. 248 E2E tests. Issue #5 fully resolved.
+~4,700 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 13 Prelude .fun files.
+MutablePtrGlobal for cross-func-func template env access.
 
 ## Requirements
 
@@ -182,6 +178,14 @@ v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 - ✓ Issue #1 해결 + E2E 재현 테스트 (TEST-01~03) — v18.0
 - ✓ 240 FsLit E2E 테스트
 
+### Validated (v21.0)
+
+- ✓ Definition-site partial env allocation (ENV-01~03) — v21.0
+- ✓ LetRec body 3+ arg curried function correctness (REC-01~02) — v21.0
+- ✓ Regression prevention (REG-01~03) — v21.0
+- ✓ E2E tests for LetRec + outer capture (TEST-01~02) — v21.0
+- ✓ 248 FsLit E2E tests
+
 ### Out of Scope
 
 - REPL — 인터프리터가 이미 존재함
@@ -217,6 +221,9 @@ v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 - v16 완성: FunLang AST 동기화 — namespace 제거 + 중첩 모듈 qualified access (234 E2E tests)
 - v17 완성: Project File — funproj.toml 파서 + fnc build/test CLI (239+ E2E tests)
 - v18 완성: Closure ABI 통일 — %arg1 always Ptr + isPtrParamBody fix (240 E2E tests, Issue #1 closed)
+- v19 완성: 3-Lambda SSA Scope Fix — guard → general Let path (244 E2E tests, Issue #4 closed)
+- v20 완성: Caller-Side Env Population — CaptureNames/OuterParamName (246 E2E tests, Issue #5 partial)
+- v21 완성: Partial Env Pattern — definition-site template env + LLVM globals (248 E2E tests, Issue #5 closed)
 - 참고: survey/funlexyacc-gap-status-v9.md (FunLexYacc 컴파일 갭 분석)
 
 ## Constraints
@@ -282,6 +289,11 @@ v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 
 | Closure %arg1 always Ptr | isPtrParamBody 결과와 무관하게 선언 타입 통일 | ✓ Good |
 | isPtrParamBody 12-pattern recursion | SetField/LetMut 등 뒤의 param 사용도 감지 | ✓ Good |
+| 3+ lambda guard → general Let path | 구조적 수정 전 임시 guard (v19.0) | ✓ Good |
+| Caller-side env population | Maker가 outer SSA 참조 안 하도록 (v20.0) | ✓ Good |
+| Template env in LLVM global | LetRec body func.funcs cannot reference @main SSA | ✓ Good |
+| Template-copy returns Ptr closure | Fallback replaces maker, not inner func call | ✓ Good |
+| MutablePtrGlobal for @__tenv_ globals | Cross-function template env access | ✓ Good |
 
 ---
 ### Validated (v19.0)
@@ -295,4 +307,4 @@ v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 - ✓ Caller-side env population: maker는 fn_ptr+outerParam만, call site에서 captures store (ENV-02~04) — v20.0
 - ✓ 246 FsLit E2E 테스트
 
-*Last updated: 2026-04-02 after v21.0 milestone started*
+*Last updated: 2026-04-02 after v21.0 milestone complete*

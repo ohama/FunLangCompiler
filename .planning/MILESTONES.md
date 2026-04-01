@@ -441,6 +441,29 @@
 
 ---
 
+### v21.0 — Partial Env Pattern (2026-04-02)
+
+**Goal:** Issue #5 완전 해결 — definition site에서 env+captures 미리 생성하여 LetRec body에서도 3+ arg curried function 정상 동작
+
+**Phases:** 65 (2 plans, all verified)
+**Requirements:** 10/10 complete
+**Tests:** 248 FsLit E2E tests (2 new)
+**Issue:** ohama/FunLangCompiler#5 closed
+
+**What shipped:**
+- Definition-site partial env allocation: GC_malloc + fn_ptr + non-outerParam captures at definition time
+- Template-copy call path: clone template env, fill outerParam, return closure Ptr
+- LLVM mutable globals (@__tenv_<name>) for cross-func-func template env access
+- MutablePtrGlobal IR type + printer support
+- 2 new E2E tests (LetRec + 3-arg + outer capture)
+
+**Key decisions validated:**
+- Template env in LLVM global (not local SSA — LetRec bodies are separate func.funcs) ✓
+- Template-copy returns Ptr closure (maker replacement, not inner function call) ✓
+- Fresh env per call (no mutation of shared template) ✓
+
+---
+
 ## Current
 
 Planning next milestone
