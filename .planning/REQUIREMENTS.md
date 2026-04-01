@@ -45,22 +45,22 @@ None — this is a focused bug fix milestone.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ENV-01 | TBD | Pending |
-| ENV-02 | TBD | Pending |
-| ENV-03 | TBD | Pending |
-| REC-01 | TBD | Pending |
-| REC-02 | TBD | Pending |
-| REG-01 | TBD | Pending |
-| REG-02 | TBD | Pending |
-| REG-03 | TBD | Pending |
-| TEST-01 | TBD | Pending |
-| TEST-02 | TBD | Pending |
+| ENV-01 | Phase 65 | Pending |
+| ENV-02 | Phase 65 | Pending |
+| ENV-03 | Phase 65 | Pending |
+| REC-01 | Phase 65 | Pending |
+| REC-02 | Phase 65 | Pending |
+| REG-01 | Phase 65 | Pending |
+| REG-02 | Phase 65 | Pending |
+| REG-03 | Phase 65 | Pending |
+| TEST-01 | Phase 65 | Pending |
+| TEST-02 | Phase 65 | Pending |
 
 **Coverage:**
 - v21.0 requirements: 10 total
-- Mapped to phases: 0
-- Unmapped: 10 ⚠️
+- Mapped to phases: 10
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-02*
-*Last updated: 2026-04-02 after initial definition*
+*Last updated: 2026-04-02 — traceability mapped to Phase 65*
