@@ -16,6 +16,17 @@ String module: 14 functions. List module: 40+ functions.
 Zero unknownSpan in source — all error messages show real file:line:col.
 Nested module qualified access (Outer.Inner.value) 지원.
 
+## Current Milestone: v17.0 Project File (funproj.toml)
+
+**Goal:** FunLang과 동일한 funproj.toml로 멀티파일 프로젝트를 네이티브 바이너리로 컴파일 (fnc build/test)
+
+**Target features:**
+- funproj.toml 파서 (FunLang 호환 형식)
+- `fnc build [name]` — [[executable]] 타겟을 네이티브 바이너리로 컴파일
+- `fnc test [name]` — [[test]] 타겟을 컴파일 + 실행
+- funproj.toml의 prelude 경로 지원
+- build/ 출력 디렉토리
+
 ## Requirements
 
 ### Validated (v1.0)

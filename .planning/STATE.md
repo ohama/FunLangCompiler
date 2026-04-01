@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-04-01)
 
 **Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v16.0 complete — Planning next milestone
+**Current focus:** v17.0 Project File (funproj.toml)
 
 ## Current Position
 
-Phase: 59 of 59 — All phases complete
-Plan: N/A
-Status: v16.0 complete
-Last activity: 2026-04-01 — v16.0 milestone shipped (phases 58-59)
+Phase: 60 of 61 — Not started
+Plan: Not started (defining requirements)
+Status: Defining requirements
+Last activity: 2026-04-01 — Milestone v17.0 started
 
-Progress: v1.0-v16.0 complete [████████████████████] 59/59 phases
+Progress: v1.0-v16.0 complete [████████████████████] 59/59 phases + v17.0 planning
 
 ## Performance Metrics
 
@@ -51,5 +51,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-01
-Stopped at: v16.0 milestone completed and archived
+Stopped at: v17.0 milestone started, requirements definition
 Resume file: None
