@@ -829,8 +829,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         match Map.tryFind capName env.Vars with
                         | Some v -> v
                         | None -> failWithSpan letSpan "Elaboration: closure capture '%s' not found in outer scope" capName
-                let storeOp = LlvmStoreOp(captureVal, slotVal)
-                [gepOp; storeOp]
+                // Issue #4: Closure env slots are Ptr. If captureVal is I64, insert inttoptr.
+                if captureVal.Type = I64 then
+                    let ptrVal = { Name = nextMakerName (); Type = Ptr }
+                    [gepOp; LlvmIntToPtrOp(ptrVal, captureVal); LlvmStoreOp(ptrVal, slotVal)]
+                else
+                    [gepOp; LlvmStoreOp(captureVal, slotVal)]
             ) |> List.concat
 
         let makerBodyOps = makerOps @ captureStoreOps @ [ReturnOp [makerArg1]]
