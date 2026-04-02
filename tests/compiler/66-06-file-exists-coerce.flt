@@ -1,0 +1,6 @@
+// Test: Issue #9 — file_exists/read_file string arg I64→Ptr coercion in closure
+// --- Command: bash %S/66-06-file-exists-coerce.sh
+// --- Input:
+// --- Output:
+Cannot read: nonexistent.txt
+1

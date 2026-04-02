@@ -2334,21 +2334,32 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // read_file — one-arg, returns Ptr (LangString*)
     | App (Var ("read_file", _), pathExpr, _) ->
         let (pathVal, pathOps) = elaborateExpr env pathExpr
+        let (ptrVal, castOps) =
+            if pathVal.Type = I64 then
+                let p = { Name = freshName env; Type = Ptr }
+                (p, [LlvmIntToPtrOp(p, pathVal)])
+            else (pathVal, [])
         let result = { Name = freshName env; Type = Ptr }
-        (result, pathOps @ [LlvmCallOp(result, "@lang_file_read", [pathVal])])
+        (result, pathOps @ castOps @ [LlvmCallOp(result, "@lang_file_read", [ptrVal])])
 
     // file_exists — one-arg, returns bool (I1 via I64 comparison)
     | App (Var ("file_exists", _), pathExpr, _) ->
         let (pathVal, pathOps) = elaborateExpr env pathExpr
+        // Phase 66: Coerce I64 → Ptr when string arg loaded from closure env
+        let (ptrVal, castOps) =
+            if pathVal.Type = I64 then
+                let p = { Name = freshName env; Type = Ptr }
+                (p, [LlvmIntToPtrOp(p, pathVal)])
+            else (pathVal, [])
         let rawVal  = { Name = freshName env; Type = I64 }
         let zeroVal = { Name = freshName env; Type = I64 }
         let boolVal = { Name = freshName env; Type = I1  }
         let ops = [
-            LlvmCallOp(rawVal, "@lang_file_exists", [pathVal])
+            LlvmCallOp(rawVal, "@lang_file_exists", [ptrVal])
             ArithConstantOp(zeroVal, 0L)
             ArithCmpIOp(boolVal, "ne", rawVal, zeroVal)
         ]
-        (boolVal, pathOps @ ops)
+        (boolVal, pathOps @ castOps @ ops)
 
     // dbg — pass-through debug: prints "[file:line] value" to stderr, returns value unchanged
     | App (Var ("dbg", _), argExpr, dbgSpan) ->
@@ -2509,20 +2520,29 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 27: read_lines — one-arg, returns Ptr
     | App (Var ("read_lines", _), pathExpr, _) ->
         let (pathVal, pathOps) = elaborateExpr env pathExpr
+        let (ptrVal, castOps) =
+            if pathVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, pathVal)])
+            else (pathVal, [])
         let result = { Name = freshName env; Type = Ptr }
-        (result, pathOps @ [LlvmCallOp(result, "@lang_read_lines", [pathVal])])
+        (result, pathOps @ castOps @ [LlvmCallOp(result, "@lang_read_lines", [ptrVal])])
 
     // Phase 27: get_env — one-arg, returns Ptr
     | App (Var ("get_env", _), nameExpr, _) ->
         let (nameVal, nameOps) = elaborateExpr env nameExpr
+        let (ptrVal, castOps) =
+            if nameVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, nameVal)])
+            else (nameVal, [])
         let result = { Name = freshName env; Type = Ptr }
-        (result, nameOps @ [LlvmCallOp(result, "@lang_get_env", [nameVal])])
+        (result, nameOps @ castOps @ [LlvmCallOp(result, "@lang_get_env", [ptrVal])])
 
     // Phase 27: dir_files — one-arg, returns Ptr
     | App (Var ("dir_files", _), pathExpr, _) ->
         let (pathVal, pathOps) = elaborateExpr env pathExpr
+        let (ptrVal, castOps) =
+            if pathVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, pathVal)])
+            else (pathVal, [])
         let result = { Name = freshName env; Type = Ptr }
-        (result, pathOps @ [LlvmCallOp(result, "@lang_dir_files", [pathVal])])
+        (result, pathOps @ castOps @ [LlvmCallOp(result, "@lang_dir_files", [ptrVal])])
 
     // Phase 27: stdin_read_line — unit-arg, returns Ptr (elaborate unit, discard, call with no args)
     | App (Var ("stdin_read_line", _), unitExpr, _) ->
