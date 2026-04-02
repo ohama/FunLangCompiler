@@ -80,6 +80,11 @@ LangString* lang_string_slice(LangString* s, int64_t start, int64_t stop) {
     return lang_string_sub(s, start, len);
 }
 
+/* Phase 66: String character access — returns byte at index as i64 (char code) */
+int64_t lang_string_char_at(LangString* s, int64_t index) {
+    return (int64_t)(unsigned char)s->data[index];
+}
+
 int64_t lang_string_contains(LangString* s, LangString* sub) {
     if (sub->length == 0) return 1;
     return strstr(s->data, sub->data) != NULL ? 1 : 0;

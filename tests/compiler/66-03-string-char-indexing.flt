@@ -1,0 +1,5 @@
+// Test: Issue #6 full repro — record string field indexing + complex boolean in let rec closure
+// --- Command: bash %S/66-03-string-char-indexing.sh
+// --- Input:
+// --- Output:
+3

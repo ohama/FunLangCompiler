@@ -52,6 +52,10 @@ type ElabEnv = {
     CollectionVars: Map<string, CollectionKind>
     // Phase 43: Bool variable tracking — names bound to boolean-producing expressions
     BoolVars: Set<string>
+    // Phase 66: String variable tracking — names bound to string-typed values (for IndexGet dispatch)
+    StringVars: Set<string>
+    // Phase 66: Record field string tracking — field names known to be string-typed (for IndexGet dispatch)
+    StringFields: Set<string>
 }
 
 let emptyEnv () : ElabEnv =
@@ -60,7 +64,7 @@ let emptyEnv () : ElabEnv =
       Globals = ref []; GlobalCounter = ref 0; TplGlobals = ref []
       TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty
       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
-      BoolVars = Set.empty }
+      BoolVars = Set.empty; StringVars = Set.empty; StringFields = Set.empty }
 
 /// Phase 44: Raise an error with source location in "file:line:col: message" format.
 /// Uses Printf.ksprintf to support format strings like failwithf.
@@ -85,6 +89,16 @@ let rec private isArrayExpr (arrayVars: Set<string>) (expr: Ast.Expr) : bool =
     | Ast.Var (name, _) -> Set.contains name arrayVars
     // Type annotation — check inner expression
     | Ast.Annot (inner, _, _) -> isArrayExpr arrayVars inner
+    | _ -> false
+
+/// Phase 66: Detect if an expression produces a string value.
+/// Used for IndexGet dispatch (string char-at vs array/hashtable indexing).
+let rec private isStringExpr (stringVars: Set<string>) (stringFields: Set<string>) (expr: Ast.Expr) : bool =
+    match expr with
+    | Ast.String _ -> true
+    | Ast.Var (name, _) -> Set.contains name stringVars
+    | Ast.Annot (inner, _, _) -> isStringExpr stringVars stringFields inner
+    | Ast.FieldAccess (_, fieldName, _) -> Set.contains fieldName stringFields
     | _ -> false
 
 /// Phase 34-03: Detect which Phase 33 collection kind an expression produces.
@@ -756,7 +770,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty }
+              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -964,7 +978,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty }
+              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
@@ -1021,9 +1035,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                || (match stripAnnot bindExpr with Lambda(_, body, _) -> bodyReturnsBool body | _ -> false)
             then Set.add name env.BoolVars
             else env.BoolVars
+        // Phase 66: Track string-producing bindings for IndexGet dispatch
+        let stringVars' =
+            if isStringExpr env.StringVars env.StringFields bindExpr
+            then Set.add name env.StringVars
+            else env.StringVars
         let baseVars = Map.add name bv env.Vars
         let varsWithAlias = match moduleShortName with Some sn -> Map.add sn bv baseVars | None -> baseVars
-        let env' = { env with Vars = varsWithAlias; ArrayVars = arrayVars'; CollectionVars = collVars'; BoolVars = boolVars' }
+        let env' = { env with Vars = varsWithAlias; ArrayVars = arrayVars'; CollectionVars = collVars'; BoolVars = boolVars'; StringVars = stringVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
         // If bops ends with a block terminator (from nested Match/TryWith/If), the
         // continuation code (rops) must go into the outer if's merge block (at blocksAfterBind - 1),
@@ -1485,7 +1504,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                       TplGlobals = env.TplGlobals
                       TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
                       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
-                      BoolVars = Set.empty }
+                      BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields }
                 let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
                 let bodySideBlocks = bodyEnv.Blocks.Value
                 let allBodyBlocks =
@@ -1912,6 +1931,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 28: IndexGet — arr.[i] or ht.[key] via runtime dispatch
     // Phase 37: dispatch to _str variant when index is Ptr (string key)
+    // Phase 66: dispatch to lang_string_char_at when collection is a known string
     | IndexGet (collExpr, idxExpr, _) ->
         let (collVal, collOps) = elaborateExpr env collExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
@@ -1920,6 +1940,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (collPtr, collCoerce) =
             if collVal.Type = Ptr then (collVal, [])
             else let v = { Name = freshName env; Type = Ptr } in (v, [LlvmIntToPtrOp(v, collVal)])
+        // Phase 66: String char-at dispatch — s.[i] returns the byte at index i as i64
+        if isStringExpr env.StringVars env.StringFields collExpr then
+            let (idxV, idxCoerce) =
+                if idxVal.Type = I64 then (idxVal, [])
+                else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
+            (result, collOps @ collCoerce @ idxOps @ idxCoerce @ [LlvmCallOp(result, "@lang_string_char_at", [collPtr; idxV])])
+        else
         match idxVal.Type with
         | Ptr ->
             (result, collOps @ collCoerce @ idxOps @ [LlvmCallOp(result, "@lang_index_get_str", [collPtr; idxVal])])
@@ -3380,7 +3407,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty }
+              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i); Type = Ptr }
@@ -4503,6 +4530,8 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_mlist_count";       ExtParams = [Ptr];           ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         // Phase 34-01: LANG-01 String slicing
         { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 66: String character access — s.[i] returns byte at index as i64
+        { ExtName = "@lang_string_char_at"; ExtParams = [Ptr; I64]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         // Phase 34-02: LANG-02 List comprehension
         { ExtName = "@lang_list_comp"; ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 34-03: LANG-03/04 for-in over Phase 33 collection types
@@ -4528,10 +4557,11 @@ let elaborateModule (expr: Expr) : MlirModule =
 // Phase 25: Made recursive with shared exnCounter so nested modules share the same counter,
 // preventing exception tag collisions across module boundaries.
 let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
-    : Map<string, TypeInfo> * Map<string, Map<string, int>> * Map<string, int> =
+    : Map<string, TypeInfo> * Map<string, Map<string, int>> * Map<string, int> * Set<string> =
     let mutable typeEnv  = Map.empty<string, TypeInfo>
     let mutable recordEnv = Map.empty<string, Map<string, int>>
     let mutable exnTags  = Map.empty<string, int>
+    let mutable stringFields = Set.empty<string>
     for decl in decls do
         match decl with
         | Ast.Decl.TypeDecl (Ast.TypeDecl(_, _, ctors, _, _)) ->
@@ -4550,6 +4580,11 @@ let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
                 |> List.mapi (fun idx (Ast.RecordFieldDecl(name, _, _, _)) -> (name, idx))
                 |> Map.ofList
             recordEnv <- Map.add typeName fieldMap recordEnv
+            // Phase 66: Collect string-typed fields for IndexGet dispatch
+            for (Ast.RecordFieldDecl(name, fieldType, _, _)) in fields do
+                match fieldType with
+                | Ast.TEString -> stringFields <- Set.add name stringFields
+                | _ -> ()
         | Ast.Decl.ExceptionDecl(name, dataTypeOpt, _) ->
             let tag = exnCounter.Value
             exnCounter.Value <- tag + 1
@@ -4557,15 +4592,16 @@ let rec private prePassDecls (exnCounter: int ref) (decls: Ast.Decl list)
             let arity = match dataTypeOpt with Some _ -> 1 | None -> 0
             typeEnv <- Map.add name { Tag = tag; Arity = arity } typeEnv
         | Ast.Decl.ModuleDecl(_, innerDecls, _) ->
-            let (innerTypeEnv, innerRecordEnv, innerExnTags) = prePassDecls exnCounter innerDecls
+            let (innerTypeEnv, innerRecordEnv, innerExnTags, innerStringFields) = prePassDecls exnCounter innerDecls
             typeEnv   <- Map.fold (fun acc k v -> Map.add k v acc) typeEnv   innerTypeEnv
             recordEnv <- Map.fold (fun acc k v -> Map.add k v acc) recordEnv innerRecordEnv
             exnTags   <- Map.fold (fun acc k v -> Map.add k v acc) exnTags   innerExnTags
+            stringFields <- Set.union stringFields innerStringFields
         | Ast.Decl.TypeClassDecl _ -> ()   // Phase 52: typeclasses handled in elaborateTypeclasses
         | Ast.Decl.InstanceDecl _ -> ()    // Phase 52: instances handled in elaborateTypeclasses
         | Ast.Decl.DerivingDecl _ -> ()    // Phase 52: deriving handled in elaborateTypeclasses
         | _ -> ()
-    (typeEnv, recordEnv, exnTags)
+    (typeEnv, recordEnv, exnTags, stringFields)
 
 // Phase 41/59: collectModuleMembers — first pass scan to build a map from dot-path module key
 // to list of underscore-qualified member names.
@@ -4766,9 +4802,9 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         match ast with
         | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) -> decls
         | Ast.EmptyModule _ -> []
-    let (typeEnv, recordEnv, exnTags) = prePassDecls (ref 0) decls
+    let (typeEnv, recordEnv, exnTags, stringFields) = prePassDecls (ref 0) decls
     let mainExpr = extractMainExpr (Ast.moduleSpanOf ast) decls
-    let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags }
+    let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags; StringFields = stringFields }
     let (resultVal, entryOps) = elaborateExpr env mainExpr
     let sideBlocks = env.Blocks.Value
     let allBlocks =
@@ -4902,6 +4938,8 @@ let elaborateProgram (ast: Ast.Module) : MlirModule =
         { ExtName = "@lang_mlist_count";       ExtParams = [Ptr];           ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         // Phase 34-01: LANG-01 String slicing
         { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
+        // Phase 66: String character access — s.[i] returns byte at index as i64
+        { ExtName = "@lang_string_char_at"; ExtParams = [Ptr; I64]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         // Phase 34-02: LANG-02 List comprehension
         { ExtName = "@lang_list_comp"; ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 34-03: LANG-03/04 for-in over Phase 33 collection types
