@@ -21,7 +21,7 @@ v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 
 ## Current State
 
-v21.0 shipped. 248 E2E tests. Issue #5 fully resolved.
+v22.0 shipped. 250 E2E tests. Issues #6, #7 resolved.
 ~4,700 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 13 Prelude .fun files.
 MutablePtrGlobal for cross-func-func template env access.
 
@@ -186,6 +186,13 @@ MutablePtrGlobal for cross-func-func template env access.
 - ✓ E2E tests for LetRec + outer capture (TEST-01~02) — v21.0
 - ✓ 248 FsLit E2E tests
 
+### Validated (v22.0)
+
+- ✓ Issue #6: And/Or eval-right block nested terminator fix (BOOL-01) — v22.0
+- ✓ Issue #7: Match Leaf merge-block append ordering fix (MATCH-01) — v22.0
+- ✓ LetPat(VarPat) terminator detection for block-creating bindExpr (LET-01) — v22.0
+- ✓ 250 FsLit E2E tests
+
 ### Out of Scope
 
 - REPL — 인터프리터가 이미 존재함
@@ -224,6 +231,7 @@ MutablePtrGlobal for cross-func-func template env access.
 - v19 완성: 3-Lambda SSA Scope Fix — guard → general Let path (244 E2E tests, Issue #4 closed)
 - v20 완성: Caller-Side Env Population — CaptureNames/OuterParamName (246 E2E tests, Issue #5 partial)
 - v21 완성: Partial Env Pattern — definition-site template env + LLVM globals (248 E2E tests, Issue #5 closed)
+- v22 완성: MLIR Codegen Bugfix — nested boolean + let-in-match block ordering (250 E2E tests, Issues #6, #7 closed)
 - 참고: survey/funlexyacc-gap-status-v9.md (FunLexYacc 컴파일 갭 분석)
 
 ## Constraints
