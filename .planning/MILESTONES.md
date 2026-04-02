@@ -464,6 +464,27 @@
 
 ---
 
+### v22.0 — MLIR Codegen Bugfix (2026-04-02)
+
+**Goal:** GitHub Issues #6, #7 해결 — nested boolean empty block + let-in-match dead code
+
+**Phases:** 66 (1 plan, direct fix)
+**Requirements:** 3/3 complete
+**Tests:** 250 FsLit E2E tests (2 new)
+**Issues:** ohama/FunLangCompiler#6 closed, ohama/FunLangCompiler#7 closed
+
+**What shipped:**
+- Issue #6: And/Or eval-right block에서 nested short-circuit 표현식의 inner merge block에 continuation patch
+- Issue #7: Match Leaf handler의 merge block patching을 prepend → append로 변경
+- LetPat(VarPat) terminator detection 추가 (WildcardPat/Let과 동일 패턴)
+- 2 new E2E tests (complex-bool-closure, if-let-in-match)
+
+**Key decisions validated:**
+- Nested And/Or inner-merge patching (evalRight block can't append after terminator) ✓
+- Match Leaf append (not prepend) contOps — Let handler may pre-fill merge block body ✓
+
+---
+
 ## Current
 
 Planning next milestone

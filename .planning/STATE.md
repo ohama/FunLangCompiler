@@ -11,8 +11,8 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 
 Phase: None (between milestones)
 Plan: N/A
-Status: v21.0 complete, ready for next milestone
-Last activity: 2026-04-02 — v21.0 Partial Env Pattern milestone complete
+Status: v22.0 complete, ready for next milestone
+Last activity: 2026-04-02 — v22.0 MLIR Codegen Bugfix milestone complete (Issues #6, #7)
 
 Progress: v1.0-v21.0 complete [█████████████████████] 65 phases / 108 plans
 
@@ -39,5 +39,5 @@ None — all known issues resolved.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: v21.0 milestone archived, ready for /gsd:new-milestone
+Stopped at: v22.0 milestone complete, ready for /gsd:new-milestone
 Resume file: None
