@@ -1,0 +1,5 @@
+// Test: Issue #7 — Dead code after cf.br: let-binding with if/else inside match branch
+// --- Command: bash %S/66-02-if-let-in-match.sh
+// --- Input:
+// --- Output:
+test.funl -> test_lex.fun

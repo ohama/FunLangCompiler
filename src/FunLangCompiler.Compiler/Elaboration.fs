@@ -1058,22 +1058,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             match op with
             | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
             | _ -> false
-        let lastOp = List.tryLast bops
-        eprintfn "DEBUG LetPat WildcardPat: bops.Length=%d lastOp=%A isterm=%A blocksAfterBind=%d blocksBeforeBind=%d rops.Length=%d" bops.Length lastOp (lastOp |> Option.map isTerminator) blocksAfterBind blocksBeforeBind rops.Length
-        match lastOp with
+        match List.tryLast bops with
         | Some op when isTerminator op && blocksAfterBind > blocksBeforeBind ->
             // Place rops in the OUTER merge block (captured BEFORE bodyExpr elaboration)
             let innerBlocks = env.Blocks.Value
             let targetIdx = blocksAfterBind - 1
             let targetBlock = innerBlocks.[targetIdx]
             let patchedTarget = { targetBlock with Body = rops @ targetBlock.Body }
-            eprintfn "DEBUG: patching block at idx=%d label=%A with %d ops" targetIdx targetBlock.Label rops.Length
             env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (rv, bops)
         | _ ->
             (rv, bops @ rops)
     | LetPat (VarPat (name, _), bindExpr, bodyExpr, _) ->
+        let blocksBeforeBind = env.Blocks.Value.Length
         let (bv, bops) = elaborateExpr env bindExpr
+        let blocksAfterBind = env.Blocks.Value.Length
         let arrayVars' = if isArrayExpr env.ArrayVars bindExpr then Set.add name env.ArrayVars else env.ArrayVars
         let collVars' =
             match detectCollectionKind env.CollectionVars bindExpr with
@@ -1081,7 +1080,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | None -> env.CollectionVars
         let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars'; CollectionVars = collVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
-        (rv, bops @ rops)
+        let isTerminator op =
+            match op with
+            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+            | _ -> false
+        match List.tryLast bops with
+        | Some op when isTerminator op && blocksAfterBind > blocksBeforeBind ->
+            // bindExpr ended with a block terminator (e.g. If/Match).
+            // Place rops in the merge block (captured BEFORE bodyExpr elaboration).
+            let innerBlocks = env.Blocks.Value
+            let targetIdx = blocksAfterBind - 1
+            let targetBlock = innerBlocks.[targetIdx]
+            let patchedTarget = { targetBlock with Body = rops @ targetBlock.Body }
+            env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+            (rv, bops)
+        | _ ->
+            (rv, bops @ rops)
     // Phase 9: LetPat with TuplePat — destructure a heap-allocated tuple via GEP + load
     | LetPat (TuplePat (pats, _), bindExpr, bodyExpr, _) ->
         let (rawTupVal, bindOps) = elaborateExpr env bindExpr
@@ -1326,7 +1340,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             else (leftVal, [])
         let evalRightLabel = freshLabel env "and_right"
         let mergeLabel     = freshLabel env "and_merge"
+        let blocksBeforeRight = List.length env.Blocks.Value
         let (rightVal, rightOps) = elaborateExpr env rhsExpr
+        let blocksAfterRight = List.length env.Blocks.Value
         // Phase 36 FIX-03: Coerce rightVal to I1 as well (merge block arg type must be I1).
         let (i1RightVal, coerceRightOps) =
             if rightVal.Type = I64 then
@@ -1335,8 +1351,23 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
             else (rightVal, [])
         let mergeArg = { Name = freshName env; Type = I1 }
-        env.Blocks.Value <- env.Blocks.Value @
-            [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
+        let isTerminatorOp op =
+            match op with CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true | _ -> false
+        let rightEndsWithTerm = rightOps |> List.tryLast |> Option.map isTerminatorOp |> Option.defaultValue false
+        if rightEndsWithTerm && blocksAfterRight > blocksBeforeRight then
+            // Right side is nested And/Or — rightOps ends with terminator.
+            // Put rightOps in evalRight block WITHOUT the continuation.
+            // Patch the inner merge block (from nested And/Or) with our continuation.
+            env.Blocks.Value <- env.Blocks.Value @
+                [ { Label = Some evalRightLabel; Args = []; Body = rightOps } ]
+            let allBlocks = env.Blocks.Value
+            let innerMergeIdx = blocksAfterRight - 1
+            let innerMerge = allBlocks.[innerMergeIdx]
+            let patched = { innerMerge with Body = innerMerge.Body @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] }
+            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerMergeIdx then patched else b)
+        else
+            env.Blocks.Value <- env.Blocks.Value @
+                [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         let andBranchOp = CfCondBrOp(i1LeftVal, evalRightLabel, [], mergeLabel, [i1LeftVal])
@@ -1370,7 +1401,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             else (leftVal, [])
         let evalRightLabel = freshLabel env "or_right"
         let mergeLabel     = freshLabel env "or_merge"
+        let blocksBeforeRight = List.length env.Blocks.Value
         let (rightVal, rightOps) = elaborateExpr env rhsExpr
+        let blocksAfterRight = List.length env.Blocks.Value
         // Phase 36 FIX-03: Coerce rightVal to I1 as well (merge block arg type must be I1).
         let (i1RightVal, coerceRightOps) =
             if rightVal.Type = I64 then
@@ -1379,8 +1412,23 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
             else (rightVal, [])
         let mergeArg = { Name = freshName env; Type = I1 }
-        env.Blocks.Value <- env.Blocks.Value @
-            [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
+        let isTerminatorOp op =
+            match op with CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true | _ -> false
+        let rightEndsWithTerm = rightOps |> List.tryLast |> Option.map isTerminatorOp |> Option.defaultValue false
+        if rightEndsWithTerm && blocksAfterRight > blocksBeforeRight then
+            // Right side is nested And/Or — rightOps ends with terminator.
+            // Put rightOps in evalRight block WITHOUT the continuation.
+            // Patch the inner merge block (from nested And/Or) with our continuation.
+            env.Blocks.Value <- env.Blocks.Value @
+                [ { Label = Some evalRightLabel; Args = []; Body = rightOps } ]
+            let allBlocks = env.Blocks.Value
+            let innerMergeIdx = blocksAfterRight - 1
+            let innerMerge = allBlocks.[innerMergeIdx]
+            let patched = { innerMerge with Body = innerMerge.Body @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] }
+            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerMergeIdx then patched else b)
+        else
+            env.Blocks.Value <- env.Blocks.Value @
+                [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         let orBranchOp = CfCondBrOp(i1LeftVal, mergeLabel, [i1LeftVal], evalRightLabel, [])
@@ -3192,12 +3240,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
                         // Body ended with a block terminator (e.g., nested if/match).
                         // Continuation (coerce + branch to merge) goes into the last side block (nested merge block).
-                        // Same pattern as Let handler: prepend rops to last side block's body.
+                        // IMPORTANT: append AFTER lastBlock.Body — the Let handler may have already
+                        // patched this block with continuation ops that must execute before our branch.
                         let innerBlocks = env.Blocks.Value
-                        let lastBlock = List.last innerBlocks
+                        let targetIdx = blocksBeforeBody + (env.Blocks.Value.Length - blocksBeforeBody) - 1
+                        let lastBlock = innerBlocks.[targetIdx]
                         let contOps = coerceOps @ [CfBrOp(mergeLabel, [coercedVal])]
-                        let patchedLast = { lastBlock with Body = contOps @ lastBlock.Body }
-                        env.Blocks.Value <- (List.take (innerBlocks.Length - 1) innerBlocks) @ [patchedLast]
+                        let patchedLast = { lastBlock with Body = lastBlock.Body @ contOps }
+                        env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedLast else b)
                         bodyOps  // entry ops only (end with terminator); side blocks already patched
                     | Some LlvmUnreachableOp -> bodyOps
                     | Some (CfBrOp _) | Some (CfCondBrOp _) -> bodyOps

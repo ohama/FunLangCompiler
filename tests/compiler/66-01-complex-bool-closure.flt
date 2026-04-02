@@ -1,0 +1,5 @@
+// Test: Issue #6 — Complex boolean (|| + &&) in let rec closure generates valid MLIR
+// --- Command: bash %S/66-01-complex-bool-closure.sh
+// --- Input:
+// --- Output:
+4
