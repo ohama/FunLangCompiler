@@ -71,14 +71,19 @@ let private resolveImportPath (importPath: string) (importingFile: string) : str
 
 /// Recursively expand FileImportDecl nodes into inline declarations.
 /// visitedFiles: absolute paths currently on the import stack (cycle detection).
+/// emittedFiles: absolute paths already fully expanded (diamond import dedup).
 /// Returns the expanded Decl list with FileImportDecl nodes replaced.
 let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<string>)
+                               (emittedFiles: System.Collections.Generic.HashSet<string>)
                                (currentFile: string)
                                (decls: Ast.Decl list) : Ast.Decl list =
     decls |> List.collect (fun decl ->
         match decl with
         | Ast.Decl.FileImportDecl(importPath, _span) ->
             let resolvedPath = resolveImportPath importPath currentFile
+            // Phase 66: Diamond import dedup — skip files already fully expanded
+            if emittedFiles.Contains resolvedPath then []
+            else
             if visitedFiles.Contains resolvedPath then
                 failwithf "Circular import detected: %s is already being imported" resolvedPath
             if not (File.Exists resolvedPath) then
@@ -91,11 +96,13 @@ let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<
                     match importedModule with
                     | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) -> ds
                     | Ast.EmptyModule _ -> []
-                expandImports visitedFiles resolvedPath importedDecls
+                let result = expandImports visitedFiles emittedFiles resolvedPath importedDecls
+                emittedFiles.Add resolvedPath |> ignore
+                result
             finally
                 visitedFiles.Remove resolvedPath |> ignore
         | Ast.Decl.ModuleDecl(name, innerDecls, s) ->
-            [Ast.Decl.ModuleDecl(name, expandImports visitedFiles currentFile innerDecls, s)]
+            [Ast.Decl.ModuleDecl(name, expandImports visitedFiles emittedFiles currentFile innerDecls, s)]
         | other -> [other])
 
 /// Compile a single .fun file to a native binary.
@@ -169,12 +176,14 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
             match ast with
             | Ast.Module(ds, s) ->
                 let visited = System.Collections.Generic.HashSet<string>()
+                let emitted = System.Collections.Generic.HashSet<string>()
                 visited.Add(Path.GetFullPath(inputPath)) |> ignore
-                Ast.Module(expandImports visited inputPath ds, s)
+                Ast.Module(expandImports visited emitted inputPath ds, s)
             | Ast.NamedModule(nm, ds, s) ->
                 let visited = System.Collections.Generic.HashSet<string>()
+                let emitted = System.Collections.Generic.HashSet<string>()
                 visited.Add(Path.GetFullPath(inputPath)) |> ignore
-                Ast.NamedModule(nm, expandImports visited inputPath ds, s)
+                Ast.NamedModule(nm, expandImports visited emitted inputPath ds, s)
             | other -> other
         // Phase 52: Transform typeclass declarations before elaboration
         let tcAst =

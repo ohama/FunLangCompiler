@@ -1,0 +1,5 @@
+// Test: Issue #8 — Diamond import dedup: same file imported via multiple paths
+// --- Command: bash %S/66-05-diamond-import.sh
+// --- Input:
+// --- Output:
+21
