@@ -1,0 +1,6 @@
+// Test: Issue #6 — not(complex boolean) in non-rec function generates valid MLIR
+// --- Command: bash %S/66-04-not-complex-bool.sh
+// --- Input:
+// --- Output:
+true
+false

@@ -1336,11 +1336,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let ifBranchOp = CfCondBrOp(i1CondVal, thenLabel, [], elseLabel, [])
         match List.tryLast condOps with
         | Some op when isTerminator op && blocksAfterCond > blocksBeforeCond ->
-            // Patch the If's CfCondBrOp into the condition's merge block
+            // Patch the If's CfCondBrOp into the condition's merge block.
+            // IMPORTANT: append AFTER targetBlock.Body — an App handler may have already
+            // placed continuation ops (e.g. Core_not call) that must execute before the branch.
             let allBlocks = env.Blocks.Value
             let targetIdx = blocksAfterCond - 1
             let targetBlock = allBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = coerceCondOps @ [ifBranchOp] @ targetBlock.Body }
+            let patchedTarget = { targetBlock with Body = targetBlock.Body @ coerceCondOps @ [ifBranchOp] }
             env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (mergeArg, condOps)
         | _ ->
@@ -1400,7 +1402,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let allBlocks = env.Blocks.Value
             let targetIdx = blocksAfterLeft - 1
             let targetBlock = allBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = coerceLeftOps @ [andBranchOp] @ targetBlock.Body }
+            let patchedTarget = { targetBlock with Body = targetBlock.Body @ coerceLeftOps @ [andBranchOp] }
             env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (mergeArg, leftOps)
         | _ ->
@@ -1461,7 +1463,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let allBlocks = env.Blocks.Value
             let targetIdx = blocksAfterLeft - 1
             let targetBlock = allBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = coerceLeftOps @ [orBranchOp] @ targetBlock.Body }
+            let patchedTarget = { targetBlock with Body = targetBlock.Body @ coerceLeftOps @ [orBranchOp] }
             env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (mergeArg, leftOps)
         | _ ->
@@ -2713,7 +2715,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             match Map.tryFind name env.KnownFuncs with
             | Some sig_ when sig_.ClosureInfo.IsNone ->
                 // DIRECT CALL (Phase 4 behavior) — known non-closure function
+                let blocksBeforeArg = env.Blocks.Value.Length
                 let (argVal, argOps) = elaborateExpr env argExpr
+                let blocksAfterArg = env.Blocks.Value.Length
                 // Coerce argument type to match function signature (e.g., Ptr→I64 for closure args).
                 // This handles calls like `map closure_arg` where map expects I64 but closure is Ptr.
                 let (coercedArgVal, coerceArgOps) =
@@ -2721,12 +2725,29 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     | [I64] when argVal.Type = Ptr ->
                         let coerced = { Name = freshName env; Type = I64 }
                         (coerced, [LlvmPtrToIntOp(coerced, argVal)])
+                    | [I64] when argVal.Type = I1 ->
+                        let coerced = { Name = freshName env; Type = I64 }
+                        (coerced, [ArithExtuIOp(coerced, argVal)])
                     | [Ptr] when argVal.Type = I64 ->
                         let coerced = { Name = freshName env; Type = Ptr }
                         (coerced, [LlvmIntToPtrOp(coerced, argVal)])
                     | _ -> (argVal, [])
                 let result = { Name = freshName env; Type = sig_.ReturnType }
-                (result, argOps @ coerceArgOps @ [DirectCallOp(result, sig_.MlirName, [coercedArgVal])])
+                let contOps = coerceArgOps @ [DirectCallOp(result, sig_.MlirName, [coercedArgVal])]
+                // Phase 66: If argOps ends with terminator (e.g. And/Or), continuation must
+                // go into the arg's merge block, not appended after the terminator.
+                let isTerminator op =
+                    match op with CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true | _ -> false
+                match List.tryLast argOps with
+                | Some op when isTerminator op && blocksAfterArg > blocksBeforeArg ->
+                    let allBlocks = env.Blocks.Value
+                    let targetIdx = blocksAfterArg - 1
+                    let targetBlock = allBlocks.[targetIdx]
+                    let patchedTarget = { targetBlock with Body = targetBlock.Body @ contOps }
+                    env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+                    (result, argOps)
+                | _ ->
+                    (result, argOps @ contOps)
             | Some sig_ ->
                 // CLOSURE-MAKING CALL — allocate env on GC heap, then call
                 let ci = sig_.ClosureInfo.Value
