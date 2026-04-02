@@ -1,0 +1,13 @@
+// Test: Prelude/Char.fun sync with FunLang — camelCase names + toInt/ofInt
+// --- Command: bash %S/66-08-char-prelude-sync.sh
+// --- Input:
+// --- Output:
+true
+false
+true
+false
+true
+66
+98
+65
+90

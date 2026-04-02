@@ -1,19 +1,25 @@
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 module Char =
-    let IsDigit c = char_is_digit c
-    let ToUpper c = char_to_upper c
-    let IsLetter c = char_is_letter c
-    let IsUpper c = char_is_upper c
-    let IsLower c = char_is_lower c
-    let ToLower c = char_to_lower c
-let _ = println (to_string (Char.IsDigit '5'))
-let _ = println (to_string (Char.IsLetter 'a'))
-let _ = println (to_string (Char.IsUpper 'A'))
-let _ = println (to_string (Char.IsLower 'a'))
+    let isDigit c = char_is_digit c
+    let toUpper c = char_to_upper c
+    let isLetter c = char_is_letter c
+    let isUpper c = char_is_upper c
+    let isLower c = char_is_lower c
+    let toLower c = char_to_lower c
+    let toInt c = char_to_int c
+    let ofInt n = int_to_char n
+let _ = println (to_string (Char.isDigit '5'))
+let _ = println (to_string (Char.isLetter 'a'))
+let _ = println (to_string (Char.isUpper 'A'))
+let _ = println (to_string (Char.isLower 'a'))
+let _ = println (to_string (Char.toInt 'A'))
+let _ = println (to_string (Char.ofInt 66))
 // --- Output:
 true
 true
 true
 true
+65
+66
 0
