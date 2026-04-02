@@ -1,0 +1,5 @@
+// Test: Issue #9 — IndexSet (arr.[i] <- v) collection arg I64→Ptr coercion in closure
+// --- Command: bash %S/66-07-indexset-coerce.sh
+// --- Input:
+// --- Output:
+42

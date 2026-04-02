@@ -1964,6 +1964,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (collVal, collOps) = elaborateExpr env collExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (valVal, valOps) = elaborateExpr env valExpr
+        // Phase 66: Coerce collection to Ptr if loaded as I64 from closure env
+        let (collPtr, collCoerce) =
+            if collVal.Type = Ptr then (collVal, [])
+            else let v = { Name = freshName env; Type = Ptr } in (v, [LlvmIntToPtrOp(v, collVal)])
         let (valV, valCoerce) =
             if valVal.Type = I64 then (valVal, [])
             else if valVal.Type = Ptr then
@@ -1973,12 +1977,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let unitVal = { Name = freshName env; Type = I64 }
         match idxVal.Type with
         | Ptr ->
-            (unitVal, collOps @ idxOps @ valOps @ valCoerce @ [LlvmCallVoidOp("@lang_index_set_str", [collVal; idxVal; valV]); ArithConstantOp(unitVal, 0L)])
+            (unitVal, collOps @ collCoerce @ idxOps @ valOps @ valCoerce @ [LlvmCallVoidOp("@lang_index_set_str", [collPtr; idxVal; valV]); ArithConstantOp(unitVal, 0L)])
         | _ ->
             let (idxV, idxCoerce) =
                 if idxVal.Type = I64 then (idxVal, [])
                 else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
-            (unitVal, collOps @ idxOps @ valOps @ idxCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_index_set", [collVal; idxV; valV]); ArithConstantOp(unitVal, 0L)])
+            (unitVal, collOps @ collCoerce @ idxOps @ valOps @ idxCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_index_set", [collPtr; idxV; valV]); ArithConstantOp(unitVal, 0L)])
 
     // hashtable_containsKey — two-arg
     // hashtable_containsKey ht key: dispatch to _str variant when key is Ptr; else call lang_hashtable_containsKey → i64 (0 or 1), compare ne 0 → I1
