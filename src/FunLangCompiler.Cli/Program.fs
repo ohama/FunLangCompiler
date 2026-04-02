@@ -91,7 +91,13 @@ let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<
             visitedFiles.Add resolvedPath |> ignore
             try
                 let src = File.ReadAllText resolvedPath
-                let importedModule = parseProgram src resolvedPath
+                let importedModule =
+                    try parseProgram src resolvedPath
+                    with ex ->
+                        // Phase 66: Prepend filename to parse/indent errors from imported files
+                        let msg = ex.Message
+                        if msg.Contains(resolvedPath) then reraise ()
+                        else failwithf "%s: %s" resolvedPath msg
                 let importedDecls =
                     match importedModule with
                     | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) -> ds
@@ -208,7 +214,7 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
         let msg = ex.Message
         if msg.StartsWith("[Elaboration]") then
             eprintfn "%s" msg
-        elif msg.Contains("parse error") || msg.Contains("Parse error") then
+        elif msg.Contains("parse error") || msg.Contains("Parse error") || msg.Contains("IndentationError") || msg.Contains("Invalid indentation") then
             eprintfn "[Parse] %s" msg
         else
             eprintfn "[Elaboration] %s" msg
