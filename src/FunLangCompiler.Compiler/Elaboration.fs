@@ -418,12 +418,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // If bops ends with a block terminator (from nested Match/TryWith/If), the
         // continuation code (rops) must go into the outer if's merge block (at blocksAfterBind - 1),
         // not the last block in env.Blocks (which may be the INNER if's merge block).
-        let isTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         match List.tryLast bops with
-        | Some op when isTerminator op && blocksAfterBind > blocksBeforeBind ->
+        | Some op when isTerminatorOp op && blocksAfterBind > blocksBeforeBind ->
             // Place rops in the OUTER merge block (captured BEFORE bodyExpr elaboration)
             let innerBlocks = env.Blocks.Value
             let targetIdx = blocksAfterBind - 1
@@ -444,12 +440,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Same fix as Let case — targets the OUTER merge block, not the innermost one.
         let blocksAfterBind = env.Blocks.Value.Length
         let (rv, rops) = elaborateExpr env bodyExpr
-        let isTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         match List.tryLast bops with
-        | Some op when isTerminator op && blocksAfterBind > blocksBeforeBind ->
+        | Some op when isTerminatorOp op && blocksAfterBind > blocksBeforeBind ->
             // Place rops in the OUTER merge block (captured BEFORE bodyExpr elaboration)
             let innerBlocks = env.Blocks.Value
             let targetIdx = blocksAfterBind - 1
@@ -470,12 +462,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | None -> env.CollectionVars
         let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars'; CollectionVars = collVars' }
         let (rv, rops) = elaborateExpr env' bodyExpr
-        let isTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         match List.tryLast bops with
-        | Some op when isTerminator op && blocksAfterBind > blocksBeforeBind ->
+        | Some op when isTerminatorOp op && blocksAfterBind > blocksBeforeBind ->
             // bindExpr ended with a block terminator (e.g. If/Match).
             // Place rops in the merge block (captured BEFORE bodyExpr elaboration).
             let innerBlocks = env.Blocks.Value
@@ -657,14 +645,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // side blocks (match arms, match merge) are created in env.Blocks. The continuation
         // CfBrOp(mergeLabel) must go into the LAST side block (match's merge block), not
         // appended inline after the terminator (which would be unreachable).
-        let isBranchTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         // Then block
         let thenBlockBody =
             match List.tryLast thenOps with
-            | Some op when isBranchTerminator op && blocksAfterThen > blocksBeforeThen ->
+            | Some op when isTerminatorOp op && blocksAfterThen > blocksBeforeThen ->
                 // thenExpr created side blocks (e.g. nested match).
                 // Patch CfBrOp(mergeLabel) into the last side block (match's merge block).
                 // IMPORTANT: append AFTER targetBlock.Body (which may contain ops computing thenVal).
@@ -681,7 +665,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Else block
         let elseBlockBody =
             match List.tryLast elseOps with
-            | Some op when isBranchTerminator op && blocksAfterElse > blocksBeforeElse ->
+            | Some op when isTerminatorOp op && blocksAfterElse > blocksBeforeElse ->
                 // elseExpr created side blocks (e.g. nested match).
                 // Patch CfBrOp(mergeLabel) into the last side block (match's merge block).
                 // IMPORTANT: append AFTER targetBlock.Body (which may contain ops computing elseVal).
@@ -700,13 +684,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Phase 36 FIX-03: If condOps ends with a terminator (e.g. And/Or produced a CfCondBrOp),
         // the If's own CfCondBrOp must go into the And/Or's merge block (blocksAfterCond - 1),
         // not appended inline after the terminator.
-        let isTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         let ifBranchOp = CfCondBrOp(i1CondVal, thenLabel, [], elseLabel, [])
         match List.tryLast condOps with
-        | Some op when isTerminator op && blocksAfterCond > blocksBeforeCond ->
+        | Some op when isTerminatorOp op && blocksAfterCond > blocksBeforeCond ->
             // Patch the If's CfCondBrOp into the condition's merge block.
             // IMPORTANT: append AFTER targetBlock.Body — an App handler may have already
             // placed continuation ops (e.g. Core_not call) that must execute before the branch.
@@ -743,8 +723,6 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
             else (rightVal, [])
         let mergeArg = { Name = freshName env; Type = I1 }
-        let isTerminatorOp op =
-            match op with CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true | _ -> false
         let rightEndsWithTerm = rightOps |> List.tryLast |> Option.map isTerminatorOp |> Option.defaultValue false
         if rightEndsWithTerm && blocksAfterRight > blocksBeforeRight then
             // Right side is nested And/Or — rightOps ends with terminator.
@@ -764,12 +742,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         let andBranchOp = CfCondBrOp(i1LeftVal, evalRightLabel, [], mergeLabel, [i1LeftVal])
         // Phase 36 FIX-03: If leftOps ends with a terminator (nested And/Or), patch into merge block.
-        let isTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         match List.tryLast leftOps with
-        | Some op when isTerminator op && blocksAfterLeft > blocksBeforeAnd ->
+        | Some op when isTerminatorOp op && blocksAfterLeft > blocksBeforeAnd ->
             let allBlocks = env.Blocks.Value
             let targetIdx = blocksAfterLeft - 1
             let targetBlock = allBlocks.[targetIdx]
@@ -804,8 +778,6 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
             else (rightVal, [])
         let mergeArg = { Name = freshName env; Type = I1 }
-        let isTerminatorOp op =
-            match op with CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true | _ -> false
         let rightEndsWithTerm = rightOps |> List.tryLast |> Option.map isTerminatorOp |> Option.defaultValue false
         if rightEndsWithTerm && blocksAfterRight > blocksBeforeRight then
             // Right side is nested And/Or — rightOps ends with terminator.
@@ -825,12 +797,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
         let orBranchOp = CfCondBrOp(i1LeftVal, mergeLabel, [i1LeftVal], evalRightLabel, [])
         // Phase 36 FIX-03: If leftOps ends with a terminator (nested Or/And), patch into merge block.
-        let isTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         match List.tryLast leftOps with
-        | Some op when isTerminator op && blocksAfterLeft > blocksBeforeOr ->
+        | Some op when isTerminatorOp op && blocksAfterLeft > blocksBeforeOr ->
             let allBlocks = env.Blocks.Value
             let targetIdx = blocksAfterLeft - 1
             let targetBlock = allBlocks.[targetIdx]
@@ -2223,10 +2191,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let contOps = coerceArgOps @ [DirectCallOp(result, sig_.MlirName, [coercedArgVal])]
                 // Phase 66: If argOps ends with terminator (e.g. And/Or), continuation must
                 // go into the arg's merge block, not appended after the terminator.
-                let isTerminator op =
-                    match op with CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true | _ -> false
                 match List.tryLast argOps with
-                | Some op when isTerminator op && blocksAfterArg > blocksBeforeArg ->
+                | Some op when isTerminatorOp op && blocksAfterArg > blocksBeforeArg ->
                     let allBlocks = env.Blocks.Value
                     let targetIdx = blocksAfterArg - 1
                     let targetBlock = allBlocks.[targetIdx]
@@ -2768,11 +2734,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let (coercedVal, coerceOps) = coerceToI64 bindEnv bodyVal
                 resultType.Value <- I64
                 // Create a body block and branch to merge (skip merge branch if body already terminated)
-                let isTerminator op =
-                    match op with CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true | _ -> false
                 let terminatedOps =
                     match List.tryLast bodyOps with
-                    | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
+                    | Some op when isTerminatorOp op && env.Blocks.Value.Length > blocksBeforeBody ->
                         // Body ended with a block terminator (e.g., nested if/match).
                         // Continuation (coerce + branch to merge) goes into the last side block (nested merge block).
                         // IMPORTANT: append AFTER lastBlock.Body — the Let handler may have already
@@ -3628,10 +3592,6 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // If bodyOps ends with a block terminator (from a nested while/if/match inside the body),
         // the back-edge must be appended to the LAST side block (the inner expression's merge/exit
         // block, which was left empty for patching), NOT inline in bodyOps.
-        let isTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         // Build the back-edge ops depending on whether back-cond created side blocks
         // If backCondSideBlocks > 0, condOps2 ends with a cf.br to its first side block,
         // and the back-edge branch must go into the last back-cond side block.
@@ -3641,7 +3601,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 // The "back-edge ops for body" are just condOps2 (entry fragment going to first side block).
                 // After body block, we push back-cond side blocks (already in env.Blocks.Value).
                 match List.tryLast bodyOps with
-                | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
+                | Some op when isTerminatorOp op && env.Blocks.Value.Length > blocksBeforeBody ->
                     // Body has side blocks too; back-cond entry fragment goes into inner last block.
                     (bodyOps, true, condOps2 @ coerceCondOps2)
                 | _ ->
@@ -3650,7 +3610,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 // Simple back-cond: no side blocks.
                 let backEdgeOps = condOps2 @ coerceCondOps2 @ [backEdgeBrOp]
                 match List.tryLast bodyOps with
-                | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
+                | Some op when isTerminatorOp op && env.Blocks.Value.Length > blocksBeforeBody ->
                     (bodyOps, true, backEdgeOps)
                 | _ ->
                     (bodyOps @ backEdgeOps, false, [])
@@ -3753,13 +3713,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let predicate = if isTo then "sle" else "sge"
         let cmpVal = { Name = freshName env; Type = I1 }
         // Detect nested loop: same pattern as WhileExpr
-        let isTerminator op =
-            match op with
-            | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
-            | _ -> false
         let bodyBlockBody, needPatchLast =
             match List.tryLast bodyOps with
-            | Some op when isTerminator op && env.Blocks.Value.Length > blocksBeforeBody ->
+            | Some op when isTerminatorOp op && env.Blocks.Value.Length > blocksBeforeBody ->
                 // Body has inner side blocks — back-edge goes into the inner last block
                 (bodyOps, true)
             | _ ->

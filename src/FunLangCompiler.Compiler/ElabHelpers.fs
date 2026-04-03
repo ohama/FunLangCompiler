@@ -326,6 +326,23 @@ let coerceToPtrArg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
         (r, [LlvmIntToPtrOp(r, v)])
     | _ -> (v, [])
 
+/// Phase 67: Check if an MLIR op is a block terminator (branch or unreachable).
+/// Used by If/And/Or/Let/Match/App handlers to detect when continuation ops
+/// must go into a merge block rather than being appended inline.
+let isTerminatorOp (op: MlirOp) : bool =
+    match op with
+    | CfBrOp _ | CfCondBrOp _ | LlvmUnreachableOp -> true
+    | _ -> false
+
+/// Phase 67: Append ops to a specific block in env.Blocks by index.
+/// Common pattern: when elaborated ops end with a terminator, continuation ops
+/// must go into the merge block (at targetIdx) rather than being appended inline.
+let appendToBlock (env: ElabEnv) (targetIdx: int) (ops: MlirOp list) : unit =
+    let allBlocks = env.Blocks.Value
+    let target = allBlocks.[targetIdx]
+    let patched = { target with Body = target.Body @ ops }
+    env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patched else b)
+
 /// Phase 39: Format specifier type for compile-time dispatch.
 type FmtSpec = IntSpec | StrSpec
 
