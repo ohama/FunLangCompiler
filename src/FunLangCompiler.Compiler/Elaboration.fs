@@ -94,13 +94,20 @@ let rec private isArrayExpr (arrayVars: Set<string>) (expr: Ast.Expr) : bool =
     | Ast.Annot (inner, _, _) -> isArrayExpr arrayVars inner
     | _ -> false
 
-/// Phase 66: Detect if an expression produces a string value.
-/// Used for IndexGet dispatch (string char-at vs array/hashtable indexing).
-let rec private isStringExpr (stringVars: Set<string>) (stringFields: Set<string>) (expr: Ast.Expr) : bool =
+/// Phase 66/67: Detect if an expression produces a string value.
+/// Phase 67: First checks AnnotationMap from type inference; falls back to heuristic.
+let rec private isStringExpr (stringVars: Set<string>) (stringFields: Set<string>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : bool =
+    // Phase 67: Type-directed check via AnnotationMap
+    let span = Ast.spanOf expr
+    match Map.tryFind span annotationMap with
+    | Some Type.TString -> true
+    | Some _ -> false
+    | None ->
+    // Fallback: heuristic check
     match expr with
     | Ast.String _ -> true
     | Ast.Var (name, _) -> Set.contains name stringVars
-    | Ast.Annot (inner, _, _) -> isStringExpr stringVars stringFields inner
+    | Ast.Annot (inner, _, _) -> isStringExpr stringVars stringFields annotationMap inner
     | Ast.FieldAccess (_, fieldName, _) -> Set.contains fieldName stringFields
     | _ -> false
 
@@ -1040,7 +1047,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             else env.BoolVars
         // Phase 66: Track string-producing bindings for IndexGet dispatch
         let stringVars' =
-            if isStringExpr env.StringVars env.StringFields bindExpr
+            if isStringExpr env.StringVars env.StringFields env.AnnotationMap bindExpr
             then Set.add name env.StringVars
             else env.StringVars
         let baseVars = Map.add name bv env.Vars
@@ -1946,7 +1953,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if collVal.Type = Ptr then (collVal, [])
             else let v = { Name = freshName env; Type = Ptr } in (v, [LlvmIntToPtrOp(v, collVal)])
         // Phase 66: String char-at dispatch — s.[i] returns the byte at index i as i64
-        if isStringExpr env.StringVars env.StringFields collExpr then
+        if isStringExpr env.StringVars env.StringFields env.AnnotationMap collExpr then
             let (idxV, idxCoerce) =
                 if idxVal.Type = I64 then (idxVal, [])
                 else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
