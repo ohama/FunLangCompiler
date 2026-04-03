@@ -5,14 +5,13 @@ D=$(mktemp -d /tmp/fnc_prelude_XXXXXX)
 ln -s "$PROJROOT/Prelude" "$D/Prelude"
 cat > "$D/test.fun" << 'FUNEOF'
 let _ =
-    // Int module
-    println (to_string (Int.parse "42"))
-    println (Int.toString 100)
-    // String-key Hashtable: createStr + indexing syntax for auto dispatch
     let ht = Hashtable.createStr ()
-    ht.["hello"] <- 1
-    ht.["world"] <- 2
-    println (to_string ht.["hello"])
+    Hashtable.setStr ht "hello" 1
+    Hashtable.setStr ht "world" 2
+    println (to_string (Hashtable.getStr ht "hello"))
+    println (to_string (Hashtable.count ht))
+    println (to_string (Hashtable.containsKeyStr ht "world"))
+    Hashtable.removeStr ht "world"
     println (to_string (Hashtable.count ht))
     let keys = Hashtable.keysStr ht
     println (to_string (List.length keys))

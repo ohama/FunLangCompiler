@@ -2056,6 +2056,65 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, uOps @ [LlvmCallOp(result, "@lang_hashtable_create_str", [])])
 
+    // Phase 66: Explicit _str builtins — always call _str C function with I64→Ptr key coercion.
+    // Needed for Prelude wrappers where closure ABI loses Ptr type info on key argument.
+    | App (App (App (Var ("hashtable_set_str", _), htExpr, _), keyExpr, _), valExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (valVal, valOps) = elaborateExpr env valExpr
+        let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let (keyPtr, keyCoerce) =
+            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let (valI64, valCoerce) =
+            match valVal.Type with
+            | I64 -> (valVal, []) | I1 -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
+            | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, valVal)]) | _ -> (valVal, [])
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = htCoerce @ keyCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_hashtable_set_str", [htPtr; keyPtr; valI64]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, htOps @ keyOps @ valOps @ ops)
+
+    | App (App (Var ("hashtable_get_str", _), htExpr, _), keyExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let (keyPtr, keyCoerce) =
+            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let result = { Name = freshName env; Type = I64 }
+        (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_get_str", [htPtr; keyPtr])])
+
+    | App (App (Var ("hashtable_containsKey_str", _), htExpr, _), keyExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let (keyPtr, keyCoerce) =
+            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let rawVal = { Name = freshName env; Type = I64 }
+        let zeroVal = { Name = freshName env; Type = I64 }
+        let boolVal = { Name = freshName env; Type = I1 }
+        (boolVal, htOps @ keyOps @ htCoerce @ keyCoerce @ [
+            LlvmCallOp(rawVal, "@lang_hashtable_containsKey_str", [htPtr; keyPtr])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolVal, "ne", rawVal, zeroVal) ])
+
+    | App (App (Var ("hashtable_remove_str", _), htExpr, _), keyExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let (keyPtr, keyCoerce) =
+            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let unitVal = { Name = freshName env; Type = I64 }
+        let ops = htCoerce @ keyCoerce @ [LlvmCallVoidOp("@lang_hashtable_remove_str", [htPtr; keyPtr]); ArithConstantOp(unitVal, 0L)]
+        (unitVal, htOps @ keyOps @ ops)
+
+    | App (App (Var ("hashtable_trygetvalue_str", _), htExpr, _), keyExpr, _) ->
+        let (htVal,  htOps)  = elaborateExpr env htExpr
+        let (keyVal, keyOps) = elaborateExpr env keyExpr
+        let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let (keyPtr, keyCoerce) =
+            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let result = { Name = freshName env; Type = Ptr }
+        (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue_str", [htPtr; keyPtr])])
+
     // hashtable_create — one-arg (takes unit, which the parser gives as App(Var "hashtable_create", unitExpr))
     // hashtable_create (): elaborate and discard the unit arg, call lang_hashtable_create() → Ptr
     | App (Var ("hashtable_create", _), unitExpr, _) ->

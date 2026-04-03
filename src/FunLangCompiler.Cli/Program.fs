@@ -327,8 +327,10 @@ let private handleTest (optLevel: int) (args: string list) : int =
             printfn "%d/%d tests passed" passCount totalCount
             if passCount = totalCount then 0 else 1
 
-[<EntryPoint>]
-let main argv =
+// Phase 66: Run main logic on a thread with larger stack (64MB) to handle deep Prelude nesting.
+// The Prelude's module declarations create deeply nested LetPat chains that exceed the default
+// 1MB/.NET stack during recursive elaboration.
+let private mainImpl (argv: string[]) =
     let args = argv |> Array.toList
 
     // Parse flags: -o <output>, -O0/-O1/-O2/-O3
@@ -369,3 +371,13 @@ let main argv =
         eprintfn "       fnc build [<target>] [-O0|-O1|-O2|-O3]"
         eprintfn "       fnc test [<target>] [-O0|-O1|-O2|-O3]"
         1
+
+[<EntryPoint>]
+let main argv =
+    let mutable exitCode = 0
+    let thread = System.Threading.Thread(
+        (fun () -> exitCode <- mainImpl argv),
+        64 * 1024 * 1024)  // 64MB stack
+    thread.Start()
+    thread.Join()
+    exitCode

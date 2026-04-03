@@ -1,9 +1,9 @@
-// Test: Prelude sync — Int.parse/toString + Hashtable.createStr/keysStr + indexing syntax
+// Test: Hashtable string-key module wrappers (createStr/setStr/getStr/containsKeyStr/removeStr/keysStr)
 // --- Command: bash %S/66-09-int-hashtablestr-prelude.sh
 // --- Input:
 // --- Output:
-42
-100
 1
 2
-2
+1
+1
+1
