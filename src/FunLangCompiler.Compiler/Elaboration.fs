@@ -1217,19 +1217,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
             | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, valVal)])
             | _   -> (valVal, [])
-        let unitVal = { Name = freshName env; Type = I64 }
         match keyVal.Type with
         | Ptr ->
-            let ops = htCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_hashtable_set_str", [htPtr; keyVal; valI64]); ArithConstantOp(unitVal, 0L)]
-            (unitVal, htOps @ keyOps @ valOps @ ops)
+            let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set_str" [htPtr; keyVal; valI64]
+            (unitVal, htOps @ keyOps @ valOps @ htCoerce @ valCoerce @ callOps)
         | _ ->
             let (keyI64, keyCoerce) =
                 match keyVal.Type with
                 | I64 -> (keyVal, [])
                 | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
                 | _   -> (keyVal, [])
-            let ops = htCoerce @ keyCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_hashtable_set", [htPtr; keyI64; valI64]); ArithConstantOp(unitVal, 0L)]
-            (unitVal, htOps @ keyOps @ valOps @ ops)
+            let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set" [htPtr; keyI64; valI64]
+            (unitVal, htOps @ keyOps @ valOps @ htCoerce @ keyCoerce @ valCoerce @ callOps)
 
     // hashtable_get — two-arg
     // hashtable_get ht key: dispatch to _str variant when key is Ptr; else coerce key to i64, call lang_hashtable_get → i64
@@ -1292,15 +1291,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, valVal)])
             else
                 let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
-        let unitVal = { Name = freshName env; Type = I64 }
         match idxVal.Type with
         | Ptr ->
-            (unitVal, collOps @ collCoerce @ idxOps @ valOps @ valCoerce @ [LlvmCallVoidOp("@lang_index_set_str", [collPtr; idxVal; valV]); ArithConstantOp(unitVal, 0L)])
+            let (unitVal, callOps) = emitVoidCall env "@lang_index_set_str" [collPtr; idxVal; valV]
+            (unitVal, collOps @ collCoerce @ idxOps @ valOps @ valCoerce @ callOps)
         | _ ->
             let (idxV, idxCoerce) =
                 if idxVal.Type = I64 then (idxVal, [])
                 else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
-            (unitVal, collOps @ collCoerce @ idxOps @ valOps @ idxCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_index_set", [collPtr; idxV; valV]); ArithConstantOp(unitVal, 0L)])
+            let (unitVal, callOps) = emitVoidCall env "@lang_index_set" [collPtr; idxV; valV]
+            (unitVal, collOps @ collCoerce @ idxOps @ valOps @ idxCoerce @ valCoerce @ callOps)
 
     // hashtable_containsKey — two-arg
     // hashtable_containsKey ht key: dispatch to _str variant when key is Ptr; else call lang_hashtable_containsKey → i64 (0 or 1), compare ne 0 → I1
@@ -1338,19 +1338,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let unitVal = { Name = freshName env; Type = I64 }
         match keyVal.Type with
         | Ptr ->
-            let ops = htCoerce @ [LlvmCallVoidOp("@lang_hashtable_remove_str", [htPtr; keyVal]); ArithConstantOp(unitVal, 0L)]
-            (unitVal, htOps @ keyOps @ ops)
+            let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove_str" [htPtr; keyVal]
+            (unitVal, htOps @ keyOps @ htCoerce @ callOps)
         | _ ->
             let (keyI64, keyCoerce) =
                 match keyVal.Type with
                 | I64 -> (keyVal, [])
                 | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
                 | _   -> (keyVal, [])
-            let ops = htCoerce @ keyCoerce @ [LlvmCallVoidOp("@lang_hashtable_remove", [htPtr; keyI64]); ArithConstantOp(unitVal, 0L)]
-            (unitVal, htOps @ keyOps @ ops)
+            let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove" [htPtr; keyI64]
+            (unitVal, htOps @ keyOps @ htCoerce @ keyCoerce @ callOps)
 
     // hashtable_keys — one-arg
     // hashtable_keys ht: call lang_hashtable_keys → Ptr (LangCons* list)
@@ -1386,9 +1385,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             match valVal.Type with
             | I64 -> (valVal, []) | I1 -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
             | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, valVal)]) | _ -> (valVal, [])
-        let unitVal = { Name = freshName env; Type = I64 }
-        let ops = htCoerce @ keyCoerce @ valCoerce @ [LlvmCallVoidOp("@lang_hashtable_set_str", [htPtr; keyPtr; valI64]); ArithConstantOp(unitVal, 0L)]
-        (unitVal, htOps @ keyOps @ valOps @ ops)
+        let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set_str" [htPtr; keyPtr; valI64]
+        (unitVal, htOps @ keyOps @ valOps @ htCoerce @ keyCoerce @ valCoerce @ callOps)
 
     | App (App (Var ("hashtable_get_str", _), htExpr, _), keyExpr, _) ->
         let (htVal,  htOps)  = elaborateExpr env htExpr
@@ -1416,9 +1414,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
         let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        let ops = htCoerce @ keyCoerce @ [LlvmCallVoidOp("@lang_hashtable_remove_str", [htPtr; keyPtr]); ArithConstantOp(unitVal, 0L)]
-        (unitVal, htOps @ keyOps @ ops)
+        let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove_str" [htPtr; keyPtr]
+        (unitVal, htOps @ keyOps @ htCoerce @ keyCoerce @ callOps)
 
     | App (App (Var ("hashtable_trygetvalue_str", _), htExpr, _), keyExpr, _) ->
         let (htVal,  htOps)  = elaborateExpr env htExpr
@@ -1501,8 +1498,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             then [LlvmIntToPtrOp(closurePtrVal, fVal)]
             else []
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, fOps @ closureOps @ arrOps @ arrCoerceOps @ [LlvmCallVoidOp("@lang_array_iter", [closurePtrVal; arrPtrVal]); ArithConstantOp(unitVal, 0L)])
+        let (unitVal, callOps) = emitVoidCall env "@lang_array_iter" [closurePtrVal; arrPtrVal]
+        (unitVal, fOps @ closureOps @ arrOps @ arrCoerceOps @ callOps)
 
     // array_map — two-arg
     // array_map closure arr: coerce closure to Ptr, call lang_array_map → Ptr
@@ -1568,8 +1565,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("array_sort", _), arrExpr, _) ->
         let (arrVal, arrOps) = elaborateExpr env arrExpr
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, arrOps @ arrCoerceOps @ [LlvmCallVoidOp("@lang_array_sort", [arrPtrVal]); ArithConstantOp(unitVal, 0L)])
+        let (unitVal, callOps) = emitVoidCall env "@lang_array_sort" [arrPtrVal]
+        (unitVal, arrOps @ arrCoerceOps @ callOps)
 
     // Phase 32-03: array_of_seq — one-arg returning Ptr
     | App (Var ("array_of_seq", _), seqExpr, _) ->
@@ -1634,8 +1631,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (qVal,   qOps)   = elaborateExpr env qExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (qPtr, qCoerce) = coerceToPtrArg env qVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, qOps @ valOps @ qCoerce @ [LlvmCallVoidOp("@lang_queue_enqueue", [qPtr; valVal]); ArithConstantOp(unitVal, 0L)])
+        let (unitVal, callOps) = emitVoidCall env "@lang_queue_enqueue" [qPtr; valVal]
+        (unitVal, qOps @ valOps @ qCoerce @ callOps)
 
     | App (App (Var ("queue_dequeue", _), qExpr, _), unitExpr, _) ->
         let (qVal,  qOps) = elaborateExpr env qExpr
@@ -1660,8 +1657,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (idxV, idxCoerce) =
             if idxVal.Type = I64 then (idxVal, [])
             else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
-        let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, mlOps @ idxOps @ idxCoerce @ valOps @ mlCoerce @ [LlvmCallVoidOp("@lang_mlist_set", [mlPtr; idxV; valVal]); ArithConstantOp(unitVal, 0L)])
+        let (unitVal, callOps) = emitVoidCall env "@lang_mlist_set" [mlPtr; idxV; valVal]
+        (unitVal, mlOps @ idxOps @ idxCoerce @ valOps @ mlCoerce @ callOps)
 
     | App (App (Var ("mutablelist_get", _), mlExpr, _), idxExpr, _) ->
         let (mlVal,  mlOps)  = elaborateExpr env mlExpr
@@ -1682,8 +1679,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (mlVal,  mlOps)  = elaborateExpr env mlExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, mlOps @ valOps @ mlCoerce @ [LlvmCallVoidOp("@lang_mlist_add", [mlPtr; valVal]); ArithConstantOp(unitVal, 0L)])
+        let (unitVal, callOps) = emitVoidCall env "@lang_mlist_add" [mlPtr; valVal]
+        (unitVal, mlOps @ valOps @ mlCoerce @ callOps)
 
     | App (Var ("mutablelist_count", _), mlExpr, _) ->
         let (mlVal, mlOps) = elaborateExpr env mlExpr
@@ -1697,9 +1694,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (contentVal, contentOps) = elaborateExpr env contentExpr
         let (pathPtr, pathCast) = coerceToPtrArg env pathVal
         let (contentPtr, contentCast) = coerceToPtrArg env contentVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        let ops = [LlvmCallVoidOp("@lang_file_write", [pathPtr; contentPtr]); ArithConstantOp(unitVal, 0L)]
-        (unitVal, pathOps @ contentOps @ pathCast @ contentCast @ ops)
+        let (unitVal, callOps) = emitVoidCall env "@lang_file_write" [pathPtr; contentPtr]
+        (unitVal, pathOps @ contentOps @ pathCast @ contentCast @ callOps)
 
     // append_file — two-arg, void return (identical shape to write_file)
     | App (App (Var ("append_file", _), pathExpr, _), contentExpr, _) ->
@@ -1707,9 +1703,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (contentVal, contentOps) = elaborateExpr env contentExpr
         let (pathPtr, pathCast) = coerceToPtrArg env pathVal
         let (contentPtr, contentCast) = coerceToPtrArg env contentVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        let ops = [LlvmCallVoidOp("@lang_file_append", [pathPtr; contentPtr]); ArithConstantOp(unitVal, 0L)]
-        (unitVal, pathOps @ contentOps @ pathCast @ contentCast @ ops)
+        let (unitVal, callOps) = emitVoidCall env "@lang_file_append" [pathPtr; contentPtr]
+        (unitVal, pathOps @ contentOps @ pathCast @ contentCast @ callOps)
 
     // read_file — one-arg, returns Ptr (LangString*)
     | App (Var ("read_file", _), pathExpr, _) ->
@@ -1753,17 +1748,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("eprint", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
         let (ptrVal, castOps) = coerceToPtrArg env strVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        let ops = [LlvmCallVoidOp("@lang_eprint", [ptrVal]); ArithConstantOp(unitVal, 0L)]
-        (unitVal, strOps @ castOps @ ops)
+        let (unitVal, callOps) = emitVoidCall env "@lang_eprint" [ptrVal]
+        (unitVal, strOps @ castOps @ callOps)
 
     // eprintln — one-arg, void return
     | App (Var ("eprintln", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
         let (ptrVal, castOps) = coerceToPtrArg env strVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        let ops = [LlvmCallVoidOp("@lang_eprintln", [ptrVal]); ArithConstantOp(unitVal, 0L)]
-        (unitVal, strOps @ castOps @ ops)
+        let (unitVal, callOps) = emitVoidCall env "@lang_eprintln" [ptrVal]
+        (unitVal, strOps @ castOps @ callOps)
 
     // Phase 39: printfn — 2-arg case (MUST come before 1-arg case)
     | App (App (App (Var ("printfn", _), String (fmt, _), _), arg1Expr, _), arg2Expr, s) ->
@@ -1868,9 +1861,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("eprintfn", _), String (fmt, _), _), argExpr, _) when fmt = "%s" ->
         let (argVal, argOps) = elaborateExpr env argExpr
         let (ptrVal, castOps) = coerceToPtrArg env argVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        let ops = [LlvmCallVoidOp("@lang_eprintln", [ptrVal]); ArithConstantOp(unitVal, 0L)]
-        (unitVal, argOps @ castOps @ ops)
+        let (unitVal, callOps) = emitVoidCall env "@lang_eprintln" [ptrVal]
+        (unitVal, argOps @ castOps @ callOps)
 
     // eprintfn — one-arg case: eprintfn "literal" (desugar to eprintln "literal")
     | App (Var ("eprintfn", _), String (fmt, _), s) ->
@@ -1882,9 +1874,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (linesVal, linesOps) = elaborateExpr env linesExpr
         let (pathPtr, pathCast) = coerceToPtrArg env pathVal
         let (linesPtr, linesCast) = coerceToPtrArg env linesVal
-        let unitVal = { Name = freshName env; Type = I64 }
-        let ops = [LlvmCallVoidOp("@lang_write_lines", [pathPtr; linesPtr]); ArithConstantOp(unitVal, 0L)]
-        (unitVal, pathOps @ linesOps @ pathCast @ linesCast @ ops)
+        let (unitVal, callOps) = emitVoidCall env "@lang_write_lines" [pathPtr; linesPtr]
+        (unitVal, pathOps @ linesOps @ pathCast @ linesCast @ callOps)
 
     // Phase 27: path_combine — two-arg, returns Ptr (MUST come before one-arg arms)
     | App (App (Var ("path_combine", _), dirExpr, _), fileExpr, _) ->
@@ -3715,8 +3706,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 then "@lang_for_in_array"
                 else "@lang_for_in_list"
         // Call lang_for_in_*(closure, collection), return unit
-        let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, closureOps @ collOps @ closureCoerceOps @ collCoerceOps @ [LlvmCallVoidOp(forInFn, [closurePtrVal; collPtrVal]); ArithConstantOp(unitVal, 0L)])
+        let (unitVal, callOps) = emitVoidCall env forInFn [closurePtrVal; collPtrVal]
+        (unitVal, closureOps @ collOps @ closureCoerceOps @ collCoerceOps @ callOps)
 
     // Phase 34-01: LANG-01 StringSliceExpr — s.[start..stop] or s.[start..] (open-ended)
     // Compiles to lang_string_slice(s, start, stop) where stop=-1 means "to end"

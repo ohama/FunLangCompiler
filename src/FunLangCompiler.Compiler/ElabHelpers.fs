@@ -343,6 +343,29 @@ let appendToBlock (env: ElabEnv) (targetIdx: int) (ops: MlirOp list) : unit =
     let patched = { target with Body = target.Body @ ops }
     env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patched else b)
 
+/// Phase 67: Emit a void C runtime call and return unit (0 : i64).
+/// Common pattern for builtins like write_file, eprint, hashtable_remove, etc.
+let emitVoidCall (env: ElabEnv) (funcName: string) (args: MlirValue list) : MlirValue * MlirOp list =
+    let unitVal = { Name = freshName env; Type = I64 }
+    (unitVal, [LlvmCallVoidOp(funcName, args); ArithConstantOp(unitVal, 0L)])
+
+/// Phase 67: Elaborate a sub-expression, tracking block count before/after.
+/// If the result ops end with a terminator and blocks were created,
+/// append contOps to the merge block and return only the entry ops.
+/// Otherwise, append contOps inline after the result ops.
+let elaborateWithCont (env: ElabEnv) (elaborateExpr: ElabEnv -> Ast.Expr -> MlirValue * MlirOp list)
+                      (expr: Ast.Expr) (contOps: MlirValue -> MlirOp list) : MlirValue * MlirOp list =
+    let blocksBefore = env.Blocks.Value.Length
+    let (v, ops) = elaborateExpr env expr
+    let blocksAfter = env.Blocks.Value.Length
+    let cont = contOps v
+    match List.tryLast ops with
+    | Some op when isTerminatorOp op && blocksAfter > blocksBefore ->
+        appendToBlock env (blocksAfter - 1) cont
+        (v, ops)
+    | _ ->
+        (v, ops @ cont)
+
 /// Phase 39: Format specifier type for compile-time dispatch.
 type FmtSpec = IntSpec | StrSpec
 
