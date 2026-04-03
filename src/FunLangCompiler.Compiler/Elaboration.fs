@@ -652,11 +652,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 // thenExpr created side blocks (e.g. nested match).
                 // Patch CfBrOp(mergeLabel) into the last side block (match's merge block).
                 // IMPORTANT: append AFTER targetBlock.Body (which may contain ops computing thenVal).
-                let allBlocks = env.Blocks.Value
                 let targetIdx = blocksAfterThen - 1
-                let targetBlock = allBlocks.[targetIdx]
-                let patchedTarget = { targetBlock with Body = targetBlock.Body @ thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])] }
-                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+                appendToBlock env targetIdx (thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])])
                 thenOps  // dispatch ops only (terminator ends block)
             | _ ->
                 thenOps @ thenCoerceOps @ [CfBrOp(mergeLabel, [finalThenVal])]
@@ -669,11 +666,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 // elseExpr created side blocks (e.g. nested match).
                 // Patch CfBrOp(mergeLabel) into the last side block (match's merge block).
                 // IMPORTANT: append AFTER targetBlock.Body (which may contain ops computing elseVal).
-                let allBlocks = env.Blocks.Value
                 let targetIdx = blocksAfterElse - 1
-                let targetBlock = allBlocks.[targetIdx]
-                let patchedTarget = { targetBlock with Body = targetBlock.Body @ elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])] }
-                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+                appendToBlock env targetIdx (elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])])
                 elseOps  // dispatch ops only
             | _ ->
                 elseOps @ elseCoerceOps @ [CfBrOp(mergeLabel, [finalElseVal])]
@@ -690,11 +684,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             // Patch the If's CfCondBrOp into the condition's merge block.
             // IMPORTANT: append AFTER targetBlock.Body — an App handler may have already
             // placed continuation ops (e.g. Core_not call) that must execute before the branch.
-            let allBlocks = env.Blocks.Value
             let targetIdx = blocksAfterCond - 1
-            let targetBlock = allBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = targetBlock.Body @ coerceCondOps @ [ifBranchOp] }
-            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+            appendToBlock env targetIdx (coerceCondOps @ [ifBranchOp])
             (mergeArg, condOps)
         | _ ->
             (mergeArg, condOps @ coerceCondOps @ [ifBranchOp])
@@ -730,11 +721,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             // Patch the inner merge block (from nested And/Or) with our continuation.
             env.Blocks.Value <- env.Blocks.Value @
                 [ { Label = Some evalRightLabel; Args = []; Body = rightOps } ]
-            let allBlocks = env.Blocks.Value
             let innerMergeIdx = blocksAfterRight - 1
-            let innerMerge = allBlocks.[innerMergeIdx]
-            let patched = { innerMerge with Body = innerMerge.Body @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] }
-            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerMergeIdx then patched else b)
+            appendToBlock env innerMergeIdx (coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])])
         else
             env.Blocks.Value <- env.Blocks.Value @
                 [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
@@ -744,11 +732,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Phase 36 FIX-03: If leftOps ends with a terminator (nested And/Or), patch into merge block.
         match List.tryLast leftOps with
         | Some op when isTerminatorOp op && blocksAfterLeft > blocksBeforeAnd ->
-            let allBlocks = env.Blocks.Value
             let targetIdx = blocksAfterLeft - 1
-            let targetBlock = allBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = targetBlock.Body @ coerceLeftOps @ [andBranchOp] }
-            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+            appendToBlock env targetIdx (coerceLeftOps @ [andBranchOp])
             (mergeArg, leftOps)
         | _ ->
             (mergeArg, leftOps @ coerceLeftOps @ [andBranchOp])
@@ -785,11 +770,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             // Patch the inner merge block (from nested And/Or) with our continuation.
             env.Blocks.Value <- env.Blocks.Value @
                 [ { Label = Some evalRightLabel; Args = []; Body = rightOps } ]
-            let allBlocks = env.Blocks.Value
             let innerMergeIdx = blocksAfterRight - 1
-            let innerMerge = allBlocks.[innerMergeIdx]
-            let patched = { innerMerge with Body = innerMerge.Body @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] }
-            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerMergeIdx then patched else b)
+            appendToBlock env innerMergeIdx (coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])])
         else
             env.Blocks.Value <- env.Blocks.Value @
                 [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
@@ -799,11 +781,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Phase 36 FIX-03: If leftOps ends with a terminator (nested Or/And), patch into merge block.
         match List.tryLast leftOps with
         | Some op when isTerminatorOp op && blocksAfterLeft > blocksBeforeOr ->
-            let allBlocks = env.Blocks.Value
             let targetIdx = blocksAfterLeft - 1
-            let targetBlock = allBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = targetBlock.Body @ coerceLeftOps @ [orBranchOp] }
-            env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+            appendToBlock env targetIdx (coerceLeftOps @ [orBranchOp])
             (mergeArg, leftOps)
         | _ ->
             (mergeArg, leftOps @ coerceLeftOps @ [orBranchOp])
@@ -2151,11 +2130,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 // go into the arg's merge block, not appended after the terminator.
                 match List.tryLast argOps with
                 | Some op when isTerminatorOp op && blocksAfterArg > blocksBeforeArg ->
-                    let allBlocks = env.Blocks.Value
                     let targetIdx = blocksAfterArg - 1
-                    let targetBlock = allBlocks.[targetIdx]
-                    let patchedTarget = { targetBlock with Body = targetBlock.Body @ contOps }
-                    env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
+                    appendToBlock env targetIdx contOps
                     (result, argOps)
                 | _ ->
                     (result, argOps @ contOps)
@@ -2699,12 +2675,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         // Continuation (coerce + branch to merge) goes into the last side block (nested merge block).
                         // IMPORTANT: append AFTER lastBlock.Body — the Let handler may have already
                         // patched this block with continuation ops that must execute before our branch.
-                        let innerBlocks = env.Blocks.Value
                         let targetIdx = blocksBeforeBody + (env.Blocks.Value.Length - blocksBeforeBody) - 1
-                        let lastBlock = innerBlocks.[targetIdx]
                         let contOps = coerceOps @ [CfBrOp(mergeLabel, [coercedVal])]
-                        let patchedLast = { lastBlock with Body = lastBlock.Body @ contOps }
-                        env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedLast else b)
+                        appendToBlock env targetIdx contOps
                         bodyOps  // entry ops only (end with terminator); side blocks already patched
                     | Some LlvmUnreachableOp -> bodyOps
                     | Some (CfBrOp _) | Some (CfCondBrOp _) -> bodyOps
@@ -3597,21 +3570,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             // Before appending: it was at env.Blocks.Value.Length - 3 - condSideBlocks
             // But condSideBlocks blocks were pushed between blocksBeforeCond and blocksBeforeBody.
             // The last header-cond side block index (before the 3 while blocks) = blocksBeforeBody - 1
-            let allBlocks = env.Blocks.Value
             let condLastIdx = blocksBeforeBody - 1  // last block pushed by cond elaboration
             if condLastIdx >= 0 then
-                let condLast = allBlocks.[condLastIdx]
-                let patched = { condLast with Body = condLast.Body @ coerceCondOps @ [condBrOp] }
-                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = condLastIdx then patched else b)
+                appendToBlock env condLastIdx (coerceCondOps @ [condBrOp])
         // Patch back-cond side blocks if needed
         if backCondSideBlocks > 0 then
             // The last back-cond side block is just before the 3 while blocks we appended.
-            let allBlocks = env.Blocks.Value
-            let backCondLastIdx = allBlocks.Length - 4  // 4th from end = just before header/body/exit
+            let backCondLastIdx = env.Blocks.Value.Length - 4  // 4th from end = just before header/body/exit
             if backCondLastIdx >= 0 then
-                let backCondLast = allBlocks.[backCondLastIdx]
-                let patched = { backCondLast with Body = backCondLast.Body @ coerceCondOps2 @ [backEdgeBrOp] }
-                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = backCondLastIdx then patched else b)
+                appendToBlock env backCondLastIdx (coerceCondOps2 @ [backEdgeBrOp])
         // If the body had inner side blocks, patch the back-edge into what is now the last
         // side block among the while's blocks (which is while_body itself — no, we need the
         // last block pushed before while_body that is the inner merge block).
@@ -3620,12 +3587,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // we appended the three while blocks — i.e., the inner merge/exit block.
         if needPatchLast then
             // The inner merge block is at position (env.Blocks.Value.Length - 4 - backCondSideBlocks)
-            let allBlocks = env.Blocks.Value
-            let innerLastIdx = allBlocks.Length - 4 - backCondSideBlocks
+            let innerLastIdx = env.Blocks.Value.Length - 4 - backCondSideBlocks
             if innerLastIdx >= 0 then
-                let innerLast = allBlocks.[innerLastIdx]
-                let patched = { innerLast with Body = innerLast.Body @ backEdgeForBody }
-                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerLastIdx then patched else b)
+                appendToBlock env innerLastIdx backEdgeForBody
             // If backCondSideBlocks > 0, also patch back-cond branch into the body's inner-last block
             // (This case: body has inner blocks AND back-cond has side blocks)
             // The back-cond side blocks are at indices (allBlocks.Length - 4 - backCondSideBlocks) to (allBlocks.Length - 4 - 1)
@@ -3693,12 +3657,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 Body  = [] } ]
         // Patch nested loop's inner merge block with back-edge ops if needed
         if needPatchLast then
-            let allBlocks = env.Blocks.Value
-            let innerLastIdx = allBlocks.Length - 4  // 4th from end = just before header/body/exit
+            let innerLastIdx = env.Blocks.Value.Length - 4  // 4th from end = just before header/body/exit
             if innerLastIdx >= 0 then
-                let innerLast = allBlocks.[innerLastIdx]
-                let patched = { innerLast with Body = innerLast.Body @ backEdgeOps }
-                env.Blocks.Value <- allBlocks |> List.mapi (fun i b -> if i = innerLastIdx then patched else b)
+                appendToBlock env innerLastIdx backEdgeOps
         // Entry fragment: elaborate start/stop, define unit constant, branch to header with start value
         (exitArg, startOps @ stopOps @ [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, [startVal]) ])
 
