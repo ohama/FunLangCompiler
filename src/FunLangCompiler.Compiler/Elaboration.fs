@@ -1402,8 +1402,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) =
-            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
         let (valI64, valCoerce) =
             match valVal.Type with
             | I64 -> (valVal, []) | I1 -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
@@ -1416,8 +1415,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) =
-            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
         let result = { Name = freshName env; Type = I64 }
         (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_get_str", [htPtr; keyPtr])])
 
@@ -1425,8 +1423,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) =
-            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
         let rawVal = { Name = freshName env; Type = I64 }
         let zeroVal = { Name = freshName env; Type = I64 }
         let boolVal = { Name = freshName env; Type = I1 }
@@ -1439,8 +1436,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) =
-            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = htCoerce @ keyCoerce @ [LlvmCallVoidOp("@lang_hashtable_remove_str", [htPtr; keyPtr]); ArithConstantOp(unitVal, 0L)]
         (unitVal, htOps @ keyOps @ ops)
@@ -1449,8 +1445,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) =
-            if keyVal.Type = Ptr then (keyVal, []) else let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, keyVal)])
+        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
         let result = { Name = freshName env; Type = Ptr }
         (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue_str", [htPtr; keyPtr])])
 
@@ -1721,12 +1716,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
         let (pathVal,    pathOps)    = elaborateExpr env pathExpr
         let (contentVal, contentOps) = elaborateExpr env contentExpr
-        let (pathPtr, pathCast) =
-            if pathVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, pathVal)])
-            else (pathVal, [])
-        let (contentPtr, contentCast) =
-            if contentVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, contentVal)])
-            else (contentVal, [])
+        let (pathPtr, pathCast) = coerceToPtrArg env pathVal
+        let (contentPtr, contentCast) = coerceToPtrArg env contentVal
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = [LlvmCallVoidOp("@lang_file_write", [pathPtr; contentPtr]); ArithConstantOp(unitVal, 0L)]
         (unitVal, pathOps @ contentOps @ pathCast @ contentCast @ ops)
@@ -1735,12 +1726,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("append_file", _), pathExpr, _), contentExpr, _) ->
         let (pathVal,    pathOps)    = elaborateExpr env pathExpr
         let (contentVal, contentOps) = elaborateExpr env contentExpr
-        let (pathPtr, pathCast) =
-            if pathVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, pathVal)])
-            else (pathVal, [])
-        let (contentPtr, contentCast) =
-            if contentVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, contentVal)])
-            else (contentVal, [])
+        let (pathPtr, pathCast) = coerceToPtrArg env pathVal
+        let (contentPtr, contentCast) = coerceToPtrArg env contentVal
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = [LlvmCallVoidOp("@lang_file_append", [pathPtr; contentPtr]); ArithConstantOp(unitVal, 0L)]
         (unitVal, pathOps @ contentOps @ pathCast @ contentCast @ ops)
@@ -1748,23 +1735,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // read_file — one-arg, returns Ptr (LangString*)
     | App (Var ("read_file", _), pathExpr, _) ->
         let (pathVal, pathOps) = elaborateExpr env pathExpr
-        let (ptrVal, castOps) =
-            if pathVal.Type = I64 then
-                let p = { Name = freshName env; Type = Ptr }
-                (p, [LlvmIntToPtrOp(p, pathVal)])
-            else (pathVal, [])
+        let (ptrVal, castOps) = coerceToPtrArg env pathVal
         let result = { Name = freshName env; Type = Ptr }
         (result, pathOps @ castOps @ [LlvmCallOp(result, "@lang_file_read", [ptrVal])])
 
     // file_exists — one-arg, returns bool (I1 via I64 comparison)
     | App (Var ("file_exists", _), pathExpr, _) ->
         let (pathVal, pathOps) = elaborateExpr env pathExpr
-        // Phase 66: Coerce I64 → Ptr when string arg loaded from closure env
-        let (ptrVal, castOps) =
-            if pathVal.Type = I64 then
-                let p = { Name = freshName env; Type = Ptr }
-                (p, [LlvmIntToPtrOp(p, pathVal)])
-            else (pathVal, [])
+        let (ptrVal, castOps) = coerceToPtrArg env pathVal
         let rawVal  = { Name = freshName env; Type = I64 }
         let zeroVal = { Name = freshName env; Type = I64 }
         let boolVal = { Name = freshName env; Type = I1  }
@@ -1795,9 +1773,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // eprint — one-arg, void return
     | App (Var ("eprint", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
-        let (ptrVal, castOps) =
-            if strVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, strVal)])
-            else (strVal, [])
+        let (ptrVal, castOps) = coerceToPtrArg env strVal
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = [LlvmCallVoidOp("@lang_eprint", [ptrVal]); ArithConstantOp(unitVal, 0L)]
         (unitVal, strOps @ castOps @ ops)
@@ -1805,9 +1781,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // eprintln — one-arg, void return
     | App (Var ("eprintln", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
-        let (ptrVal, castOps) =
-            if strVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, strVal)])
-            else (strVal, [])
+        let (ptrVal, castOps) = coerceToPtrArg env strVal
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = [LlvmCallVoidOp("@lang_eprintln", [ptrVal]); ArithConstantOp(unitVal, 0L)]
         (unitVal, strOps @ castOps @ ops)
@@ -1914,9 +1888,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // eprintfn — two-arg case: eprintfn "%s" str  (MUST come before one-arg case)
     | App (App (Var ("eprintfn", _), String (fmt, _), _), argExpr, _) when fmt = "%s" ->
         let (argVal, argOps) = elaborateExpr env argExpr
-        let (ptrVal, castOps) =
-            if argVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, argVal)])
-            else (argVal, [])
+        let (ptrVal, castOps) = coerceToPtrArg env argVal
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = [LlvmCallVoidOp("@lang_eprintln", [ptrVal]); ArithConstantOp(unitVal, 0L)]
         (unitVal, argOps @ castOps @ ops)
@@ -1929,12 +1901,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("write_lines", _), pathExpr, _), linesExpr, _) ->
         let (pathVal,  pathOps)  = elaborateExpr env pathExpr
         let (linesVal, linesOps) = elaborateExpr env linesExpr
-        let (pathPtr, pathCast) =
-            if pathVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, pathVal)])
-            else (pathVal, [])
-        let (linesPtr, linesCast) =
-            if linesVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, linesVal)])
-            else (linesVal, [])
+        let (pathPtr, pathCast) = coerceToPtrArg env pathVal
+        let (linesPtr, linesCast) = coerceToPtrArg env linesVal
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = [LlvmCallVoidOp("@lang_write_lines", [pathPtr; linesPtr]); ArithConstantOp(unitVal, 0L)]
         (unitVal, pathOps @ linesOps @ pathCast @ linesCast @ ops)
@@ -1943,39 +1911,29 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("path_combine", _), dirExpr, _), fileExpr, _) ->
         let (dirVal,  dirOps)  = elaborateExpr env dirExpr
         let (fileVal, fileOps) = elaborateExpr env fileExpr
-        let (dirPtr, dirCast) =
-            if dirVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, dirVal)])
-            else (dirVal, [])
-        let (filePtr, fileCast) =
-            if fileVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, fileVal)])
-            else (fileVal, [])
+        let (dirPtr, dirCast) = coerceToPtrArg env dirVal
+        let (filePtr, fileCast) = coerceToPtrArg env fileVal
         let result = { Name = freshName env; Type = Ptr }
         (result, dirOps @ fileOps @ dirCast @ fileCast @ [LlvmCallOp(result, "@lang_path_combine", [dirPtr; filePtr])])
 
     // Phase 27: read_lines — one-arg, returns Ptr
     | App (Var ("read_lines", _), pathExpr, _) ->
         let (pathVal, pathOps) = elaborateExpr env pathExpr
-        let (ptrVal, castOps) =
-            if pathVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, pathVal)])
-            else (pathVal, [])
+        let (ptrVal, castOps) = coerceToPtrArg env pathVal
         let result = { Name = freshName env; Type = Ptr }
         (result, pathOps @ castOps @ [LlvmCallOp(result, "@lang_read_lines", [ptrVal])])
 
     // Phase 27: get_env — one-arg, returns Ptr
     | App (Var ("get_env", _), nameExpr, _) ->
         let (nameVal, nameOps) = elaborateExpr env nameExpr
-        let (ptrVal, castOps) =
-            if nameVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, nameVal)])
-            else (nameVal, [])
+        let (ptrVal, castOps) = coerceToPtrArg env nameVal
         let result = { Name = freshName env; Type = Ptr }
         (result, nameOps @ castOps @ [LlvmCallOp(result, "@lang_get_env", [ptrVal])])
 
     // Phase 27: dir_files — one-arg, returns Ptr
     | App (Var ("dir_files", _), pathExpr, _) ->
         let (pathVal, pathOps) = elaborateExpr env pathExpr
-        let (ptrVal, castOps) =
-            if pathVal.Type = I64 then let p = { Name = freshName env; Type = Ptr } in (p, [LlvmIntToPtrOp(p, pathVal)])
-            else (pathVal, [])
+        let (ptrVal, castOps) = coerceToPtrArg env pathVal
         let result = { Name = freshName env; Type = Ptr }
         (result, pathOps @ castOps @ [LlvmCallOp(result, "@lang_dir_files", [ptrVal])])
 
