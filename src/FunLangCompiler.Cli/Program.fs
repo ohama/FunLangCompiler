@@ -194,8 +194,8 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
         // Phase 52: Transform typeclass declarations before elaboration
         let tcAst =
             match expandedAst with
-            | Ast.Module(ds, s) -> Ast.Module(Elaboration.elaborateTypeclasses ds, s)
-            | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, Elaboration.elaborateTypeclasses ds, s)
+            | Ast.Module(ds, s) -> Ast.Module(ElabProgram.elaborateTypeclasses ds, s)
+            | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, ElabProgram.elaborateTypeclasses ds, s)
             | Ast.EmptyModule s -> Ast.EmptyModule s
         // Phase 67: Run FunLang type inference to get per-expression type annotations.
         // This runs independently from the compilation pipeline — errors are non-fatal
@@ -212,7 +212,7 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                 finally
                     System.Console.SetError(savedErr)
             with _ -> Map.empty  // Type check failed — fall back to heuristics
-        let mlirMod = Elaboration.elaborateProgram tcAst annotationMap
+        let mlirMod = ElabProgram.elaborateProgram tcAst annotationMap
         match Pipeline.compile mlirMod outputPath optLevel with
         | Ok () ->
             0

@@ -9,7 +9,9 @@
     <Compile Include="MlirIR.fs" />
     <Compile Include="Printer.fs" />
     <Compile Include="MatchCompiler.fs" />
+    <Compile Include="ElabHelpers.fs" />
     <Compile Include="Elaboration.fs" />
+    <Compile Include="ElabProgram.fs" />
     <Compile Include="Pipeline.fs" />
     <Compile Include="ProjectFile.fs" />
   </ItemGroup>
