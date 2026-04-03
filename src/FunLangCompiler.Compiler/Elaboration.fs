@@ -395,8 +395,12 @@ let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
     | _ -> false
 
 /// Detect whether a function-call expression likely returns a string (Ptr).
-/// Used to accumulate known-string variables from let-bindings.
-let private isStringReturningExpr (expr: Expr) : bool =
+/// Phase 67: Checks AnnotationMap first, falls back to function-name heuristic.
+let private isStringReturningExpr (annotationMap: Map<Ast.Span, Type.Type>) (expr: Expr) : bool =
+    match Map.tryFind (Ast.spanOf expr) annotationMap with
+    | Some Type.TString -> true
+    | Some _ -> false
+    | None ->
     match stripAnnot expr with
     | App(Var(fname, _), _, _) ->
         fname = "readIdent" || fname = "lexeme" || fname = "to_string" ||
@@ -463,12 +467,12 @@ let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
         | NotEqual(other, Var(v, _), _) when v = paramName -> hasParamPtrUse strVars other
         // Recurse through let bindings; accumulate known-string vars
         | Let(name, bindE, bodyE, _) ->
-            let strVars' = if isStringReturningExpr bindE then Set.add name strVars else strVars
+            let strVars' = if isStringReturningExpr Map.empty bindE then Set.add name strVars else strVars
             hasParamPtrUse strVars bindE || hasParamPtrUse strVars' bodyE
         // Phase 62: LetPat(WildcardPat, e1, e2) is the desugared form of e1; e2 (statement sequence).
         // Must traverse to find param usage deeper in the body (was causing premature false).
         | LetPat(VarPat(vname, _), bindE, bodyE, _) ->
-            let strVars' = if isStringReturningExpr bindE then Set.add vname strVars else strVars
+            let strVars' = if isStringReturningExpr Map.empty bindE then Set.add vname strVars else strVars
             hasParamPtrUse strVars bindE || hasParamPtrUse strVars' bodyE
         | LetPat(_, bindE, bodyE, _) ->
             hasParamPtrUse strVars bindE || hasParamPtrUse strVars bodyE
@@ -556,6 +560,13 @@ let rec private bodyReturnsBool (expr: Expr) : bool =
     | LetPat (_, _, cont, _) -> bodyReturnsBool cont
     | Match (_, clauses, _) -> clauses |> List.exists (fun (_, _, arm) -> bodyReturnsBool arm)
     | _ -> false
+
+/// Phase 67: Type-aware bodyReturnsBool — checks AnnotationMap first, falls back to heuristic.
+let private bodyReturnsBoolTyped (annotationMap: Map<Ast.Span, Type.Type>) (expr: Expr) : bool =
+    match Map.tryFind (Ast.spanOf expr) annotationMap with
+    | Some Type.TBool -> true
+    | Some _ -> false
+    | None -> bodyReturnsBool expr
 
 /// Phase 11: Test a pattern against a scrutinee value.
 /// Returns (condOpt, testOps, bodySetupOps, bindEnv) where:
@@ -913,7 +924,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
         // Step 6: Add to KnownFuncs
         let closureInfo = { InnerLambdaFn = closureFnName; NumCaptures = numCaptures
-                            InnerReturnIsBool = bodyReturnsBool innerBody
+                            InnerReturnIsBool = bodyReturnsBoolTyped env.AnnotationMap innerBody
                             CaptureNames = captures; OuterParamName = outerParam }
         let sig_ : FuncSignature =
             { MlirName    = "@" + name
@@ -921,7 +932,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               ReturnType  = Ptr
               ClosureInfo = Some closureInfo
               ReturnIsBool = false
-              InnerReturnIsBool = bodyReturnsBool innerBody }
+              InnerReturnIsBool = bodyReturnsBoolTyped env.AnnotationMap innerBody }
         // Phase 35: Module-qualified naming — also register short name alias in KnownFuncs
         // so that references within the same module body resolve correctly.
         let twoLambdaShortAlias =
@@ -1002,8 +1013,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               |> Set.isEmpty) ->
         let paramType = if isPtrParamTyped env.AnnotationMap lamSpan param body then Ptr else I64
         let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
-        let retIsBool = preReturnType = I64 && bodyReturnsBool body
-        let innerRetIsBool = match stripAnnot body with Lambda(_, innerBody, _) -> bodyReturnsBool innerBody | _ -> false
+        let retIsBool = preReturnType = I64 && bodyReturnsBoolTyped env.AnnotationMap body
+        let innerRetIsBool = match stripAnnot body with Lambda(_, innerBody, _) -> bodyReturnsBoolTyped env.AnnotationMap innerBody | _ -> false
         let sig_ : FuncSignature =
             { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
               ReturnIsBool = retIsBool; InnerReturnIsBool = innerRetIsBool }
@@ -1078,7 +1089,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Phase 43: Track bool-producing bindings AND bool-returning closures for to_string dispatch
         let boolVars' =
             if bv.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs env.AnnotationMap bindExpr
-               || (match stripAnnot bindExpr with Lambda(_, body, _) -> bodyReturnsBool body | _ -> false)
+               || (match stripAnnot bindExpr with Lambda(_, body, _) -> bodyReturnsBoolTyped env.AnnotationMap body | _ -> false)
             then Set.add name env.BoolVars
             else env.BoolVars
         // Phase 66: Track string-producing bindings for IndexGet dispatch
@@ -1522,8 +1533,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             bindings |> List.map (fun (name, param, _paramTypeAnnot, body, bindingSpan) ->
                 let paramType = if isPtrParamTyped env.AnnotationMap bindingSpan param body then Ptr else I64
                 let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
-                let retIsBool = preReturnType = I64 && bodyReturnsBool body
-                let innerRetIsBool = match stripAnnot body with Lambda(_, ib, _) -> bodyReturnsBool ib | _ -> false
+                let retIsBool = preReturnType = I64 && bodyReturnsBoolTyped env.AnnotationMap body
+                let innerRetIsBool = match stripAnnot body with Lambda(_, ib, _) -> bodyReturnsBoolTyped env.AnnotationMap ib | _ -> false
                 let shortNameAlias =
                     let idx = name.IndexOf('_')
                     if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
