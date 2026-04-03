@@ -77,16 +77,25 @@ let inline private failWithSpan (span: Ast.Span) fmt =
         failwith (sprintf "[Elaboration] %s: %s" loc msg)
     ) fmt
 
+/// Phase 67: Look up the inferred type of an expression from the AnnotationMap.
+/// Returns None if the expression's span is not in the map (type inference failed or unavailable).
+let private inferredType (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : Type.Type option =
+    Map.tryFind (Ast.spanOf expr) annotationMap
+
+/// Phase 67: Check if an expression's inferred type satisfies a predicate.
+/// Returns Some true/false if type is known, None if not in AnnotationMap (use fallback).
+let private checkInferredType (annotationMap: Map<Ast.Span, Type.Type>) (predicate: Type.Type -> bool) (expr: Ast.Expr) : bool option =
+    match inferredType annotationMap expr with
+    | Some ty -> Some (predicate ty)
+    | None -> None
+
 /// Phase 30: Determine if an expression is statically known to produce an array (not a list).
 /// Used by ForInExpr to select lang_for_in_array vs lang_for_in_list at compile time.
 /// Conservative: returns false (assume list) for variables or unknown expressions.
 let rec private isArrayExpr (arrayVars: Set<string>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : bool =
-    // Phase 67: Type-directed check via AnnotationMap
-    match Map.tryFind (Ast.spanOf expr) annotationMap with
-    | Some (Type.TArray _) -> true
-    | Some _ -> false
+    match checkInferredType annotationMap (function Type.TArray _ -> true | _ -> false) expr with
+    | Some result -> result
     | None ->
-    // Fallback: heuristic check
     match expr with
     | Ast.App (Ast.Var ("array_of_list", _), _, _)
     | Ast.App (Ast.Var ("array_create", _), _, _)
@@ -100,13 +109,9 @@ let rec private isArrayExpr (arrayVars: Set<string>) (annotationMap: Map<Ast.Spa
 /// Phase 66/67: Detect if an expression produces a string value.
 /// Phase 67: First checks AnnotationMap from type inference; falls back to heuristic.
 let rec private isStringExpr (stringVars: Set<string>) (stringFields: Set<string>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : bool =
-    // Phase 67: Type-directed check via AnnotationMap
-    let span = Ast.spanOf expr
-    match Map.tryFind span annotationMap with
-    | Some Type.TString -> true
-    | Some _ -> false
+    match checkInferredType annotationMap ((=) Type.TString) expr with
+    | Some result -> result
     | None ->
-    // Fallback: heuristic check
     match expr with
     | Ast.String _ -> true
     | Ast.Var (name, _) -> Set.contains name stringVars
@@ -117,15 +122,13 @@ let rec private isStringExpr (stringVars: Set<string>) (stringFields: Set<string
 /// Phase 34-03: Detect which Phase 33 collection kind an expression produces.
 /// Returns Some kind if the expression is a known collection-creating call or variable.
 let rec private detectCollectionKind (collVars: Map<string, CollectionKind>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : CollectionKind option =
-    // Phase 67: Type-directed check via AnnotationMap
-    match Map.tryFind (Ast.spanOf expr) annotationMap with
+    match inferredType annotationMap expr with
     | Some (Type.TData("HashSet", _)) -> Some HashSet
     | Some (Type.TData("Queue", _)) -> Some Queue
     | Some (Type.TData("MutableList", _)) -> Some MutableList
     | Some (Type.THashtable _) -> Some Hashtable
     | Some _ -> None
     | None ->
-    // Fallback: heuristic check
     match expr with
     | Ast.App (Ast.Var ("hashset_create", _), _, _)   -> Some HashSet
     | Ast.App (Ast.Var ("queue_create", _), _, _)     -> Some Queue
@@ -397,9 +400,8 @@ let private isListParamBody (paramName: string) (bodyExpr: Expr) : bool =
 /// Detect whether a function-call expression likely returns a string (Ptr).
 /// Phase 67: Checks AnnotationMap first, falls back to function-name heuristic.
 let private isStringReturningExpr (annotationMap: Map<Ast.Span, Type.Type>) (expr: Expr) : bool =
-    match Map.tryFind (Ast.spanOf expr) annotationMap with
-    | Some Type.TString -> true
-    | Some _ -> false
+    match checkInferredType annotationMap ((=) Type.TString) expr with
+    | Some result -> result
     | None ->
     match stripAnnot expr with
     | App(Var(fname, _), _, _) ->
@@ -522,12 +524,9 @@ let private isPtrParamTyped (annotationMap: Map<Ast.Span, Type.Type>) (lambdaSpa
 /// Phase 43: Detect whether an expression statically produces a boolean value.
 /// Used to populate BoolVars for correct to_string dispatch.
 let rec private isBoolExpr (boolVars: Set<string>) (knownFuncs: Map<string, FuncSignature>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : bool =
-    // Phase 67: Type-directed check via AnnotationMap
-    match Map.tryFind (Ast.spanOf expr) annotationMap with
-    | Some Type.TBool -> true
-    | Some _ -> false
+    match checkInferredType annotationMap ((=) Type.TBool) expr with
+    | Some result -> result
     | None ->
-    // Fallback: heuristic check
     match expr with
     | Ast.Bool _ -> true
     | Ast.Equal _ | Ast.NotEqual _ | Ast.LessThan _ | Ast.GreaterThan _
@@ -563,9 +562,8 @@ let rec private bodyReturnsBool (expr: Expr) : bool =
 
 /// Phase 67: Type-aware bodyReturnsBool — checks AnnotationMap first, falls back to heuristic.
 let private bodyReturnsBoolTyped (annotationMap: Map<Ast.Span, Type.Type>) (expr: Expr) : bool =
-    match Map.tryFind (Ast.spanOf expr) annotationMap with
-    | Some Type.TBool -> true
-    | Some _ -> false
+    match checkInferredType annotationMap ((=) Type.TBool) expr with
+    | Some result -> result
     | None -> bodyReturnsBool expr
 
 /// Phase 11: Test a pattern against a scrutinee value.
