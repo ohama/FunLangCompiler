@@ -496,6 +496,25 @@ let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
         | _ -> false
     hasParamPtrUse Set.empty bodyExpr
 
+/// Phase 67: Determine if a FunLang Type needs Ptr representation (vs I64).
+/// String, list, array, tuple (non-unit), record, ADT, hashtable, closures → Ptr.
+/// Int, bool, char, unit → I64.
+let private typeNeedsPtr (ty: Type.Type) : bool =
+    match ty with
+    | Type.TString | Type.TList _ | Type.TArray _ | Type.THashtable _
+    | Type.TArrow _ | Type.TExn -> true
+    | Type.TTuple elems -> not elems.IsEmpty  // non-unit tuple → Ptr
+    | Type.TData _ -> true                    // ADT/record → Ptr
+    | Type.TInt | Type.TBool | Type.TChar | Type.TError -> false
+    | Type.TVar _ -> false                    // unresolved type var → fallback I64
+    | _ -> false
+
+/// Phase 67: Type-aware isPtrParam — checks AnnotationMap for Lambda type, falls back to heuristic.
+let private isPtrParamTyped (annotationMap: Map<Ast.Span, Type.Type>) (lambdaSpan: Ast.Span) (paramName: string) (bodyExpr: Expr) : bool =
+    match Map.tryFind lambdaSpan annotationMap with
+    | Some (Type.TArrow(paramType, _)) -> typeNeedsPtr paramType
+    | _ -> isPtrParamBody paramName bodyExpr
+
 /// Phase 43: Detect whether an expression statically produces a boolean value.
 /// Used to populate BoolVars for correct to_string dispatch.
 let rec private isBoolExpr (boolVars: Set<string>) (knownFuncs: Map<string, FuncSignature>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : bool =
@@ -755,7 +774,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     // Phase 43: StripAnnot sees through Annot/LambdaAnnot wrappers from type annotations
-    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, _)), _)), inExpr, letSpan) ->
+    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, innerLamSpan)), _)), inExpr, letSpan) ->
         // Step 1: Compute free variables of the inner lambda body relative to innerParam only.
         // These are variables that need to come from the closure environment struct.
         // outerParam IS one such variable — it's passed to the closure-maker and stored at env[1+i].
@@ -779,7 +798,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let arg1Val = { Name = "%arg1"; Type = Ptr }
         // If innerParam needs I64 type, coerce ptr arg1 to i64 via ptrtoint.
         // The coerced value gets name %t0 (first SSA name after captures).
-        let innerParamNeedsI64 = not (isPtrParamBody innerParam innerBody)
+        let innerParamNeedsI64 = not (isPtrParamTyped env.AnnotationMap innerLamSpan innerParam innerBody)
         let (innerParamVal, paramCoerceOps, captureStartIdx) =
             if innerParamNeedsI64 then
                 let i64Val = { Name = "%t0"; Type = I64 }
@@ -977,11 +996,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Single-arg Let-Lambda: compile as named func.func and add to KnownFuncs (not Vars).
     // This prevents the function value being captured as a closure in nested two-arg functions,
     // which would cause MLIR "value defined outside region" errors.
-    | Let (name, StripAnnot (Lambda (param, body, _)), inExpr, _)
+    | Let (name, StripAnnot (Lambda (param, body, lamSpan)), inExpr, _)
         when (freeVars (Set.singleton param) body
               |> Set.filter (fun v -> Map.containsKey v env.Vars)
               |> Set.isEmpty) ->
-        let paramType = if isPtrParamBody param body then Ptr else I64
+        let paramType = if isPtrParamTyped env.AnnotationMap lamSpan param body then Ptr else I64
         let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
         let retIsBool = preReturnType = I64 && bodyReturnsBool body
         let innerRetIsBool = match stripAnnot body with Lambda(_, innerBody, _) -> bodyReturnsBool innerBody | _ -> false
@@ -1500,8 +1519,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Pass 1: Pre-register ALL binding signatures in KnownFuncs so every body can call every sibling.
         // Pass 2: Elaborate each body with the full KnownFuncs, then update with actual return types.
         let bindingInfos =
-            bindings |> List.map (fun (name, param, _paramTypeAnnot, body, _) ->
-                let paramType = if isPtrParamBody param body then Ptr else I64
+            bindings |> List.map (fun (name, param, _paramTypeAnnot, body, bindingSpan) ->
+                let paramType = if isPtrParamTyped env.AnnotationMap bindingSpan param body then Ptr else I64
                 let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
                 let retIsBool = preReturnType = I64 && bodyReturnsBool body
                 let innerRetIsBool = match stripAnnot body with Lambda(_, ib, _) -> bodyReturnsBool ib | _ -> false
@@ -3534,7 +3553,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 12: bare Lambda as a value — create inline closure struct
     // Used by ComposeRight/ComposeLeft which desugar to Lambda(...) as expressions
-    | Lambda (param, body, _) ->
+    | Lambda (param, body, lamSpan) ->
         // Free variables relative to param, restricted to those in env.Vars (not KnownFuncs — they are direct calls)
         let allFree = freeVars (Set.singleton param) body
         let captures =
@@ -3553,7 +3572,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // If param needs I64 type, coerce ptr arg1 to i64 via ptrtoint.
         let arg0Val = { Name = "%arg0"; Type = Ptr }
         let arg1Val = { Name = "%arg1"; Type = Ptr }
-        let lambdaParamNeedsI64 = not (isPtrParamBody param body)
+        let lambdaParamNeedsI64 = not (isPtrParamTyped env.AnnotationMap lamSpan param body)
         let (lambdaParamVal, lambdaParamCoerceOps, lambdaCaptureStart) =
             if lambdaParamNeedsI64 then
                 let i64Val = { Name = "%t0"; Type = I64 }
