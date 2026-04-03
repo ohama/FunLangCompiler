@@ -197,7 +197,22 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
             | Ast.Module(ds, s) -> Ast.Module(Elaboration.elaborateTypeclasses ds, s)
             | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, Elaboration.elaborateTypeclasses ds, s)
             | Ast.EmptyModule s -> Ast.EmptyModule s
-        let mlirMod = Elaboration.elaborateProgram tcAst
+        // Phase 67: Run FunLang type inference to get per-expression type annotations.
+        // This runs independently from the compilation pipeline — errors are non-fatal
+        // (type checker may reject code that the compiler handles via heuristics).
+        // Stderr is suppressed during type checking because Prelude may contain
+        // compiler-specific builtins unknown to FunLang's type checker.
+        let annotationMap =
+            try
+                let savedErr = System.Console.Error
+                System.Console.SetError(System.IO.TextWriter.Null)
+                try
+                    let typedModule = ExportApi.typeCheckFile (Path.GetFullPath(inputPath))
+                    typedModule.AnnotationMap
+                finally
+                    System.Console.SetError(savedErr)
+            with _ -> Map.empty  // Type check failed — fall back to heuristics
+        let mlirMod = Elaboration.elaborateProgram tcAst annotationMap
         match Pipeline.compile mlirMod outputPath optLevel with
         | Ok () ->
             0

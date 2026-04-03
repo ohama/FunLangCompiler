@@ -56,6 +56,8 @@ type ElabEnv = {
     StringVars: Set<string>
     // Phase 66: Record field string tracking — field names known to be string-typed (for IndexGet dispatch)
     StringFields: Set<string>
+    // Phase 67: Typed AST annotation map from FunLang type inference (Span → Type)
+    AnnotationMap: Map<Ast.Span, Type.Type>
 }
 
 let emptyEnv () : ElabEnv =
@@ -64,7 +66,8 @@ let emptyEnv () : ElabEnv =
       Globals = ref []; GlobalCounter = ref 0; TplGlobals = ref []
       TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty
       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
-      BoolVars = Set.empty; StringVars = Set.empty; StringFields = Set.empty }
+      BoolVars = Set.empty; StringVars = Set.empty; StringFields = Set.empty
+      AnnotationMap = Map.empty }
 
 /// Phase 44: Raise an error with source location in "file:line:col: message" format.
 /// Uses Printf.ksprintf to support format strings like failwithf.
@@ -770,7 +773,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields }
+              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -978,7 +981,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields }
+              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
@@ -1506,7 +1509,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                       TplGlobals = env.TplGlobals
                       TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
                       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
-                      BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields }
+                      BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
                 let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
                 let bodySideBlocks = bodyEnv.Blocks.Value
                 let allBodyBlocks =
@@ -3544,7 +3547,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields }
+              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i); Type = Ptr }
@@ -4934,14 +4937,14 @@ let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
 
 // Phase 16: elaborateProgram — new entry point accepting Ast.Module.
 // Runs prePassDecls to populate TypeEnv/RecordEnv/ExnTags, then elaborates the program body.
-let elaborateProgram (ast: Ast.Module) : MlirModule =
+let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>) : MlirModule =
     let decls =
         match ast with
         | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) -> decls
         | Ast.EmptyModule _ -> []
     let (typeEnv, recordEnv, exnTags, stringFields) = prePassDecls (ref 0) decls
     let mainExpr = extractMainExpr (Ast.moduleSpanOf ast) decls
-    let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags; StringFields = stringFields }
+    let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags; StringFields = stringFields; AnnotationMap = annotationMap }
     let (resultVal, entryOps) = elaborateExpr env mainExpr
     let sideBlocks = env.Blocks.Value
     let allBlocks =
