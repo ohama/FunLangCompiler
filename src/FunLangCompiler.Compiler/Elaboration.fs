@@ -1931,13 +1931,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, uOps @ [LlvmCallOp(result, "@lang_get_args", [])])
 
-    // Phase 14: char_to_int — identity (char is already i64)
-    | App (Var ("char_to_int", _), charExpr, _) ->
-        elaborateExpr env charExpr
-
-    // Phase 14: int_to_char — identity (int treated as char code point)
-    | App (Var ("int_to_char", _), intExpr, _) ->
-        elaborateExpr env intExpr
+    // Phase 14/67: char_to_int/int_to_char moved to Prelude/Core.fun as identity functions
 
     // Phase 31: char_is_digit — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_digit", _), charExpr, _) ->

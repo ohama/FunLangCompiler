@@ -12,5 +12,7 @@ module Core =
     let fst p = match p with | (a, _) -> a
     let snd p = match p with | (_, b) -> b
     let ignore x = ()
+    let char_to_int c = c
+    let int_to_char n = n
 
 open Core

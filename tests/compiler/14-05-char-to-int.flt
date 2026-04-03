@@ -1,5 +1,5 @@
-// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Command: bash -c 'PROJROOT=%S/../..; D=$(mktemp -d /tmp/fnc_XXXXXX); ln -s "$PROJROOT/Prelude" "$D/Prelude"; echo "let _ = println (to_string (char_to_int '"'"'Z'"'"'))" > "$D/t.fun"; OUTBIN=$(mktemp /tmp/fnc_XXXXXX); dotnet run --project "$PROJROOT/src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj" -- "$D/t.fun" -o "$OUTBIN" 2>/dev/null && chmod +x "$OUTBIN" && "$OUTBIN"; echo $?; rm -rf "$D" "$OUTBIN"'
 // --- Input:
-char_to_int 'Z'
 // --- Output:
 90
+0
