@@ -154,7 +154,7 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
             if dir = "" then ""
             else
                 // Explicit load order: Option/Result before List (List uses None/Some constructors)
-                let ordered = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun";
+                let ordered = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun"; "Int.fun";
                                  "Hashtable.fun"; "HashSet.fun"; "MutableList.fun"; "Queue.fun";
                                  "StringBuilder.fun"; "List.fun"; "Array.fun" |]
                 ordered
