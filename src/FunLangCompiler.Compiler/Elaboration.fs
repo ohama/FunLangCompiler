@@ -80,18 +80,21 @@ let inline private failWithSpan (span: Ast.Span) fmt =
 /// Phase 30: Determine if an expression is statically known to produce an array (not a list).
 /// Used by ForInExpr to select lang_for_in_array vs lang_for_in_list at compile time.
 /// Conservative: returns false (assume list) for variables or unknown expressions.
-let rec private isArrayExpr (arrayVars: Set<string>) (expr: Ast.Expr) : bool =
+let rec private isArrayExpr (arrayVars: Set<string>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : bool =
+    // Phase 67: Type-directed check via AnnotationMap
+    match Map.tryFind (Ast.spanOf expr) annotationMap with
+    | Some (Type.TArray _) -> true
+    | Some _ -> false
+    | None ->
+    // Fallback: heuristic check
     match expr with
-    // Direct array-creating builtins
     | Ast.App (Ast.Var ("array_of_list", _), _, _)
     | Ast.App (Ast.Var ("array_create", _), _, _)
     | Ast.App (Ast.Var ("array_init", _), _, _)
     | Ast.App (Ast.App (Ast.Var ("array_create", _), _, _), _, _)
     | Ast.App (Ast.App (Ast.Var ("array_init", _), _, _), _, _) -> true
-    // Variable previously determined to be an array
     | Ast.Var (name, _) -> Set.contains name arrayVars
-    // Type annotation — check inner expression
-    | Ast.Annot (inner, _, _) -> isArrayExpr arrayVars inner
+    | Ast.Annot (inner, _, _) -> isArrayExpr arrayVars annotationMap inner
     | _ -> false
 
 /// Phase 66/67: Detect if an expression produces a string value.
@@ -113,7 +116,16 @@ let rec private isStringExpr (stringVars: Set<string>) (stringFields: Set<string
 
 /// Phase 34-03: Detect which Phase 33 collection kind an expression produces.
 /// Returns Some kind if the expression is a known collection-creating call or variable.
-let rec private detectCollectionKind (collVars: Map<string, CollectionKind>) (expr: Ast.Expr) : CollectionKind option =
+let rec private detectCollectionKind (collVars: Map<string, CollectionKind>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : CollectionKind option =
+    // Phase 67: Type-directed check via AnnotationMap
+    match Map.tryFind (Ast.spanOf expr) annotationMap with
+    | Some (Type.TData("HashSet", _)) -> Some HashSet
+    | Some (Type.TData("Queue", _)) -> Some Queue
+    | Some (Type.TData("MutableList", _)) -> Some MutableList
+    | Some (Type.THashtable _) -> Some Hashtable
+    | Some _ -> None
+    | None ->
+    // Fallback: heuristic check
     match expr with
     | Ast.App (Ast.Var ("hashset_create", _), _, _)   -> Some HashSet
     | Ast.App (Ast.Var ("queue_create", _), _, _)     -> Some Queue
@@ -121,7 +133,7 @@ let rec private detectCollectionKind (collVars: Map<string, CollectionKind>) (ex
     | Ast.App (Ast.Var ("hashtable_create", _), _, _)     -> Some Hashtable
     | Ast.App (Ast.Var ("hashtable_create_str", _), _, _) -> Some Hashtable
     | Ast.Var (name, _)                                   -> Map.tryFind name collVars
-    | Ast.Annot (inner, _, _)                         -> detectCollectionKind collVars inner
+    | Ast.Annot (inner, _, _)                         -> detectCollectionKind collVars annotationMap inner
     | _ -> None
 
 let private addStringGlobal (env: ElabEnv) (rawValue: string) : string =
@@ -486,7 +498,13 @@ let rec private isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
 
 /// Phase 43: Detect whether an expression statically produces a boolean value.
 /// Used to populate BoolVars for correct to_string dispatch.
-let rec private isBoolExpr (boolVars: Set<string>) (knownFuncs: Map<string, FuncSignature>) (expr: Ast.Expr) : bool =
+let rec private isBoolExpr (boolVars: Set<string>) (knownFuncs: Map<string, FuncSignature>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : bool =
+    // Phase 67: Type-directed check via AnnotationMap
+    match Map.tryFind (Ast.spanOf expr) annotationMap with
+    | Some Type.TBool -> true
+    | Some _ -> false
+    | None ->
+    // Fallback: heuristic check
     match expr with
     | Ast.Bool _ -> true
     | Ast.Equal _ | Ast.NotEqual _ | Ast.LessThan _ | Ast.GreaterThan _
@@ -497,12 +515,11 @@ let rec private isBoolExpr (boolVars: Set<string>) (knownFuncs: Map<string, Func
         match Map.tryFind name knownFuncs with
         | Some sig_ -> sig_.ReturnIsBool
         | None -> Set.contains name boolVars
-    // Phase 43: curried 2-lambda call — App(App(Var(f), arg1), arg2) returns inner closure's result
     | Ast.App (Ast.App (Ast.Var (name, _), _, _), _, _) ->
         match Map.tryFind name knownFuncs with
         | Some sig_ -> sig_.InnerReturnIsBool
         | None -> false
-    | Ast.Annot (inner, _, _) -> isBoolExpr boolVars knownFuncs inner
+    | Ast.Annot (inner, _, _) -> isBoolExpr boolVars knownFuncs annotationMap inner
     | Ast.LambdaAnnot _ -> false
     | _ -> false
 
@@ -1027,9 +1044,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // This records the index of the OUTER expression's merge block, so we patch
         // the correct block even when bodyExpr adds more side blocks (e.g. a second if).
         let blocksAfterBind = env.Blocks.Value.Length
-        let arrayVars' = if isArrayExpr env.ArrayVars bindExpr then Set.add name env.ArrayVars else env.ArrayVars
+        let arrayVars' = if isArrayExpr env.ArrayVars env.AnnotationMap bindExpr then Set.add name env.ArrayVars else env.ArrayVars
         let collVars' =
-            match detectCollectionKind env.CollectionVars bindExpr with
+            match detectCollectionKind env.CollectionVars env.AnnotationMap bindExpr with
             | Some kind -> Map.add name kind env.CollectionVars
             | None -> env.CollectionVars
         // Phase 35: Module-qualified naming — if name is module-prefixed (e.g., "List_hd"),
@@ -1041,7 +1058,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Phase 43: Track bool-producing bindings for to_string dispatch
         // Phase 43: Track bool-producing bindings AND bool-returning closures for to_string dispatch
         let boolVars' =
-            if bv.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs bindExpr
+            if bv.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs env.AnnotationMap bindExpr
                || (match stripAnnot bindExpr with Lambda(_, body, _) -> bodyReturnsBool body | _ -> false)
             then Set.add name env.BoolVars
             else env.BoolVars
@@ -1102,9 +1119,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let blocksBeforeBind = env.Blocks.Value.Length
         let (bv, bops) = elaborateExpr env bindExpr
         let blocksAfterBind = env.Blocks.Value.Length
-        let arrayVars' = if isArrayExpr env.ArrayVars bindExpr then Set.add name env.ArrayVars else env.ArrayVars
+        let arrayVars' = if isArrayExpr env.ArrayVars env.AnnotationMap bindExpr then Set.add name env.ArrayVars else env.ArrayVars
         let collVars' =
-            match detectCollectionKind env.CollectionVars bindExpr with
+            match detectCollectionKind env.CollectionVars env.AnnotationMap bindExpr with
             | Some kind -> Map.add name kind env.CollectionVars
             | None -> env.CollectionVars
         let env' = { env with Vars = Map.add name bv env.Vars; ArrayVars = arrayVars'; CollectionVars = collVars' }
@@ -1688,7 +1705,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                                (Map.find "show" env.KnownFuncs).ParamTypes = [Ptr])) ->
         let (argVal, argOps) = elaborateExpr env argExpr
         let result = { Name = freshName env; Type = Ptr }
-        let isBool = argVal.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs argExpr
+        let isBool = argVal.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs env.AnnotationMap argExpr
         if isBool then
             if argVal.Type = I1 then
                 let extVal = { Name = freshName env; Type = I64 }
@@ -1757,7 +1774,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("to_string", _), argExpr, _) ->
         let (argVal, argOps) = elaborateExpr env argExpr
         let result = { Name = freshName env; Type = Ptr }
-        let isBool = argVal.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs argExpr
+        let isBool = argVal.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs env.AnnotationMap argExpr
         if isBool then
             if argVal.Type = I1 then
                 // Zero-extend I1 to I64 for C ABI compatibility (lang_to_string_bool takes int64_t)
@@ -4469,13 +4486,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             else []
         // Select runtime function based on collection type (Phase 34-03: collection dispatch)
         let forInFn =
-            match detectCollectionKind env.CollectionVars collExpr with
+            match detectCollectionKind env.CollectionVars env.AnnotationMap collExpr with
             | Some HashSet     -> "@lang_for_in_hashset"
             | Some Queue       -> "@lang_for_in_queue"
             | Some MutableList -> "@lang_for_in_mlist"
             | Some Hashtable   -> "@lang_for_in_hashtable"
             | None ->
-                if isArrayExpr env.ArrayVars collExpr
+                if isArrayExpr env.ArrayVars env.AnnotationMap collExpr
                 then "@lang_for_in_array"
                 else "@lang_for_in_list"
         // Call lang_for_in_*(closure, collection), return unit

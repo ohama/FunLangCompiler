@@ -8,7 +8,7 @@ let _ = println (to_string v) in
 let (found2, v2) = hashtable_trygetvalue ht 99 in
 println (to_string found2)
 // --- Output:
-1
+true
 100
-0
+false
 0

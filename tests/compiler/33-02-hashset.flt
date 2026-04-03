@@ -8,7 +8,7 @@ println (to_string (hashset_contains hs 1));
 println (to_string (hashset_contains hs 3));
 println (to_string (hashset_count hs))
 // --- Output:
-1
-0
+true
+false
 2
 0
