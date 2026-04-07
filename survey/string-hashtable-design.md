@@ -11,66 +11,70 @@
 - **이중 구현**: `LangHashtable` (int key, tag=-1) + `LangHashtableStr` (string key, tag=-2)
 - C 런타임에 별도 struct, 별도 hash/equality 함수
 
-## 자동 dispatch vs 수동 선택
+## Prelude wrapper의 한계
 
-| 함수 | dispatch 방식 | 설명 |
-|------|-------------|------|
-| `hashtable_set ht key val` | **자동** (key의 elaborated type이 Ptr이면 `_str` 호출) | ✓ |
-| `hashtable_get ht key` | **자동** | ✓ |
-| `hashtable_containsKey ht key` | **자동** | ✓ |
-| `hashtable_remove ht key` | **자동** | ✓ |
-| `hashtable_trygetvalue ht key` | **자동** | ✓ |
-| `hashtable_create ()` | **수동** — int HT만 생성 | ✗ `hashtable_create_str ()` 필요 |
-| `hashtable_keys ht` | **수동** — int key만 반환 | ✗ `hashtable_keys_str ht` 필요 |
-| `hashtable_count ht` | **자동** (GEP offset 2, 공통) | ✓ |
+Prelude module 함수는 standalone func.func로 컴파일된다. 이때 **모든 파라미터가 i64**로 전달되므로, 함수 body 안에서 key의 MlirType(I64 vs Ptr)을 구분할 수 없다.
 
-## 왜 create/keys만 수동인가?
+```
+유저 코드:  Hashtable.set ht "hello" 1
+          → Hashtable_set(ht, "hello", 1)     // func.func 호출
+          
+func.func body:  hashtable_set ht key value
+                 key의 MlirType = I64         // Ptr 정보 소실!
+                 → lang_hashtable_set 호출    // int 버전 → crash
+```
 
-- `create`: 생성 시점에 key 타입 정보가 없음 (인자가 unit)
-- `keys`: 반환할 key 리스트의 원소 타입이 다름 (int list vs string list)
-- 나머지: key 인자의 elaborated type (I64 vs Ptr)으로 자동 결정 가능
+**결론**: key dispatch가 필요한 **모든** 함수에 `*Str` 변종이 필요하다. `count`만 type-independent(GEP+load).
 
-## Prelude 설계 결론
+## 최종 Prelude 설계
 
 ```fun
 module Hashtable =
-    let create ()           = hashtable_create ()       // int key HT
-    let createStr ()        = hashtable_create_str ()   // string key HT
-    let get ht key          = hashtable_get ht key      // 자동 dispatch
-    let set ht key value    = hashtable_set ht key value
-    let containsKey ht key  = hashtable_containsKey ht key
-    let keys ht             = hashtable_keys ht         // int key HT only
-    let keysStr ht          = hashtable_keys_str ht     // string key HT only
-    let remove ht key       = hashtable_remove ht key
-    let tryGetValue ht key  = hashtable_trygetvalue ht key
-    let count ht            = hashtable_count ht        // 공통
+    let create ()             = hashtable_create ()
+    let createStr ()          = hashtable_create_str ()
+    let get ht key            = hashtable_get ht key
+    let getStr ht key         = hashtable_get_str ht key
+    let set ht key value      = hashtable_set ht key value
+    let setStr ht key value   = hashtable_set_str ht key value
+    let containsKey ht key    = hashtable_containsKey ht key
+    let containsKeyStr ht key = hashtable_containsKey_str ht key
+    let keys ht               = hashtable_keys ht
+    let keysStr ht            = hashtable_keys_str ht
+    let remove ht key         = hashtable_remove ht key
+    let removeStr ht key      = hashtable_remove_str ht key
+    let tryGetValue ht key    = hashtable_trygetvalue ht key
+    let tryGetValueStr ht key = hashtable_trygetvalue_str ht key
+    let count ht              = hashtable_count ht        // 공통
 ```
 
 **사용 예시:**
 ```fun
-// String key hashtable
-let ht = Hashtable.createStr ()   // ← 유일하게 다른 부분
-Hashtable.set ht "hello" 42      // 자동 dispatch (key="hello" → Ptr → _str)
-Hashtable.get ht "hello"          // 자동 dispatch
-let keys = Hashtable.keysStr ht   // ← 유일하게 다른 부분
+// Int key hashtable
+let ht = Hashtable.create ()
+Hashtable.set ht 1 42
+Hashtable.get ht 1
+let keys = Hashtable.keys ht
+
+// String key hashtable — 모든 함수에 Str suffix
+let ht = Hashtable.createStr ()
+Hashtable.setStr ht "hello" 42
+Hashtable.getStr ht "hello"
+let keys = Hashtable.keysStr ht
 ```
 
-## 주의: Prelude wrapper를 통한 auto-dispatch는 동작하지 않음
+## 직접 builtin 호출과 IndexGet/Set
 
-`Hashtable.set ht "hello" 1` — wrapper 함수의 closure ABI가 모든 파라미터를 I64로 전달하므로 string key의 Ptr 타입 정보가 소실됩니다. 결과적으로 int key 변형이 호출되어 crash.
+**직접 builtin 호출** (Prelude 비경유):
+- `hashtable_set ht "hello" 1` — elaboration이 key의 Ptr 타입 감지 → 자동 dispatch 동작
 
-**동작하는 패턴:**
-- 직접 builtin 호출: `hashtable_set ht "hello" 1` (elaboration이 "hello"의 Ptr 타입 감지)
-- IndexGet/Set 구문: `ht.["hello"] <- 1`, `ht.["hello"]` (자동 dispatch)
-
-**동작하지 않는 패턴:**
-- Module wrapper: `Hashtable.set ht "hello" 1` (key가 I64로 전달되어 int HT 함수 호출 → crash)
-
-## IndexGet/IndexSet (`ht.["key"]`)
-
-`ht.[key]` 구문도 자동 dispatch:
+**IndexGet/IndexSet** (`ht.["key"]`):
+- `ht.[key]` 구문은 inline elaboration → 자동 dispatch 동작
 - key가 Ptr → `lang_index_get_str` 호출
-- key가 I64 → `lang_index_get` 호출 (runtime tag 기반 array/HT 구분)
+- key가 I64 → `lang_index_get` 호출
+
+## 근본적 해결: Uniform Tagged Representation
+
+현재의 `*Str` 중복은 컴파일 타임 type dispatch + func.func의 i64 uniform ABI 사이의 불일치에서 발생한다. 근본적 해결은 OCaml 방식의 tagged representation 도입이다. 자세한 내용은 [uniform-tagged-representation.md](uniform-tagged-representation.md) 참조.
 
 ---
-*2026-04-02 — FunLangCompiler v22.0 기준*
+*2026-04-07 — Prelude wrapper type 소실 문제 반영, 전체 `*Str` 변종 확정*
