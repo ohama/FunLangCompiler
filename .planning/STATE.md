@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 92 — C Boundary Simplification (complete)
+**Current focus:** Phase 93 — Generic Equality and Hash (in progress)
 
 ## Current Position
 
-Phase: 92 (C Boundary Simplification)
-Plan: 92-02 of 92-02
-Status: Phase complete
-Last activity: 2026-04-07 — Completed 92-02-PLAN.md (structural GEP + array access)
+Phase: 93 (Generic Equality and Hash)
+Plan: 93-01 of 93-03
+Status: In progress
+Last activity: 2026-04-07 — Completed 93-01-PLAN.md (heap tag word)
 
-Progress: v1.0-v21.0 + Phase 88-92 [█████████████████████░] 69 phases / 114 plans
+Progress: v1.0-v21.0 + Phase 88-93 [█████████████████████░] 69 phases / 115 plans
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 114
+- Total plans completed: 115
 - Average duration: ~10 min/plan
 
 ## Accumulated Context
@@ -36,6 +36,8 @@ Progress: v1.0-v21.0 + Phase 88-92 [██████████████�
 | lang_index_get/set pass tagged index | C functions untag internally for arrays, pass tagged directly for hashtables | 2026-04-07 |
 | string_sub_raw helper for internal calls | lang_string_slice calls string_sub_raw (not lang_string_sub) to avoid double-untag | 2026-04-07 |
 | array_set coerces value to I64 | coerceToI64 ensures I1/Ptr values are compatible with C int64_t parameter | 2026-04-07 |
+| Heap tag constants 1-5, closures/arrays untagged | Only string/tuple/record/cons/ADT get tags; closures never used as hash keys | 2026-04-07 |
+| Tuple/record store field count at slot 1 | Generic hash/equality needs iteration count at runtime without type info | 2026-04-07 |
 
 ### Pending Todos
 
@@ -48,5 +50,5 @@ Progress: v1.0-v21.0 + Phase 88-92 [██████████████�
 ## Session Continuity
 
 Last session: 2026-04-07
-Stopped at: Completed 92-02-PLAN.md
+Stopped at: Completed 93-01-PLAN.md
 Resume file: None
