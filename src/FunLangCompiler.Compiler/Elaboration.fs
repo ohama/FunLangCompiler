@@ -1072,49 +1072,23 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = I64 }
         (result, strOps @ strCoerce @ [LlvmCallOp(result, "@lang_string_to_int", [strPtr])])
 
-    // Phase 22: array_set — three-arg (must appear before two-arg and one-arg patterns)
-    // array_set arr idx val: bounds check, compute slot idx+1, GEP, store, return unit
+    // Phase 92: array_set — C function handles untag, bounds check, store
     | App (App (App (Var ("array_set", _), arrExpr, _), idxExpr, _), valExpr, _) ->
         let (arrVal, arrOps) = elaborateExpr env arrExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
-        // Phase 88: Untag index for bounds check and GEP arithmetic
-        let (rawIdx, untagIdxOps) = emitUntag env idxVal
-        let oneVal    = { Name = freshName env; Type = I64 }
-        let slotVal   = { Name = freshName env; Type = I64 }
-        let elemPtr   = { Name = freshName env; Type = Ptr }
-        let unitVal   = { Name = freshName env; Type = I64 }
-        let ops = [
-            LlvmCallVoidOp("@lang_array_bounds_check", [arrPtrVal; rawIdx])
-            ArithConstantOp(oneVal, 1L)
-            ArithAddIOp(slotVal, rawIdx, oneVal)
-            LlvmGEPDynamicOp(elemPtr, arrPtrVal, slotVal)
-            LlvmStoreOp(valVal, elemPtr)
-            ArithConstantOp(unitVal, 1L)
-        ]
-        (unitVal, arrOps @ arrCoerceOps @ idxOps @ untagIdxOps @ valOps @ ops)
+        let (valV, valCoerce) = coerceToI64 env valVal
+        let (unitVal, callOps) = emitVoidCall env "@lang_array_set" [arrPtrVal; idxVal; valV]
+        (unitVal, arrOps @ arrCoerceOps @ idxOps @ valOps @ valCoerce @ callOps)
 
-    // Phase 22: array_get — two-arg
-    // array_get arr idx: bounds check, compute slot idx+1, GEP, load
+    // Phase 92: array_get — C function handles untag, bounds check, load
     | App (App (Var ("array_get", _), arrExpr, _), idxExpr, _) ->
         let (arrVal, arrOps) = elaborateExpr env arrExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
-        // Phase 88: Untag index for bounds check and GEP arithmetic
-        let (rawIdx, untagIdxOps) = emitUntag env idxVal
-        let oneVal  = { Name = freshName env; Type = I64 }
-        let slotVal = { Name = freshName env; Type = I64 }
-        let elemPtr = { Name = freshName env; Type = Ptr }
-        let result  = { Name = freshName env; Type = I64 }
-        let ops = [
-            LlvmCallVoidOp("@lang_array_bounds_check", [arrPtrVal; rawIdx])
-            ArithConstantOp(oneVal, 1L)
-            ArithAddIOp(slotVal, rawIdx, oneVal)
-            LlvmGEPDynamicOp(elemPtr, arrPtrVal, slotVal)
-            LlvmLoadOp(result, elemPtr)
-        ]
-        (result, arrOps @ arrCoerceOps @ idxOps @ untagIdxOps @ ops)
+        let result = { Name = freshName env; Type = I64 }
+        (result, arrOps @ arrCoerceOps @ idxOps @ [LlvmCallOp(result, "@lang_array_get", [arrPtrVal; idxVal])])
 
     // Phase 92: array_create — C function untags count internally
     | App (App (Var ("array_create", _), nExpr, _), defExpr, _) ->
@@ -1190,11 +1164,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         | Ptr ->
             (rawResult, collOps @ collCoerce @ idxOps @ [LlvmCallOp(rawResult, "@lang_index_get_str", [collPtr; idxVal])])
         | _ ->
-            // Phase 88: Untag index before passing to C
-            let (idxV, idxCoerce) =
-                if idxVal.Type = I64 then emitUntag env idxVal
-                else (idxVal, [])
-            (rawResult, collOps @ collCoerce @ idxOps @ idxCoerce @ [LlvmCallOp(rawResult, "@lang_index_get", [collPtr; idxV])])
+            // Phase 92: C function untags index internally
+            (rawResult, collOps @ collCoerce @ idxOps @ [LlvmCallOp(rawResult, "@lang_index_get", [collPtr; idxVal])])
 
     // Phase 28: IndexSet — arr.[i] <- v or ht.[key] <- v via runtime dispatch
     // Phase 37: dispatch to _str variant when index is Ptr (string key); also handle Ptr-typed values via LlvmPtrToIntOp
@@ -1212,12 +1183,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let (unitVal, callOps) = emitVoidCall env "@lang_index_set_str" [collPtr; idxVal; valV]
             (unitVal, collOps @ collCoerce @ idxOps @ valOps @ valCoerce @ callOps)
         | _ ->
-            // Phase 88: Untag index before passing to C (value stays tagged)
-            let (idxV, idxCoerce) =
-                if idxVal.Type = I64 then emitUntag env idxVal
-                else (idxVal, [])
-            let (unitVal, callOps) = emitVoidCall env "@lang_index_set" [collPtr; idxV; valV]
-            (unitVal, collOps @ collCoerce @ idxOps @ valOps @ idxCoerce @ valCoerce @ callOps)
+            // Phase 92: C function untags index internally
+            let (unitVal, callOps) = emitVoidCall env "@lang_index_set" [collPtr; idxVal; valV]
+            (unitVal, collOps @ collCoerce @ idxOps @ valOps @ valCoerce @ callOps)
 
     // Phase 90: Unified hashtable_containsKey — two-arg, key passed as-is
     | App (App (Var ("hashtable_containsKey", _), htExpr, _), keyExpr, _) ->

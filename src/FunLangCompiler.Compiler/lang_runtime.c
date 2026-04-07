@@ -439,6 +439,19 @@ int64_t lang_array_length(int64_t* arr) {
     return LANG_TAG_INT(arr[0]);
 }
 
+/* Phase 92: Array element access — untag index, bounds check, access */
+int64_t lang_array_get(int64_t* arr, int64_t tagged_idx) {
+    int64_t i = LANG_UNTAG_INT(tagged_idx);
+    lang_array_bounds_check(arr, i);
+    return arr[i + 1];
+}
+
+void lang_array_set(int64_t* arr, int64_t tagged_idx, int64_t value) {
+    int64_t i = LANG_UNTAG_INT(tagged_idx);
+    lang_array_bounds_check(arr, i);
+    arr[i + 1] = value;
+}
+
 int64_t* lang_array_of_list(LangCons* list) {
     int64_t n = 0;
     LangCons* cur = list;
@@ -655,26 +668,28 @@ void lang_index_set_str(void* collection, LangString* key, int64_t value) {
 int64_t lang_index_get(void* collection, int64_t index) {
     int64_t first_word = ((int64_t*)collection)[0];
     if (first_word < 0) {
-        // Hashtable: tag is -1. Retag index since compiler passed raw int.
-        return lang_hashtable_get((LangHashtable*)collection, LANG_TAG_INT(index));
+        // Hashtable: index arrives tagged, pass directly
+        return lang_hashtable_get((LangHashtable*)collection, index);
     } else {
-        // Array: first word is non-negative length
+        // Array: untag index, bounds check, access
         int64_t* arr = (int64_t*)collection;
-        lang_array_bounds_check(arr, index);
-        return arr[index + 1];
+        int64_t i = LANG_UNTAG_INT(index);
+        lang_array_bounds_check(arr, i);
+        return arr[i + 1];
     }
 }
 
 void lang_index_set(void* collection, int64_t index, int64_t value) {
     int64_t first_word = ((int64_t*)collection)[0];
     if (first_word < 0) {
-        // Hashtable: tag is -1. Retag index since compiler passed raw int.
-        lang_hashtable_set((LangHashtable*)collection, LANG_TAG_INT(index), value);
+        // Hashtable: index arrives tagged, pass directly
+        lang_hashtable_set((LangHashtable*)collection, index, value);
     } else {
-        // Array: first word is non-negative length
+        // Array: untag index, bounds check, store
         int64_t* arr = (int64_t*)collection;
-        lang_array_bounds_check(arr, index);
-        arr[index + 1] = value;
+        int64_t i = LANG_UNTAG_INT(index);
+        lang_array_bounds_check(arr, i);
+        arr[i + 1] = value;
     }
 }
 
