@@ -500,21 +500,27 @@ LangCons* lang_array_to_list(int64_t* arr) {
  * Chained-bucket hashtable; all allocations via GC_malloc.
  * Missing-key errors use lang_throw (catchable by try/with). */
 
-/* Phase 90: Unified hash — LSB dispatch: tagged ints (LSB=1) use murmurhash3,
- * string pointers (LSB=0) use FNV-1a over content bytes. */
-static uint64_t lang_ht_hash(int64_t key) {
-    if (key & 1) {
+/* Phase 93: Generic hash — dispatches on LSB (tagged int) or heap tag at slot 0.
+ * Handles: tagged ints, strings, tuples, records, lists, ADTs.
+ * Depth limit 256 for list traversal to prevent stack overflow. */
+static uint64_t lang_ht_hash(int64_t val) {
+    if (val & 1) {
         /* Tagged int — murmurhash3 finalizer */
-        uint64_t h = (uint64_t)key;
+        uint64_t h = (uint64_t)val;
         h ^= h >> 33;
         h *= UINT64_C(0xff51afd7ed558ccd);
         h ^= h >> 33;
         h *= UINT64_C(0xc4ceb9fe1a85ec53);
         h ^= h >> 33;
         return h;
-    } else {
-        /* Pointer (string) — FNV-1a over string content */
-        LangString* s = (LangString*)(uintptr_t)key;
+    }
+    if (val == 0) return 0;  /* NULL pointer (nil list, unit, etc.) */
+
+    int64_t* block = (int64_t*)val;
+    int64_t tag = block[0];
+    switch (tag) {
+    case LANG_HEAP_TAG_STRING: {
+        LangString* s = (LangString*)block;
         uint64_t h = UINT64_C(14695981039346656037);
         for (int64_t i = 0; i < s->length; i++) {
             h ^= (uint8_t)s->data[i];
@@ -522,17 +528,89 @@ static uint64_t lang_ht_hash(int64_t key) {
         }
         return h;
     }
+    case LANG_HEAP_TAG_TUPLE:
+    case LANG_HEAP_TAG_RECORD: {
+        int64_t n = block[1]; /* num_fields */
+        uint64_t h = (uint64_t)tag;
+        for (int64_t i = 0; i < n; i++) {
+            h = h * 31 + lang_ht_hash(block[2 + i]);
+        }
+        return h;
+    }
+    case LANG_HEAP_TAG_LIST: {
+        uint64_t h = UINT64_C(0x9e3779b97f4a7c15);
+        int64_t* cur = block;
+        int depth = 0;
+        while (cur != NULL && depth < 256) {
+            h = h * 31 + lang_ht_hash(cur[1]); /* head at slot 1 */
+            int64_t tail = cur[2];              /* tail at slot 2 */
+            cur = (tail == 0) ? NULL : (int64_t*)tail;
+            depth++;
+        }
+        return h;
+    }
+    case LANG_HEAP_TAG_ADT: {
+        uint64_t h = lang_ht_hash(block[1]); /* constructor tag (tagged int) at slot 1 */
+        int64_t payload = block[2];           /* payload at slot 2 */
+        if (payload != 0) {
+            h = h * 31 + lang_ht_hash(payload);
+        }
+        return h;
+    }
+    default:
+        /* Unknown pointer (closure, etc.) — hash pointer value */
+        return (uint64_t)val * UINT64_C(0x9e3779b97f4a7c15);
+    }
 }
 
-/* Phase 90: Unified equality — LSB dispatch */
+/* Phase 93: Generic equality — structural comparison dispatching on heap tag.
+ * Handles: tagged ints, strings, tuples, records, lists, ADTs.
+ * Depth limit 256 for list traversal. */
 static int lang_ht_eq(int64_t a, int64_t b) {
-    if ((a & 1) != (b & 1)) return 0;  /* different types */
-    if (a & 1) return a == b;           /* both tagged ints */
-    /* Both strings — content equality */
-    LangString* sa = (LangString*)(uintptr_t)a;
-    LangString* sb = (LangString*)(uintptr_t)b;
-    return sa->length == sb->length &&
-           memcmp(sa->data, sb->data, (size_t)sa->length) == 0;
+    if (a == b) return 1;                      /* Same value/pointer */
+    if ((a & 1) != (b & 1)) return 0;          /* int vs ptr mismatch */
+    if (a & 1) return 0;                        /* Both ints but different */
+    if (a == 0 || b == 0) return 0;             /* One is NULL */
+
+    int64_t* ba = (int64_t*)a;
+    int64_t* bb = (int64_t*)b;
+    if (ba[0] != bb[0]) return 0;              /* Different heap tags */
+
+    switch (ba[0]) {
+    case LANG_HEAP_TAG_STRING: {
+        LangString* sa = (LangString*)ba;
+        LangString* sb = (LangString*)bb;
+        return sa->length == sb->length &&
+               memcmp(sa->data, sb->data, (size_t)sa->length) == 0;
+    }
+    case LANG_HEAP_TAG_TUPLE:
+    case LANG_HEAP_TAG_RECORD: {
+        int64_t na = ba[1], nb = bb[1];
+        if (na != nb) return 0;
+        for (int64_t i = 0; i < na; i++) {
+            if (!lang_ht_eq(ba[2+i], bb[2+i])) return 0;
+        }
+        return 1;
+    }
+    case LANG_HEAP_TAG_LIST: {
+        int64_t* ca = ba;
+        int64_t* cb = bb;
+        int depth = 0;
+        while (ca != NULL && cb != NULL && depth < 256) {
+            if (!lang_ht_eq(ca[1], cb[1])) return 0;
+            ca = (ca[2] == 0) ? NULL : (int64_t*)ca[2];
+            cb = (cb[2] == 0) ? NULL : (int64_t*)cb[2];
+            depth++;
+        }
+        return (ca == NULL && cb == NULL) ? 1 : 0;
+    }
+    case LANG_HEAP_TAG_ADT: {
+        if (ba[1] != bb[1]) return 0;          /* different constructor tag */
+        return lang_ht_eq(ba[2], bb[2]);        /* compare payloads */
+    }
+    default:
+        return 0;
+    }
 }
 
 /* Find entry for key; returns NULL if not present.
