@@ -416,15 +416,15 @@ let fmtSpecTypes (fmt: string) : FmtSpec list =
             i <- i + 1
     specs |> Seq.toList
 
-/// Phase 39: Coerce a value to I64 for int-typed sprintf wrapper args.
-/// I1 → zext to I64; I64 → pass through; Ptr → ptrtoint; I32 → pass through.
+/// Phase 39: Coerce a value to raw I64 for int-typed sprintf wrapper args (C boundary).
+/// Phase 88: All integer args are now tagged — untag before passing to C.
+/// I1 → zext to I64 (raw 0/1); I64 → untag; Ptr → ptrtoint; I32 → pass through.
 let coerceToI64Arg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
     match v.Type with
-    | I64 -> (v, [])
+    | I64 -> emitUntag env v
     | I1  ->
         let ext = { Name = freshName env; Type = I64 }
-        let (tagged, retagOps) = emitRetag env ext
-        (tagged, [ArithExtuIOp(ext, v)] @ retagOps)
+        (ext, [ArithExtuIOp(ext, v)])
     | Ptr ->
         let i = { Name = freshName env; Type = I64 }
         (i, [LlvmPtrToIntOp(i, v)])

@@ -871,8 +871,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (startVal, startOps) = elaborateExpr env startExpr
         let (lenVal,   lenOps)   = elaborateExpr env lenExpr
         let (strPtr, strCoerce) = coerceToPtrArg env strVal
+        // Phase 88: Untag start and length before passing to C
+        let (rawStart, untagStartOps) = emitUntag env startVal
+        let (rawLen, untagLenOps) = emitUntag env lenVal
         let result = { Name = freshName env; Type = Ptr }
-        (result, strOps @ startOps @ lenOps @ strCoerce @ [LlvmCallOp(result, "@lang_string_sub", [strPtr; startVal; lenVal])])
+        (result, strOps @ startOps @ lenOps @ strCoerce @ untagStartOps @ untagLenOps @ [LlvmCallOp(result, "@lang_string_sub", [strPtr; rawStart; rawLen])])
 
     // Phase 14: string_contains builtin — App(App(Var("string_contains"), s), sub)
     | App (App (Var ("string_contains", _), strExpr, _), subExpr, _) ->
@@ -944,8 +947,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (subVal, subOps) = elaborateExpr env subExpr
         let (strPtr, strCoerce) = coerceToPtrArg env strVal
         let (subPtr, subCoerce) = coerceToPtrArg env subVal
-        let result = { Name = freshName env; Type = I64 }
-        (result, strOps @ subOps @ strCoerce @ subCoerce @ [LlvmCallOp(result, "@lang_string_indexof", [strPtr; subPtr])])
+        let rawResult = { Name = freshName env; Type = I64 }
+        // Phase 88: Retag result from C (raw int → tagged)
+        let (result, retagOps) = emitRetag env rawResult
+        (result, strOps @ subOps @ strCoerce @ subCoerce @ [LlvmCallOp(rawResult, "@lang_string_indexof", [strPtr; subPtr])] @ retagOps)
 
     // Phase 54: string_replace builtin — App(App(App(Var("string_replace"), s), old), rep)
     | App (App (App (Var ("string_replace", _), strExpr, _), oldExpr, _), repExpr, _) ->
@@ -1013,13 +1018,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let extVal = { Name = freshName env; Type = I64 }
                 (result, argOps @ [ArithExtuIOp(extVal, argVal); LlvmCallOp(result, "@lang_to_string_bool", [extVal])])
             else
-                (result, argOps @ [LlvmCallOp(result, "@lang_to_string_bool", [argVal])])
+                // Phase 88: Untag I64 bool before passing to C
+                let (rawBool, untagOps) = emitUntag env argVal
+                (result, argOps @ untagOps @ [LlvmCallOp(result, "@lang_to_string_bool", [rawBool])])
         elif argVal.Type = Ptr then
-            // Ptr: already a LangString* — return unchanged (handles string variables)
             (argVal, argOps)
         else
-            // I64 — call lang_to_string_int
-            (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
+            // Phase 88: Untag I64 int before passing to C
+            let (rawInt, untagOps) = emitUntag env argVal
+            (result, argOps @ untagOps @ [LlvmCallOp(result, "@lang_to_string_int", [rawInt])])
 
     // Phase 53: eq builtin — polymorphic equality, dispatches on static argument type.
     // Fires when arguments are string literals or non-Ptr values.
@@ -1083,15 +1090,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let extVal = { Name = freshName env; Type = I64 }
                 (result, argOps @ [ArithExtuIOp(extVal, argVal); LlvmCallOp(result, "@lang_to_string_bool", [extVal])])
             else
-                // I64 value known to be bool — call lang_to_string_bool directly
-                (result, argOps @ [LlvmCallOp(result, "@lang_to_string_bool", [argVal])])
+                // Phase 88: Untag I64 bool before passing to C (tagged 1→0 false, 3→1 true)
+                let (rawBool, untagOps) = emitUntag env argVal
+                (result, argOps @ untagOps @ [LlvmCallOp(result, "@lang_to_string_bool", [rawBool])])
         elif argVal.Type = Ptr then
-            // Phase 53: Ptr value is already a LangString* — return it unchanged.
-            // This handles to_string on string arguments (and show string via Show string instance).
             (argVal, argOps)
         else
-            // I64 and other numeric types — call lang_to_string_int directly
-            (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
+            // Phase 88: Untag I64 int before passing to C
+            let (rawInt, untagOps) = emitUntag env argVal
+            (result, argOps @ untagOps @ [LlvmCallOp(result, "@lang_to_string_int", [rawInt])])
 
     // Phase 8: string_length builtin — GEP field 0 and load
     | App (Var ("string_length", _), strExpr, _) ->
@@ -1103,7 +1110,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             LlvmGEPStructOp(lenPtrVal, strPtr, 0)
             LlvmLoadOp(lenVal, lenPtrVal)
         ]
-        (lenVal, strOps @ strCoerce @ ops)
+        // Phase 88: Retag loaded length (raw C value → tagged)
+        let (taggedLen, retagOps) = emitRetag env lenVal
+        (taggedLen, strOps @ strCoerce @ ops @ retagOps)
 
     // Phase 14: failwith builtin — extract char* from LangString, call lang_failwith (noreturn)
     | App (Var ("failwith", _), msgExpr, _) ->
@@ -1124,8 +1133,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("string_to_int", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
         let (strPtr, strCoerce) = coerceToPtrArg env strVal
-        let result = { Name = freshName env; Type = I64 }
-        (result, strOps @ strCoerce @ [LlvmCallOp(result, "@lang_string_to_int", [strPtr])])
+        let rawResult = { Name = freshName env; Type = I64 }
+        // Phase 88: Retag result from C (raw int → tagged)
+        let (result, retagOps) = emitRetag env rawResult
+        (result, strOps @ strCoerce @ [LlvmCallOp(rawResult, "@lang_string_to_int", [strPtr])] @ retagOps)
 
     // Phase 22: array_set — three-arg (must appear before two-arg and one-arg patterns)
     // array_set arr idx val: bounds check, compute slot idx+1, GEP, store, return unit
@@ -1134,19 +1145,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
+        // Phase 88: Untag index for bounds check and GEP arithmetic
+        let (rawIdx, untagIdxOps) = emitUntag env idxVal
         let oneVal    = { Name = freshName env; Type = I64 }
         let slotVal   = { Name = freshName env; Type = I64 }
         let elemPtr   = { Name = freshName env; Type = Ptr }
         let unitVal   = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmCallVoidOp("@lang_array_bounds_check", [arrPtrVal; idxVal])
+            LlvmCallVoidOp("@lang_array_bounds_check", [arrPtrVal; rawIdx])
             ArithConstantOp(oneVal, 1L)
-            ArithAddIOp(slotVal, idxVal, oneVal)
+            ArithAddIOp(slotVal, rawIdx, oneVal)
             LlvmGEPDynamicOp(elemPtr, arrPtrVal, slotVal)
             LlvmStoreOp(valVal, elemPtr)
             ArithConstantOp(unitVal, 1L)
         ]
-        (unitVal, arrOps @ arrCoerceOps @ idxOps @ valOps @ ops)
+        (unitVal, arrOps @ arrCoerceOps @ idxOps @ untagIdxOps @ valOps @ ops)
 
     // Phase 22: array_get — two-arg
     // array_get arr idx: bounds check, compute slot idx+1, GEP, load
@@ -1154,18 +1167,20 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (arrVal, arrOps) = elaborateExpr env arrExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
+        // Phase 88: Untag index for bounds check and GEP arithmetic
+        let (rawIdx, untagIdxOps) = emitUntag env idxVal
         let oneVal  = { Name = freshName env; Type = I64 }
         let slotVal = { Name = freshName env; Type = I64 }
         let elemPtr = { Name = freshName env; Type = Ptr }
         let result  = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmCallVoidOp("@lang_array_bounds_check", [arrPtrVal; idxVal])
+            LlvmCallVoidOp("@lang_array_bounds_check", [arrPtrVal; rawIdx])
             ArithConstantOp(oneVal, 1L)
-            ArithAddIOp(slotVal, idxVal, oneVal)
+            ArithAddIOp(slotVal, rawIdx, oneVal)
             LlvmGEPDynamicOp(elemPtr, arrPtrVal, slotVal)
             LlvmLoadOp(result, elemPtr)
         ]
-        (result, arrOps @ arrCoerceOps @ idxOps @ ops)
+        (result, arrOps @ arrCoerceOps @ idxOps @ untagIdxOps @ ops)
 
     // Phase 22: array_create — two-arg
     // array_create n defVal: call lang_array_create(n, defVal)
@@ -1182,7 +1197,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         let (nV, nCoerce)     = nI64
         let (defV, defCoerce) = defI64
-        (result, nOps @ defOps @ nCoerce @ defCoerce @ [LlvmCallOp(result, "@lang_array_create", [nV; defV])])
+        // Phase 88: Untag count before passing to C (value stays tagged)
+        let (rawN, untagNOps) = emitUntag env nV
+        (result, nOps @ defOps @ nCoerce @ defCoerce @ untagNOps @ [LlvmCallOp(result, "@lang_array_create", [rawN; defV])])
 
     // Phase 22: array_length — one-arg
     // array_length arr: GEP slot 0 (length slot), load
@@ -1190,12 +1207,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (arrVal, arrOps) = elaborateExpr env arrExpr
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let lenPtr = { Name = freshName env; Type = Ptr }
-        let result = { Name = freshName env; Type = I64 }
+        let rawLen = { Name = freshName env; Type = I64 }
         let ops = [
             LlvmGEPLinearOp(lenPtr, arrPtrVal, 0)
-            LlvmLoadOp(result, lenPtr)
+            LlvmLoadOp(rawLen, lenPtr)
         ]
-        (result, arrOps @ arrCoerceOps @ ops)
+        // Phase 88: Retag loaded length (raw C value → tagged)
+        let (result, retagOps) = emitRetag env rawLen
+        (result, arrOps @ arrCoerceOps @ ops @ retagOps)
 
     // Phase 22: array_of_list — one-arg
     | App (Var ("array_of_list", _), lstExpr, _) ->
@@ -1233,9 +1252,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set_str" [htPtr; keyVal; valI64]
             (unitVal, htOps @ keyOps @ valOps @ htCoerce @ valCoerce @ callOps)
         | _ ->
+            // Phase 88: Untag int key before passing to C
             let (keyI64, keyCoerce) =
                 match keyVal.Type with
-                | I64 -> (keyVal, [])
+                | I64 -> emitUntag env keyVal
                 | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
                 | _   -> (keyVal, [])
             let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set" [htPtr; keyI64; valI64]
@@ -1252,9 +1272,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         | Ptr ->
             (result, htOps @ keyOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_get_str", [htPtr; keyVal])])
         | _ ->
+            // Phase 88: Untag int key before passing to C
             let (keyI64, keyCoerce) =
                 match keyVal.Type with
-                | I64 -> (keyVal, [])
+                | I64 -> emitUntag env keyVal
                 | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
                 | _   -> (keyVal, [])
             (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_get", [htPtr; keyI64])])
@@ -1265,26 +1286,29 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | IndexGet (collExpr, idxExpr, _) ->
         let (collVal, collOps) = elaborateExpr env collExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
-        let result = { Name = freshName env; Type = I64 }
+        let rawResult = { Name = freshName env; Type = I64 }
         // Coerce collection to Ptr if it was loaded from a record slot (I64 → Ptr)
         let (collPtr, collCoerce) =
             if collVal.Type = Ptr then (collVal, [])
             else let v = { Name = freshName env; Type = Ptr } in (v, [LlvmIntToPtrOp(v, collVal)])
         // Phase 66: String char-at dispatch — s.[i] returns the byte at index i as i64
         if isStringExpr env.StringVars env.StringFields env.AnnotationMap collExpr then
+            // Phase 88: Untag index, retag char result
             let (idxV, idxCoerce) =
-                if idxVal.Type = I64 then (idxVal, [])
-                else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
-            (result, collOps @ collCoerce @ idxOps @ idxCoerce @ [LlvmCallOp(result, "@lang_string_char_at", [collPtr; idxV])])
+                if idxVal.Type = I64 then emitUntag env idxVal
+                else (idxVal, [])
+            let (result, retagOps) = emitRetag env rawResult
+            (result, collOps @ collCoerce @ idxOps @ idxCoerce @ [LlvmCallOp(rawResult, "@lang_string_char_at", [collPtr; idxV])] @ retagOps)
         else
         match idxVal.Type with
         | Ptr ->
-            (result, collOps @ collCoerce @ idxOps @ [LlvmCallOp(result, "@lang_index_get_str", [collPtr; idxVal])])
+            (rawResult, collOps @ collCoerce @ idxOps @ [LlvmCallOp(rawResult, "@lang_index_get_str", [collPtr; idxVal])])
         | _ ->
+            // Phase 88: Untag index before passing to C
             let (idxV, idxCoerce) =
-                if idxVal.Type = I64 then (idxVal, [])
-                else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
-            (result, collOps @ collCoerce @ idxOps @ idxCoerce @ [LlvmCallOp(result, "@lang_index_get", [collPtr; idxV])])
+                if idxVal.Type = I64 then emitUntag env idxVal
+                else (idxVal, [])
+            (rawResult, collOps @ collCoerce @ idxOps @ idxCoerce @ [LlvmCallOp(rawResult, "@lang_index_get", [collPtr; idxV])])
 
     // Phase 28: IndexSet — arr.[i] <- v or ht.[key] <- v via runtime dispatch
     // Phase 37: dispatch to _str variant when index is Ptr (string key); also handle Ptr-typed values via LlvmPtrToIntOp
@@ -1307,9 +1331,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let (unitVal, callOps) = emitVoidCall env "@lang_index_set_str" [collPtr; idxVal; valV]
             (unitVal, collOps @ collCoerce @ idxOps @ valOps @ valCoerce @ callOps)
         | _ ->
+            // Phase 88: Untag index before passing to C (value stays tagged)
             let (idxV, idxCoerce) =
-                if idxVal.Type = I64 then (idxVal, [])
-                else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
+                if idxVal.Type = I64 then emitUntag env idxVal
+                else (idxVal, [])
             let (unitVal, callOps) = emitVoidCall env "@lang_index_set" [collPtr; idxV; valV]
             (unitVal, collOps @ collCoerce @ idxOps @ valOps @ idxCoerce @ valCoerce @ callOps)
 
@@ -1331,9 +1356,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             ]
             (boolVal, htOps @ keyOps @ ops)
         | _ ->
+            // Phase 88: Untag int key before passing to C
             let (keyI64, keyCoerce) =
                 match keyVal.Type with
-                | I64 -> (keyVal, [])
+                | I64 -> emitUntag env keyVal
                 | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
                 | _   -> (keyVal, [])
             let ops = htCoerce @ keyCoerce @ [
@@ -1354,9 +1380,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove_str" [htPtr; keyVal]
             (unitVal, htOps @ keyOps @ htCoerce @ callOps)
         | _ ->
+            // Phase 88: Untag int key before passing to C
             let (keyI64, keyCoerce) =
                 match keyVal.Type with
-                | I64 -> (keyVal, [])
+                | I64 -> emitUntag env keyVal
                 | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
                 | _   -> (keyVal, [])
             let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove" [htPtr; keyI64]
@@ -1463,9 +1490,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         | Ptr ->
             (result, htOps @ keyOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue_str", [htPtr; keyVal])])
         | _ ->
+            // Phase 88: Untag int key before passing to C
             let (kv, kCoerce) =
-                if keyVal.Type = I64 then (keyVal, [])
-                else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
+                if keyVal.Type = I64 then emitUntag env keyVal
+                else (keyVal, [])
             (result, htOps @ keyOps @ htCoerce @ kCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue", [htPtr; kv])])
 
     // hashtable_count — one-arg, inline GEP+load at field index 2 (size field of LangHashtable struct)
@@ -1474,12 +1502,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (htVal, htOps) = elaborateExpr env htExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
         let sizePtr = { Name = freshName env; Type = Ptr }
-        let result  = { Name = freshName env; Type = I64 }
+        let rawSize = { Name = freshName env; Type = I64 }
         let ops = [
             LlvmGEPLinearOp(sizePtr, htPtr, 2)   // field index 2 = size
-            LlvmLoadOp(result, sizePtr)
+            LlvmLoadOp(rawSize, sizePtr)
         ]
-        (result, htOps @ htCoerce @ ops)
+        // Phase 88: Retag loaded size (raw C value → tagged)
+        let (result, retagOps) = emitRetag env rawSize
+        (result, htOps @ htCoerce @ ops @ retagOps)
 
     // Phase 24: array HOF builtins
     // array_fold — three-arg (must appear before two-arg patterns)
@@ -1547,6 +1577,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if nVal.Type = I64 then (nVal, [])
             else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, nVal)])
         let (nV, nCoerce) = nI64
+        // Phase 88: Untag count before passing to C
+        let (rawN, untagNOps) = emitUntag env nV
         let closurePtrVal =
             if fVal.Type = I64
             then { Name = freshName env; Type = Ptr }
@@ -1556,7 +1588,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             then [LlvmIntToPtrOp(closurePtrVal, fVal)]
             else []
         let result = { Name = freshName env; Type = Ptr }
-        (result, nOps @ nCoerce @ fOps @ closureOps @ [LlvmCallOp(result, "@lang_array_init", [nV; closurePtrVal])])
+        (result, nOps @ nCoerce @ untagNOps @ fOps @ closureOps @ [LlvmCallOp(result, "@lang_array_init", [rawN; closurePtrVal])])
 
     // list_sort_by — two-arg curried with closure coercion (mirrors array_map pattern)
     | App (App (Var ("list_sort_by", _), closureExpr, _), listExpr, _) ->
@@ -1625,21 +1657,26 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (hsVal,  hsOps)  = elaborateExpr env hsExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
+        // Phase 88: Untag value before passing to C
+        let (rawVal, untagOps) = emitUntag env valVal
         let result = { Name = freshName env; Type = I64 }
-        (result, hsOps @ valOps @ hsCoerce @ [LlvmCallOp(result, "@lang_hashset_add", [hsPtr; valVal])])
+        (result, hsOps @ valOps @ hsCoerce @ untagOps @ [LlvmCallOp(result, "@lang_hashset_add", [hsPtr; rawVal])])
 
     | App (App (Var ("hashset_contains", _), hsExpr, _), valExpr, _) ->
         let (hsVal,  hsOps)  = elaborateExpr env hsExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
+        // Phase 88: Untag value before passing to C
+        let (rawVal, untagOps) = emitUntag env valVal
         let result = { Name = freshName env; Type = I64 }
-        (result, hsOps @ valOps @ hsCoerce @ [LlvmCallOp(result, "@lang_hashset_contains", [hsPtr; valVal])])
+        (result, hsOps @ valOps @ hsCoerce @ untagOps @ [LlvmCallOp(result, "@lang_hashset_contains", [hsPtr; rawVal])])
 
     | App (Var ("hashset_count", _), hsExpr, _) ->
         let (hsVal, hsOps) = elaborateExpr env hsExpr
         let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
-        let result = { Name = freshName env; Type = I64 }
-        (result, hsOps @ hsCoerce @ [LlvmCallOp(result, "@lang_hashset_count", [hsPtr])])
+        let rawResult = { Name = freshName env; Type = I64 }
+        let (result, retagOps) = emitRetag env rawResult
+        (result, hsOps @ hsCoerce @ [LlvmCallOp(rawResult, "@lang_hashset_count", [hsPtr])] @ retagOps)
 
     // Phase 33-02: COL-03 Queue
     | App (Var ("queue_create", _), unitExpr, _) ->
@@ -1664,8 +1701,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("queue_count", _), qExpr, _) ->
         let (qVal, qOps) = elaborateExpr env qExpr
         let (qPtr, qCoerce) = coerceToPtrArg env qVal
-        let result = { Name = freshName env; Type = I64 }
-        (result, qOps @ qCoerce @ [LlvmCallOp(result, "@lang_queue_count", [qPtr])])
+        let rawResult = { Name = freshName env; Type = I64 }
+        let (result, retagOps) = emitRetag env rawResult
+        (result, qOps @ qCoerce @ [LlvmCallOp(rawResult, "@lang_queue_count", [qPtr])] @ retagOps)
 
     // Phase 33-02: COL-04 MutableList
     // NOTE: mutablelist_set (three-arg) MUST appear BEFORE mutablelist_get (two-arg)
@@ -1674,9 +1712,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
+        // Phase 88: Untag index before passing to C
         let (idxV, idxCoerce) =
-            if idxVal.Type = I64 then (idxVal, [])
-            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
+            if idxVal.Type = I64 then emitUntag env idxVal
+            else (idxVal, [])
         let (unitVal, callOps) = emitVoidCall env "@lang_mlist_set" [mlPtr; idxV; valVal]
         (unitVal, mlOps @ idxOps @ idxCoerce @ valOps @ mlCoerce @ callOps)
 
@@ -1684,9 +1723,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (mlVal,  mlOps)  = elaborateExpr env mlExpr
         let (idxVal, idxOps) = elaborateExpr env idxExpr
         let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
+        // Phase 88: Untag index before passing to C
         let (idxV, idxCoerce) =
-            if idxVal.Type = I64 then (idxVal, [])
-            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, idxVal)])
+            if idxVal.Type = I64 then emitUntag env idxVal
+            else (idxVal, [])
         let result = { Name = freshName env; Type = I64 }
         (result, mlOps @ idxOps @ idxCoerce @ mlCoerce @ [LlvmCallOp(result, "@lang_mlist_get", [mlPtr; idxV])])
 
@@ -1705,8 +1745,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("mutablelist_count", _), mlExpr, _) ->
         let (mlVal, mlOps) = elaborateExpr env mlExpr
         let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
-        let result = { Name = freshName env; Type = I64 }
-        (result, mlOps @ mlCoerce @ [LlvmCallOp(result, "@lang_mlist_count", [mlPtr])])
+        let rawResult = { Name = freshName env; Type = I64 }
+        let (result, retagOps) = emitRetag env rawResult
+        (result, mlOps @ mlCoerce @ [LlvmCallOp(rawResult, "@lang_mlist_count", [mlPtr])] @ retagOps)
 
     // write_file — two-arg, void return
     | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
@@ -1754,13 +1795,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let locStr = sprintf "[%s:%d] " dbgSpan.FileName dbgSpan.StartLine
         let (locVal, locOps) = elaborateExpr env (String(locStr, dbgSpan))
         // Convert argVal to displayable string via lang_to_string_int
+        // Phase 88: Untag I64 before passing to C
         let strVal = { Name = freshName env; Type = Ptr }
         let toStrOps =
             if argVal.Type = Ptr then
                 let i64Val = { Name = freshName env; Type = I64 }
                 [LlvmPtrToIntOp(i64Val, argVal); LlvmCallOp(strVal, "@lang_to_string_int", [i64Val])]
             else
-                [LlvmCallOp(strVal, "@lang_to_string_int", [argVal])]
+                let (rawVal, untagOps) = emitUntag env argVal
+                untagOps @ [LlvmCallOp(strVal, "@lang_to_string_int", [rawVal])]
         // eprint("[file:line] "); eprintln(to_string(arg)); return original value
         (argVal, argOps @ locOps @ toStrOps @ [LlvmCallVoidOp("@lang_eprint", [locVal]); LlvmCallVoidOp("@lang_eprintln", [strVal])])
 
@@ -1956,66 +1999,77 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 31: char_is_digit — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_digit", _), charExpr, _) ->
         let (charVal, charOps) = elaborateExpr env charExpr
+        // Phase 88: Untag char before passing to C
+        let (rawChar, untagOps) = emitUntag env charVal
         let rawResult  = { Name = freshName env; Type = I64 }
         let zeroVal    = { Name = freshName env; Type = I64 }
         let boolResult = { Name = freshName env; Type = I1 }
         let ops = [
-            LlvmCallOp(rawResult, "@lang_char_is_digit", [charVal])
+            LlvmCallOp(rawResult, "@lang_char_is_digit", [rawChar])
             ArithConstantOp(zeroVal, 0L)
             ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
         ]
-        (boolResult, charOps @ ops)
+        (boolResult, charOps @ untagOps @ ops)
 
     // Phase 31: char_is_letter — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_letter", _), charExpr, _) ->
         let (charVal, charOps) = elaborateExpr env charExpr
+        let (rawChar, untagOps) = emitUntag env charVal
         let rawResult  = { Name = freshName env; Type = I64 }
         let zeroVal    = { Name = freshName env; Type = I64 }
         let boolResult = { Name = freshName env; Type = I1 }
         let ops = [
-            LlvmCallOp(rawResult, "@lang_char_is_letter", [charVal])
+            LlvmCallOp(rawResult, "@lang_char_is_letter", [rawChar])
             ArithConstantOp(zeroVal, 0L)
             ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
         ]
-        (boolResult, charOps @ ops)
+        (boolResult, charOps @ untagOps @ ops)
 
     // Phase 31: char_is_upper — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_upper", _), charExpr, _) ->
         let (charVal, charOps) = elaborateExpr env charExpr
+        let (rawChar, untagOps) = emitUntag env charVal
         let rawResult  = { Name = freshName env; Type = I64 }
         let zeroVal    = { Name = freshName env; Type = I64 }
         let boolResult = { Name = freshName env; Type = I1 }
         let ops = [
-            LlvmCallOp(rawResult, "@lang_char_is_upper", [charVal])
+            LlvmCallOp(rawResult, "@lang_char_is_upper", [rawChar])
             ArithConstantOp(zeroVal, 0L)
             ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
         ]
-        (boolResult, charOps @ ops)
+        (boolResult, charOps @ untagOps @ ops)
 
     // Phase 31: char_is_lower — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_lower", _), charExpr, _) ->
         let (charVal, charOps) = elaborateExpr env charExpr
+        let (rawChar, untagOps) = emitUntag env charVal
         let rawResult  = { Name = freshName env; Type = I64 }
         let zeroVal    = { Name = freshName env; Type = I64 }
         let boolResult = { Name = freshName env; Type = I1 }
         let ops = [
-            LlvmCallOp(rawResult, "@lang_char_is_lower", [charVal])
+            LlvmCallOp(rawResult, "@lang_char_is_lower", [rawChar])
             ArithConstantOp(zeroVal, 0L)
             ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
         ]
-        (boolResult, charOps @ ops)
+        (boolResult, charOps @ untagOps @ ops)
 
     // Phase 31: char_to_upper — pass-through (returns i64 char code)
     | App (Var ("char_to_upper", _), charExpr, _) ->
         let (charVal, charOps) = elaborateExpr env charExpr
-        let result = { Name = freshName env; Type = I64 }
-        (result, charOps @ [LlvmCallOp(result, "@lang_char_to_upper", [charVal])])
+        // Phase 88: Untag char before C, retag result
+        let (rawChar, untagOps) = emitUntag env charVal
+        let rawResult = { Name = freshName env; Type = I64 }
+        let (result, retagOps) = emitRetag env rawResult
+        (result, charOps @ untagOps @ [LlvmCallOp(rawResult, "@lang_char_to_upper", [rawChar])] @ retagOps)
 
     // Phase 31: char_to_lower — pass-through (returns i64 char code)
     | App (Var ("char_to_lower", _), charExpr, _) ->
         let (charVal, charOps) = elaborateExpr env charExpr
-        let result = { Name = freshName env; Type = I64 }
-        (result, charOps @ [LlvmCallOp(result, "@lang_char_to_lower", [charVal])])
+        // Phase 88: Untag char before C, retag result
+        let (rawChar, untagOps) = emitUntag env charVal
+        let rawResult = { Name = freshName env; Type = I64 }
+        let (result, retagOps) = emitRetag env rawResult
+        (result, charOps @ untagOps @ [LlvmCallOp(rawResult, "@lang_char_to_lower", [rawChar])] @ retagOps)
 
     // Phase 7: print/println builtins — static literal fast path (keep before general case)
     | App (Var ("print", _), String (s, _), _) ->
@@ -2322,13 +2376,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             // General case: evaluate funcExpr to get a closure value, then dispatch
             let (funcVal, funcOps) = elaborateExpr env funcExpr
             let (argVal, argOps) = elaborateExpr env argExpr
+            // Phase 88: Coerce arg to I64 for uniform closure ABI (I1→tagged I64, Ptr→I64)
+            let (argI64, argCoerce) = coerceToI64 env argVal
             if funcVal.Type = Ptr then
                 // Ptr-typed closure: load fn_ptr from slot 0, call indirect
                 let fnPtrVal = { Name = freshName env; Type = Ptr }
                 let result = { Name = freshName env; Type = I64 }
                 let loadOp = LlvmLoadOp(fnPtrVal, funcVal)
-                let callOp = IndirectCallOp(result, fnPtrVal, funcVal, argVal)
-                (result, funcOps @ argOps @ [loadOp; callOp])
+                let callOp = IndirectCallOp(result, fnPtrVal, funcVal, argI64)
+                (result, funcOps @ argOps @ argCoerce @ [loadOp; callOp])
             elif funcVal.Type = I64 then
                 // I64-typed closure (passed through uniform ABI): inttoptr then indirect call
                 let closurePtrVal = { Name = freshName env; Type = Ptr }
@@ -2336,8 +2392,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let result = { Name = freshName env; Type = I64 }
                 let castOp = LlvmIntToPtrOp(closurePtrVal, funcVal)
                 let loadOp = LlvmLoadOp(fnPtrVal, closurePtrVal)
-                let callOp = IndirectCallOp(result, fnPtrVal, closurePtrVal, argVal)
-                (result, funcOps @ argOps @ [castOp; loadOp; callOp])
+                let callOp = IndirectCallOp(result, fnPtrVal, closurePtrVal, argI64)
+                (result, funcOps @ argOps @ argCoerce @ [castOp; loadOp; callOp])
             else
                 failWithSpan appSpan "Elaboration: unsupported App — function expression elaborated to unsupported type %A" funcVal.Type
     // Phase 9: Tuple construction — GC_malloc(n*8) + sequential GEP + store
@@ -2412,8 +2468,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | None ->
                 let v = { Name = freshName env; Type = I64 }
                 (v, [ArithConstantOp(v, tagConst 1L)])
+        // Phase 88: Pass tagged start/stop directly to C so list elements are tagged.
+        // Convert tagged step to raw double: tagged(k) = 2k+1, step for C = 2k = tagged(k) - 1.
+        let rawStepOne = { Name = freshName env; Type = I64 }
+        let rawStep = { Name = freshName env; Type = I64 }
+        let stepConvOps = [ArithConstantOp(rawStepOne, 1L); ArithSubIOp(rawStep, stepVal, rawStepOne)]
         let result = { Name = freshName env; Type = Ptr }
-        (result, startOps @ stopOps @ stepOps @ [LlvmCallOp(result, "@lang_range", [startVal; stopVal; stepVal])])
+        (result, startOps @ stopOps @ stepOps @ stepConvOps @ [LlvmCallOp(result, "@lang_range", [startVal; stopVal; rawStep])])
 
     // Phase 11 (v2): General Match compiler — Jules Jacobs decision tree algorithm.
     // Compiles pattern matching to a binary decision tree, then emits MLIR from the tree.
@@ -2534,7 +2595,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | MatchCompiler.IntLit n ->
                 let kVal = { Name = freshName env; Type = I64 }
                 let cond = { Name = freshName env; Type = I1 }
-                let ops = [ ArithConstantOp(kVal, int64 n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+                let ops = [ ArithConstantOp(kVal, tagConst (int64 n)); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
                 (cond, ops)
             | MatchCompiler.BoolLit b ->
                 let kVal = { Name = freshName env; Type = I1 }
@@ -3279,7 +3340,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | MatchCompiler.IntLit n ->
                 let kVal = { Name = freshName env; Type = I64 }
                 let cond = { Name = freshName env; Type = I1 }
-                let ops = [ ArithConstantOp(kVal, int64 n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+                let ops = [ ArithConstantOp(kVal, tagConst (int64 n)); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
                 (cond, ops)
             | MatchCompiler.BoolLit b ->
                 let kVal = { Name = freshName env; Type = I1 }
@@ -3738,14 +3799,20 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | Some stopExpr -> elaborateExpr env stopExpr
             | None ->
                 let sv = { Name = freshName env; Type = I64 }
-                (sv, [ArithConstantOp(sv, -1L)])
+                (sv, [ArithConstantOp(sv, -1L)])  // raw sentinel, not tagged
         let strPtrVal =
             if strVal.Type = I64 then { Name = freshName env; Type = Ptr } else strVal
         let strCoerceOps =
             if strVal.Type = I64 then [LlvmIntToPtrOp(strPtrVal, strVal)] else []
+        // Phase 88: Untag start before C; untag stop only if it came from user expression
+        let (rawStart, untagStartOps) = emitUntag env startVal
+        let (rawStop, untagStopOps) =
+            match stopOpt with
+            | Some _ -> emitUntag env stopVal
+            | None -> (stopVal, [])  // -1 sentinel is already raw
         let result = { Name = freshName env; Type = Ptr }
-        (result, strOps @ startOps @ stopOps @ strCoerceOps
-                 @ [LlvmCallOp(result, "@lang_string_slice", [strPtrVal; startVal; stopVal])])
+        (result, strOps @ startOps @ stopOps @ strCoerceOps @ untagStartOps @ untagStopOps
+                 @ [LlvmCallOp(result, "@lang_string_slice", [strPtrVal; rawStart; rawStop])])
 
     // Phase 34-02: LANG-02 ListCompExpr — [for x in coll -> expr] or [for i in 0..n -> expr]
     // Wraps body as Lambda, calls lang_list_comp(closure, collection) → new LangCons* list.

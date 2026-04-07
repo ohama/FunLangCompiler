@@ -12,20 +12,34 @@ let private appendReturnIfNeeded (ops: MlirOp list) (retVal: MlirValue) : MlirOp
     | Some LlvmUnreachableOp -> ops
     | _ -> ops @ [ReturnOp [retVal]]
 
+/// Phase 88: Append untag ops only if the block does NOT end with unreachable.
+let private appendUntagIfSafe (ops: MlirOp list) (untagOps: MlirOp list) : MlirOp list =
+    match List.tryLast ops with
+    | Some LlvmUnreachableOp -> ops  // unreachable terminates; no untag needed
+    | _ -> ops @ untagOps
+
 let elaborateModule (expr: Expr) : MlirModule =
     let env = emptyEnv ()
     let (resultVal, entryOps) = elaborateExpr env expr
-    // Phase 88: Untag @main return value so the process exit code is raw (not tagged).
-    // tagged(0) = 1, which would cause exit code 1 (failure) for unit-returning programs.
-    let (exitVal, untagOps) = emitUntag env resultVal
+    // Phase 88: Convert @main return value to raw I64 for process exit code.
+    // I64 (tagged): untag via >> 1; I1 (bool): zext to I64; Ptr: return 0.
+    let (exitVal, untagOps) =
+        match resultVal.Type with
+        | I64 -> emitUntag env resultVal
+        | I1  ->
+            let ext = { Name = freshName env; Type = I64 }
+            (ext, [ArithExtuIOp(ext, resultVal)])
+        | _ ->
+            let zero = { Name = freshName env; Type = I64 }
+            (zero, [ArithConstantOp(zero, 0L)])
     let sideBlocks = env.Blocks.Value
     let allBlocks =
         if sideBlocks.IsEmpty then
-            [ { Label = None; Args = []; Body = appendReturnIfNeeded (entryOps @ untagOps) exitVal } ]
+            [ { Label = None; Args = []; Body = appendReturnIfNeeded (appendUntagIfSafe entryOps untagOps) exitVal } ]
         else
             let entryBlock = { Label = None; Args = []; Body = entryOps }
             let lastBlock = List.last sideBlocks
-            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded (lastBlock.Body @ untagOps) exitVal }
+            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded (appendUntagIfSafe lastBlock.Body untagOps) exitVal }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
     // Phase 38: %arg0/%arg1 match Printer's func param naming convention
@@ -439,16 +453,24 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
     let mainExpr = LetNormalize.normalizeExpr mainExpr
     let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags; StringFields = stringFields; AnnotationMap = annotationMap }
     let (resultVal, entryOps) = elaborateExpr env mainExpr
-    // Phase 88: Untag @main return value so the process exit code is raw (not tagged).
-    let (exitVal, untagOps) = emitUntag env resultVal
+    // Phase 88: Convert @main return value to raw I64 for process exit code.
+    let (exitVal, untagOps) =
+        match resultVal.Type with
+        | I64 -> emitUntag env resultVal
+        | I1  ->
+            let ext = { Name = freshName env; Type = I64 }
+            (ext, [ArithExtuIOp(ext, resultVal)])
+        | _ ->
+            let zero = { Name = freshName env; Type = I64 }
+            (zero, [ArithConstantOp(zero, 0L)])
     let sideBlocks = env.Blocks.Value
     let allBlocks =
         if sideBlocks.IsEmpty then
-            [ { Label = None; Args = []; Body = appendReturnIfNeeded (entryOps @ untagOps) exitVal } ]
+            [ { Label = None; Args = []; Body = appendReturnIfNeeded (appendUntagIfSafe entryOps untagOps) exitVal } ]
         else
             let entryBlock = { Label = None; Args = []; Body = entryOps }
             let lastBlock = List.last sideBlocks
-            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded (lastBlock.Body @ untagOps) exitVal }
+            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded (appendUntagIfSafe lastBlock.Body untagOps) exitVal }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
     // Phase 38: %arg0/%arg1 match Printer's func param naming convention
