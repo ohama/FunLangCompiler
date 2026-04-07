@@ -54,27 +54,8 @@ int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key);
 int64_t lang_index_get(void* collection, int64_t index);
 void lang_index_set(void* collection, int64_t index, int64_t value);
 
-/* Phase 37: String-key hashtable (FNV-1a hash, memcmp equality) */
-typedef struct LangHashEntryStr {
-    struct LangString_s* key;
-    int64_t val;
-    struct LangHashEntryStr* next;
-} LangHashEntryStr;
-
-typedef struct {
-    int64_t tag;        // -2 = string-key hashtable
-    int64_t capacity;
-    int64_t size;
-    LangHashEntryStr** buckets;
-} LangHashtableStr;
-
-LangHashtableStr* lang_hashtable_create_str(void);
-int64_t lang_hashtable_get_str(LangHashtableStr* ht, struct LangString_s* key);
-void lang_hashtable_set_str(LangHashtableStr* ht, struct LangString_s* key, int64_t val);
-int64_t lang_hashtable_containsKey_str(LangHashtableStr* ht, struct LangString_s* key);
-void lang_hashtable_remove_str(LangHashtableStr* ht, struct LangString_s* key);
-LangCons* lang_hashtable_keys_str(LangHashtableStr* ht);
-int64_t* lang_hashtable_trygetvalue_str(LangHashtableStr* ht, struct LangString_s* key);
+/* Phase 90: lang_index_get_str / lang_index_set_str — thin wrappers for ht.["key"] syntax.
+ * These coerce LangString* key to int64_t and call unified hashtable functions. */
 int64_t lang_index_get_str(void* collection, struct LangString_s* key);
 void lang_index_set_str(void* collection, struct LangString_s* key, int64_t value);
 
