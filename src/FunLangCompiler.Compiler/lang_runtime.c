@@ -67,7 +67,8 @@ void lang_failwith(const char* msg) {
     exit(1);
 }
 
-LangString* lang_string_sub(LangString* s, int64_t start, int64_t len) {
+/* Internal helper: raw (untagged) start/len arguments */
+static LangString* string_sub_raw(LangString* s, int64_t start, int64_t len) {
     if (start < 0) start = 0;
     if (start > s->length) start = s->length;
     if (len < 0) len = 0;
@@ -81,17 +82,26 @@ LangString* lang_string_sub(LangString* s, int64_t start, int64_t len) {
     return r;
 }
 
+LangString* lang_string_sub(LangString* s, int64_t start, int64_t len) {
+    start = LANG_UNTAG_INT(start);
+    len = LANG_UNTAG_INT(len);
+    return string_sub_raw(s, start, len);
+}
+
 /* Phase 34-01: LANG-01 String slicing — s.[start..stop] and s.[start..] */
 LangString* lang_string_slice(LangString* s, int64_t start, int64_t stop) {
+    start = LANG_UNTAG_INT(start);
+    stop = LANG_UNTAG_INT(stop);
     // stop == -1 means open-ended (to end of string)
     if (stop < 0) stop = s->length - 1;
     int64_t len = stop - start + 1;
-    return lang_string_sub(s, start, len);
+    return string_sub_raw(s, start, len);
 }
 
 /* Phase 66: String character access — returns byte at index as i64 (char code) */
 int64_t lang_string_char_at(LangString* s, int64_t index) {
-    return (int64_t)(unsigned char)s->data[index];
+    index = LANG_UNTAG_INT(index);
+    return LANG_TAG_INT((int64_t)(unsigned char)s->data[index]);
 }
 
 int64_t lang_string_contains(LangString* s, LangString* sub) {
@@ -130,11 +140,11 @@ LangString* lang_string_trim(LangString* s) {
 
 /* Phase 54: string_indexof — find substring position, return -1 if not found */
 int64_t lang_string_indexof(LangString* s, LangString* sub) {
-    if (sub->length == 0) return 0;
-    if (sub->length > s->length) return 0 - 1;
+    if (sub->length == 0) return LANG_TAG_INT(0);
+    if (sub->length > s->length) return LANG_TAG_INT(-1);
     char* found = strstr(s->data, sub->data);
-    if (!found) return 0 - 1;
-    return (int64_t)(found - s->data);
+    if (!found) return LANG_TAG_INT(-1);
+    return LANG_TAG_INT((int64_t)(found - s->data));
 }
 
 /* Phase 54: string_replace — replace all occurrences */
@@ -201,7 +211,7 @@ LangString* lang_string_tolower(LangString* s) {
 }
 
 int64_t lang_string_to_int(LangString* s) {
-    return (int64_t)strtol(s->data, NULL, 10);
+    return LANG_TAG_INT((int64_t)strtol(s->data, NULL, 10));
 }
 
 int64_t lang_char_is_digit(int64_t c) {
@@ -937,7 +947,7 @@ int64_t lang_hashset_contains(LangHashSet* hs, int64_t key) {
     return 0;
 }
 
-int64_t lang_hashset_count(LangHashSet* hs) { return hs->size; }
+int64_t lang_hashset_count(LangHashSet* hs) { return LANG_TAG_INT(hs->size); }
 
 /* Phase 33-02: COL-03 Queue (struct defined in lang_runtime.h) */
 LangQueue* lang_queue_create(void) {
@@ -974,7 +984,7 @@ int64_t lang_queue_dequeue(LangQueue* q) {
     return value;
 }
 
-int64_t lang_queue_count(LangQueue* q) { return q->count; }
+int64_t lang_queue_count(LangQueue* q) { return LANG_TAG_INT(q->count); }
 
 /* Phase 33-02: COL-04 MutableList (struct defined in lang_runtime.h) */
 LangMutableList* lang_mlist_create(void) {
@@ -997,6 +1007,7 @@ void lang_mlist_add(LangMutableList* ml, int64_t value) {
 }
 
 int64_t lang_mlist_get(LangMutableList* ml, int64_t index) {
+    index = LANG_UNTAG_INT(index);
     if (index < 0 || index >= ml->len) {
         lang_failwith("MutableList.get: index out of bounds");
     }
@@ -1004,13 +1015,14 @@ int64_t lang_mlist_get(LangMutableList* ml, int64_t index) {
 }
 
 void lang_mlist_set(LangMutableList* ml, int64_t index, int64_t value) {
+    index = LANG_UNTAG_INT(index);
     if (index < 0 || index >= ml->len) {
         lang_failwith("MutableList.set: index out of bounds");
     }
     ml->data[index] = value;
 }
 
-int64_t lang_mlist_count(LangMutableList* ml) { return ml->len; }
+int64_t lang_mlist_count(LangMutableList* ml) { return LANG_TAG_INT(ml->len); }
 
 /* File I/O runtime functions */
 
