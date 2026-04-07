@@ -37,8 +37,8 @@ v13.0의 tagged representation 기반 위에 HashSet 통합, C boundary 단순�
 **Plans:** 2 plans
 
 Plans:
-- [ ] 92-01-PLAN.md — Simple C boundary sites (char/to_string/sprintf/string-int/counts/mutablelist)
-- [ ] 92-02-PLAN.md — Structural changes (new C wrappers, array access, index dispatch)
+- [x] 92-01-PLAN.md — Simple C boundary sites (char/to_string/sprintf/string-int/counts/mutablelist)
+- [x] 92-02-PLAN.md — Structural changes (new C wrappers, array access, index dispatch)
 
 **Success Criteria:**
 
@@ -57,12 +57,19 @@ Plans:
 
 **Requirements:** GE-01, GE-02, GE-03, GE-04, GE-05
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 93-01-PLAN.md — Add heap tags to all pointer types (C structs + compiler GEP offsets)
+- [ ] 93-02-PLAN.md — Implement generic hash/equality in C runtime
+- [ ] 93-03-PLAN.md — E2E tests for tuple/record keys and generic equality
+
 **Success Criteria:**
 
-1. 힙 블록에 tag byte가 있어 string(252), tuple(0), record(1), list(2), ADT(3) 구분 가능
+1. 힙 블록에 tag byte가 있어 string(1), tuple(2), record(3), list(4), ADT(5) 구분 가능
 2. `hashtable_set ht (1, "a") 42` — tuple key로 hashtable 사용 가능
 3. `(1, "a") = (1, "a")` — generic structural equality 동작
-4. 257+ E2E 테스트 전체 통과
+4. 260+ E2E 테스트 전체 통과
 
 ---
 
@@ -72,7 +79,7 @@ Plans:
 |-------|------|-------------|--------|
 | 91 | HashSet LSB Unification | HS-01, HS-02, HS-03 | Complete |
 | 92 | C Boundary Simplification | CB-01, CB-02, CB-03, CB-04 | Complete |
-| 93 | Generic Equality and Hash | GE-01, GE-02, GE-03, GE-04, GE-05 | Pending |
+| 93 | Generic Equality and Hash | GE-01, GE-02, GE-03, GE-04, GE-05 | In Progress |
 
 ---
 
