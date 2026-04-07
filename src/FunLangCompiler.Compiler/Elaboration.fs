@@ -717,44 +717,38 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let blocksBeforeRight = List.length env.Blocks.Value
         let (rightVal, rightOps) = elaborateExpr env rhsExpr
         let blocksAfterRight = List.length env.Blocks.Value
-        // Phase 36 FIX-03: Coerce rightVal to I1 as well (merge block arg type must be I1).
-        let (i1RightVal, coerceRightOps) =
-            if rightVal.Type = I64 then
-                let zeroVal = { Name = freshName env; Type = I64 }
-                let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
-            else (rightVal, [])
-        let mergeArg = { Name = freshName env; Type = I1 }
+        // Phase 88: And returns I64 tagged bool directly (avoids coerceToI64 after terminator).
+        // Right branch: coerce rightVal to I64 tagged.
+        let (i64RightVal, coerceRightOps) = coerceToI64 env rightVal
+        // Phase 88: tagged false constant for false branch
+        let taggedFalse = { Name = freshName env; Type = I64 }
+        let taggedFalseOp = ArithConstantOp(taggedFalse, 1L)
+        let mergeArg = { Name = freshName env; Type = I64 }
         let rightEndsWithTerm = rightOps |> List.tryLast |> Option.map isTerminatorOp |> Option.defaultValue false
         if rightEndsWithTerm && blocksAfterRight > blocksBeforeRight then
-            // Right side is nested And/Or — rightOps ends with terminator.
-            // Put rightOps in evalRight block WITHOUT the continuation.
-            // Patch the inner merge block (from nested And/Or) with our continuation.
             env.Blocks.Value <- env.Blocks.Value @
                 [ { Label = Some evalRightLabel; Args = []; Body = rightOps } ]
             let innerMergeIdx = blocksAfterRight - 1
-            appendToBlock env innerMergeIdx (coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])])
+            appendToBlock env innerMergeIdx (coerceRightOps @ [CfBrOp(mergeLabel, [i64RightVal])])
         else
             env.Blocks.Value <- env.Blocks.Value @
-                [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
+                [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i64RightVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
-        let andBranchOp = CfCondBrOp(i1LeftVal, evalRightLabel, [], mergeLabel, [i1LeftVal])
-        // Phase 36 FIX-03: If leftOps ends with a terminator (nested And/Or), patch into merge block.
+        let andBranchOp = CfCondBrOp(i1LeftVal, evalRightLabel, [], mergeLabel, [taggedFalse])
         match List.tryLast leftOps with
         | Some op when isTerminatorOp op && blocksAfterLeft > blocksBeforeAnd ->
             let targetIdx = blocksAfterLeft - 1
-            appendToBlock env targetIdx (coerceLeftOps @ [andBranchOp])
+            appendToBlock env targetIdx (coerceLeftOps @ [taggedFalseOp; andBranchOp])
             (mergeArg, leftOps)
         | _ ->
-            (mergeArg, leftOps @ coerceLeftOps @ [andBranchOp])
+            (mergeArg, leftOps @ coerceLeftOps @ [taggedFalseOp; andBranchOp])
     | Or (lhsExpr, rhsExpr, _) ->
         let blocksBeforeOr = List.length env.Blocks.Value
         let (leftVal, leftOps) = elaborateExpr env lhsExpr
         let blocksAfterLeft = List.length env.Blocks.Value
-        // Phase 36 FIX-03: If leftVal is I64 (e.g. module Bool function returning I64),
-        // coerce to I1 via != tagged(false) comparison before use in cf.cond_br.
-        // Note: Or is short-circuit: true → merge (with left), false → eval right.
+        // Phase 36 FIX-03: If leftVal is I64, coerce to I1 via != tagged(false).
+        // Note: Or is short-circuit: true → merge (with tagged true), false → eval right.
         let (i1LeftVal, coerceLeftOps) =
             if leftVal.Type = I64 then
                 let zeroVal = { Name = freshName env; Type = I64 }
@@ -766,37 +760,31 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let blocksBeforeRight = List.length env.Blocks.Value
         let (rightVal, rightOps) = elaborateExpr env rhsExpr
         let blocksAfterRight = List.length env.Blocks.Value
-        // Phase 36 FIX-03: Coerce rightVal to I1 as well (merge block arg type must be I1).
-        let (i1RightVal, coerceRightOps) =
-            if rightVal.Type = I64 then
-                let zeroVal = { Name = freshName env; Type = I64 }
-                let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
-            else (rightVal, [])
-        let mergeArg = { Name = freshName env; Type = I1 }
+        // Phase 88: Or returns I64 tagged bool directly.
+        let (i64RightVal, coerceRightOps) = coerceToI64 env rightVal
+        // Phase 88: tagged true constant for true branch
+        let taggedTrue = { Name = freshName env; Type = I64 }
+        let taggedTrueOp = ArithConstantOp(taggedTrue, 3L)
+        let mergeArg = { Name = freshName env; Type = I64 }
         let rightEndsWithTerm = rightOps |> List.tryLast |> Option.map isTerminatorOp |> Option.defaultValue false
         if rightEndsWithTerm && blocksAfterRight > blocksBeforeRight then
-            // Right side is nested And/Or — rightOps ends with terminator.
-            // Put rightOps in evalRight block WITHOUT the continuation.
-            // Patch the inner merge block (from nested And/Or) with our continuation.
             env.Blocks.Value <- env.Blocks.Value @
                 [ { Label = Some evalRightLabel; Args = []; Body = rightOps } ]
             let innerMergeIdx = blocksAfterRight - 1
-            appendToBlock env innerMergeIdx (coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])])
+            appendToBlock env innerMergeIdx (coerceRightOps @ [CfBrOp(mergeLabel, [i64RightVal])])
         else
             env.Blocks.Value <- env.Blocks.Value @
-                [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i1RightVal])] } ]
+                [ { Label = Some evalRightLabel; Args = []; Body = rightOps @ coerceRightOps @ [CfBrOp(mergeLabel, [i64RightVal])] } ]
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some mergeLabel; Args = [mergeArg]; Body = [] } ]
-        let orBranchOp = CfCondBrOp(i1LeftVal, mergeLabel, [i1LeftVal], evalRightLabel, [])
-        // Phase 36 FIX-03: If leftOps ends with a terminator (nested Or/And), patch into merge block.
+        let orBranchOp = CfCondBrOp(i1LeftVal, mergeLabel, [taggedTrue], evalRightLabel, [])
         match List.tryLast leftOps with
         | Some op when isTerminatorOp op && blocksAfterLeft > blocksBeforeOr ->
             let targetIdx = blocksAfterLeft - 1
-            appendToBlock env targetIdx (coerceLeftOps @ [orBranchOp])
+            appendToBlock env targetIdx (coerceLeftOps @ [taggedTrueOp; orBranchOp])
             (mergeArg, leftOps)
         | _ ->
-            (mergeArg, leftOps @ coerceLeftOps @ [orBranchOp])
+            (mergeArg, leftOps @ coerceLeftOps @ [taggedTrueOp; orBranchOp])
     | LetRec (bindings, inExpr, _) ->
         // Phase 66: Two-pass elaboration for mutual recursion (let rec ... and ...).
         // Pass 1: Pre-register ALL binding signatures in KnownFuncs so every body can call every sibling.
@@ -1668,8 +1656,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
         // Phase 88: Untag value before passing to C
         let (rawVal, untagOps) = emitUntag env valVal
-        let result = { Name = freshName env; Type = I64 }
-        (result, hsOps @ valOps @ hsCoerce @ untagOps @ [LlvmCallOp(result, "@lang_hashset_contains", [hsPtr; rawVal])])
+        let rawResult = { Name = freshName env; Type = I64 }
+        let zeroVal   = { Name = freshName env; Type = I64 }
+        let boolResult = { Name = freshName env; Type = I1  }
+        (boolResult, hsOps @ valOps @ hsCoerce @ untagOps @ [
+            LlvmCallOp(rawResult, "@lang_hashset_contains", [hsPtr; rawVal])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+        ])
 
     | App (Var ("hashset_count", _), hsExpr, _) ->
         let (hsVal, hsOps) = elaborateExpr env hsExpr

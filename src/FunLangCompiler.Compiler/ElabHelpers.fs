@@ -323,6 +323,8 @@ let coerceToI64 (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
     match v.Type with
     | I64 -> (v, [])
     | I1  ->
+        // Phase 88: zext I1 to I64, then retag (0→1, 1→3) for tagged representation.
+        // This produces 4 ops: zext + const(1) + shl + ori
         let ext = { Name = freshName env; Type = I64 }
         let (tagged, retagOps) = emitRetag env ext
         (tagged, [ArithExtuIOp(ext, v)] @ retagOps)
@@ -570,7 +572,6 @@ let typeNeedsPtr (ty: Type.Type) : bool =
     | Type.TData _ -> true                    // ADT/record → Ptr
     | Type.TInt | Type.TBool | Type.TChar | Type.TError -> false
     | Type.TVar _ -> false                    // unresolved type var → fallback I64
-    | _ -> false
 
 /// Phase 67: Type-aware isPtrParam — checks AnnotationMap for Lambda type, falls back to heuristic.
 let isPtrParamTyped (annotationMap: Map<Ast.Span, Type.Type>) (lambdaSpan: Ast.Span) (paramName: string) (bodyExpr: Expr) : bool =
