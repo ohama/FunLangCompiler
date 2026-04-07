@@ -2,6 +2,52 @@
 
 ## Completed
 
+### v13.1 — Tagged Representation Extensions (2026-04-07)
+
+**Delivered:** HashSet LSB 통합 + C boundary 단순화 (zero emitUntag/emitRetag) + generic structural equality/hash with heap block tags
+
+**Phases completed:** 91-93 (6 plans total)
+
+**Key accomplishments:**
+- HashSet unified with Hashtable's LSB dispatch (lang_hs_hash removed)
+- 29 C functions handle tagged values internally, zero C-boundary untag/retag in compiler
+- 5 new C wrapper functions replace inline GEP patterns (string_length, array_length, etc.)
+- Heap block tag byte enables runtime type identification (STRING=1, TUPLE=2, RECORD=3, LIST=4, ADT=5)
+- Generic structural hash/equality: any value as hashtable key, `(1,"a") = (1,"a")` works
+- `=` operator uses generic structural comparison (not just string strcmp)
+
+**Stats:**
+- 13 files changed, +633/-331 lines
+- ~5,834 lines F# + C (Elaboration.fs 3,477 + ElabHelpers.fs 796 + lang_runtime.c 1,561)
+- 3 phases, 6 plans
+- 1 day (2026-04-07)
+- 260 E2E tests passing
+
+**Git range:** `a16b500` → `5a72bb3`
+
+---
+
+### v13.0 — Uniform Tagged Representation (2026-04-07)
+
+**Delivered:** OCaml-style LSB 1-bit tagging (int=2n+1) + Hashtable *_str 제거 + C runtime tagging macros
+
+**Phases completed:** 88-90 (7 plans total)
+
+**Key accomplishments:**
+- Tagged integers (2n+1), arithmetic correction, And/Or I64 tagged merge
+- C runtime LANG_TAG_INT/LANG_UNTAG_INT macros, callback tagging
+- Unified C hashtable with LSB dispatch, ~260 lines *_str duplication removed
+- Single `Hashtable.create()` API for both int and string keys
+
+**Stats:**
+- 3 phases, 7 plans
+- 1 day (2026-04-07)
+- 257 E2E tests passing
+
+**Git range:** `fcdba02` → `bf7eaca`
+
+---
+
 ### v1.0 — Core Compiler (2026-03-26)
 
 **Goal:** FunLang 소스 코드를 네이티브 실행 바이너리로 컴파일
