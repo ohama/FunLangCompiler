@@ -191,9 +191,14 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                 visited.Add(Path.GetFullPath(inputPath)) |> ignore
                 Ast.NamedModule(nm, expandImports visited emitted inputPath ds, s)
             | other -> other
+        // Phase 84/85: Apply fixity rewrite — resolve operator precedence from #[left N] / #[right N] attributes
+        let fixityAst =
+            let decls = match expandedAst with | Ast.Module(ds, _) | Ast.NamedModule(_, ds, _) -> ds | Ast.EmptyModule _ -> []
+            let fixEnv = FixityEnv.collectFixity Map.empty decls
+            FixityEnv.rewriteFixity fixEnv expandedAst
         // Phase 52: Transform typeclass declarations before elaboration
         let tcAst =
-            match expandedAst with
+            match fixityAst with
             | Ast.Module(ds, s) -> Ast.Module(ElabProgram.elaborateTypeclasses ds, s)
             | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, ElabProgram.elaborateTypeclasses ds, s)
             | Ast.EmptyModule s -> Ast.EmptyModule s

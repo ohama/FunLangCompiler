@@ -10,6 +10,8 @@
     <Compile Include="Printer.fs" />
     <Compile Include="MatchCompiler.fs" />
     <Compile Include="ElabHelpers.fs" />
+    <Compile Include="LambdaLift.fs" />
+    <Compile Include="LetNormalize.fs" />
     <Compile Include="Elaboration.fs" />
     <Compile Include="ElabProgram.fs" />
     <Compile Include="Pipeline.fs" />
