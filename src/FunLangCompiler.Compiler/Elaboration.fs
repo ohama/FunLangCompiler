@@ -10,59 +10,61 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     match expr with
     | Number (n, _) ->
         let v = { Name = freshName env; Type = I64 }
-        (v, [ArithConstantOp(v, int64 n)])
+        (v, [ArithConstantOp(v, tagConst (int64 n))])
     | Char (c, _) ->
         let v = { Name = freshName env; Type = I64 }
-        (v, [ArithConstantOp(v, int64 (int c))])
+        (v, [ArithConstantOp(v, tagConst (int64 (int c)))])
     | Add (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
+        let raw = { Name = freshName env; Type = I64 }
+        let one = { Name = freshName env; Type = I64 }
         let result = { Name = freshName env; Type = I64 }
-        (result, lops @ rops @ [ArithAddIOp(result, lv, rv)])
+        (result, lops @ rops @ [
+            ArithAddIOp(raw, lv, rv)
+            ArithConstantOp(one, 1L)
+            ArithSubIOp(result, raw, one)
+        ])
     | Subtract (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
+        let raw = { Name = freshName env; Type = I64 }
+        let one = { Name = freshName env; Type = I64 }
         let result = { Name = freshName env; Type = I64 }
-        (result, lops @ rops @ [ArithSubIOp(result, lv, rv)])
+        (result, lops @ rops @ [
+            ArithSubIOp(raw, lv, rv)
+            ArithConstantOp(one, 1L)
+            ArithAddIOp(result, raw, one)
+        ])
     | Multiply (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
-        let result = { Name = freshName env; Type = I64 }
-        (result, lops @ rops @ [ArithMulIOp(result, lv, rv)])
+        let (la, untagL) = emitUntag env lv
+        let (rb, untagR) = emitUntag env rv
+        let raw = { Name = freshName env; Type = I64 }
+        let (result, retagOps) = emitRetag env raw
+        (result, lops @ rops @ untagL @ untagR @ [ArithMulIOp(raw, la, rb)] @ retagOps)
     | Divide (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
-        let result = { Name = freshName env; Type = I64 }
-        (result, lops @ rops @ [ArithDivSIOp(result, lv, rv)])
+        let (la, untagL) = emitUntag env lv
+        let (rb, untagR) = emitUntag env rv
+        let raw = { Name = freshName env; Type = I64 }
+        let (result, retagOps) = emitRetag env raw
+        (result, lops @ rops @ untagL @ untagR @ [ArithDivSIOp(raw, la, rb)] @ retagOps)
     | Modulo (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
-        let result = { Name = freshName env; Type = I64 }
-        (result, lops @ rops @ [ArithRemSIOp(result, lv, rv)])
-    | PipeRight (left, right, span) ->
-        // x |> f  ≡  f x  ≡  App(right, left)
-        elaborateExpr env (App(right, left, span))
-    | ComposeRight (f, g, span) ->
-        // f >> g  ≡  fun x -> g (f x)
-        let n = env.Counter.Value
-        env.Counter.Value <- n + 1
-        let paramName = sprintf "__comp_%d" n
-        let innerApp = App(f, Var(paramName, span), span)
-        let outerApp = App(g, innerApp, span)
-        elaborateExpr env (Lambda(paramName, outerApp, span))
-    | ComposeLeft (f, g, span) ->
-        // f << g  ≡  fun x -> f (g x)
-        let n = env.Counter.Value
-        env.Counter.Value <- n + 1
-        let paramName = sprintf "__comp_%d" n
-        let innerApp = App(g, Var(paramName, span), span)
-        let outerApp = App(f, innerApp, span)
-        elaborateExpr env (Lambda(paramName, outerApp, span))
+        let (la, untagL) = emitUntag env lv
+        let (rb, untagR) = emitUntag env rv
+        let raw = { Name = freshName env; Type = I64 }
+        let (result, retagOps) = emitRetag env raw
+        (result, lops @ rops @ untagL @ untagR @ [ArithRemSIOp(raw, la, rb)] @ retagOps)
     | Negate (inner, _) ->
         let (iv, iops) = elaborateExpr env inner
-        let zero = { Name = freshName env; Type = I64 }
+        let two = { Name = freshName env; Type = I64 }
         let result = { Name = freshName env; Type = I64 }
-        (result, iops @ [ArithConstantOp(zero, 0L); ArithSubIOp(result, zero, iv)])
+        (result, iops @ [ArithConstantOp(two, 2L); ArithSubIOp(result, two, iv)])
     | Var (name, span) ->
         match Map.tryFind name env.Vars with
         | Some v ->
@@ -71,7 +73,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (loaded, [LlvmLoadOp(loaded, v)])
             else
                 (v, [])
-        | None -> failWithSpan span "Elaboration: unbound variable '%s'" name
+        | None ->
+            // Auto eta-expand: if name is a KnownFunc (direct-call), wrap it in a closure
+            // so it can be passed as a first-class value (e.g., `List.map double xs`, `5 |> f`).
+            match Map.tryFind name env.KnownFuncs with
+            | Some sig_ when sig_.ClosureInfo.IsNone ->
+                let n = env.Counter.Value
+                env.Counter.Value <- n + 1
+                let etaParam = sprintf "__eta_%d" n
+                elaborateExpr env (Lambda(etaParam, App(Var(name, span), Var(etaParam, span), span), span))
+            | _ -> failWithSpan span "Elaboration: unbound variable '%s'" name
     // Phase 21: Mutable variable allocation
     | LetMut (name, initExpr, bodyExpr, _) ->
         let (initVal, initOps) = elaborateExpr env initExpr
@@ -95,7 +106,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | Some v -> v
             | None -> failWithSpan span "Elaboration: unbound mutable variable '%s' in Assign" name
         let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, valOps @ [LlvmStoreOp(newVal, cellPtr); ArithConstantOp(unitVal, 0L)])
+        (unitVal, valOps @ [LlvmStoreOp(newVal, cellPtr); ArithConstantOp(unitVal, 1L)])
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     // Phase 43: StripAnnot sees through Annot/LambdaAnnot wrappers from type annotations
@@ -618,12 +629,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (condVal, condOps) = elaborateExpr env condExpr
         let blocksAfterCond = env.Blocks.Value.Length
         // Phase 35: If condition is I64 (e.g. result from module-wrapped bool builtin),
-        // compare != 0 to produce I1 for cf.cond_br.
+        // compare != tagged(false) to produce I1 for cf.cond_br.
         let (i1CondVal, coerceCondOps) =
             if condVal.Type = I64 then
                 let zeroVal = { Name = freshName env; Type = I64 }
                 let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", condVal, zeroVal)])
+                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", condVal, zeroVal)])
             else (condVal, [])
         let thenLabel  = freshLabel env "then"
         let elseLabel  = freshLabel env "else"
@@ -694,12 +705,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (leftVal, leftOps) = elaborateExpr env lhsExpr
         let blocksAfterLeft = List.length env.Blocks.Value
         // Phase 36 FIX-03: If leftVal is I64 (e.g. module Bool function returning I64),
-        // coerce to I1 via != 0 comparison before use in cf.cond_br.
+        // coerce to I1 via != tagged(false) comparison before use in cf.cond_br.
         let (i1LeftVal, coerceLeftOps) =
             if leftVal.Type = I64 then
                 let zeroVal = { Name = freshName env; Type = I64 }
                 let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", leftVal, zeroVal)])
+                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", leftVal, zeroVal)])
             else (leftVal, [])
         let evalRightLabel = freshLabel env "and_right"
         let mergeLabel     = freshLabel env "and_merge"
@@ -711,7 +722,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if rightVal.Type = I64 then
                 let zeroVal = { Name = freshName env; Type = I64 }
                 let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
+                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
             else (rightVal, [])
         let mergeArg = { Name = freshName env; Type = I1 }
         let rightEndsWithTerm = rightOps |> List.tryLast |> Option.map isTerminatorOp |> Option.defaultValue false
@@ -742,13 +753,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (leftVal, leftOps) = elaborateExpr env lhsExpr
         let blocksAfterLeft = List.length env.Blocks.Value
         // Phase 36 FIX-03: If leftVal is I64 (e.g. module Bool function returning I64),
-        // coerce to I1 via != 0 comparison before use in cf.cond_br.
+        // coerce to I1 via != tagged(false) comparison before use in cf.cond_br.
         // Note: Or is short-circuit: true → merge (with left), false → eval right.
         let (i1LeftVal, coerceLeftOps) =
             if leftVal.Type = I64 then
                 let zeroVal = { Name = freshName env; Type = I64 }
                 let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", leftVal, zeroVal)])
+                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", leftVal, zeroVal)])
             else (leftVal, [])
         let evalRightLabel = freshLabel env "or_right"
         let mergeLabel     = freshLabel env "or_merge"
@@ -760,7 +771,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if rightVal.Type = I64 then
                 let zeroVal = { Name = freshName env; Type = I64 }
                 let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
+                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", rightVal, zeroVal)])
             else (rightVal, [])
         let mergeArg = { Name = freshName env; Type = I1 }
         let rightEndsWithTerm = rightOps |> List.tryLast |> Option.map isTerminatorOp |> Option.defaultValue false
@@ -1105,7 +1116,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             LlvmGEPStructOp(dataPtrVal, msgPtr, 1)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
             LlvmCallVoidOp("@lang_failwith", [dataAddrVal])
-            ArithConstantOp(unitVal, 0L)
+            ArithConstantOp(unitVal, 1L)
         ]
         (unitVal, msgOps @ msgCoerce @ ops)
 
@@ -1133,7 +1144,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             ArithAddIOp(slotVal, idxVal, oneVal)
             LlvmGEPDynamicOp(elemPtr, arrPtrVal, slotVal)
             LlvmStoreOp(valVal, elemPtr)
-            ArithConstantOp(unitVal, 0L)
+            ArithConstantOp(unitVal, 1L)
         ]
         (unitVal, arrOps @ arrCoerceOps @ idxOps @ valOps @ ops)
 
@@ -1351,27 +1362,41 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove" [htPtr; keyI64]
             (unitVal, htOps @ keyOps @ htCoerce @ keyCoerce @ callOps)
 
-    // hashtable_keys — one-arg
-    // hashtable_keys ht: call lang_hashtable_keys → Ptr (LangCons* list)
-    | App (Var ("hashtable_keys", _), htExpr, _) ->
-        let (htVal, htOps) = elaborateExpr env htExpr
-        let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let result = { Name = freshName env; Type = Ptr }
-        (result, htOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_keys", [htPtr])])
-
-    // Phase 37: hashtable_keys_str — one-arg (separate builtin; keys has no key arg to dispatch on)
-    // hashtable_keys_str ht: call lang_hashtable_keys_str → Ptr (LangCons* list of string ptrs)
+    // hashtable_keys — one-arg, dispatch via type inference on ht argument
+    // hashtable_keys ht: if ht : THashtable(TString, _) → lang_hashtable_keys_str, else lang_hashtable_keys
     | App (Var ("hashtable_keys_str", _), htExpr, _) ->
         let (htVal, htOps) = elaborateExpr env htExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
         let result = { Name = freshName env; Type = Ptr }
         (result, htOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_keys_str", [htPtr])])
 
-    // Phase 37: hashtable_create_str — one-arg (takes unit), call lang_hashtable_create_str() → Ptr
-    | App (Var ("hashtable_create_str", _), unitExpr, _) ->
-        let (_, uOps) = elaborateExpr env unitExpr
+    | App (Var ("hashtable_keys", _), htExpr, _) ->
+        let (htVal, htOps) = elaborateExpr env htExpr
+        let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let result = { Name = freshName env; Type = Ptr }
+        let isStrKey =
+            match inferredType env.AnnotationMap htExpr with
+            | Some (Type.THashtable(Type.TString, _)) -> true
+            | _ -> false
+        let cFunc = if isStrKey then "@lang_hashtable_keys_str" else "@lang_hashtable_keys"
+        (result, htOps @ htCoerce @ [LlvmCallOp(result, cFunc, [htPtr])])
+
+    // hashtable_create — one-arg, dispatch via type inference on return type
+    // hashtable_create (): if result : THashtable(TString, _) → lang_hashtable_create_str
+    | App (Var ("hashtable_create_str", _), unitExpr, _appSpan) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
         let result = { Name = freshName env; Type = Ptr }
         (result, uOps @ [LlvmCallOp(result, "@lang_hashtable_create_str", [])])
+
+    | App (Var ("hashtable_create", _), unitExpr, appSpan) ->
+        let (_uVal, uOps) = elaborateExpr env unitExpr
+        let result = { Name = freshName env; Type = Ptr }
+        let isStrKey =
+            match Map.tryFind appSpan env.AnnotationMap with
+            | Some (Type.THashtable(Type.TString, _)) -> true
+            | _ -> false
+        let cFunc = if isStrKey then "@lang_hashtable_create_str" else "@lang_hashtable_create"
+        (result, uOps @ [LlvmCallOp(result, cFunc, [])])
 
     // Phase 66: Explicit _str builtins — always call _str C function with I64→Ptr key coercion.
     // Needed for Prelude wrappers where closure ABI loses Ptr type info on key argument.
@@ -1425,12 +1450,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue_str", [htPtr; keyPtr])])
 
-    // hashtable_create — one-arg (takes unit, which the parser gives as App(Var "hashtable_create", unitExpr))
-    // hashtable_create (): elaborate and discard the unit arg, call lang_hashtable_create() → Ptr
-    | App (Var ("hashtable_create", _), unitExpr, _) ->
-        let (_uVal, uOps) = elaborateExpr env unitExpr   // elaborate unit arg for side-effects (none); discard result
-        let result = { Name = freshName env; Type = Ptr }
-        (result, uOps @ [LlvmCallOp(result, "@lang_hashtable_create", [])])
+    // hashtable_create: handled above (unified with type-inference dispatch)
 
     // hashtable_trygetvalue — two-arg curried builtin returning Ptr (2-slot tuple: [bool, value])
     // hashtable_trygetvalue ht key: dispatch to _str variant when key is Ptr; else call lang_hashtable_trygetvalue → Ptr
@@ -2006,7 +2026,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let ops = [
             LlvmAddressOfOp(ptrVal, globalName)
             LlvmCallOp(fmtRes, "@printf", [ptrVal])
-            ArithConstantOp(unitVal, 0L)
+            ArithConstantOp(unitVal, 1L)
         ]
         (unitVal, ops)
 
@@ -2018,7 +2038,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let ops = [
             LlvmAddressOfOp(ptrVal, globalName)
             LlvmCallOp(fmtRes, "@printf", [ptrVal])
-            ArithConstantOp(unitVal, 0L)
+            ArithConstantOp(unitVal, 1L)
         ]
         (unitVal, ops)
 
@@ -2040,7 +2060,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             LlvmGEPStructOp(dataPtrVal, ptrVal, 1)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
             LlvmCallOp(fmtRes, "@printf", [dataAddrVal])
-            ArithConstantOp(unitVal, 0L)
+            ArithConstantOp(unitVal, 1L)
         ]
         (unitVal, strOps @ castOps @ ops)
 
@@ -2065,7 +2085,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             LlvmCallOp(fmtRes1, "@printf", [dataAddrVal])
             LlvmAddressOfOp(nlPtrVal, nlGlobal)
             LlvmCallOp(fmtRes2, "@printf", [nlPtrVal])
-            ArithConstantOp(unitVal, 0L)
+            ArithConstantOp(unitVal, 1L)
         ]
         (unitVal, strOps @ castOps @ ops)
 
@@ -2249,8 +2269,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         "array_create"; "array_init"; "array_get"; "array_set"; "array_length"
                         "array_of_list"; "array_to_list"; "array_iter"; "array_map"; "array_fold"
                         "array_sort"; "array_of_seq"
-                        "hashtable_create"; "hashtable_get"; "hashtable_set"
-                        "hashtable_containsKey"; "hashtable_keys"; "hashtable_remove"
+                        "hashtable_create"; "hashtable_create_str"; "hashtable_get"; "hashtable_get_str"
+                        "hashtable_set"; "hashtable_set_str"
+                        "hashtable_containsKey"; "hashtable_containsKey_str"
+                        "hashtable_keys"; "hashtable_keys_str"
+                        "hashtable_remove"; "hashtable_remove_str"
+                        "hashtable_trygetvalue_str"
                         "stringbuilder_create"; "stringbuilder_append"; "stringbuilder_tostring"
                         "hashset_create"; "hashset_add"; "hashset_contains"; "hashset_count"
                         "queue_create"; "queue_enqueue"; "queue_dequeue"; "queue_count"
@@ -2323,7 +2347,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         if n = 0 then
             // Empty tuple = unit value: return I64 0 (same as print/println)
             let unitVal = { Name = freshName env; Type = I64 }
-            (unitVal, [ArithConstantOp(unitVal, 0L)])
+            (unitVal, [ArithConstantOp(unitVal, 1L)])
         else
         // Elaborate all field expressions first
         let fieldResults = exprs |> List.map (fun e -> elaborateExpr env e)
@@ -2387,7 +2411,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             | Some stepExpr -> elaborateExpr env stepExpr
             | None ->
                 let v = { Name = freshName env; Type = I64 }
-                (v, [ArithConstantOp(v, 1L)])
+                (v, [ArithConstantOp(v, tagConst 1L)])
         let result = { Name = freshName env; Type = Ptr }
         (result, startOps @ stopOps @ stepOps @ [LlvmCallOp(result, "@lang_range", [startVal; stopVal; stepVal])])
 
@@ -2757,7 +2781,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (mergeArg, scrutOps @ chainEntryOps)
 
     // Phase 12: bare Lambda as a value — create inline closure struct
-    // Used by ComposeRight/ComposeLeft which desugar to Lambda(...) as expressions
+    // Used by closures (e.g. compose operators defined in Prelude)
     | Lambda (param, body, lamSpan) ->
         // Free variables relative to param, restricted to those in env.Vars (not KnownFuncs — they are direct calls)
         let allFree = freeVars (Set.singleton param) body
@@ -3057,7 +3081,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let ops = [
             LlvmGEPLinearOp(slotPtr, recPtr, slotIdx)
             LlvmStoreOp(newVal, slotPtr)
-            ArithConstantOp(unitVal, 0L)
+            ArithConstantOp(unitVal, 1L)
         ]
         (unitVal, recOps @ recCoerce @ newValOps @ ops)
 
@@ -3070,7 +3094,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // deadVal must be defined by ArithConstantOp to satisfy MLIR SSA validity,
         // even though it is never used after llvm.unreachable
         let deadVal = { Name = freshName env; Type = I64 }
-        (deadVal, exnOps @ [ ArithConstantOp(deadVal, 0L); LlvmCallVoidOp("@lang_throw", [exnVal]); LlvmUnreachableOp ])
+        (deadVal, exnOps @ [ ArithConstantOp(deadVal, 1L); LlvmCallVoidOp("@lang_throw", [exnVal]); LlvmUnreachableOp ])
 
     // Phase 19: TryWith — setjmp/longjmp exception handling
     // Control flow:
@@ -3484,7 +3508,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if condVal.Type = I64 then
                 let zeroVal = { Name = freshName env; Type = I64 }
                 let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", condVal, zeroVal)])
+                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", condVal, zeroVal)])
             else (condVal, [])
         let condBrOp = CfCondBrOp(i1CondVal, bodyLabel, [], exitLabel, [unitConst])
         // Track how many side blocks exist before elaborating body (for detecting inner blocks)
@@ -3501,7 +3525,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if condVal2.Type = I64 then
                 let zeroVal = { Name = freshName env; Type = I64 }
                 let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 0L); ArithCmpIOp(boolVal, "ne", condVal2, zeroVal)])
+                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", condVal2, zeroVal)])
             else (condVal2, [])
         let backEdgeBrOp = CfCondBrOp(i1CondVal2, bodyLabel, [], exitLabel, [unitConst])
         // Determine where to place the back-edge branch op.
@@ -3581,7 +3605,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             // backEdgeBrOp should be in the last of those (already patched above in the backCondSideBlocks > 0 branch)
         // Entry fragment: define unit constant (dominates all loop blocks), then branch to header
         eprintfn "DEBUG WhileExpr: exit, blocks=%d" env.Blocks.Value.Length
-        (exitArg, [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, []) ])
+        (exitArg, [ ArithConstantOp(unitConst, 1L); CfBrOp(headerLabel, []) ])
 
     // Phase 29: ForExpr — block-argument CFG pattern for loop counter
     // Control flow:
@@ -3614,8 +3638,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let incrOp =
             if isTo then ArithAddIOp(nextVal, iArg, oneConst)
             else          ArithSubIOp(nextVal, iArg, oneConst)
-        // Back-edge ops: increment counter and branch back to header
-        let backEdgeOps = [ ArithConstantOp(oneConst, 1L); incrOp; CfBrOp(headerLabel, [nextVal]) ]
+        // Back-edge ops: increment counter by 2 (raw) and branch back to header
+        // tagged(n) + 2 = (2n+1) + 2 = 2(n+1)+1 = tagged(n+1)
+        let backEdgeOps = [ ArithConstantOp(oneConst, 2L); incrOp; CfBrOp(headerLabel, [nextVal]) ]
         // Comparison predicate: sle for ascending, sge for descending
         let predicate = if isTo then "sle" else "sge"
         let cmpVal = { Name = freshName env; Type = I1 }
@@ -3646,7 +3671,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             if innerLastIdx >= 0 then
                 appendToBlock env innerLastIdx backEdgeOps
         // Entry fragment: elaborate start/stop, define unit constant, branch to header with start value
-        (exitArg, startOps @ stopOps @ [ ArithConstantOp(unitConst, 0L); CfBrOp(headerLabel, [startVal]) ])
+        (exitArg, startOps @ stopOps @ [ ArithConstantOp(unitConst, 1L); CfBrOp(headerLabel, [startVal]) ])
 
     // Phase 30: Type annotation pass-through — ignore type at codegen
     | Annot (expr, _, _) -> elaborateExpr env expr

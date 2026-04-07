@@ -362,7 +362,7 @@ let appendToBlock (env: ElabEnv) (targetIdx: int) (ops: MlirOp list) : unit =
 /// Common pattern for builtins like write_file, eprint, hashtable_remove, etc.
 let emitVoidCall (env: ElabEnv) (funcName: string) (args: MlirValue list) : MlirValue * MlirOp list =
     let unitVal = { Name = freshName env; Type = I64 }
-    (unitVal, [LlvmCallVoidOp(funcName, args); ArithConstantOp(unitVal, 0L)])
+    (unitVal, [LlvmCallVoidOp(funcName, args); ArithConstantOp(unitVal, 1L)])
 
 /// Phase 67: Elaborate a sub-expression, tracking block count before/after.
 /// If the result ops end with a terminator and blocks were created,
@@ -641,7 +641,7 @@ let rec testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
     | ConstPat(IntConst n, _) ->
         let kVal = { Name = freshName env; Type = I64 }
         let cond = { Name = freshName env; Type = I1 }
-        let ops  = [ ArithConstantOp(kVal, int64 n); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
+        let ops  = [ ArithConstantOp(kVal, tagConst (int64 n)); ArithCmpIOp(cond, "eq", scrutVal, kVal) ]
         (Some cond, ops, [], env)
     | ConstPat(BoolConst b, _) ->
         let kVal = { Name = freshName env; Type = I1 }

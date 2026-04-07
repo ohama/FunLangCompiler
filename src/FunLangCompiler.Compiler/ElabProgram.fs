@@ -15,14 +15,17 @@ let private appendReturnIfNeeded (ops: MlirOp list) (retVal: MlirValue) : MlirOp
 let elaborateModule (expr: Expr) : MlirModule =
     let env = emptyEnv ()
     let (resultVal, entryOps) = elaborateExpr env expr
+    // Phase 88: Untag @main return value so the process exit code is raw (not tagged).
+    // tagged(0) = 1, which would cause exit code 1 (failure) for unit-returning programs.
+    let (exitVal, untagOps) = emitUntag env resultVal
     let sideBlocks = env.Blocks.Value
     let allBlocks =
         if sideBlocks.IsEmpty then
-            [ { Label = None; Args = []; Body = appendReturnIfNeeded entryOps resultVal } ]
+            [ { Label = None; Args = []; Body = appendReturnIfNeeded (entryOps @ untagOps) exitVal } ]
         else
             let entryBlock = { Label = None; Args = []; Body = entryOps }
             let lastBlock = List.last sideBlocks
-            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded lastBlock.Body resultVal }
+            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded (lastBlock.Body @ untagOps) exitVal }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
     // Phase 38: %arg0/%arg1 match Printer's func param naming convention
@@ -38,7 +41,7 @@ let elaborateModule (expr: Expr) : MlirModule =
     let mainFunc : FuncOp =
         { Name        = "@main"
           InputTypes  = [I64; Ptr]
-          ReturnType  = Some resultVal.Type
+          ReturnType  = Some exitVal.Type
           Body        = { Blocks = allBlocksWithGC }
           IsLlvmFunc  = false }
     let globals =
@@ -238,6 +241,10 @@ let private collectModuleMembers (decls: Ast.Decl list) : Map<string, string lis
                 let qualifiedName = underPath + "_" + name
                 let existing = match Map.tryFind dotPath result with Some xs -> xs | None -> []
                 result <- Map.add dotPath (existing @ [qualifiedName]) result
+            | Ast.Decl.InfixDecl(_, name, _, _) when underPath <> "" ->
+                let qualifiedName = underPath + "_" + name
+                let existing = match Map.tryFind dotPath result with Some xs -> xs | None -> []
+                result <- Map.add dotPath (existing @ [qualifiedName]) result
             | Ast.Decl.LetRecDecl(bindings, _) when underPath <> "" ->
                 for (name, _, _, _, _) in bindings do
                     let qualifiedName = underPath + "_" + name
@@ -262,6 +269,8 @@ let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName:
             flattenDecls moduleMembers childPrefix innerDecls
         | Ast.Decl.LetDecl(name, body, s) when modName <> "" && name <> "_" ->
             [Ast.Decl.LetDecl(modName + "_" + name, body, s)]
+        | Ast.Decl.InfixDecl(attrs, name, body, s) when modName <> "" ->
+            [Ast.Decl.InfixDecl(attrs, modName + "_" + name, body, s)]
         | Ast.Decl.LetRecDecl(bindings, s) when modName <> "" ->
             let prefixed = bindings |> List.map (fun (name, param, pt, body, s2) -> (modName + "_" + name, param, pt, body, s2))
             [Ast.Decl.LetRecDecl(prefixed, s)]
@@ -294,7 +303,7 @@ let private extractMainExpr (moduleSpan: Ast.Span) (decls: Ast.Decl list) : Expr
         flatDecls |> List.filter (fun d ->
             match d with
             | Ast.Decl.LetDecl _ | Ast.Decl.LetRecDecl _ | Ast.Decl.LetMutDecl _
-            | Ast.Decl.LetPatDecl _ -> true
+            | Ast.Decl.LetPatDecl _ | Ast.Decl.InfixDecl _ -> true
             | _ -> false)
     match exprDecls with
     | [] -> Number(0, s)  // empty module → produce 0 as unit sentinel
@@ -324,6 +333,9 @@ let private extractMainExpr (moduleSpan: Ast.Span) (decls: Ast.Decl list) : Expr
                 LetMut(name, body, build rest, s)
             | Ast.Decl.LetPatDecl(pat, body, sp) :: rest ->
                 LetPat(pat, body, build rest, sp)
+            | [Ast.Decl.InfixDecl(_, name, body, _)] -> Let(name, body, Var(name, s), s)
+            | Ast.Decl.InfixDecl(_, name, body, _) :: rest ->
+                Let(name, body, build rest, s)
             | _ :: rest -> build rest
         build exprDecls
 
@@ -421,16 +433,22 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         | Ast.EmptyModule _ -> []
     let (typeEnv, recordEnv, exnTags, stringFields) = prePassDecls (ref 0) decls
     let mainExpr = extractMainExpr (Ast.moduleSpanOf ast) decls
+    // Lambda lifting: nested LetRec captures → explicit parameters (MLIR-style AST rewrite)
+    let mainExpr = LambdaLift.liftExpr mainExpr
+    // Let-normalization: extract control-flow sub-expressions from operand positions (partial ANF)
+    let mainExpr = LetNormalize.normalizeExpr mainExpr
     let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags; StringFields = stringFields; AnnotationMap = annotationMap }
     let (resultVal, entryOps) = elaborateExpr env mainExpr
+    // Phase 88: Untag @main return value so the process exit code is raw (not tagged).
+    let (exitVal, untagOps) = emitUntag env resultVal
     let sideBlocks = env.Blocks.Value
     let allBlocks =
         if sideBlocks.IsEmpty then
-            [ { Label = None; Args = []; Body = appendReturnIfNeeded entryOps resultVal } ]
+            [ { Label = None; Args = []; Body = appendReturnIfNeeded (entryOps @ untagOps) exitVal } ]
         else
             let entryBlock = { Label = None; Args = []; Body = entryOps }
             let lastBlock = List.last sideBlocks
-            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded lastBlock.Body resultVal }
+            let lastBlockWithReturn = { lastBlock with Body = appendReturnIfNeeded (lastBlock.Body @ untagOps) exitVal }
             let sideBlocksPatched = (List.take (sideBlocks.Length - 1) sideBlocks) @ [lastBlockWithReturn]
             entryBlock :: sideBlocksPatched
     // Phase 38: %arg0/%arg1 match Printer's func param naming convention
@@ -446,7 +464,7 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
     let mainFunc : FuncOp =
         { Name        = "@main"
           InputTypes  = [I64; Ptr]
-          ReturnType  = Some resultVal.Type
+          ReturnType  = Some exitVal.Type
           Body        = { Blocks = allBlocksWithGC }
           IsLlvmFunc  = false }
     let globals =
