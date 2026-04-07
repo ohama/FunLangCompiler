@@ -5,15 +5,15 @@ D=$(mktemp -d /tmp/fnc_prelude_XXXXXX)
 ln -s "$PROJROOT/Prelude" "$D/Prelude"
 cat > "$D/test.fun" << 'FUNEOF'
 let _ =
-    let ht = Hashtable.createStr ()
-    Hashtable.setStr ht "hello" 1
-    Hashtable.setStr ht "world" 2
-    println (to_string (Hashtable.getStr ht "hello"))
+    let ht = Hashtable.create ()
+    Hashtable.set ht "hello" 1
+    Hashtable.set ht "world" 2
+    println (to_string (Hashtable.get ht "hello"))
     println (to_string (Hashtable.count ht))
-    println (to_string (Hashtable.containsKeyStr ht "world"))
-    Hashtable.removeStr ht "world"
+    println (to_string (Hashtable.containsKey ht "world"))
+    Hashtable.remove ht "world"
     println (to_string (Hashtable.count ht))
-    let keys = Hashtable.keysStr ht
+    let keys = Hashtable.keys ht
     println (to_string (List.length keys))
 FUNEOF
 OUTBIN=$(mktemp /tmp/fnc_XXXXXX)

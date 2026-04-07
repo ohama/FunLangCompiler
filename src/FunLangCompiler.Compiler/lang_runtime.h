@@ -54,10 +54,14 @@ int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key);
 int64_t lang_index_get(void* collection, int64_t index);
 void lang_index_set(void* collection, int64_t index, int64_t value);
 
+/* Forward declaration for LangString (defined in lang_runtime.c) */
+struct LangString_s;
+typedef struct LangString_s LangString;
+
 /* Phase 90: lang_index_get_str / lang_index_set_str — thin wrappers for ht.["key"] syntax.
  * These coerce LangString* key to int64_t and call unified hashtable functions. */
-int64_t lang_index_get_str(void* collection, struct LangString_s* key);
-void lang_index_set_str(void* collection, struct LangString_s* key, int64_t value);
+int64_t lang_index_get_str(void* collection, LangString* key);
+void lang_index_set_str(void* collection, LangString* key, int64_t value);
 
 typedef int64_t (*LangClosureFn)(void* env, int64_t arg);
 void lang_array_iter(void* closure, int64_t* arr);
@@ -68,10 +72,6 @@ LangCons* lang_list_comp(void* closure, void* collection);
 int64_t* lang_array_map(void* closure, int64_t* arr);
 int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr);
 int64_t* lang_array_init(int64_t n, void* closure);
-
-/* Forward declaration for LangString (defined in lang_runtime.c) */
-struct LangString_s;
-typedef struct LangString_s LangString;
 LangString* lang_file_read(LangString* path);
 void        lang_file_write(LangString* path, LangString* content);
 void        lang_file_append(LangString* path, LangString* content);

@@ -1,7 +1,7 @@
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
 let s1 = string_concat "hel" "lo"
-let ht = hashtable_create_str ()
+let ht = hashtable_create ()
 let _ = hashtable_set ht "hello" 99
 let v = hashtable_get ht s1
 let _ = println (to_string v)

@@ -1,4 +1,4 @@
-// Test: Hashtable string-key module wrappers (createStr/setStr/getStr/containsKeyStr/removeStr/keysStr)
+// Test: Hashtable unified API with string keys (Phase 90: create/set/get/containsKey/remove/keys)
 // --- Command: bash %S/66-09-int-hashtablestr-prelude.sh
 // --- Input:
 // --- Output:

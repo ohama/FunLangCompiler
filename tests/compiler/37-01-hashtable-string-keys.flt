@@ -4,7 +4,7 @@ let rec len lst =
   match lst with
   | [] -> 0
   | _ :: t -> 1 + len t
-let ht = hashtable_create_str ()
+let ht = hashtable_create ()
 let _ = hashtable_set ht "hello" 42
 let v1 = hashtable_get ht "hello"
 let _ = println (to_string v1)
@@ -20,7 +20,7 @@ let c3 = if hashtable_containsKey ht "hello" then 1 else 0
 let _ = println (to_string c3)
 let n2 = hashtable_count ht
 let _ = println (to_string n2)
-let ks = hashtable_keys_str ht
+let ks = hashtable_keys ht
 let klen = len ks
 let _ = println (to_string klen)
 // --- Output:

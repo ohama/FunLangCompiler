@@ -891,7 +891,17 @@ LangString* lang_sb_tostring(LangStringBuilder* sb) {
     return s;
 }
 
-/* Phase 33-01: COL-02 HashSet (struct defined in lang_runtime.h; placed after lang_ht_hash for static visibility) */
+/* Phase 33-01: COL-02 HashSet (struct defined in lang_runtime.h)
+ * HashSet stores raw (untagged) integers, so uses murmurhash only (no LSB dispatch). */
+static uint64_t lang_hs_hash(int64_t key) {
+    uint64_t h = (uint64_t)key;
+    h ^= h >> 33;
+    h *= UINT64_C(0xff51afd7ed558ccd);
+    h ^= h >> 33;
+    h *= UINT64_C(0xc4ceb9fe1a85ec53);
+    h ^= h >> 33;
+    return h;
+}
 LangHashSet* lang_hashset_create(void) {
     LangHashSet* hs = (LangHashSet*)GC_malloc(sizeof(LangHashSet));
     hs->capacity = 16;
@@ -902,7 +912,7 @@ LangHashSet* lang_hashset_create(void) {
 }
 
 int64_t lang_hashset_add(LangHashSet* hs, int64_t key) {
-    uint64_t bucket = lang_ht_hash(key) % (uint64_t)hs->capacity;
+    uint64_t bucket = lang_hs_hash(key) % (uint64_t)hs->capacity;
     LangHashSetEntry* e = hs->buckets[bucket];
     while (e != NULL) {
         if (e->key == key) return 0; /* already present */
@@ -917,7 +927,7 @@ int64_t lang_hashset_add(LangHashSet* hs, int64_t key) {
 }
 
 int64_t lang_hashset_contains(LangHashSet* hs, int64_t key) {
-    uint64_t bucket = lang_ht_hash(key) % (uint64_t)hs->capacity;
+    uint64_t bucket = lang_hs_hash(key) % (uint64_t)hs->capacity;
     LangHashSetEntry* e = hs->buckets[bucket];
     while (e != NULL) {
         if (e->key == key) return 1;
