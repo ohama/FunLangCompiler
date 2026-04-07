@@ -1,70 +1,62 @@
-# Roadmap: v13.0 Uniform Tagged Representation
+# Roadmap: v13.1 Tagged Representation Extensions
 
 ## Overview
 
-OCaml-style LSB 1-bit tagging을 도입하여 모든 값을 i64 하나로 uniform 표현하고, 런타임에서 int/pointer를 즉시 구분할 수 있게 한다. 이를 통해 hashtable `*_str` 함수 7개 중복을 제거하고, Prelude wrapper 함수의 타입 정보 소실 문제를 근본적으로 해결한다.
+v13.0의 tagged representation 기반 위에 HashSet 통합, C boundary 단순화, generic equality/hash를 추가한다. Elaboration.fs의 ~50곳 untag/retag 제거로 코드 단순화, tuple/record 키를 hashtable에서 사용 가능하게 한다.
 
-**Phases:** 3 (88-90)
-**Requirements:** 13
-**Start:** Phase 88
-
----
-
-## Phase 88: Tagged Literals and Arithmetic
-
-**Goal:** 컴파일러가 모든 정수/bool/char 리터럴을 2n+1로 인코딩하고, 산술 연산이 tagged 값에서 올바르게 동작한다.
-
-**Dependencies:** None (foundation phase)
-
-**Requirements:** TAG-01, TAG-02, TAG-03, ARITH-01, ARITH-02, ARITH-03, ARITH-04
-
-**Plans:** 3 plans
-
-Plans:
-- [ ] 88-01-PLAN.md — IR infrastructure (ArithShRSIOp, ArithShLIOp, ArithOrIOp + helpers)
-- [ ] 88-02-PLAN.md — Core tagging (literals, arithmetic ops, truthiness, @main return)
-- [ ] 88-03-PLAN.md — C boundary untag/retag + full test verification
-
-**Success Criteria:**
-
-1. `fnc` 로 컴파일한 프로그램에서 정수 리터럴 42가 LLVM IR에서 85 (2*42+1)로 출력된다
-2. `true`는 3, `false`는 1, `char 'A'`는 131로 인코딩된다
-3. `10 + 20`이 30을 반환하고, `10 - 3`이 7을 반환한다 (tag 보정 적용)
-4. `6 * 7`이 42를, `10 / 3`이 3을, `10 % 3`이 1을 반환한다 (untag-op-retag)
-5. `3 < 5`가 true, `-a`가 올바른 부정값을 반환한다 (tagged 직접 비교 + 단항 부정)
+**Phases:** 3 (91-93)
+**Requirements:** 12
+**Start:** Phase 91
 
 ---
 
-## Phase 89: C Runtime Adaptation
+## Phase 91: HashSet LSB Unification
 
-**Goal:** C 런타임 함수들이 tagged 정수를 올바르게 untag/retag 하여, int 입출력/char 변환/array 인덱싱이 정상 동작한다.
+**Goal:** HashSet이 Hashtable과 동일한 LSB dispatch 패턴을 사용하여 int/string 값을 통합 처리한다.
 
-**Dependencies:** Phase 88 (tagged literals must be in place)
+**Dependencies:** Phase 90 (Hashtable unification pattern)
 
-**Requirements:** RT-02, RT-03, RT-04
+**Requirements:** HS-01, HS-02, HS-03
 
 **Success Criteria:**
 
-1. `print_int 42`가 "42"를 출력하고, `int_to_string 42`가 "42" 문자열을 반환한다 (tagged 85를 untag 후 처리)
-2. `char_to_int 'A'`가 65를, `int_to_char 65`가 'A'를 반환한다 (tag/untag 적용)
-3. `arr.[2]`로 배열 세 번째 원소에 접근하고, `arr.[2] <- v`로 설정할 수 있다 (인덱스 untag)
+1. `hashset_add hs 42` 와 `hashset_add hs "hello"` 가 같은 C 함수로 동작
+2. for_in_hashset이 tagged 값을 직접 전달 (LANG_TAG_INT 불필요)
+3. 257+ E2E 테스트 전체 통과
 
 ---
 
-## Phase 90: Hashtable Unification and Compatibility
+## Phase 92: C Boundary Simplification
 
-**Goal:** Hashtable 7개 `*_str` 변종이 LSB dispatch 기반 통합 함수로 대체되고, 인터프리터 호환성이 유지되며, 전체 테스트가 통과한다.
+**Goal:** C 런타임 함수가 tagged 정수를 직접 받고 반환하여, Elaboration.fs의 C 호출 전후 emitUntag/emitRetag를 제거한다.
 
-**Dependencies:** Phase 89 (runtime tagging infrastructure must work)
+**Dependencies:** Phase 91 (HashSet도 tagged 값 사용)
 
-**Requirements:** RT-01, COMPAT-01, COMPAT-02
+**Requirements:** CB-01, CB-02, CB-03, CB-04
 
 **Success Criteria:**
 
-1. `hashtable_create()` 하나로 int-key와 string-key 해시테이블 모두 생성/조회/삽입 가능하다 (LSB dispatch)
-2. 인터프리터에서 `hashtable_create`와 `hashtable_create_str` 양쪽 이름 모두 동작한다 (하위 호환)
-3. 기존 723+ flt 테스트 전체 통과한다
-4. Prelude/Hashtable.fun에서 `*_str` 변종 호출이 제거되고 통합 함수만 사용한다
+1. `lang_to_string_int(tagged_val)`가 내부에서 untag 후 변환
+2. `lang_string_length(str)`가 tagged length를 직접 반환
+3. Elaboration.fs에서 C 호출 전후 emitUntag/emitRetag 코드 제거 (~50곳)
+4. 257+ E2E 테스트 전체 통과
+
+---
+
+## Phase 93: Generic Equality and Hash
+
+**Goal:** 힙 블록 header tag로 string/tuple/record/list/ADT를 구분하고, generic hash/equality로 모든 값을 hashtable 키로 사용 가능하게 한다.
+
+**Dependencies:** Phase 92 (C runtime이 tagged 값을 직접 처리)
+
+**Requirements:** GE-01, GE-02, GE-03, GE-04, GE-05
+
+**Success Criteria:**
+
+1. 힙 블록에 tag byte가 있어 string(252), tuple(0), record(1), list(2), ADT(3) 구분 가능
+2. `hashtable_set ht (1, "a") 42` — tuple key로 hashtable 사용 가능
+3. `(1, "a") = (1, "a")` — generic structural equality 동작
+4. 257+ E2E 테스트 전체 통과
 
 ---
 
@@ -72,9 +64,9 @@ Plans:
 
 | Phase | Name | Requirements | Status |
 |-------|------|-------------|--------|
-| 88 | Tagged Literals and Arithmetic | TAG-01, TAG-02, TAG-03, ARITH-01, ARITH-02, ARITH-03, ARITH-04 | Complete |
-| 89 | C Runtime Adaptation | RT-02, RT-03, RT-04 | Complete |
-| 90 | Hashtable Unification and Compatibility | RT-01, COMPAT-01, COMPAT-02 | Complete |
+| 91 | HashSet LSB Unification | HS-01, HS-02, HS-03 | Pending |
+| 92 | C Boundary Simplification | CB-01, CB-02, CB-03, CB-04 | Pending |
+| 93 | Generic Equality and Hash | GE-01, GE-02, GE-03, GE-04, GE-05 | Pending |
 
 ---
 
@@ -82,21 +74,20 @@ Plans:
 
 | Requirement | Phase | Category |
 |-------------|-------|----------|
-| TAG-01 | 88 | Tagged Value |
-| TAG-02 | 88 | Tagged Value |
-| TAG-03 | 88 | Tagged Value |
-| ARITH-01 | 88 | Arithmetic |
-| ARITH-02 | 88 | Arithmetic |
-| ARITH-03 | 88 | Arithmetic |
-| ARITH-04 | 88 | Arithmetic |
-| RT-02 | 89 | C Runtime |
-| RT-03 | 89 | C Runtime |
-| RT-04 | 89 | C Runtime |
-| RT-01 | 90 | C Runtime |
-| COMPAT-01 | 90 | Compatibility |
-| COMPAT-02 | 90 | Compatibility |
+| HS-01 | 91 | HashSet |
+| HS-02 | 91 | HashSet |
+| HS-03 | 91 | HashSet |
+| CB-01 | 92 | C Boundary |
+| CB-02 | 92 | C Boundary |
+| CB-03 | 92 | C Boundary |
+| CB-04 | 92 | C Boundary |
+| GE-01 | 93 | Generic Eq/Hash |
+| GE-02 | 93 | Generic Eq/Hash |
+| GE-03 | 93 | Generic Eq/Hash |
+| GE-04 | 93 | Generic Eq/Hash |
+| GE-05 | 93 | Generic Eq/Hash |
 
-**Mapped: 13/13** -- no orphans, no duplicates.
+**Mapped: 12/12** — no orphans, no duplicates.
 
 ---
-*Created: 2026-04-07 -- v13.0 Uniform Tagged Representation*
+*Created: 2026-04-07 — v13.1 Tagged Representation Extensions*
