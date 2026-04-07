@@ -49,12 +49,12 @@
 | ARITH-02 | Phase 88 | Complete |
 | ARITH-03 | Phase 88 | Complete |
 | ARITH-04 | Phase 88 | Complete |
-| RT-01 | Phase 90 | Pending |
+| RT-01 | Phase 90 | Complete |
 | RT-02 | Phase 89 | Complete |
 | RT-03 | Phase 89 | Complete |
 | RT-04 | Phase 89 | Complete |
-| COMPAT-01 | Phase 90 | Pending |
-| COMPAT-02 | Phase 90 | Pending |
+| COMPAT-01 | Phase 90 | Complete |
+| COMPAT-02 | Phase 90 | Complete |
 
 ---
 *Created: 2026-04-07 -- 13 requirements across 4 categories*

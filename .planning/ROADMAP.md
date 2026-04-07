@@ -74,7 +74,7 @@ Plans:
 |-------|------|-------------|--------|
 | 88 | Tagged Literals and Arithmetic | TAG-01, TAG-02, TAG-03, ARITH-01, ARITH-02, ARITH-03, ARITH-04 | Complete |
 | 89 | C Runtime Adaptation | RT-02, RT-03, RT-04 | Complete |
-| 90 | Hashtable Unification and Compatibility | RT-01, COMPAT-01, COMPAT-02 | Pending |
+| 90 | Hashtable Unification and Compatibility | RT-01, COMPAT-01, COMPAT-02 | Complete |
 
 ---
 
