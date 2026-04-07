@@ -362,20 +362,25 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
               BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
+        // Phase 88: Retag I1 returns to I64 tagged for uniform ABI.
+        // Only I1 needs retag; I64/Ptr stay as-is.
+        let (finalBodyVal, coerceRetOps) =
+            if bodyVal.Type = I1 then coerceToI64 bodyEnv bodyVal
+            else (bodyVal, [])
         let bodySideBlocks = bodyEnv.Blocks.Value
         let allBodyBlocks =
             if bodySideBlocks.IsEmpty then
-                [ { Label = None; Args = []; Body = bodyEntryOps @ [ReturnOp [bodyVal]] } ]
+                [ { Label = None; Args = []; Body = bodyEntryOps @ coerceRetOps @ [ReturnOp [finalBodyVal]] } ]
             else
                 let entryBlock = { Label = None; Args = []; Body = bodyEntryOps }
                 let lastBlock = List.last bodySideBlocks
-                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [bodyVal]] }
+                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ coerceRetOps @ [ReturnOp [finalBodyVal]] }
                 let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
                 entryBlock :: sideBlocksPatched
         let funcOp : FuncOp =
             { Name = "@" + name
               InputTypes = [paramType]
-              ReturnType = Some bodyVal.Type
+              ReturnType = Some finalBodyVal.Type
               Body = { Blocks = allBodyBlocks }
               IsLlvmFunc = false }
         // Phase 53: If a function with the same name already exists (e.g., from Prelude InstanceDecl
@@ -386,7 +391,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             env.Funcs.Value <- existingFuncs |> List.map (fun f -> if f.Name = mlirName then funcOp else f)
         else
             env.Funcs.Value <- existingFuncs @ [funcOp]
-        let finalSig = { sig_ with ReturnType = bodyVal.Type }
+        let finalSig = { sig_ with ReturnType = finalBodyVal.Type }
         let env' =
             let kf = Map.add name finalSig env.KnownFuncs
             let kf' = match shortNameAlias with Some sn -> Map.add sn finalSig kf | None -> kf
@@ -825,24 +830,28 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
                       BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
                 let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
+                // Phase 88: Retag I1 returns to I64 tagged for uniform ABI.
+                let (finalBodyVal, coerceRetOps) =
+                    if bodyVal.Type = I1 then coerceToI64 bodyEnv bodyVal
+                    else (bodyVal, [])
                 let bodySideBlocks = bodyEnv.Blocks.Value
                 let allBodyBlocks =
                     if bodySideBlocks.IsEmpty then
-                        [ { Label = None; Args = []; Body = bodyEntryOps @ [ReturnOp [bodyVal]] } ]
+                        [ { Label = None; Args = []; Body = bodyEntryOps @ coerceRetOps @ [ReturnOp [finalBodyVal]] } ]
                     else
                         let entryBlock = { Label = None; Args = []; Body = bodyEntryOps }
                         let lastBlock = List.last bodySideBlocks
-                        let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ [ReturnOp [bodyVal]] }
+                        let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ coerceRetOps @ [ReturnOp [finalBodyVal]] }
                         let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
                         entryBlock :: sideBlocksPatched
                 let funcOp : FuncOp =
                     { Name = "@" + name
                       InputTypes = [paramType]
-                      ReturnType = Some bodyVal.Type
+                      ReturnType = Some finalBodyVal.Type
                       Body = { Blocks = allBodyBlocks }
                       IsLlvmFunc = false }
                 env.Funcs.Value <- env.Funcs.Value @ [funcOp]
-                let finalSig = { sig_ with ReturnType = bodyVal.Type }
+                let finalSig = { sig_ with ReturnType = finalBodyVal.Type }
                 let kfAcc' = Map.add name finalSig kfAcc
                 match shortAlias with Some sn -> Map.add sn finalSig kfAcc' | None -> kfAcc'
             ) env.KnownFuncs
