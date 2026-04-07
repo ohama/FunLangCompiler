@@ -64,7 +64,7 @@ v13.0의 tagged representation 기반 위에 HashSet 통합, C boundary 단순�
 
 | Phase | Name | Requirements | Status |
 |-------|------|-------------|--------|
-| 91 | HashSet LSB Unification | HS-01, HS-02, HS-03 | Pending |
+| 91 | HashSet LSB Unification | HS-01, HS-02, HS-03 | Complete |
 | 92 | C Boundary Simplification | CB-01, CB-02, CB-03, CB-04 | Pending |
 | 93 | Generic Equality and Hash | GE-01, GE-02, GE-03, GE-04, GE-05 | Pending |
 

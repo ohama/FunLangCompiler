@@ -25,9 +25,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HS-01 | — | Pending |
-| HS-02 | — | Pending |
-| HS-03 | — | Pending |
+| HS-01 | Phase 91 | Complete |
+| HS-02 | Phase 91 | Complete |
+| HS-03 | Phase 91 | Complete |
 | CB-01 | — | Pending |
 | CB-02 | — | Pending |
 | CB-03 | — | Pending |
