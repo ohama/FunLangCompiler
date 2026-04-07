@@ -2180,8 +2180,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         let coerced = { Name = freshName env; Type = I64 }
                         (coerced, [LlvmPtrToIntOp(coerced, argVal)])
                     | [I64] when argVal.Type = I1 ->
-                        let coerced = { Name = freshName env; Type = I64 }
-                        (coerced, [ArithExtuIOp(coerced, argVal)])
+                        // Phase 88: zext I1→I64 then retag for tagged representation
+                        let (coerced, coerceOps) = coerceToI64 env argVal
+                        (coerced, coerceOps)
                     | [Ptr] when argVal.Type = I64 ->
                         let coerced = { Name = freshName env; Type = Ptr }
                         (coerced, [LlvmIntToPtrOp(coerced, argVal)])

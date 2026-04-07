@@ -8,6 +8,13 @@
 #include <gc.h>
 #include "lang_runtime.h"
 
+/* Phase 89: Tagged integer helpers for C↔FunLang boundary.
+ * All integers passed to FunLang closures or stored in compiler-read
+ * data structures must use tagged representation: int n → (n<<1)|1.
+ * Pointers (strings, lists, etc.) are always even (LSB=0). */
+#define LANG_TAG_INT(n)    (((int64_t)(n) << 1) | 1)
+#define LANG_UNTAG_INT(v)  ((int64_t)(v) >> 1)
+
 /* String struct layout matches MLIR {i64 length, ptr data} at offsets 0 and 8 */
 typedef struct LangString_s {
     int64_t length;
@@ -459,11 +466,11 @@ int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key) {
     int64_t* tup = (int64_t*)GC_malloc(16);  /* 2 slots x 8 bytes */
     LangHashEntry* e = lang_ht_find(ht, key);
     if (e != NULL) {
-        tup[0] = 1;       /* true */
-        tup[1] = e->val;
+        tup[0] = LANG_TAG_INT(1);  /* tagged true = 3 */
+        tup[1] = e->val;           /* already tagged */
     } else {
-        tup[0] = 0;       /* false */
-        tup[1] = 0;       /* placeholder */
+        tup[0] = LANG_TAG_INT(0);  /* tagged false = 1 */
+        tup[1] = LANG_TAG_INT(0);  /* tagged zero = 1 */
     }
     return tup;
 }
@@ -701,11 +708,11 @@ int64_t* lang_hashtable_trygetvalue_str(LangHashtableStr* ht, LangString* key) {
     int64_t* tup = (int64_t*)GC_malloc(16);  /* 2 slots x 8 bytes */
     LangHashEntryStr* e = lang_ht_str_find(ht, key);
     if (e != NULL) {
-        tup[0] = 1;
-        tup[1] = e->val;
+        tup[0] = LANG_TAG_INT(1);  /* tagged true = 3 */
+        tup[1] = e->val;           /* already tagged */
     } else {
-        tup[0] = 0;
-        tup[1] = 0;
+        tup[0] = LANG_TAG_INT(0);  /* tagged false = 1 */
+        tup[1] = LANG_TAG_INT(0);  /* tagged zero = 1 */
     }
     return tup;
 }
@@ -796,7 +803,7 @@ void lang_for_in_hashset(void* closure, LangHashSet* hs) {
     for (int64_t i = 0; i < hs->capacity; i++) {
         LangHashSetEntry* e = hs->buckets[i];
         while (e != NULL) {
-            fn(closure, e->key);
+            fn(closure, LANG_TAG_INT(e->key));
             e = e->next;
         }
     }
@@ -824,8 +831,8 @@ void lang_for_in_hashtable(void* closure, LangHashtable* ht) {
         LangHashEntry* e = ht->buckets[i];
         while (e != NULL) {
             int64_t* tup = (int64_t*)GC_malloc(2 * sizeof(int64_t));
-            tup[0] = e->key;
-            tup[1] = e->val;
+            tup[0] = LANG_TAG_INT(e->key);  /* retag stored-raw key */
+            tup[1] = e->val;               /* val already tagged */
             fn(closure, (int64_t)(uintptr_t)tup);
             e = e->next;
         }
@@ -892,7 +899,7 @@ int64_t* lang_array_init(int64_t n, void* closure) {
     int64_t* out = (int64_t*)GC_malloc((size_t)((n + 1) * 8));
     out[0] = n;
     for (int64_t i = 0; i < n; i++) {
-        out[i + 1] = fn(closure, i);
+        out[i + 1] = fn(closure, LANG_TAG_INT(i));
     }
     return out;
 }
