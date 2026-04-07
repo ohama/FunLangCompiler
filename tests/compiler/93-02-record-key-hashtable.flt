@@ -1,0 +1,10 @@
+// Test: Record as hashtable key with structural hash/equality (Phase 93)
+// --- Command: bash %S/93-02-record-key-hashtable.sh
+// --- Input:
+// --- Output:
+origin-near
+far-away
+true
+false
+updated
+2

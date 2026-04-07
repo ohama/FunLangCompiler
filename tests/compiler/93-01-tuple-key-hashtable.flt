@@ -1,0 +1,10 @@
+// Test: Tuple as hashtable key with structural hash/equality (Phase 93)
+// --- Command: bash %S/93-01-tuple-key-hashtable.sh
+// --- Input:
+// --- Output:
+100
+200
+100
+false
+true
+999

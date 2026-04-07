@@ -613,6 +613,13 @@ static int lang_ht_eq(int64_t a, int64_t b) {
     }
 }
 
+/* Phase 93: Non-static wrapper for lang_ht_eq — called by compiled = operator
+ * for structural equality on all heap types (string, tuple, record, list, ADT).
+ * Returns 1 (equal) or 0 (not equal) as int64_t. */
+int64_t lang_generic_eq(int64_t a, int64_t b) {
+    return lang_ht_eq(a, b) ? 1 : 0;
+}
+
 /* Find entry for key; returns NULL if not present.
  * Phase 90: Uses lang_ht_eq for unified int/string equality. */
 static LangHashEntry* lang_ht_find(LangHashtable* ht, int64_t key) {

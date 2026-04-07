@@ -546,22 +546,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (lv, lops, c, rops @ [LlvmPtrToIntOp(c, rv)])
             else (lv, lops, rv, rops)
         if lv.Type = Ptr then
-            // String equality via strcmp
-            let lDataPtr   = { Name = freshName env; Type = Ptr }
-            let lData      = { Name = freshName env; Type = Ptr }
-            let rDataPtr   = { Name = freshName env; Type = Ptr }
-            let rData      = { Name = freshName env; Type = Ptr }
-            let cmpResult  = { Name = freshName env; Type = I32 }
-            let zero32     = { Name = freshName env; Type = I32 }
+            // Phase 93: Generic structural equality via lang_generic_eq
+            let cmpResult  = { Name = freshName env; Type = I64 }
+            let zero64     = { Name = freshName env; Type = I64 }
             let boolResult = { Name = freshName env; Type = I1 }
             let ops = [
-                LlvmGEPStructOp(lDataPtr, lv, 2)
-                LlvmLoadOp(lData, lDataPtr)
-                LlvmGEPStructOp(rDataPtr, rv, 2)
-                LlvmLoadOp(rData, rDataPtr)
-                LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
-                ArithConstantOp(zero32, 0L)
-                ArithCmpIOp(boolResult, "eq", cmpResult, zero32)
+                LlvmCallOp(cmpResult, "@lang_generic_eq", [lv; rv])
+                ArithConstantOp(zero64, 0L)
+                ArithCmpIOp(boolResult, "ne", cmpResult, zero64)
             ]
             (boolResult, lops @ rops @ ops)
         else
@@ -580,22 +572,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (lv, lops, c, rops @ [LlvmPtrToIntOp(c, rv)])
             else (lv, lops, rv, rops)
         if lv.Type = Ptr then
-            // String inequality via strcmp != 0
-            let lDataPtr   = { Name = freshName env; Type = Ptr }
-            let lData      = { Name = freshName env; Type = Ptr }
-            let rDataPtr   = { Name = freshName env; Type = Ptr }
-            let rData      = { Name = freshName env; Type = Ptr }
-            let cmpResult  = { Name = freshName env; Type = I32 }
-            let zero32     = { Name = freshName env; Type = I32 }
+            // Phase 93: Generic structural inequality via lang_generic_eq
+            let cmpResult  = { Name = freshName env; Type = I64 }
+            let zero64     = { Name = freshName env; Type = I64 }
             let boolResult = { Name = freshName env; Type = I1 }
             let ops = [
-                LlvmGEPStructOp(lDataPtr, lv, 2)
-                LlvmLoadOp(lData, lDataPtr)
-                LlvmGEPStructOp(rDataPtr, rv, 2)
-                LlvmLoadOp(rData, rDataPtr)
-                LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
-                ArithConstantOp(zero32, 0L)
-                ArithCmpIOp(boolResult, "ne", cmpResult, zero32)
+                LlvmCallOp(cmpResult, "@lang_generic_eq", [lv; rv])
+                ArithConstantOp(zero64, 0L)
+                ArithCmpIOp(boolResult, "eq", cmpResult, zero64)
             ]
             (boolResult, lops @ rops @ ops)
         else
@@ -998,22 +982,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (lv, lops) = elaborateExpr env lhsExpr
         let (rv, rops) = elaborateExpr env rhsExpr
         if lv.Type = Ptr then
-            // String equality via strcmp (same as Equal case for Ptr)
-            let lDataPtr   = { Name = freshName env; Type = Ptr }
-            let lData      = { Name = freshName env; Type = Ptr }
-            let rDataPtr   = { Name = freshName env; Type = Ptr }
-            let rData      = { Name = freshName env; Type = Ptr }
-            let cmpResult  = { Name = freshName env; Type = I32 }
-            let zero32     = { Name = freshName env; Type = I32 }
+            // Phase 93: Generic structural equality via lang_generic_eq
+            let cmpResult  = { Name = freshName env; Type = I64 }
+            let zero64     = { Name = freshName env; Type = I64 }
             let boolResult = { Name = freshName env; Type = I1 }
             let ops = [
-                LlvmGEPStructOp(lDataPtr, lv, 2)
-                LlvmLoadOp(lData, lDataPtr)
-                LlvmGEPStructOp(rDataPtr, rv, 2)
-                LlvmLoadOp(rData, rDataPtr)
-                LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
-                ArithConstantOp(zero32, 0L)
-                ArithCmpIOp(boolResult, "eq", cmpResult, zero32)
+                LlvmCallOp(cmpResult, "@lang_generic_eq", [lv; rv])
+                ArithConstantOp(zero64, 0L)
+                ArithCmpIOp(boolResult, "ne", cmpResult, zero64)
             ]
             (boolResult, lops @ rops @ ops)
         else
