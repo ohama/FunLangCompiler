@@ -47,6 +47,10 @@ type MlirOp =
     | ArithMulIOp     of result: MlirValue * lhs: MlirValue * rhs: MlirValue
     | ArithDivSIOp    of result: MlirValue * lhs: MlirValue * rhs: MlirValue
     | ArithRemSIOp    of result: MlirValue * lhs: MlirValue * rhs: MlirValue
+    // Phase 88: shift/or ops for tagged value representation (2n+1)
+    | ArithShRSIOp    of result: MlirValue * lhs: MlirValue * rhs: MlirValue  // arith.shrsi (untag)
+    | ArithShLIOp     of result: MlirValue * lhs: MlirValue * rhs: MlirValue  // arith.shli (retag)
+    | ArithOrIOp      of result: MlirValue * lhs: MlirValue * rhs: MlirValue  // arith.ori (set LSB)
     | ArithCmpIOp     of result: MlirValue * predicate: string * lhs: MlirValue * rhs: MlirValue
     | ArithExtuIOp    of result: MlirValue * value: MlirValue   // zero-extend (e.g. I1 -> I64)
     | CfCondBrOp      of cond: MlirValue * trueLabel: string * trueArgs: MlirValue list * falseLabel: string * falseArgs: MlirValue list

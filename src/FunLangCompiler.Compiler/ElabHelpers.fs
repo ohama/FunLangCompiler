@@ -160,6 +160,22 @@ let freshLabel (env: ElabEnv) (prefix: string) : string =
     env.LabelCounter.Value <- n + 1
     sprintf "%s%d" prefix n
 
+/// Phase 88: Tag a compile-time constant: 2n+1
+let tagConst (n: int64) : int64 = n * 2L + 1L
+
+/// Phase 88: Emit untag sequence: (tagged_val >> 1) -> raw value
+let emitUntag (env: ElabEnv) (v: MlirValue) : MlirValue * MlirOp list =
+    let one = { Name = freshName env; Type = I64 }
+    let result = { Name = freshName env; Type = I64 }
+    (result, [ArithConstantOp(one, 1L); ArithShRSIOp(result, v, one)])
+
+/// Phase 88: Emit retag sequence: (raw_val << 1) | 1 -> tagged value
+let emitRetag (env: ElabEnv) (v: MlirValue) : MlirValue * MlirOp list =
+    let one = { Name = freshName env; Type = I64 }
+    let shifted = { Name = freshName env; Type = I64 }
+    let result = { Name = freshName env; Type = I64 }
+    (result, [ArithConstantOp(one, 1L); ArithShLIOp(shifted, v, one); ArithOrIOp(result, shifted, one)])
+
 // Phase 8: Allocate a heap string struct {i64 length, ptr data} for a compile-time string literal.
 let elaborateStringLiteral (env: ElabEnv) (s: string) : MlirValue * MlirOp list =
     let globalName  = addStringGlobal env s
@@ -220,8 +236,6 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
         let bodyFree = freeVars (Set.union boundVars patBound) bodyExpr
         Set.union bindFree bodyFree
     | Modulo (l, r, _) ->
-        Set.union (freeVars boundVars l) (freeVars boundVars r)
-    | PipeRight (l, r, _) | ComposeRight (l, r, _) | ComposeLeft (l, r, _) ->
         Set.union (freeVars boundVars l) (freeVars boundVars r)
     | Constructor(_, None, _) -> Set.empty
     | Constructor(_, Some argExpr, _) -> freeVars boundVars argExpr
@@ -309,8 +323,9 @@ let coerceToI64 (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
     match v.Type with
     | I64 -> (v, [])
     | I1  ->
-        let r = { Name = freshName env; Type = I64 }
-        (r, [ArithExtuIOp(r, v)])
+        let ext = { Name = freshName env; Type = I64 }
+        let (tagged, retagOps) = emitRetag env ext
+        (tagged, [ArithExtuIOp(ext, v)] @ retagOps)
     | Ptr ->
         let r = { Name = freshName env; Type = I64 }
         (r, [LlvmPtrToIntOp(r, v)])
@@ -408,7 +423,8 @@ let coerceToI64Arg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
     | I64 -> (v, [])
     | I1  ->
         let ext = { Name = freshName env; Type = I64 }
-        (ext, [ArithExtuIOp(ext, v)])
+        let (tagged, retagOps) = emitRetag env ext
+        (tagged, [ArithExtuIOp(ext, v)] @ retagOps)
     | Ptr ->
         let i = { Name = freshName env; Type = I64 }
         (i, [LlvmPtrToIntOp(i, v)])
