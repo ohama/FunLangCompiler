@@ -635,12 +635,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let blocksAfterCond = env.Blocks.Value.Length
         // Phase 35: If condition is I64 (e.g. result from module-wrapped bool builtin),
         // compare != tagged(false) to produce I1 for cf.cond_br.
-        let (i1CondVal, coerceCondOps) =
-            if condVal.Type = I64 then
-                let zeroVal = { Name = freshName env; Type = I64 }
-                let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", condVal, zeroVal)])
-            else (condVal, [])
+        let (i1CondVal, coerceCondOps) = coerceToI1 env condVal
         let thenLabel  = freshLabel env "then"
         let elseLabel  = freshLabel env "else"
         let mergeLabel = freshLabel env "merge"
@@ -711,12 +706,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let blocksAfterLeft = List.length env.Blocks.Value
         // Phase 36 FIX-03: If leftVal is I64 (e.g. module Bool function returning I64),
         // coerce to I1 via != tagged(false) comparison before use in cf.cond_br.
-        let (i1LeftVal, coerceLeftOps) =
-            if leftVal.Type = I64 then
-                let zeroVal = { Name = freshName env; Type = I64 }
-                let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", leftVal, zeroVal)])
-            else (leftVal, [])
+        let (i1LeftVal, coerceLeftOps) = coerceToI1 env leftVal
         let evalRightLabel = freshLabel env "and_right"
         let mergeLabel     = freshLabel env "and_merge"
         let blocksBeforeRight = List.length env.Blocks.Value
@@ -754,12 +744,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let blocksAfterLeft = List.length env.Blocks.Value
         // Phase 36 FIX-03: If leftVal is I64, coerce to I1 via != tagged(false).
         // Note: Or is short-circuit: true → merge (with tagged true), false → eval right.
-        let (i1LeftVal, coerceLeftOps) =
-            if leftVal.Type = I64 then
-                let zeroVal = { Name = freshName env; Type = I64 }
-                let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", leftVal, zeroVal)])
-            else (leftVal, [])
+        let (i1LeftVal, coerceLeftOps) = coerceToI1 env leftVal
         let evalRightLabel = freshLabel env "or_right"
         let mergeLabel     = freshLabel env "or_merge"
         let blocksBeforeRight = List.length env.Blocks.Value
@@ -876,51 +861,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 14: string_contains builtin — App(App(Var("string_contains"), s), sub)
     | App (App (Var ("string_contains", _), strExpr, _), subExpr, _) ->
-        let (strVal, strOps) = elaborateExpr env strExpr
-        let (subVal, subOps) = elaborateExpr env subExpr
-        let (strPtr, strCoerce) = coerceToPtrArg env strVal
-        let (subPtr, subCoerce) = coerceToPtrArg env subVal
-        let rawResult  = { Name = freshName env; Type = I64 }
-        let zeroVal    = { Name = freshName env; Type = I64 }
-        let boolResult = { Name = freshName env; Type = I1 }
-        let ops = [
-            LlvmCallOp(rawResult, "@lang_string_contains", [strPtr; subPtr])
-            ArithConstantOp(zeroVal, 0L)
-            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
-        ]
-        (boolResult, strOps @ subOps @ strCoerce @ subCoerce @ ops)
+        emitStrPredicate env "@lang_string_contains" strExpr subExpr elaborateExpr
 
     // Phase 31: string_endswith builtin — App(App(Var("string_endswith"), s), suffix)
     | App (App (Var ("string_endswith", _), strExpr, _), suffixExpr, _) ->
-        let (strVal, strOps) = elaborateExpr env strExpr
-        let (sufVal, sufOps) = elaborateExpr env suffixExpr
-        let (strPtr, strCoerce) = coerceToPtrArg env strVal
-        let (sufPtr, sufCoerce) = coerceToPtrArg env sufVal
-        let rawResult  = { Name = freshName env; Type = I64 }
-        let zeroVal    = { Name = freshName env; Type = I64 }
-        let boolResult = { Name = freshName env; Type = I1 }
-        let ops = [
-            LlvmCallOp(rawResult, "@lang_string_endswith", [strPtr; sufPtr])
-            ArithConstantOp(zeroVal, 0L)
-            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
-        ]
-        (boolResult, strOps @ sufOps @ strCoerce @ sufCoerce @ ops)
+        emitStrPredicate env "@lang_string_endswith" strExpr suffixExpr elaborateExpr
 
     // Phase 31: string_startswith builtin — App(App(Var("string_startswith"), s), prefix)
     | App (App (Var ("string_startswith", _), strExpr, _), prefixExpr, _) ->
-        let (strVal, strOps) = elaborateExpr env strExpr
-        let (pfxVal, pfxOps) = elaborateExpr env prefixExpr
-        let (strPtr, strCoerce) = coerceToPtrArg env strVal
-        let (pfxPtr, pfxCoerce) = coerceToPtrArg env pfxVal
-        let rawResult  = { Name = freshName env; Type = I64 }
-        let zeroVal    = { Name = freshName env; Type = I64 }
-        let boolResult = { Name = freshName env; Type = I1 }
-        let ops = [
-            LlvmCallOp(rawResult, "@lang_string_startswith", [strPtr; pfxPtr])
-            ArithConstantOp(zeroVal, 0L)
-            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
-        ]
-        (boolResult, strOps @ pfxOps @ strCoerce @ pfxCoerce @ ops)
+        emitStrPredicate env "@lang_string_startswith" strExpr prefixExpr elaborateExpr
 
     // Phase 31: string_trim builtin — App(Var("string_trim"), s)
     | App (Var ("string_trim", _), strExpr, _) ->
@@ -1185,15 +1134,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (nVal,   nOps)   = elaborateExpr env nExpr
         let (defVal, defOps) = elaborateExpr env defExpr
         // Ensure both args are I64 (defVal may be I1 from bool literals)
-        let nI64 =
-            if nVal.Type = I64 then (nVal, [])
-            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, nVal)])
-        let defI64 =
-            if defVal.Type = I64 then (defVal, [])
-            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, defVal)])
+        let (nV, nCoerce)     = coerceToI64 env nVal
+        let (defV, defCoerce) = coerceToI64 env defVal
         let result = { Name = freshName env; Type = Ptr }
-        let (nV, nCoerce)     = nI64
-        let (defV, defCoerce) = defI64
         // Phase 88: Untag count before passing to C (value stays tagged)
         let (rawN, untagNOps) = emitUntag env nV
         (result, nOps @ defOps @ nCoerce @ defCoerce @ untagNOps @ [LlvmCallOp(result, "@lang_array_create", [rawN; defV])])
@@ -1291,12 +1234,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (collPtr, collCoerce) =
             if collVal.Type = Ptr then (collVal, [])
             else let v = { Name = freshName env; Type = Ptr } in (v, [LlvmIntToPtrOp(v, collVal)])
-        let (valV, valCoerce) =
-            if valVal.Type = I64 then (valVal, [])
-            else if valVal.Type = Ptr then
-                let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, valVal)])
-            else
-                let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
+        let (valV, valCoerce) = coerceToI64 env valVal
         match idxVal.Type with
         | Ptr ->
             let (unitVal, callOps) = emitVoidCall env "@lang_index_set_str" [collPtr; idxVal; valV]
@@ -1378,18 +1316,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (fVal,   fOps)   = elaborateExpr env closureExpr
         let (initVal, initOps) = elaborateExpr env initExpr
         let (arrVal, arrOps) = elaborateExpr env arrExpr
-        let closurePtrVal =
-            if fVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else fVal
-        let closureOps =
-            if fVal.Type = I64
-            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
-            else []
-        let initI64 =
-            if initVal.Type = I64 then (initVal, [])
-            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, initVal)])
-        let (initV, initCoerce) = initI64
+        let (closurePtrVal, closureOps) = coerceToPtrArg env fVal
+        let (initV, initCoerce) = coerceToI64 env initVal
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let result = { Name = freshName env; Type = I64 }
         (result, fOps @ closureOps @ initOps @ initCoerce @ arrOps @ arrCoerceOps @ [LlvmCallOp(result, "@lang_array_fold", [closurePtrVal; initV; arrPtrVal])])
@@ -1399,14 +1327,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("array_iter", _), closureExpr, _), arrExpr, _) ->
         let (fVal,   fOps)   = elaborateExpr env closureExpr
         let (arrVal, arrOps) = elaborateExpr env arrExpr
-        let closurePtrVal =
-            if fVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else fVal
-        let closureOps =
-            if fVal.Type = I64
-            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
-            else []
+        let (closurePtrVal, closureOps) = coerceToPtrArg env fVal
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let (unitVal, callOps) = emitVoidCall env "@lang_array_iter" [closurePtrVal; arrPtrVal]
         (unitVal, fOps @ closureOps @ arrOps @ arrCoerceOps @ callOps)
@@ -1416,14 +1337,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("array_map", _), closureExpr, _), arrExpr, _) ->
         let (fVal,   fOps)   = elaborateExpr env closureExpr
         let (arrVal, arrOps) = elaborateExpr env arrExpr
-        let closurePtrVal =
-            if fVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else fVal
-        let closureOps =
-            if fVal.Type = I64
-            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
-            else []
+        let (closurePtrVal, closureOps) = coerceToPtrArg env fVal
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
         let result = { Name = freshName env; Type = Ptr }
         (result, fOps @ closureOps @ arrOps @ arrCoerceOps @ [LlvmCallOp(result, "@lang_array_map", [closurePtrVal; arrPtrVal])])
@@ -1433,20 +1347,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("array_init", _), nExpr, _), closureExpr, _) ->
         let (nVal,   nOps)   = elaborateExpr env nExpr
         let (fVal,   fOps)   = elaborateExpr env closureExpr
-        let nI64 =
-            if nVal.Type = I64 then (nVal, [])
-            else let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, nVal)])
-        let (nV, nCoerce) = nI64
+        let (nV, nCoerce) = coerceToI64 env nVal
         // Phase 88: Untag count before passing to C
         let (rawN, untagNOps) = emitUntag env nV
-        let closurePtrVal =
-            if fVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else fVal
-        let closureOps =
-            if fVal.Type = I64
-            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
-            else []
+        let (closurePtrVal, closureOps) = coerceToPtrArg env fVal
         let result = { Name = freshName env; Type = Ptr }
         (result, nOps @ nCoerce @ untagNOps @ fOps @ closureOps @ [LlvmCallOp(result, "@lang_array_init", [rawN; closurePtrVal])])
 
@@ -1454,14 +1358,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (App (Var ("list_sort_by", _), closureExpr, _), listExpr, _) ->
         let (fVal,    fOps)    = elaborateExpr env closureExpr
         let (listVal, listOps) = elaborateExpr env listExpr
-        let closurePtrVal =
-            if fVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else fVal
-        let closureOps =
-            if fVal.Type = I64
-            then [LlvmIntToPtrOp(closurePtrVal, fVal)]
-            else []
+        let (closurePtrVal, closureOps) = coerceToPtrArg env fVal
         let (listPtrVal, listCoerceOps) = coerceToPtrArg env listVal
         let result = { Name = freshName env; Type = Ptr }
         (result, fOps @ closureOps @ listOps @ listCoerceOps @ [LlvmCallOp(result, "@lang_list_sort_by", [closurePtrVal; listPtrVal])])
@@ -1864,60 +1761,19 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 31: char_is_digit — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_digit", _), charExpr, _) ->
-        let (charVal, charOps) = elaborateExpr env charExpr
-        // Phase 88: Untag char before passing to C
-        let (rawChar, untagOps) = emitUntag env charVal
-        let rawResult  = { Name = freshName env; Type = I64 }
-        let zeroVal    = { Name = freshName env; Type = I64 }
-        let boolResult = { Name = freshName env; Type = I1 }
-        let ops = [
-            LlvmCallOp(rawResult, "@lang_char_is_digit", [rawChar])
-            ArithConstantOp(zeroVal, 0L)
-            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
-        ]
-        (boolResult, charOps @ untagOps @ ops)
+        emitCharPredicate env "@lang_char_is_digit" charExpr elaborateExpr
 
     // Phase 31: char_is_letter — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_letter", _), charExpr, _) ->
-        let (charVal, charOps) = elaborateExpr env charExpr
-        let (rawChar, untagOps) = emitUntag env charVal
-        let rawResult  = { Name = freshName env; Type = I64 }
-        let zeroVal    = { Name = freshName env; Type = I64 }
-        let boolResult = { Name = freshName env; Type = I1 }
-        let ops = [
-            LlvmCallOp(rawResult, "@lang_char_is_letter", [rawChar])
-            ArithConstantOp(zeroVal, 0L)
-            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
-        ]
-        (boolResult, charOps @ untagOps @ ops)
+        emitCharPredicate env "@lang_char_is_letter" charExpr elaborateExpr
 
     // Phase 31: char_is_upper — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_upper", _), charExpr, _) ->
-        let (charVal, charOps) = elaborateExpr env charExpr
-        let (rawChar, untagOps) = emitUntag env charVal
-        let rawResult  = { Name = freshName env; Type = I64 }
-        let zeroVal    = { Name = freshName env; Type = I64 }
-        let boolResult = { Name = freshName env; Type = I1 }
-        let ops = [
-            LlvmCallOp(rawResult, "@lang_char_is_upper", [rawChar])
-            ArithConstantOp(zeroVal, 0L)
-            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
-        ]
-        (boolResult, charOps @ untagOps @ ops)
+        emitCharPredicate env "@lang_char_is_upper" charExpr elaborateExpr
 
     // Phase 31: char_is_lower — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_lower", _), charExpr, _) ->
-        let (charVal, charOps) = elaborateExpr env charExpr
-        let (rawChar, untagOps) = emitUntag env charVal
-        let rawResult  = { Name = freshName env; Type = I64 }
-        let zeroVal    = { Name = freshName env; Type = I64 }
-        let boolResult = { Name = freshName env; Type = I1 }
-        let ops = [
-            LlvmCallOp(rawResult, "@lang_char_is_lower", [rawChar])
-            ArithConstantOp(zeroVal, 0L)
-            ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
-        ]
-        (boolResult, charOps @ untagOps @ ops)
+        emitCharPredicate env "@lang_char_is_lower" charExpr elaborateExpr
 
     // Phase 31: char_to_upper — pass-through (returns i64 char code)
     | App (Var ("char_to_upper", _), charExpr, _) ->
@@ -3429,12 +3285,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (condVal, condOps)    = elaborateExpr env condExpr
         let condSideBlocks = env.Blocks.Value.Length - blocksBeforeCond
         // Phase 36 FIX-03: Coerce condVal to I1 if it is I64 (e.g. module Bool function).
-        let (i1CondVal, coerceCondOps) =
-            if condVal.Type = I64 then
-                let zeroVal = { Name = freshName env; Type = I64 }
-                let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", condVal, zeroVal)])
-            else (condVal, [])
+        let (i1CondVal, coerceCondOps) = coerceToI1 env condVal
         let condBrOp = CfCondBrOp(i1CondVal, bodyLabel, [], exitLabel, [unitConst])
         // Track how many side blocks exist before elaborating body (for detecting inner blocks)
         let blocksBeforeBody = env.Blocks.Value.Length
@@ -3446,12 +3297,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (condVal2, condOps2)  = elaborateExpr env condExpr
         let backCondSideBlocks = env.Blocks.Value.Length - blocksBeforeBackCond
         // Phase 36 FIX-03: Coerce condVal2 to I1 if it is I64 (same pattern as header cond).
-        let (i1CondVal2, coerceCondOps2) =
-            if condVal2.Type = I64 then
-                let zeroVal = { Name = freshName env; Type = I64 }
-                let boolVal = { Name = freshName env; Type = I1  }
-                (boolVal, [ArithConstantOp(zeroVal, 1L); ArithCmpIOp(boolVal, "ne", condVal2, zeroVal)])
-            else (condVal2, [])
+        let (i1CondVal2, coerceCondOps2) = coerceToI1 env condVal2
         let backEdgeBrOp = CfCondBrOp(i1CondVal2, bodyLabel, [], exitLabel, [unitConst])
         // Determine where to place the back-edge branch op.
         // If bodyOps ends with a block terminator (from a nested while/if/match inside the body),
@@ -3621,23 +3467,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Elaborate collection
         let (collVal, collOps) = elaborateExpr env collExpr
         // Coerce closure to Ptr if needed (same pattern as array_iter)
-        let closurePtrVal =
-            if closureVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else closureVal
-        let closureCoerceOps =
-            if closureVal.Type = I64
-            then [LlvmIntToPtrOp(closurePtrVal, closureVal)]
-            else []
+        let (closurePtrVal, closureCoerceOps) = coerceToPtrArg env closureVal
         // Coerce collection to Ptr if needed (list pointer may arrive as I64)
-        let collPtrVal =
-            if collVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else collVal
-        let collCoerceOps =
-            if collVal.Type = I64
-            then [LlvmIntToPtrOp(collPtrVal, collVal)]
-            else []
+        let (collPtrVal, collCoerceOps) = coerceToPtrArg env collVal
         // Select runtime function based on collection type (Phase 34-03: collection dispatch)
         let forInFn =
             match detectCollectionKind env.CollectionVars env.AnnotationMap collExpr with
@@ -3687,23 +3519,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (closureVal, closureOps) = elaborateExpr env closureLambda
         let (collVal, collOps) = elaborateExpr env collExpr
         // Coerce closure to Ptr if needed (same pattern as ForInExpr)
-        let closurePtrVal =
-            if closureVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else closureVal
-        let closureCoerceOps =
-            if closureVal.Type = I64
-            then [LlvmIntToPtrOp(closurePtrVal, closureVal)]
-            else []
+        let (closurePtrVal, closureCoerceOps) = coerceToPtrArg env closureVal
         // Coerce collection to Ptr if needed (list pointer may arrive as I64)
-        let collPtrVal =
-            if collVal.Type = I64
-            then { Name = freshName env; Type = Ptr }
-            else collVal
-        let collCoerceOps =
-            if collVal.Type = I64
-            then [LlvmIntToPtrOp(collPtrVal, collVal)]
-            else []
+        let (collPtrVal, collCoerceOps) = coerceToPtrArg env collVal
         let result = { Name = freshName env; Type = Ptr }
         (result, closureOps @ collOps @ closureCoerceOps @ collCoerceOps
                  @ [LlvmCallOp(result, "@lang_list_comp", [closurePtrVal; collPtrVal])])

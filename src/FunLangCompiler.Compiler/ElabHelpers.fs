@@ -175,6 +175,56 @@ let emitRetag (env: ElabEnv) (v: MlirValue) : MlirValue * MlirOp list =
     let result = { Name = freshName env; Type = I64 }
     (result, [ArithConstantOp(one, 1L); ArithShLIOp(shifted, v, one); ArithOrIOp(result, shifted, one)])
 
+/// Phase 88: Coerce I64 to I1 for cf.cond_br — compares against tagged false (1L).
+/// I1 values pass through unchanged.
+let coerceToI1 (env: ElabEnv) (v: MlirValue) : MlirValue * MlirOp list =
+    if v.Type = I1 then (v, [])
+    else
+        let taggedFalse = { Name = freshName env; Type = I64 }
+        let boolVal = { Name = freshName env; Type = I1 }
+        (boolVal, [ArithConstantOp(taggedFalse, 1L); ArithCmpIOp(boolVal, "ne", v, taggedFalse)])
+
+/// Phase 35: Coerce a value to Ptr for builtin functions that expect pointer arguments.
+/// I64 → inttoptr; Ptr → no-op.
+let coerceToPtrArg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
+    match v.Type with
+    | Ptr -> (v, [])
+    | I64 ->
+        let r = { Name = freshName env; Type = Ptr }
+        (r, [LlvmIntToPtrOp(r, v)])
+    | _ -> (v, [])
+
+/// Phase 90: Elaborate two string args → coerceToPtrArg both → emit void C call.
+/// Used by string_contains, string_endswith, string_startswith.
+let emitStrPredicate (env: ElabEnv) (cFunc: string) (strExpr: Ast.Expr) (argExpr: Ast.Expr) (elaborateExpr: ElabEnv -> Ast.Expr -> MlirValue * MlirOp list) : MlirValue * MlirOp list =
+    let (strVal, strOps) = elaborateExpr env strExpr
+    let (argVal, argOps) = elaborateExpr env argExpr
+    let (strPtr, strCoerce) = coerceToPtrArg env strVal
+    let (argPtr, argCoerce) = coerceToPtrArg env argVal
+    let rawResult  = { Name = freshName env; Type = I64 }
+    let zeroVal    = { Name = freshName env; Type = I64 }
+    let boolResult = { Name = freshName env; Type = I1 }
+    let ops = [
+        LlvmCallOp(rawResult, cFunc, [strPtr; argPtr])
+        ArithConstantOp(zeroVal, 0L)
+        ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+    ]
+    (boolResult, strOps @ argOps @ strCoerce @ argCoerce @ ops)
+
+/// Phase 90: Elaborate char arg → untag → call C predicate → compare against 0 → I1.
+/// Used by char_is_digit, char_is_letter, char_is_upper, char_is_lower.
+let emitCharPredicate (env: ElabEnv) (cFunc: string) (charExpr: Ast.Expr) (elaborateExpr: ElabEnv -> Ast.Expr -> MlirValue * MlirOp list) : MlirValue * MlirOp list =
+    let (charVal, charOps) = elaborateExpr env charExpr
+    let (rawChar, untagOps) = emitUntag env charVal
+    let rawResult  = { Name = freshName env; Type = I64 }
+    let zeroVal    = { Name = freshName env; Type = I64 }
+    let boolResult = { Name = freshName env; Type = I1 }
+    (boolResult, charOps @ untagOps @ [
+        LlvmCallOp(rawResult, cFunc, [rawChar])
+        ArithConstantOp(zeroVal, 0L)
+        ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
+    ])
+
 // Phase 8: Allocate a heap string struct {i64 length, ptr data} for a compile-time string literal.
 let elaborateStringLiteral (env: ElabEnv) (s: string) : MlirValue * MlirOp list =
     let globalName  = addStringGlobal env s
@@ -331,16 +381,6 @@ let coerceToI64 (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
         let r = { Name = freshName env; Type = I64 }
         (r, [LlvmPtrToIntOp(r, v)])
     | _ -> (v, [])  // I32 or other — pass through unchanged
-
-/// Phase 35: Coerce a value to Ptr for builtin functions that expect pointer arguments.
-/// I64 → inttoptr; Ptr → no-op.
-let coerceToPtrArg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
-    match v.Type with
-    | Ptr -> (v, [])
-    | I64 ->
-        let r = { Name = freshName env; Type = Ptr }
-        (r, [LlvmIntToPtrOp(r, v)])
-    | _ -> (v, [])
 
 /// Phase 67: Check if an MLIR op is a block terminator (branch or unreachable).
 /// Used by If/And/Or/Let/Match/App handlers to detect when continuation ops
