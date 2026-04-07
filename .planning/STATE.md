@@ -5,21 +5,21 @@
 See: .planning/PROJECT.md (updated 2026-04-02)
 
 **Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 93 — Generic Equality and Hash (in progress)
+**Current focus:** Phase 93 — Generic Equality and Hash (complete)
 
 ## Current Position
 
 Phase: 93 (Generic Equality and Hash)
-Plan: 93-02 of 93-03
-Status: In progress
-Last activity: 2026-04-07 — Completed 93-02-PLAN.md (generic hash/equality)
+Plan: 93-03 of 93-03
+Status: Phase complete
+Last activity: 2026-04-07 — Completed 93-03-PLAN.md (E2E tests + generic = operator)
 
-Progress: v1.0-v21.0 + Phase 88-93 [█████████████████████░] 69 phases / 116 plans
+Progress: v1.0-v21.0 + Phase 88-93 [█████████████████████░] 69 phases / 117 plans
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 116
+- Total plans completed: 117
 - Average duration: ~10 min/plan
 
 ## Accumulated Context
@@ -39,6 +39,7 @@ Progress: v1.0-v21.0 + Phase 88-93 [██████████████�
 | Heap tag constants 1-5, closures/arrays untagged | Only string/tuple/record/cons/ADT get tags; closures never used as hash keys | 2026-04-07 |
 | Tuple/record store field count at slot 1 | Generic hash/equality needs iteration count at runtime without type info | 2026-04-07 |
 | Generic hash/eq replaces LSB-only dispatch | lang_ht_hash/lang_ht_eq now dispatch on heap tag for all 5 types + tagged ints | 2026-04-07 |
+| = operator uses lang_generic_eq for Ptr types | Replaces strcmp-only comparison; enables structural equality for tuples, records, lists, ADTs | 2026-04-07 |
 
 ### Pending Todos
 
@@ -46,10 +47,10 @@ Progress: v1.0-v21.0 + Phase 88-93 [██████████████�
 
 ### Blockers/Concerns
 
-- None — 257/257 tests pass
+- None — 260/260 tests pass
 
 ## Session Continuity
 
 Last session: 2026-04-07
-Stopped at: Completed 93-02-PLAN.md
+Stopped at: Completed 93-03-PLAN.md (Phase 93 complete)
 Resume file: None
