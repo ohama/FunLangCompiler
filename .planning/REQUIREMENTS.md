@@ -28,10 +28,10 @@
 | HS-01 | Phase 91 | Complete |
 | HS-02 | Phase 91 | Complete |
 | HS-03 | Phase 91 | Complete |
-| CB-01 | — | Pending |
-| CB-02 | — | Pending |
-| CB-03 | — | Pending |
-| CB-04 | — | Pending |
+| CB-01 | Phase 92 | Complete |
+| CB-02 | Phase 92 | Complete |
+| CB-03 | Phase 92 | Complete |
+| CB-04 | Phase 92 | Complete |
 | GE-01 | — | Pending |
 | GE-02 | — | Pending |
 | GE-03 | — | Pending |
