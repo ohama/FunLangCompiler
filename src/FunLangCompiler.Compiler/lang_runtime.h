@@ -25,6 +25,13 @@ void *lang_current_exception(void);
 __attribute__((returns_twice))
 int lang_try_enter(LangExnFrame *frame);
 
+/* Phase 93: Heap type tags — slot 0 of tagged heap blocks for runtime type discrimination */
+#define LANG_HEAP_TAG_STRING  1
+#define LANG_HEAP_TAG_TUPLE   2
+#define LANG_HEAP_TAG_RECORD  3
+#define LANG_HEAP_TAG_LIST    4
+#define LANG_HEAP_TAG_ADT     5
+
 typedef struct LangCons LangCons;
 int64_t* lang_array_create(int64_t n, int64_t default_val);
 void lang_array_bounds_check(int64_t* arr, int64_t i);
@@ -54,7 +61,8 @@ int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key);
 int64_t lang_index_get(void* collection, int64_t index);
 void lang_index_set(void* collection, int64_t index, int64_t value);
 
-/* Forward declaration for LangString (defined in lang_runtime.c) */
+/* Forward declaration for LangString (defined in lang_runtime.c)
+ * Phase 93 layout: {heap_tag, length, data} — heap_tag at slot 0 */
 struct LangString_s;
 typedef struct LangString_s LangString;
 

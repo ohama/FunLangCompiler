@@ -15,8 +15,9 @@
 #define LANG_TAG_INT(n)    (((int64_t)(n) << 1) | 1)
 #define LANG_UNTAG_INT(v)  ((int64_t)(v) >> 1)
 
-/* String struct layout matches MLIR {i64 length, ptr data} at offsets 0 and 8 */
+/* Phase 93: String struct layout — {heap_tag, length, data} at offsets 0, 8, 16 */
 typedef struct LangString_s {
+    int64_t heap_tag;
     int64_t length;
     char*   data;
 } LangString;
@@ -28,6 +29,7 @@ LangString* lang_string_concat(LangString* a, LangString* b) {
     memcpy(buf + a->length, b->data, (size_t)b->length);
     buf[total] = '\0';
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = total;
     s->data = buf;
     return s;
@@ -40,6 +42,7 @@ LangString* lang_to_string_int(int64_t n) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     memcpy(buf, tmp, (size_t)(len + 1));
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = (int64_t)len;
     s->data = buf;
     return s;
@@ -52,6 +55,7 @@ LangString* lang_to_string_bool(int64_t b) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     memcpy(buf, str, (size_t)(len + 1));
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = len;
     s->data = buf;
     return s;
@@ -77,6 +81,7 @@ static LangString* string_sub_raw(LangString* s, int64_t start, int64_t len) {
     memcpy(buf, s->data + start, (size_t)len);
     buf[len] = '\0';
     LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->heap_tag = LANG_HEAP_TAG_STRING;
     r->length = len;
     r->data = buf;
     return r;
@@ -138,6 +143,7 @@ LangString* lang_string_trim(LangString* s) {
     memcpy(buf, s->data + start, (size_t)len);
     buf[len] = '\0';
     LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->heap_tag = LANG_HEAP_TAG_STRING;
     r->length = len;
     r->data = buf;
     return r;
@@ -156,6 +162,7 @@ int64_t lang_string_indexof(LangString* s, LangString* sub) {
 LangString* lang_string_replace(LangString* s, LangString* old, LangString* rep) {
     if (old->length == 0) {
         LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+        r->heap_tag = LANG_HEAP_TAG_STRING;
         char* buf = (char*)GC_malloc((size_t)(s->length + 1));
         memcpy(buf, s->data, (size_t)s->length);
         buf[s->length] = '\0';
@@ -184,6 +191,7 @@ LangString* lang_string_replace(LangString* s, LangString* old, LangString* rep)
     }
     *dst = '\0';
     LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->heap_tag = LANG_HEAP_TAG_STRING;
     r->length = new_len;
     r->data = buf;
     return r;
@@ -197,6 +205,7 @@ LangString* lang_string_toupper(LangString* s) {
     }
     buf[s->length] = '\0';
     LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->heap_tag = LANG_HEAP_TAG_STRING;
     r->length = s->length;
     r->data = buf;
     return r;
@@ -210,6 +219,7 @@ LangString* lang_string_tolower(LangString* s) {
     }
     buf[s->length] = '\0';
     LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->heap_tag = LANG_HEAP_TAG_STRING;
     r->length = s->length;
     r->data = buf;
     return r;
@@ -244,9 +254,9 @@ int64_t lang_char_to_lower(int64_t c) {
     return LANG_TAG_INT((int64_t)tolower((int)c));
 }
 
-/* Cons cell layout: {int64_t head @ offset 0, ConsCell* tail @ offset 8} — 16 bytes total */
-/* Matches Phase 10 GC_malloc(16) cons cell layout exactly. */
+/* Phase 93: Cons cell layout: {heap_tag, head, tail} — 24 bytes total */
 typedef struct LangCons {
+    int64_t         heap_tag;
     int64_t         head;
     struct LangCons* tail;
 } LangCons;
@@ -279,6 +289,7 @@ LangString* lang_string_concat_list(LangString* sep, LangCons* list) {
     }
     buf[total] = '\0';
     LangString* r = (LangString*)GC_malloc(sizeof(LangString));
+    r->heap_tag = LANG_HEAP_TAG_STRING;
     r->length = total;
     r->data = buf;
     return r;
@@ -293,6 +304,7 @@ LangCons* lang_string_split(LangString* s, LangString* sep) {
     int64_t sep_len = sep->length;
     if (sep_len == 0) {
         LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
         cell->head = (int64_t)s;
         cell->tail = NULL;
         return cell;
@@ -315,12 +327,14 @@ LangCons* lang_string_split(LangString* s, LangString* sep) {
             chunk_len = src_len - pos;
         }
         LangString* part = (LangString*)GC_malloc(sizeof(LangString));
+        part->heap_tag = LANG_HEAP_TAG_STRING;
         char* buf = (char*)GC_malloc((size_t)(chunk_len + 1));
         memcpy(buf, src + pos, (size_t)chunk_len);
         buf[chunk_len] = '\0';
         part->length = chunk_len;
         part->data = buf;
         LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
         cell->head = (int64_t)part;
         cell->tail = NULL;
         *cursor = cell;
@@ -346,6 +360,7 @@ LangCons* lang_range(int64_t start, int64_t stop, int64_t step) {
     if (step > 0) {
         for (int64_t i = start; i <= stop; i += step) {
             LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+            cell->heap_tag = LANG_HEAP_TAG_LIST;
             cell->head = i;
             cell->tail = NULL;
             *cursor = cell;
@@ -354,6 +369,7 @@ LangCons* lang_range(int64_t start, int64_t stop, int64_t step) {
     } else {
         for (int64_t i = start; i >= stop; i += step) {
             LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+            cell->heap_tag = LANG_HEAP_TAG_LIST;
             cell->head = i;
             cell->tail = NULL;
             *cursor = cell;
@@ -428,6 +444,7 @@ void lang_array_bounds_check(int64_t* arr, int64_t i) {
         char* buf = (char*)GC_malloc((size_t)(msglen + 1));
         memcpy(buf, tmp, (size_t)(msglen + 1));
         LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->heap_tag = LANG_HEAP_TAG_STRING;
         msg->length = (int64_t)msglen;
         msg->data = buf;
         lang_throw((void*)msg);
@@ -471,6 +488,7 @@ LangCons* lang_array_to_list(int64_t* arr) {
     LangCons* head = NULL;
     for (int64_t i = n; i >= 1; i--) {
         LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
         cell->head = arr[i];
         cell->tail = head;
         head = cell;
@@ -530,14 +548,16 @@ static LangHashEntry* lang_ht_find(LangHashtable* ht, int64_t key) {
 }
 
 int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key) {
-    int64_t* tup = (int64_t*)GC_malloc(16);  /* 2 slots x 8 bytes */
+    int64_t* tup = (int64_t*)GC_malloc(32);  /* Phase 93: 4 slots x 8 = tag + count + 2 fields */
+    tup[0] = LANG_HEAP_TAG_TUPLE;
+    tup[1] = 2;  /* field count */
     LangHashEntry* e = lang_ht_find(ht, key);
     if (e != NULL) {
-        tup[0] = LANG_TAG_INT(1);  /* tagged true = 3 */
-        tup[1] = e->val;           /* already tagged */
+        tup[2] = LANG_TAG_INT(1);  /* tagged true = 3 */
+        tup[3] = e->val;           /* already tagged */
     } else {
-        tup[0] = LANG_TAG_INT(0);  /* tagged false = 1 */
-        tup[1] = LANG_TAG_INT(0);  /* tagged zero = 1 */
+        tup[2] = LANG_TAG_INT(0);  /* tagged false = 1 */
+        tup[3] = LANG_TAG_INT(0);  /* tagged zero = 1 */
     }
     return tup;
 }
@@ -563,6 +583,7 @@ int64_t lang_hashtable_get(LangHashtable* ht, int64_t key) {
     char* buf = (char*)GC_malloc((size_t)(msg_len + 1));
     memcpy(buf, msg_str, (size_t)(msg_len + 1));
     LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+    msg->heap_tag = LANG_HEAP_TAG_STRING;
     msg->length = msg_len;
     msg->data = buf;
     lang_throw((void*)msg);
@@ -641,6 +662,7 @@ LangCons* lang_hashtable_keys(LangHashtable* ht) {
         LangHashEntry* e = ht->buckets[i];
         while (e != NULL) {
             LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+            cell->heap_tag = LANG_HEAP_TAG_LIST;
             cell->head = e->key;
             cell->tail = result;
             result = cell;
@@ -768,9 +790,11 @@ void lang_for_in_hashtable(void* closure, LangHashtable* ht) {
     for (int64_t i = 0; i < ht->capacity; i++) {
         LangHashEntry* e = ht->buckets[i];
         while (e != NULL) {
-            int64_t* tup = (int64_t*)GC_malloc(2 * sizeof(int64_t));
-            tup[0] = e->key;  /* Phase 90: key already tagged (int) or pointer — pass as-is */
-            tup[1] = e->val;               /* val already tagged */
+            int64_t* tup = (int64_t*)GC_malloc(4 * sizeof(int64_t));  /* Phase 93: tag + count + 2 fields */
+            tup[0] = LANG_HEAP_TAG_TUPLE;
+            tup[1] = 2;  /* field count */
+            tup[2] = e->key;  /* Phase 90: key already tagged (int) or pointer — pass as-is */
+            tup[3] = e->val;               /* val already tagged */
             fn(closure, (int64_t)(uintptr_t)tup);
             e = e->next;
         }
@@ -787,6 +811,7 @@ LangCons* lang_list_comp(void* closure, void* collection) {
     while (cur != NULL) {
         int64_t val = fn(closure, cur->head);
         LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
         cell->head = val;
         cell->tail = result;
         result = cell;
@@ -875,6 +900,7 @@ LangCons* lang_list_sort_by(void* closure, LangCons* list) {
     LangCons* head = NULL;
     for (int64_t i = n - 1; i >= 0; i--) {
         LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
         cell->head = elems[i];
         cell->tail = head;
         head = cell;
@@ -936,6 +962,7 @@ LangString* lang_sb_tostring(LangStringBuilder* sb) {
     memcpy(data, sb->buf, (size_t)sb->len);
     data[sb->len] = '\0';
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = sb->len;
     s->data = data;
     return s;
@@ -1069,6 +1096,7 @@ LangString* lang_file_read(LangString* path) {
         memcpy(buf + prefix_len, path->data, (size_t)path->length);
         buf[total_len] = '\0';
         LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->heap_tag = LANG_HEAP_TAG_STRING;
         msg->length = total_len;
         msg->data = buf;
         lang_throw((void*)msg);
@@ -1082,6 +1110,7 @@ LangString* lang_file_read(LangString* path) {
     fclose(f);
     content[size] = '\0';
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = (int64_t)size;
     s->data = content;
     return s;
@@ -1131,6 +1160,7 @@ LangCons* lang_read_lines(LangString* path) {
         memcpy(buf + prefix_len, path->data, (size_t)path->length);
         buf[total_len] = '\0';
         LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->heap_tag = LANG_HEAP_TAG_STRING;
         msg->length = total_len;
         msg->data = buf;
         lang_throw((void*)msg);
@@ -1148,9 +1178,11 @@ LangCons* lang_read_lines(LangString* path) {
         char* data = (char*)GC_malloc((size_t)(len + 1));
         memcpy(data, line_buf, (size_t)(len + 1));
         LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+        s->heap_tag = LANG_HEAP_TAG_STRING;
         s->length = len;
         s->data = data;
         LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
         cell->head = (int64_t)(uintptr_t)s;
         cell->tail = NULL;
         *cursor = cell;
@@ -1189,6 +1221,7 @@ LangString* lang_stdin_read_line(void) {
     }
     buf[len] = '\0';
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = len;
     s->data = buf;
     return s;
@@ -1210,6 +1243,7 @@ LangString* lang_stdin_read_all(void) {
     }
     buf[len] = '\0';
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = len;
     s->data = buf;
     return s;
@@ -1228,6 +1262,7 @@ LangString* lang_get_env(LangString* varName) {
         memcpy(buf + prefix_len, varName->data, (size_t)varName->length);
         memcpy(buf + prefix_len + varName->length, msg_suffix, (size_t)(suffix_len + 1));
         LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->heap_tag = LANG_HEAP_TAG_STRING;
         msg->length = total_len;
         msg->data = buf;
         lang_throw((void*)msg);
@@ -1237,6 +1272,7 @@ LangString* lang_get_env(LangString* varName) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     memcpy(buf, val, (size_t)(len + 1));
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = len;
     s->data = buf;
     return s;
@@ -1250,6 +1286,7 @@ LangString* lang_get_cwd(void) {
         char* buf = (char*)GC_malloc((size_t)(msg_len + 1));
         memcpy(buf, msg_str, (size_t)(msg_len + 1));
         LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->heap_tag = LANG_HEAP_TAG_STRING;
         msg->length = msg_len;
         msg->data = buf;
         lang_throw((void*)msg);
@@ -1259,6 +1296,7 @@ LangString* lang_get_cwd(void) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     memcpy(buf, tmp, (size_t)(len + 1));
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = len;
     s->data = buf;
     return s;
@@ -1273,6 +1311,7 @@ LangString* lang_path_combine(LangString* dir, LangString* file) {
     memcpy(buf + dir->length + add_sep, file->data, (size_t)file->length);
     buf[total_len] = '\0';
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = total_len;
     s->data = buf;
     return s;
@@ -1289,6 +1328,7 @@ LangCons* lang_dir_files(LangString* path) {
         memcpy(buf + prefix_len, path->data, (size_t)path->length);
         buf[total_len] = '\0';
         LangString* msg = (LangString*)GC_malloc(sizeof(LangString));
+        msg->heap_tag = LANG_HEAP_TAG_STRING;
         msg->length = total_len;
         msg->data = buf;
         lang_throw((void*)msg);
@@ -1312,9 +1352,11 @@ LangCons* lang_dir_files(LangString* path) {
         if (add_sep) full[path->length] = '/';
         memcpy(full + path->length + add_sep, entry->d_name, (size_t)(name_len + 1));
         LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+        s->heap_tag = LANG_HEAP_TAG_STRING;
         s->length = full_len;
         s->data = full;
         LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
         cell->head = (int64_t)(uintptr_t)s;
         cell->tail = NULL;
         *cursor = cell;
@@ -1333,6 +1375,7 @@ LangString* lang_sprintf_1i(char* fmt, int64_t a) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     snprintf(buf, (size_t)(len + 1), fmt, (long)a);
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = (int64_t)len;
     s->data = buf;
     return s;
@@ -1344,6 +1387,7 @@ LangString* lang_sprintf_1s(char* fmt, char* a) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     snprintf(buf, (size_t)(len + 1), fmt, a);
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = (int64_t)len;
     s->data = buf;
     return s;
@@ -1357,6 +1401,7 @@ LangString* lang_sprintf_2ii(char* fmt, int64_t a, int64_t b) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     snprintf(buf, (size_t)(len + 1), fmt, (long)a, (long)b);
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = (int64_t)len;
     s->data = buf;
     return s;
@@ -1369,6 +1414,7 @@ LangString* lang_sprintf_2si(char* fmt, char* a, int64_t b) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     snprintf(buf, (size_t)(len + 1), fmt, a, (long)b);
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = (int64_t)len;
     s->data = buf;
     return s;
@@ -1381,6 +1427,7 @@ LangString* lang_sprintf_2is(char* fmt, int64_t a, char* b) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     snprintf(buf, (size_t)(len + 1), fmt, (long)a, b);
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = (int64_t)len;
     s->data = buf;
     return s;
@@ -1392,6 +1439,7 @@ LangString* lang_sprintf_2ss(char* fmt, char* a, char* b) {
     char* buf = (char*)GC_malloc((size_t)(len + 1));
     snprintf(buf, (size_t)(len + 1), fmt, a, b);
     LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+    s->heap_tag = LANG_HEAP_TAG_STRING;
     s->length = (int64_t)len;
     s->data = buf;
     return s;
@@ -1414,9 +1462,11 @@ LangCons* lang_get_args(void) {
         char* buf = (char*)GC_malloc((size_t)(len + 1));
         memcpy(buf, s_argv[i], (size_t)(len + 1));
         LangString* s = (LangString*)GC_malloc(sizeof(LangString));
+        s->heap_tag = LANG_HEAP_TAG_STRING;
         s->length = len;
         s->data = buf;
         LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
         cell->head = (int64_t)(uintptr_t)s;
         cell->tail = NULL;
         *cursor = cell;
