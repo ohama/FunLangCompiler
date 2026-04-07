@@ -104,6 +104,11 @@ int64_t lang_string_char_at(LangString* s, int64_t index) {
     return LANG_TAG_INT((int64_t)(unsigned char)s->data[index]);
 }
 
+/* Phase 92: Return tagged string length for compiler — replaces inline GEP+load+retag */
+int64_t lang_string_length(LangString* s) {
+    return LANG_TAG_INT(s->length);
+}
+
 int64_t lang_string_contains(LangString* s, LangString* sub) {
     if (sub->length == 0) return 1;
     return strstr(s->data, sub->data) != NULL ? 1 : 0;
@@ -403,6 +408,7 @@ int lang_try_enter(LangExnFrame *frame) {
  * One-block layout: GC_malloc((n+1)*8) where arr[0]=n (length), arr[1..n]=elements. */
 
 int64_t* lang_array_create(int64_t n, int64_t default_val) {
+    n = LANG_UNTAG_INT(n);
     if (n < 0) {
         lang_failwith("array_create: negative length");
     }
@@ -426,6 +432,11 @@ void lang_array_bounds_check(int64_t* arr, int64_t i) {
         msg->data = buf;
         lang_throw((void*)msg);
     }
+}
+
+/* Phase 92: Return tagged array length — replaces inline GEP+load+retag */
+int64_t lang_array_length(int64_t* arr) {
+    return LANG_TAG_INT(arr[0]);
 }
 
 int64_t* lang_array_of_list(LangCons* list) {
@@ -604,6 +615,11 @@ void lang_hashtable_remove(LangHashtable* ht, int64_t key) {
         prev = e;
         e = e->next;
     }
+}
+
+/* Phase 92: Return tagged hashtable size — replaces inline GEP+load+retag */
+int64_t lang_hashtable_count(LangHashtable* ht) {
+    return LANG_TAG_INT(ht->size);
 }
 
 LangCons* lang_hashtable_keys(LangHashtable* ht) {
@@ -799,6 +815,7 @@ int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr) {
 }
 
 int64_t* lang_array_init(int64_t n, void* closure) {
+    n = LANG_UNTAG_INT(n);
     if (n < 0) {
         lang_failwith("array_init: negative length");
     }

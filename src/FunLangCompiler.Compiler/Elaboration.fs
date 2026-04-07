@@ -1042,19 +1042,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             // Phase 92: C function now untags internally
             (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
 
-    // Phase 8: string_length builtin — GEP field 0 and load
+    // Phase 92: string_length — C wrapper returns tagged length
     | App (Var ("string_length", _), strExpr, _) ->
         let (strVal, strOps) = elaborateExpr env strExpr
         let (strPtr, strCoerce) = coerceToPtrArg env strVal
-        let lenPtrVal = { Name = freshName env; Type = Ptr }
-        let lenVal    = { Name = freshName env; Type = I64 }
-        let ops = [
-            LlvmGEPStructOp(lenPtrVal, strPtr, 0)
-            LlvmLoadOp(lenVal, lenPtrVal)
-        ]
-        // Phase 88: Retag loaded length (raw C value → tagged)
-        let (taggedLen, retagOps) = emitRetag env lenVal
-        (taggedLen, strOps @ strCoerce @ ops @ retagOps)
+        let result = { Name = freshName env; Type = I64 }
+        (result, strOps @ strCoerce @ [LlvmCallOp(result, "@lang_string_length", [strPtr])])
 
     // Phase 14: failwith builtin — extract char* from LangString, call lang_failwith (noreturn)
     | App (Var ("failwith", _), msgExpr, _) ->
@@ -1123,33 +1116,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         ]
         (result, arrOps @ arrCoerceOps @ idxOps @ untagIdxOps @ ops)
 
-    // Phase 22: array_create — two-arg
-    // array_create n defVal: call lang_array_create(n, defVal)
+    // Phase 92: array_create — C function untags count internally
     | App (App (Var ("array_create", _), nExpr, _), defExpr, _) ->
         let (nVal,   nOps)   = elaborateExpr env nExpr
         let (defVal, defOps) = elaborateExpr env defExpr
-        // Ensure both args are I64 (defVal may be I1 from bool literals)
         let (nV, nCoerce)     = coerceToI64 env nVal
         let (defV, defCoerce) = coerceToI64 env defVal
         let result = { Name = freshName env; Type = Ptr }
-        // Phase 88: Untag count before passing to C (value stays tagged)
-        let (rawN, untagNOps) = emitUntag env nV
-        (result, nOps @ defOps @ nCoerce @ defCoerce @ untagNOps @ [LlvmCallOp(result, "@lang_array_create", [rawN; defV])])
+        (result, nOps @ defOps @ nCoerce @ defCoerce @ [LlvmCallOp(result, "@lang_array_create", [nV; defV])])
 
-    // Phase 22: array_length — one-arg
-    // array_length arr: GEP slot 0 (length slot), load
+    // Phase 92: array_length — C wrapper returns tagged length
     | App (Var ("array_length", _), arrExpr, _) ->
         let (arrVal, arrOps) = elaborateExpr env arrExpr
         let (arrPtrVal, arrCoerceOps) = coerceToPtrArg env arrVal
-        let lenPtr = { Name = freshName env; Type = Ptr }
-        let rawLen = { Name = freshName env; Type = I64 }
-        let ops = [
-            LlvmGEPLinearOp(lenPtr, arrPtrVal, 0)
-            LlvmLoadOp(rawLen, lenPtr)
-        ]
-        // Phase 88: Retag loaded length (raw C value → tagged)
-        let (result, retagOps) = emitRetag env rawLen
-        (result, arrOps @ arrCoerceOps @ ops @ retagOps)
+        let result = { Name = freshName env; Type = I64 }
+        (result, arrOps @ arrCoerceOps @ [LlvmCallOp(result, "@lang_array_length", [arrPtrVal])])
 
     // Phase 22: array_of_list — one-arg
     | App (Var ("array_of_list", _), lstExpr, _) ->
@@ -1285,20 +1266,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue", [htPtr; keyI64])])
 
-    // hashtable_count — one-arg, inline GEP+load at field index 2 (size field of LangHashtable struct)
-    // No C call needed: LangHashtable.size is at field index 2
+    // Phase 92: hashtable_count — C wrapper returns tagged count
     | App (Var ("hashtable_count", _), htExpr, _) ->
         let (htVal, htOps) = elaborateExpr env htExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let sizePtr = { Name = freshName env; Type = Ptr }
-        let rawSize = { Name = freshName env; Type = I64 }
-        let ops = [
-            LlvmGEPLinearOp(sizePtr, htPtr, 2)   // field index 2 = size
-            LlvmLoadOp(rawSize, sizePtr)
-        ]
-        // Phase 88: Retag loaded size (raw C value → tagged)
-        let (result, retagOps) = emitRetag env rawSize
-        (result, htOps @ htCoerce @ ops @ retagOps)
+        let result = { Name = freshName env; Type = I64 }
+        (result, htOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_count", [htPtr])])
 
     // Phase 24: array HOF builtins
     // array_fold — three-arg (must appear before two-arg patterns)
@@ -1333,17 +1306,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, fOps @ closureOps @ arrOps @ arrCoerceOps @ [LlvmCallOp(result, "@lang_array_map", [closurePtrVal; arrPtrVal])])
 
-    // array_init — two-arg
-    // array_init n closure: coerce n to I64, coerce closure to Ptr, call lang_array_init → Ptr
+    // Phase 92: array_init — C function untags count internally
     | App (App (Var ("array_init", _), nExpr, _), closureExpr, _) ->
         let (nVal,   nOps)   = elaborateExpr env nExpr
         let (fVal,   fOps)   = elaborateExpr env closureExpr
         let (nV, nCoerce) = coerceToI64 env nVal
-        // Phase 88: Untag count before passing to C
-        let (rawN, untagNOps) = emitUntag env nV
         let (closurePtrVal, closureOps) = coerceToPtrArg env fVal
         let result = { Name = freshName env; Type = Ptr }
-        (result, nOps @ nCoerce @ untagNOps @ fOps @ closureOps @ [LlvmCallOp(result, "@lang_array_init", [rawN; closurePtrVal])])
+        (result, nOps @ nCoerce @ fOps @ closureOps @ [LlvmCallOp(result, "@lang_array_init", [nV; closurePtrVal])])
 
     // list_sort_by — two-arg curried with closure coercion (mirrors array_map pattern)
     | App (App (Var ("list_sort_by", _), closureExpr, _), listExpr, _) ->

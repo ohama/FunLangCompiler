@@ -159,6 +159,10 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 66: String character access — s.[i] returns byte at index as i64
         { ExtName = "@lang_string_char_at"; ExtParams = [Ptr; I64]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        // Phase 92: C wrappers for length/count/array access
+        { ExtName = "@lang_string_length";    ExtParams = [Ptr];            ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_length";     ExtParams = [Ptr];            ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_count";  ExtParams = [Ptr];            ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         // Phase 34-02: LANG-02 List comprehension
         { ExtName = "@lang_list_comp"; ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 34-03: LANG-03/04 for-in over Phase 33 collection types
@@ -583,6 +587,10 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 66: String character access — s.[i] returns byte at index as i64
         { ExtName = "@lang_string_char_at"; ExtParams = [Ptr; I64]; ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        // Phase 92: C wrappers for length/count/array access
+        { ExtName = "@lang_string_length";    ExtParams = [Ptr];            ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_array_length";     ExtParams = [Ptr];            ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashtable_count";  ExtParams = [Ptr];            ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         // Phase 34-02: LANG-02 List comprehension
         { ExtName = "@lang_list_comp"; ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 34-03: LANG-03/04 for-in over Phase 33 collection types
