@@ -1231,51 +1231,25 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // coerceToI64: converts a MlirValue to I64 if it isn't already (Ptr→I64, I1→I64)
     // Returns (coerced value, coercion ops list)
 
-    // hashtable_set — three-arg (must appear before two-arg and one-arg patterns)
-    // hashtable_set ht key val: dispatch to _str variant when key is Ptr; else coerce key+val to i64, call lang_hashtable_set (void), return unit
+    // Phase 90: Unified hashtable_set — three-arg, keys passed as-is (tagged int or PtrToInt string)
     | App (App (App (Var ("hashtable_set", _), htExpr, _), keyExpr, _), valExpr, _) ->
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (valI64, valCoerce) =
-            match valVal.Type with
-            | I64 -> (valVal, [])
-            | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
-            | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, valVal)])
-            | _   -> (valVal, [])
-        match keyVal.Type with
-        | Ptr ->
-            let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set_str" [htPtr; keyVal; valI64]
-            (unitVal, htOps @ keyOps @ valOps @ htCoerce @ valCoerce @ callOps)
-        | _ ->
-            // Phase 88: Untag int key before passing to C
-            let (keyI64, keyCoerce) =
-                match keyVal.Type with
-                | I64 -> emitUntag env keyVal
-                | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
-                | _   -> (keyVal, [])
-            let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set" [htPtr; keyI64; valI64]
-            (unitVal, htOps @ keyOps @ valOps @ htCoerce @ keyCoerce @ valCoerce @ callOps)
+        let (keyI64, keyCoerce) = coerceToI64 env keyVal
+        let (valI64, valCoerce) = coerceToI64 env valVal
+        let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set" [htPtr; keyI64; valI64]
+        (unitVal, htOps @ keyOps @ valOps @ htCoerce @ keyCoerce @ valCoerce @ callOps)
 
-    // hashtable_get — two-arg
-    // hashtable_get ht key: dispatch to _str variant when key is Ptr; else coerce key to i64, call lang_hashtable_get → i64
+    // Phase 90: Unified hashtable_get — two-arg, key passed as-is
     | App (App (Var ("hashtable_get", _), htExpr, _), keyExpr, _) ->
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let (keyI64, keyCoerce) = coerceToI64 env keyVal
         let result = { Name = freshName env; Type = I64 }
-        match keyVal.Type with
-        | Ptr ->
-            (result, htOps @ keyOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_get_str", [htPtr; keyVal])])
-        | _ ->
-            // Phase 88: Untag int key before passing to C
-            let (keyI64, keyCoerce) =
-                match keyVal.Type with
-                | I64 -> emitUntag env keyVal
-                | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
-                | _   -> (keyVal, [])
-            (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_get", [htPtr; keyI64])])
+        (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_get", [htPtr; keyI64])])
 
     // Phase 28: IndexGet — arr.[i] or ht.[key] via runtime dispatch
     // Phase 37: dispatch to _str variant when index is Ptr (string key)
@@ -1335,163 +1309,52 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let (unitVal, callOps) = emitVoidCall env "@lang_index_set" [collPtr; idxV; valV]
             (unitVal, collOps @ collCoerce @ idxOps @ valOps @ idxCoerce @ valCoerce @ callOps)
 
-    // hashtable_containsKey — two-arg
-    // hashtable_containsKey ht key: dispatch to _str variant when key is Ptr; else call lang_hashtable_containsKey → i64 (0 or 1), compare ne 0 → I1
+    // Phase 90: Unified hashtable_containsKey — two-arg, key passed as-is
     | App (App (Var ("hashtable_containsKey", _), htExpr, _), keyExpr, _) ->
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let (keyI64, keyCoerce) = coerceToI64 env keyVal
         let rawVal  = { Name = freshName env; Type = I64 }
         let zeroVal = { Name = freshName env; Type = I64 }
         let boolVal = { Name = freshName env; Type = I1  }
-        match keyVal.Type with
-        | Ptr ->
-            let ops = htCoerce @ [
-                LlvmCallOp(rawVal, "@lang_hashtable_containsKey_str", [htPtr; keyVal])
-                ArithConstantOp(zeroVal, 0L)
-                ArithCmpIOp(boolVal, "ne", rawVal, zeroVal)
-            ]
-            (boolVal, htOps @ keyOps @ ops)
-        | _ ->
-            // Phase 88: Untag int key before passing to C
-            let (keyI64, keyCoerce) =
-                match keyVal.Type with
-                | I64 -> emitUntag env keyVal
-                | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
-                | _   -> (keyVal, [])
-            let ops = htCoerce @ keyCoerce @ [
-                LlvmCallOp(rawVal, "@lang_hashtable_containsKey", [htPtr; keyI64])
-                ArithConstantOp(zeroVal, 0L)
-                ArithCmpIOp(boolVal, "ne", rawVal, zeroVal)
-            ]
-            (boolVal, htOps @ keyOps @ ops)
+        let ops = htCoerce @ keyCoerce @ [
+            LlvmCallOp(rawVal, "@lang_hashtable_containsKey", [htPtr; keyI64])
+            ArithConstantOp(zeroVal, 0L)
+            ArithCmpIOp(boolVal, "ne", rawVal, zeroVal)
+        ]
+        (boolVal, htOps @ keyOps @ ops)
 
-    // hashtable_remove — two-arg
-    // hashtable_remove ht key: dispatch to _str variant when key is Ptr; else coerce key to i64, call lang_hashtable_remove (void), return unit
+    // Phase 90: Unified hashtable_remove — two-arg, key passed as-is
     | App (App (Var ("hashtable_remove", _), htExpr, _), keyExpr, _) ->
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        match keyVal.Type with
-        | Ptr ->
-            let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove_str" [htPtr; keyVal]
-            (unitVal, htOps @ keyOps @ htCoerce @ callOps)
-        | _ ->
-            // Phase 88: Untag int key before passing to C
-            let (keyI64, keyCoerce) =
-                match keyVal.Type with
-                | I64 -> emitUntag env keyVal
-                | I1  -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, keyVal)])
-                | _   -> (keyVal, [])
-            let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove" [htPtr; keyI64]
-            (unitVal, htOps @ keyOps @ htCoerce @ keyCoerce @ callOps)
+        let (keyI64, keyCoerce) = coerceToI64 env keyVal
+        let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove" [htPtr; keyI64]
+        (unitVal, htOps @ keyOps @ htCoerce @ keyCoerce @ callOps)
 
-    // hashtable_keys — one-arg, dispatch via type inference on ht argument
-    // hashtable_keys ht: if ht : THashtable(TString, _) → lang_hashtable_keys_str, else lang_hashtable_keys
-    | App (Var ("hashtable_keys_str", _), htExpr, _) ->
-        let (htVal, htOps) = elaborateExpr env htExpr
-        let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let result = { Name = freshName env; Type = Ptr }
-        (result, htOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_keys_str", [htPtr])])
-
+    // Phase 90: Unified hashtable_keys — one-arg, single C function
     | App (Var ("hashtable_keys", _), htExpr, _) ->
         let (htVal, htOps) = elaborateExpr env htExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
         let result = { Name = freshName env; Type = Ptr }
-        let isStrKey =
-            match inferredType env.AnnotationMap htExpr with
-            | Some (Type.THashtable(Type.TString, _)) -> true
-            | _ -> false
-        let cFunc = if isStrKey then "@lang_hashtable_keys_str" else "@lang_hashtable_keys"
-        (result, htOps @ htCoerce @ [LlvmCallOp(result, cFunc, [htPtr])])
+        (result, htOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_keys", [htPtr])])
 
-    // hashtable_create — one-arg, dispatch via type inference on return type
-    // hashtable_create (): if result : THashtable(TString, _) → lang_hashtable_create_str
-    | App (Var ("hashtable_create_str", _), unitExpr, _appSpan) ->
+    // Phase 90: Unified hashtable_create — single C function
+    | App (Var ("hashtable_create", _), unitExpr, _appSpan) ->
         let (_uVal, uOps) = elaborateExpr env unitExpr
         let result = { Name = freshName env; Type = Ptr }
-        (result, uOps @ [LlvmCallOp(result, "@lang_hashtable_create_str", [])])
+        (result, uOps @ [LlvmCallOp(result, "@lang_hashtable_create", [])])
 
-    | App (Var ("hashtable_create", _), unitExpr, appSpan) ->
-        let (_uVal, uOps) = elaborateExpr env unitExpr
-        let result = { Name = freshName env; Type = Ptr }
-        let isStrKey =
-            match Map.tryFind appSpan env.AnnotationMap with
-            | Some (Type.THashtable(Type.TString, _)) -> true
-            | _ -> false
-        let cFunc = if isStrKey then "@lang_hashtable_create_str" else "@lang_hashtable_create"
-        (result, uOps @ [LlvmCallOp(result, cFunc, [])])
-
-    // Phase 66: Explicit _str builtins — always call _str C function with I64→Ptr key coercion.
-    // Needed for Prelude wrappers where closure ABI loses Ptr type info on key argument.
-    | App (App (App (Var ("hashtable_set_str", _), htExpr, _), keyExpr, _), valExpr, _) ->
-        let (htVal,  htOps)  = elaborateExpr env htExpr
-        let (keyVal, keyOps) = elaborateExpr env keyExpr
-        let (valVal, valOps) = elaborateExpr env valExpr
-        let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
-        let (valI64, valCoerce) =
-            match valVal.Type with
-            | I64 -> (valVal, []) | I1 -> let v = { Name = freshName env; Type = I64 } in (v, [ArithExtuIOp(v, valVal)])
-            | Ptr -> let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, valVal)]) | _ -> (valVal, [])
-        let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_set_str" [htPtr; keyPtr; valI64]
-        (unitVal, htOps @ keyOps @ valOps @ htCoerce @ keyCoerce @ valCoerce @ callOps)
-
-    | App (App (Var ("hashtable_get_str", _), htExpr, _), keyExpr, _) ->
-        let (htVal,  htOps)  = elaborateExpr env htExpr
-        let (keyVal, keyOps) = elaborateExpr env keyExpr
-        let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
-        let result = { Name = freshName env; Type = I64 }
-        (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_get_str", [htPtr; keyPtr])])
-
-    | App (App (Var ("hashtable_containsKey_str", _), htExpr, _), keyExpr, _) ->
-        let (htVal,  htOps)  = elaborateExpr env htExpr
-        let (keyVal, keyOps) = elaborateExpr env keyExpr
-        let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
-        let rawVal = { Name = freshName env; Type = I64 }
-        let zeroVal = { Name = freshName env; Type = I64 }
-        let boolVal = { Name = freshName env; Type = I1 }
-        (boolVal, htOps @ keyOps @ htCoerce @ keyCoerce @ [
-            LlvmCallOp(rawVal, "@lang_hashtable_containsKey_str", [htPtr; keyPtr])
-            ArithConstantOp(zeroVal, 0L)
-            ArithCmpIOp(boolVal, "ne", rawVal, zeroVal) ])
-
-    | App (App (Var ("hashtable_remove_str", _), htExpr, _), keyExpr, _) ->
-        let (htVal,  htOps)  = elaborateExpr env htExpr
-        let (keyVal, keyOps) = elaborateExpr env keyExpr
-        let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
-        let (unitVal, callOps) = emitVoidCall env "@lang_hashtable_remove_str" [htPtr; keyPtr]
-        (unitVal, htOps @ keyOps @ htCoerce @ keyCoerce @ callOps)
-
-    | App (App (Var ("hashtable_trygetvalue_str", _), htExpr, _), keyExpr, _) ->
-        let (htVal,  htOps)  = elaborateExpr env htExpr
-        let (keyVal, keyOps) = elaborateExpr env keyExpr
-        let (htPtr, htCoerce) = coerceToPtrArg env htVal
-        let (keyPtr, keyCoerce) = coerceToPtrArg env keyVal
-        let result = { Name = freshName env; Type = Ptr }
-        (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue_str", [htPtr; keyPtr])])
-
-    // hashtable_create: handled above (unified with type-inference dispatch)
-
-    // hashtable_trygetvalue — two-arg curried builtin returning Ptr (2-slot tuple: [bool, value])
-    // hashtable_trygetvalue ht key: dispatch to _str variant when key is Ptr; else call lang_hashtable_trygetvalue → Ptr
+    // Phase 90: Unified hashtable_trygetvalue — two-arg, key passed as-is
     | App (App (Var ("hashtable_trygetvalue", _), htExpr, _), keyExpr, _) ->
         let (htVal,  htOps)  = elaborateExpr env htExpr
         let (keyVal, keyOps) = elaborateExpr env keyExpr
         let (htPtr, htCoerce) = coerceToPtrArg env htVal
+        let (keyI64, keyCoerce) = coerceToI64 env keyVal
         let result = { Name = freshName env; Type = Ptr }
-        match keyVal.Type with
-        | Ptr ->
-            (result, htOps @ keyOps @ htCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue_str", [htPtr; keyVal])])
-        | _ ->
-            // Phase 88: Untag int key before passing to C
-            let (kv, kCoerce) =
-                if keyVal.Type = I64 then emitUntag env keyVal
-                else (keyVal, [])
-            (result, htOps @ keyOps @ htCoerce @ kCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue", [htPtr; kv])])
+        (result, htOps @ keyOps @ htCoerce @ keyCoerce @ [LlvmCallOp(result, "@lang_hashtable_trygetvalue", [htPtr; keyI64])])
 
     // hashtable_count — one-arg, inline GEP+load at field index 2 (size field of LangHashtable struct)
     // No C call needed: LangHashtable.size is at field index 2
@@ -2327,12 +2190,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         "array_create"; "array_init"; "array_get"; "array_set"; "array_length"
                         "array_of_list"; "array_to_list"; "array_iter"; "array_map"; "array_fold"
                         "array_sort"; "array_of_seq"
-                        "hashtable_create"; "hashtable_create_str"; "hashtable_get"; "hashtable_get_str"
-                        "hashtable_set"; "hashtable_set_str"
-                        "hashtable_containsKey"; "hashtable_containsKey_str"
-                        "hashtable_keys"; "hashtable_keys_str"
-                        "hashtable_remove"; "hashtable_remove_str"
-                        "hashtable_trygetvalue_str"
+                        "hashtable_create"; "hashtable_get"; "hashtable_set"
+                        "hashtable_containsKey"; "hashtable_keys"
+                        "hashtable_remove"; "hashtable_trygetvalue"; "hashtable_count"
                         "stringbuilder_create"; "stringbuilder_append"; "stringbuilder_tostring"
                         "hashset_create"; "hashset_add"; "hashset_contains"; "hashset_count"
                         "queue_create"; "queue_enqueue"; "queue_dequeue"; "queue_count"

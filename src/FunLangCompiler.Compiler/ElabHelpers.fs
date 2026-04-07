@@ -135,7 +135,6 @@ let rec detectCollectionKind (collVars: Map<string, CollectionKind>) (annotation
     | Ast.App (Ast.Var ("queue_create", _), _, _)     -> Some Queue
     | Ast.App (Ast.Var ("mutablelist_create", _), _, _) -> Some MutableList
     | Ast.App (Ast.Var ("hashtable_create", _), _, _)     -> Some Hashtable
-    | Ast.App (Ast.Var ("hashtable_create_str", _), _, _) -> Some Hashtable
     | Ast.Var (name, _)                                   -> Map.tryFind name collVars
     | Ast.Annot (inner, _, _)                         -> detectCollectionKind collVars annotationMap inner
     | _ -> None

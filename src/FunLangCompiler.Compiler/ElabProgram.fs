@@ -91,13 +91,6 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_keys";           ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_trygetvalue";    ExtParams = [Ptr; I64];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_create_str";      ExtParams = [];           ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_get_str";         ExtParams = [Ptr; Ptr];   ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_set_str";         ExtParams = [Ptr; Ptr; I64]; ExtReturn = None;  IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_containsKey_str"; ExtParams = [Ptr; Ptr];   ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_remove_str";      ExtParams = [Ptr; Ptr];   ExtReturn = None;     IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_keys_str";        ExtParams = [Ptr];        ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_trygetvalue_str"; ExtParams = [Ptr; Ptr];   ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_index_get_str";             ExtParams = [Ptr; Ptr];   ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_index_set_str";             ExtParams = [Ptr; Ptr; I64]; ExtReturn = None;  IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_iter";            ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
@@ -522,13 +515,6 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         { ExtName = "@lang_hashtable_remove";      ExtParams = [Ptr; I64];       ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_keys";           ExtParams = [Ptr];            ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashtable_trygetvalue";    ExtParams = [Ptr; I64];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_create_str";      ExtParams = [];           ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_get_str";         ExtParams = [Ptr; Ptr];   ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_set_str";         ExtParams = [Ptr; Ptr; I64]; ExtReturn = None;  IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_containsKey_str"; ExtParams = [Ptr; Ptr];   ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_remove_str";      ExtParams = [Ptr; Ptr];   ExtReturn = None;     IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_keys_str";        ExtParams = [Ptr];        ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_hashtable_trygetvalue_str"; ExtParams = [Ptr; Ptr];   ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_index_get_str";             ExtParams = [Ptr; Ptr];   ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_index_set_str";             ExtParams = [Ptr; Ptr; I64]; ExtReturn = None;  IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_array_iter";            ExtParams = [Ptr; Ptr];       ExtReturn = None;     IsVarArg = false; Attrs = [] }

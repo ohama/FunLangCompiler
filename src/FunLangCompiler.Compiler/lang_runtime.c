@@ -621,8 +621,8 @@ void lang_index_set_str(void* collection, LangString* key, int64_t value) {
 int64_t lang_index_get(void* collection, int64_t index) {
     int64_t first_word = ((int64_t*)collection)[0];
     if (first_word < 0) {
-        // Hashtable: tag is -1
-        return lang_hashtable_get((LangHashtable*)collection, index);
+        // Hashtable: tag is -1. Retag index since compiler passed raw int.
+        return lang_hashtable_get((LangHashtable*)collection, LANG_TAG_INT(index));
     } else {
         // Array: first word is non-negative length
         int64_t* arr = (int64_t*)collection;
@@ -634,8 +634,8 @@ int64_t lang_index_get(void* collection, int64_t index) {
 void lang_index_set(void* collection, int64_t index, int64_t value) {
     int64_t first_word = ((int64_t*)collection)[0];
     if (first_word < 0) {
-        // Hashtable: tag is -1
-        lang_hashtable_set((LangHashtable*)collection, index, value);
+        // Hashtable: tag is -1. Retag index since compiler passed raw int.
+        lang_hashtable_set((LangHashtable*)collection, LANG_TAG_INT(index), value);
     } else {
         // Array: first word is non-negative length
         int64_t* arr = (int64_t*)collection;
