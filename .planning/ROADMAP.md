@@ -79,7 +79,7 @@ Plans:
 |-------|------|-------------|--------|
 | 91 | HashSet LSB Unification | HS-01, HS-02, HS-03 | Complete |
 | 92 | C Boundary Simplification | CB-01, CB-02, CB-03, CB-04 | Complete |
-| 93 | Generic Equality and Hash | GE-01, GE-02, GE-03, GE-04, GE-05 | In Progress |
+| 93 | Generic Equality and Hash | GE-01, GE-02, GE-03, GE-04, GE-05 | Complete |
 
 ---
 
