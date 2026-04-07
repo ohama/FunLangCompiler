@@ -10,16 +10,16 @@ See: .planning/PROJECT.md (updated 2026-04-02)
 ## Current Position
 
 Phase: 93 (Generic Equality and Hash)
-Plan: 93-01 of 93-03
+Plan: 93-02 of 93-03
 Status: In progress
-Last activity: 2026-04-07 — Completed 93-01-PLAN.md (heap tag word)
+Last activity: 2026-04-07 — Completed 93-02-PLAN.md (generic hash/equality)
 
-Progress: v1.0-v21.0 + Phase 88-93 [█████████████████████░] 69 phases / 115 plans
+Progress: v1.0-v21.0 + Phase 88-93 [█████████████████████░] 69 phases / 116 plans
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 115
+- Total plans completed: 116
 - Average duration: ~10 min/plan
 
 ## Accumulated Context
@@ -38,6 +38,7 @@ Progress: v1.0-v21.0 + Phase 88-93 [██████████████�
 | array_set coerces value to I64 | coerceToI64 ensures I1/Ptr values are compatible with C int64_t parameter | 2026-04-07 |
 | Heap tag constants 1-5, closures/arrays untagged | Only string/tuple/record/cons/ADT get tags; closures never used as hash keys | 2026-04-07 |
 | Tuple/record store field count at slot 1 | Generic hash/equality needs iteration count at runtime without type info | 2026-04-07 |
+| Generic hash/eq replaces LSB-only dispatch | lang_ht_hash/lang_ht_eq now dispatch on heap tag for all 5 types + tagged ints | 2026-04-07 |
 
 ### Pending Todos
 
@@ -50,5 +51,5 @@ Progress: v1.0-v21.0 + Phase 88-93 [██████████████�
 ## Session Continuity
 
 Last session: 2026-04-07
-Stopped at: Completed 93-01-PLAN.md
+Stopped at: Completed 93-02-PLAN.md
 Resume file: None
