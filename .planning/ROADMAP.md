@@ -34,6 +34,12 @@ v13.0의 tagged representation 기반 위에 HashSet 통합, C boundary 단순�
 
 **Requirements:** CB-01, CB-02, CB-03, CB-04
 
+**Plans:** 2 plans
+
+Plans:
+- [ ] 92-01-PLAN.md — Simple C boundary sites (char/to_string/sprintf/string-int/counts/mutablelist)
+- [ ] 92-02-PLAN.md — Structural changes (new C wrappers, array access, index dispatch)
+
 **Success Criteria:**
 
 1. `lang_to_string_int(tagged_val)`가 내부에서 untag 후 변환
