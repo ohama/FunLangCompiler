@@ -1410,26 +1410,25 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, uOps @ [LlvmCallOp(result, "@lang_hashset_create", [])])
 
+    // Phase 91: HashSet values passed as-is (tagged) — unified LSB dispatch in C
     | App (App (Var ("hashset_add", _), hsExpr, _), valExpr, _) ->
         let (hsVal,  hsOps)  = elaborateExpr env hsExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
-        // Phase 88: Untag value before passing to C
-        let (rawVal, untagOps) = emitUntag env valVal
+        let (valI64, valCoerce) = coerceToI64 env valVal
         let result = { Name = freshName env; Type = I64 }
-        (result, hsOps @ valOps @ hsCoerce @ untagOps @ [LlvmCallOp(result, "@lang_hashset_add", [hsPtr; rawVal])])
+        (result, hsOps @ valOps @ hsCoerce @ valCoerce @ [LlvmCallOp(result, "@lang_hashset_add", [hsPtr; valI64])])
 
     | App (App (Var ("hashset_contains", _), hsExpr, _), valExpr, _) ->
         let (hsVal,  hsOps)  = elaborateExpr env hsExpr
         let (valVal, valOps) = elaborateExpr env valExpr
         let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
-        // Phase 88: Untag value before passing to C
-        let (rawVal, untagOps) = emitUntag env valVal
+        let (valI64, valCoerce) = coerceToI64 env valVal
         let rawResult = { Name = freshName env; Type = I64 }
         let zeroVal   = { Name = freshName env; Type = I64 }
         let boolResult = { Name = freshName env; Type = I1  }
-        (boolResult, hsOps @ valOps @ hsCoerce @ untagOps @ [
-            LlvmCallOp(rawResult, "@lang_hashset_contains", [hsPtr; rawVal])
+        (boolResult, hsOps @ valOps @ hsCoerce @ valCoerce @ [
+            LlvmCallOp(rawResult, "@lang_hashset_contains", [hsPtr; valI64])
             ArithConstantOp(zeroVal, 0L)
             ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
         ])

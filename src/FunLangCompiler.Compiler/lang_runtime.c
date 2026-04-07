@@ -692,7 +692,7 @@ void lang_for_in_hashset(void* closure, LangHashSet* hs) {
     for (int64_t i = 0; i < hs->capacity; i++) {
         LangHashSetEntry* e = hs->buckets[i];
         while (e != NULL) {
-            fn(closure, LANG_TAG_INT(e->key));
+            fn(closure, e->key);  /* key stored as-is (tagged) */
             e = e->next;
         }
     }
@@ -893,15 +893,8 @@ LangString* lang_sb_tostring(LangStringBuilder* sb) {
 
 /* Phase 33-01: COL-02 HashSet (struct defined in lang_runtime.h)
  * HashSet stores raw (untagged) integers, so uses murmurhash only (no LSB dispatch). */
-static uint64_t lang_hs_hash(int64_t key) {
-    uint64_t h = (uint64_t)key;
-    h ^= h >> 33;
-    h *= UINT64_C(0xff51afd7ed558ccd);
-    h ^= h >> 33;
-    h *= UINT64_C(0xc4ceb9fe1a85ec53);
-    h ^= h >> 33;
-    return h;
-}
+/* Phase 91: HashSet uses unified lang_ht_hash/lang_ht_eq from Phase 90.
+ * Values stored as-is (tagged ints, raw pointers). */
 LangHashSet* lang_hashset_create(void) {
     LangHashSet* hs = (LangHashSet*)GC_malloc(sizeof(LangHashSet));
     hs->capacity = 16;
@@ -912,10 +905,10 @@ LangHashSet* lang_hashset_create(void) {
 }
 
 int64_t lang_hashset_add(LangHashSet* hs, int64_t key) {
-    uint64_t bucket = lang_hs_hash(key) % (uint64_t)hs->capacity;
+    uint64_t bucket = lang_ht_hash(key) % (uint64_t)hs->capacity;
     LangHashSetEntry* e = hs->buckets[bucket];
     while (e != NULL) {
-        if (e->key == key) return 0; /* already present */
+        if (lang_ht_eq(e->key, key)) return 0; /* already present */
         e = e->next;
     }
     LangHashSetEntry* ne = (LangHashSetEntry*)GC_malloc(sizeof(LangHashSetEntry));
@@ -927,10 +920,10 @@ int64_t lang_hashset_add(LangHashSet* hs, int64_t key) {
 }
 
 int64_t lang_hashset_contains(LangHashSet* hs, int64_t key) {
-    uint64_t bucket = lang_hs_hash(key) % (uint64_t)hs->capacity;
+    uint64_t bucket = lang_ht_hash(key) % (uint64_t)hs->capacity;
     LangHashSetEntry* e = hs->buckets[bucket];
     while (e != NULL) {
-        if (e->key == key) return 1;
+        if (lang_ht_eq(e->key, key)) return 1;
         e = e->next;
     }
     return 0;
