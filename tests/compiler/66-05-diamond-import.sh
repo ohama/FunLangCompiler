@@ -8,7 +8,7 @@ type Cset = (int * int) list
 let empty : Cset = []
 FUNEOF
 cat > "$D/b.fun" << 'FUNEOF'
-open "a.fun"
+import "a.fun"
 type Nfa = { mutable n : int }
 let alloc (nfa : Nfa) : int =
     let id = nfa.n
@@ -19,24 +19,24 @@ let build3 (nfa : Nfa) (x : int) (flag : bool) : int =
     if flag then s + x else s
 FUNEOF
 cat > "$D/c.fun" << 'FUNEOF'
-open "b.fun"
+import "b.fun"
 let rec useIt (nfa : Nfa) (xs : int list) : int =
     match xs with
     | [] -> 0
     | x :: rest -> build3 nfa x true + useIt nfa rest
 FUNEOF
 cat > "$D/d.fun" << 'FUNEOF'
-open "b.fun"
-open "c.fun"
+import "b.fun"
+import "c.fun"
 let rec useIt2 (nfa : Nfa) (xs : int list) : int =
     match xs with
     | [] -> 0
     | x :: rest -> build3 nfa x false + useIt2 nfa rest
 FUNEOF
 cat > "$D/main.fun" << 'FUNEOF'
-open "b.fun"
-open "c.fun"
-open "d.fun"
+import "b.fun"
+import "c.fun"
+import "d.fun"
 let _ =
     let nfa = { n = 0 }
     println (to_string (useIt nfa [1;2;3] + useIt2 nfa [4;5;6]))
