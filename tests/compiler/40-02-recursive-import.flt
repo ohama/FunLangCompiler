@@ -1,4 +1,4 @@
-// --- Command: bash -c 'D=$(mktemp -d /tmp/langtest_XXXXXX) && printf "let mul a b = a * b\n" > $D/c.fun && printf "open \x22c.fun\x22\nlet add a b = a + b\n" > $D/b.fun && printf "open \x22b.fun\x22\nlet _ = println (to_string (add 2 3))\nlet _ = println (to_string (mul 4 5))\n" > $D/a.fun && OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- $D/a.fun -o $OUTBIN && $OUTBIN; echo $?; rm -rf $D $OUTBIN'
+// --- Command: bash -c 'D=$(mktemp -d /tmp/langtest_XXXXXX) && printf "let mul a b = a * b\n" > $D/c.fun && printf "import \x22c.fun\x22\nlet add a b = a + b\n" > $D/b.fun && printf "import \x22b.fun\x22\nlet _ = println (to_string (add 2 3))\nlet _ = println (to_string (mul 4 5))\n" > $D/a.fun && OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- $D/a.fun -o $OUTBIN && $OUTBIN; echo $?; rm -rf $D $OUTBIN'
 // --- Input:
 // --- Output:
 5

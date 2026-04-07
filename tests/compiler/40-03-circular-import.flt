@@ -1,4 +1,4 @@
-// --- Command: bash -c 'D=$(mktemp -d /tmp/langtest_XXXXXX) && printf "open \x22b.fun\x22\nlet x = 1\n" > $D/a.fun && printf "open \x22a.fun\x22\nlet y = 2\n" > $D/b.fun && OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && OUT=$(dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- $D/a.fun -o $OUTBIN 2>&1); CODE=$?; echo "$OUT" | grep -q "Circular import detected" && echo "circular error detected" || echo "no circular error"; echo $CODE; rm -rf $D $OUTBIN'
+// --- Command: bash -c 'D=$(mktemp -d /tmp/langtest_XXXXXX) && printf "import \x22b.fun\x22\nlet x = 1\n" > $D/a.fun && printf "import \x22a.fun\x22\nlet y = 2\n" > $D/b.fun && OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && OUT=$(dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- $D/a.fun -o $OUTBIN 2>&1); CODE=$?; echo "$OUT" | grep -q "Circular import detected" && echo "circular error detected" || echo "no circular error"; echo $CODE; rm -rf $D $OUTBIN'
 // --- Input:
 // --- Output:
 circular error detected
