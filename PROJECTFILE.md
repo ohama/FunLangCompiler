@@ -169,7 +169,7 @@ fnc hello.fun -O3          # 최적화 레벨 지정
 | 출력 위치 | (없음) | `build/` 디렉토리 |
 | funproj.toml | 동일 형식 | 동일 형식 |
 
-같은 `funproj.toml`, 같은 소스, 같은 `open "..."` 의존성 — 도구만 바꾸면 된다.
+같은 `funproj.toml`, 같은 소스, 같은 `import "..."` 의존성 — 도구만 바꾸면 된다.
 
 ```bash
 # 개발 중: fn으로 빠른 반복
@@ -202,7 +202,7 @@ myproject/
     └── tool
 ```
 
-멀티파일 의존성은 소스 코드의 `open "file.fun"` 문이 해결한다. `fnc`가 재귀적으로 인라인.
+멀티파일 의존성은 소스 코드의 `import "file.fun"` 문이 해결한다. `fnc`가 재귀적으로 인라인.
 
 ---
 
@@ -305,7 +305,7 @@ $ fnc src/calc.fun
 ## Implementation Notes
 
 - **TOML 파서:** 수동 구현 (외부 의존성 없음). `[project]`, `[[executable]]`, `[[test]]` 서브셋만 지원.
-- **멀티파일:** `open "file.fun"` 임포트를 `expandImports`가 재귀적으로 AST에 인라인.
+- **멀티파일:** `import "file.fun"` 임포트를 `expandImports`가 재귀적으로 AST에 인라인.
 - **compileFile 헬퍼:** 단일 파일 모드와 프로젝트 모드가 동일한 컴파일 파이프라인 공유.
 
 ### Source Files
@@ -318,4 +318,4 @@ $ fnc src/calc.fun
 ---
 
 *Source: `src/FunLangCompiler.Compiler/ProjectFile.fs`, `src/FunLangCompiler.Cli/Program.fs`*
-*Last updated: 2026-04-01*
+*Last updated: 2026-04-07*

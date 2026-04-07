@@ -6,7 +6,7 @@
 # Build
 dotnet build src/FunLangCompiler.Cli
 
-# Run all E2E tests (239+ tests)
+# Run all E2E tests (260+ tests)
 dotnet run --project deps/fslit/FsLit/FsLit.fsproj -- tests/compiler/
 
 # Run a specific test

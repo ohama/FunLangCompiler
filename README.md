@@ -78,11 +78,15 @@ fnc test unit          # 특정 테스트만
 | Logic | `&&`, `||` (short-circuit), `if-else` |
 | Bindings | `let`, `let rec` (recursive functions) |
 | Functions | Lambda with free-variable capture, closures (`{fn_ptr, env}`), direct and indirect call dispatch |
-| Strings | Heap-allocated `{length, data}` structs, `string_length`, `string_concat`, `to_string`, `=`/`<>` via `strcmp` |
+| Strings | Heap-allocated `{heap_tag, length, data}` structs, `string_length`, `string_concat`, `to_string` |
 | Tuples | N-ary tuple construction, `let (a, b) = ...` destructuring |
 | Lists | `[]`, `h :: t` cons, `[e1; e2; ...]` literals, recursive processing |
 | Pattern Matching | `match` compiled via [Jacobs decision tree algorithm](#pattern-matching-compilation); constant, wildcard, variable, tuple, list, string patterns; non-exhaustive match runtime error |
-| I/O | `print`, `println` builtins |
+| Equality | Generic structural equality (`=`, `<>`) for int, string, tuple, record, list, ADT |
+| Tagged Values | OCaml-style LSB 1-bit tagging (int=2n+1, ptr=LSB 0) for runtime type dispatch |
+| Heap Tags | Slot-0 type tag (STRING=1, TUPLE=2, RECORD=3, LIST=4, ADT=5) for generic hash/equality |
+| Collections | Hashtable, HashSet, Queue, MutableList, StringBuilder, Array — all with unified LSB dispatch |
+| I/O | `print`, `println`, `printf`, `sprintf`, file I/O (14 builtins) |
 | Debugging | `dbg expr` — prints `[file:line] value` to stderr, returns value (pass-through) |
 | GC | Boehm GC (`libgc`) for all heap allocation |
 
@@ -117,10 +121,11 @@ clang + libgc         -- Native binary linking
 | `MlirIR.fs` | ~130 | Typed IR: `MlirModule`, `FuncOp`, `MlirOp` DU (~25 cases), `MlirType`, `MlirValue` |
 | `MatchCompiler.fs` | ~150 | Decision tree pattern matching compiler ([Jacobs algorithm](#pattern-matching-compilation)) |
 | `Printer.fs` | ~180 | Pure serializer: MlirIR -> `.mlir` text |
-| `Elaboration.fs` | ~4600 | AST -> MlirIR recursive pass with `ElabEnv` |
+| `ElabHelpers.fs` | ~800 | Helpers: coerce, tag/untag, string/char predicates |
+| `Elaboration.fs` | ~3500 | AST -> MlirIR recursive pass with `ElabEnv` |
 | `Pipeline.fs` | ~130 | Shell pipeline: `mlir-opt` -> `mlir-translate` -> `clang` (-O0~O3) |
 | `ProjectFile.fs` | ~100 | funproj.toml TOML subset parser |
-| `lang_runtime.c` | ~1450 | C runtime: string, array, hashtable, collection, I/O builtins |
+| `lang_runtime.c` | ~1560 | C runtime: string, array, hashtable, collection, I/O, generic hash/equality |
 | `Program.fs` | ~300 | CLI entry point: build/test/single-file modes |
 
 ## Dependencies
@@ -156,7 +161,7 @@ sudo apt install libgc-dev
 
 ## Testing
 
-239+개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
+260+개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
 
 ```bash
 # Run all tests
