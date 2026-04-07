@@ -225,22 +225,27 @@ let emitCharPredicate (env: ElabEnv) (cFunc: string) (charExpr: Ast.Expr) (elabo
         ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
     ])
 
-// Phase 8: Allocate a heap string struct {i64 length, ptr data} for a compile-time string literal.
+// Phase 93: Allocate a heap string struct {heap_tag, length, data} for a compile-time string literal.
 let elaborateStringLiteral (env: ElabEnv) (s: string) : MlirValue * MlirOp list =
     let globalName  = addStringGlobal env s
     let sizeVal     = { Name = freshName env; Type = I64 }
     let headerVal   = { Name = freshName env; Type = Ptr }
+    let tagPtrVal   = { Name = freshName env; Type = Ptr }
+    let tagVal      = { Name = freshName env; Type = I64 }
     let lenPtrVal   = { Name = freshName env; Type = Ptr }
     let lenVal      = { Name = freshName env; Type = I64 }
     let dataPtrVal  = { Name = freshName env; Type = Ptr }
     let dataAddrVal = { Name = freshName env; Type = Ptr }
     let ops = [
-        ArithConstantOp(sizeVal, 16L)                              // struct size = 16 bytes
+        ArithConstantOp(sizeVal, 24L)                              // struct size = 24 bytes (tag+len+data)
         LlvmCallOp(headerVal, "@GC_malloc", [sizeVal])             // alloc header
-        LlvmGEPStructOp(lenPtrVal, headerVal, 0)                   // &header.length
+        LlvmGEPStructOp(tagPtrVal, headerVal, 0)                   // &header.heap_tag
+        ArithConstantOp(tagVal, 1L)                                // LANG_HEAP_TAG_STRING = 1
+        LlvmStoreOp(tagVal, tagPtrVal)                             // header.heap_tag = 1
+        LlvmGEPStructOp(lenPtrVal, headerVal, 1)                   // &header.length
         ArithConstantOp(lenVal, int64 s.Length)                    // compile-time length
         LlvmStoreOp(lenVal, lenPtrVal)                             // header.length = len
-        LlvmGEPStructOp(dataPtrVal, headerVal, 1)                  // &header.data
+        LlvmGEPStructOp(dataPtrVal, headerVal, 2)                  // &header.data
         LlvmAddressOfOp(dataAddrVal, globalName)                   // addressof @__str_N
         LlvmStoreOp(dataAddrVal, dataPtrVal)                       // header.data = &global
     ]
@@ -700,13 +705,15 @@ let rec testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
         let nullVal  = { Name = freshName env; Type = Ptr }
         let cond     = { Name = freshName env; Type = I1 }
         let testOps  = [ LlvmNullOp(nullVal); LlvmIcmpOp(cond, "ne", scrutVal, nullVal) ]
-        // Body setup: load head and tail from cons cell
+        // Phase 93: load head and tail from cons cell (tag@0, head@1, tail@2)
+        let headSlot = { Name = freshName env; Type = Ptr }
         let headVal  = { Name = freshName env; Type = I64 }
         let tailSlot = { Name = freshName env; Type = Ptr }
         let tailVal  = { Name = freshName env; Type = Ptr }
         let setupOps = [
-            LlvmLoadOp(headVal, scrutVal)
-            LlvmGEPLinearOp(tailSlot, scrutVal, 1)
+            LlvmGEPLinearOp(headSlot, scrutVal, 1)
+            LlvmLoadOp(headVal, headSlot)
+            LlvmGEPLinearOp(tailSlot, scrutVal, 2)
             LlvmLoadOp(tailVal, tailSlot)
         ]
         // Bind head and tail names
@@ -731,9 +738,9 @@ let rec testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
         let zero32  = { Name = freshName env; Type = I32 }
         let cond    = { Name = freshName env; Type = I1 }
         let ops = patStrOps @ [
-            LlvmGEPStructOp(patDataPtrVal, patStrVal, 1)
+            LlvmGEPStructOp(patDataPtrVal, patStrVal, 2)
             LlvmLoadOp(patDataVal, patDataPtrVal)
-            LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 1)
+            LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 2)
             LlvmLoadOp(scrutDataVal, scrutDataPtrVal)
             LlvmCallOp(cmpRes, "@strcmp", [scrutDataVal; patDataVal])
             ArithConstantOp(zero32, 0L)
@@ -754,7 +761,7 @@ let rec testPattern (env: ElabEnv) (scrutVal: MlirValue) (pat: Pattern)
             |> List.fold (fun (opsAcc, eAcc: ElabEnv) (i, subPat) ->
                 let slotVal  = { Name = freshName env; Type = Ptr }
                 let fieldVal = { Name = freshName env; Type = loadTypeOfPat subPat }
-                let gepOp    = LlvmGEPLinearOp(slotVal, scrutVal, i)
+                let gepOp    = LlvmGEPLinearOp(slotVal, scrutVal, i + 2)  // Phase 93: +2 for tag+count header
                 let loadOp   = LlvmLoadOp(fieldVal, slotVal)
                 match subPat with
                 | VarPat(vname, _) ->

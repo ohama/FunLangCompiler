@@ -511,7 +511,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             |> List.fold (fun (opsAcc, eAcc: ElabEnv) (i, pat) ->
                 let slotVal  = { Name = freshName env; Type = Ptr }
                 let fieldVal = { Name = freshName env; Type = loadTypeOfPat pat }
-                let gepOp    = LlvmGEPLinearOp(slotVal, ptrVal, i)
+                let gepOp    = LlvmGEPLinearOp(slotVal, ptrVal, i + 2)  // Phase 93: +2 for tag+count header
                 let loadOp   = LlvmLoadOp(fieldVal, slotVal)
                 match pat with
                 | VarPat (vname, _) ->
@@ -555,9 +555,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let zero32     = { Name = freshName env; Type = I32 }
             let boolResult = { Name = freshName env; Type = I1 }
             let ops = [
-                LlvmGEPStructOp(lDataPtr, lv, 1)
+                LlvmGEPStructOp(lDataPtr, lv, 2)
                 LlvmLoadOp(lData, lDataPtr)
-                LlvmGEPStructOp(rDataPtr, rv, 1)
+                LlvmGEPStructOp(rDataPtr, rv, 2)
                 LlvmLoadOp(rData, rDataPtr)
                 LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
                 ArithConstantOp(zero32, 0L)
@@ -589,9 +589,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let zero32     = { Name = freshName env; Type = I32 }
             let boolResult = { Name = freshName env; Type = I1 }
             let ops = [
-                LlvmGEPStructOp(lDataPtr, lv, 1)
+                LlvmGEPStructOp(lDataPtr, lv, 2)
                 LlvmLoadOp(lData, lDataPtr)
-                LlvmGEPStructOp(rDataPtr, rv, 1)
+                LlvmGEPStructOp(rDataPtr, rv, 2)
                 LlvmLoadOp(rData, rDataPtr)
                 LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
                 ArithConstantOp(zero32, 0L)
@@ -985,9 +985,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let zero32     = { Name = freshName env; Type = I32 }
         let boolResult = { Name = freshName env; Type = I1 }
         let ops = [
-            LlvmGEPStructOp(lDataPtr, lv, 1)
+            LlvmGEPStructOp(lDataPtr, lv, 2)
             LlvmLoadOp(lData, lDataPtr)
-            LlvmGEPStructOp(rDataPtr, rv, 1)
+            LlvmGEPStructOp(rDataPtr, rv, 2)
             LlvmLoadOp(rData, rDataPtr)
             LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
             ArithConstantOp(zero32, 0L)
@@ -1007,9 +1007,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let zero32     = { Name = freshName env; Type = I32 }
             let boolResult = { Name = freshName env; Type = I1 }
             let ops = [
-                LlvmGEPStructOp(lDataPtr, lv, 1)
+                LlvmGEPStructOp(lDataPtr, lv, 2)
                 LlvmLoadOp(lData, lDataPtr)
-                LlvmGEPStructOp(rDataPtr, rv, 1)
+                LlvmGEPStructOp(rDataPtr, rv, 2)
                 LlvmLoadOp(rData, rDataPtr)
                 LlvmCallOp(cmpResult, "@strcmp", [lData; rData])
                 ArithConstantOp(zero32, 0L)
@@ -1057,7 +1057,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let dataAddrVal = { Name = freshName env; Type = Ptr }
         let unitVal     = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPStructOp(dataPtrVal, msgPtr, 1)
+            LlvmGEPStructOp(dataPtrVal, msgPtr, 2)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
             LlvmCallVoidOp("@lang_failwith", [dataAddrVal])
             ArithConstantOp(unitVal, 1L)
@@ -1542,7 +1542,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let (a2, c2) = coerceToI64Arg env arg2Val
             let ops = [
                 LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
-                LlvmGEPStructOp(dp1, a1Ptr, 1); LlvmLoadOp(da1, dp1)
+                LlvmGEPStructOp(dp1, a1Ptr, 2); LlvmLoadOp(da1, dp1)
                 LlvmCallOp(result, "@lang_sprintf_2si", [fmtPtrVal; da1; a2])
             ]
             (result, arg1Ops @ arg2Ops @ c1 @ c2 @ ops)
@@ -1553,7 +1553,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let da2 = { Name = freshName env; Type = Ptr }
             let ops = [
                 LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
-                LlvmGEPStructOp(dp2, a2Ptr, 1); LlvmLoadOp(da2, dp2)
+                LlvmGEPStructOp(dp2, a2Ptr, 2); LlvmLoadOp(da2, dp2)
                 LlvmCallOp(result, "@lang_sprintf_2is", [fmtPtrVal; a1; da2])
             ]
             (result, arg1Ops @ arg2Ops @ c1 @ c2 @ ops)
@@ -1566,8 +1566,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let da2 = { Name = freshName env; Type = Ptr }
             let ops = [
                 LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
-                LlvmGEPStructOp(dp1, a1Ptr, 1); LlvmLoadOp(da1, dp1)
-                LlvmGEPStructOp(dp2, a2Ptr, 1); LlvmLoadOp(da2, dp2)
+                LlvmGEPStructOp(dp1, a1Ptr, 2); LlvmLoadOp(da1, dp1)
+                LlvmGEPStructOp(dp2, a2Ptr, 2); LlvmLoadOp(da2, dp2)
                 LlvmCallOp(result, "@lang_sprintf_2ss", [fmtPtrVal; da1; da2])
             ]
             (result, arg1Ops @ arg2Ops @ c1 @ c2 @ ops)
@@ -1599,7 +1599,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result      = { Name = freshName env; Type = Ptr }
         let ops = [
             LlvmAddressOfOp(fmtPtrVal, fmtGlobal)
-            LlvmGEPStructOp(dataPtrVal, argPtr, 1)
+            LlvmGEPStructOp(dataPtrVal, argPtr, 2)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
             LlvmCallOp(result, "@lang_sprintf_1s", [fmtPtrVal; dataAddrVal])
         ]
@@ -1751,7 +1751,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let fmtRes      = { Name = freshName env; Type = I32 }
         let unitVal     = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPStructOp(dataPtrVal, ptrVal, 1)
+            LlvmGEPStructOp(dataPtrVal, ptrVal, 2)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
             LlvmCallOp(fmtRes, "@printf", [dataAddrVal])
             ArithConstantOp(unitVal, 1L)
@@ -1774,7 +1774,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let fmtRes2     = { Name = freshName env; Type = I32 }
         let unitVal     = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPStructOp(dataPtrVal, ptrVal, 1)
+            LlvmGEPStructOp(dataPtrVal, ptrVal, 2)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
             LlvmCallOp(fmtRes1, "@printf", [dataAddrVal])
             LlvmAddressOfOp(nlPtrVal, nlGlobal)
@@ -2047,18 +2047,28 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let fieldResults = exprs |> List.map (fun e -> elaborateExpr env e)
         let allFieldOps  = fieldResults |> List.collect snd
         let fieldVals    = fieldResults |> List.map fst
-        // GC_malloc(n * 8) to allocate the tuple struct
+        // Phase 93: GC_malloc((n+2) * 8) — slot 0 = heap tag, slot 1 = field count, slots 2+ = fields
         let bytesVal  = { Name = freshName env; Type = I64 }
         let tupPtrVal = { Name = freshName env; Type = Ptr }
+        let tagSlot   = { Name = freshName env; Type = Ptr }
+        let tagVal    = { Name = freshName env; Type = I64 }
+        let countSlot = { Name = freshName env; Type = Ptr }
+        let countVal  = { Name = freshName env; Type = I64 }
         let allocOps  = [
-            ArithConstantOp(bytesVal, int64 (n * 8))
+            ArithConstantOp(bytesVal, int64 ((n + 2) * 8))
             LlvmCallOp(tupPtrVal, "@GC_malloc", [bytesVal])
+            LlvmGEPLinearOp(tagSlot, tupPtrVal, 0)
+            ArithConstantOp(tagVal, 2L)  // LANG_HEAP_TAG_TUPLE
+            LlvmStoreOp(tagVal, tagSlot)
+            LlvmGEPLinearOp(countSlot, tupPtrVal, 1)
+            ArithConstantOp(countVal, int64 n)
+            LlvmStoreOp(countVal, countSlot)
         ]
-        // Store each field: GEP ptr[i] + store value at slot
+        // Store each field: GEP ptr[i+2] + store value at slot
         let storeOps =
             fieldVals |> List.mapi (fun i fv ->
                 let slotVal = { Name = freshName env; Type = Ptr }
-                [ LlvmGEPLinearOp(slotVal, tupPtrVal, i)
+                [ LlvmGEPLinearOp(slotVal, tupPtrVal, i + 2)
                   LlvmStoreOp(fv, slotVal) ]
             ) |> List.concat
         (tupPtrVal, allFieldOps @ allocOps @ storeOps)
@@ -2073,19 +2083,26 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let v = { Name = freshName env; Type = Ptr }
         (v, [LlvmNullOp(v)])
 
-    // Phase 10: Cons — GC_malloc(16) cons cell with head at slot 0, tail at slot 1
+    // Phase 93: Cons — GC_malloc(24) cons cell with tag at slot 0, head at slot 1, tail at slot 2
     | Cons(headExpr, tailExpr, _) ->
         let (headVal, headOps) = elaborateExpr env headExpr
         let (tailVal, tailOps) = elaborateExpr env tailExpr
         let bytesVal = { Name = freshName env; Type = I64 }
         let cellPtr  = { Name = freshName env; Type = Ptr }
+        let tagSlot  = { Name = freshName env; Type = Ptr }
+        let tagVal   = { Name = freshName env; Type = I64 }
+        let headSlot = { Name = freshName env; Type = Ptr }
         let tailSlot = { Name = freshName env; Type = Ptr }
         let allocOps = [
-            ArithConstantOp(bytesVal, 16L)
+            ArithConstantOp(bytesVal, 24L)
             LlvmCallOp(cellPtr, "@GC_malloc", [bytesVal])
-            LlvmStoreOp(headVal, cellPtr)               // head at slot 0 (base ptr)
-            LlvmGEPLinearOp(tailSlot, cellPtr, 1)       // slot 1 for tail
-            LlvmStoreOp(tailVal, tailSlot)              // store tail ptr at slot 1
+            LlvmGEPLinearOp(tagSlot, cellPtr, 0)
+            ArithConstantOp(tagVal, 4L)  // LANG_HEAP_TAG_LIST
+            LlvmStoreOp(tagVal, tagSlot)
+            LlvmGEPLinearOp(headSlot, cellPtr, 1)       // head at slot 1
+            LlvmStoreOp(headVal, headSlot)
+            LlvmGEPLinearOp(tailSlot, cellPtr, 2)       // tail at slot 2
+            LlvmStoreOp(tailVal, tailSlot)
         ]
         (cellPtr, headOps @ tailOps @ allocOps)
 
@@ -2251,9 +2268,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let zero32  = { Name = freshName env; Type = I32 }
                 let cond    = { Name = freshName env; Type = I1 }
                 let ops = patStrOps @ [
-                    LlvmGEPStructOp(patDataPtrVal, patStrVal, 1)
+                    LlvmGEPStructOp(patDataPtrVal, patStrVal, 2)
                     LlvmLoadOp(patDataVal, patDataPtrVal)
-                    LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 1)
+                    LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 2)
                     LlvmLoadOp(scrutDataVal, scrutDataPtrVal)
                     LlvmCallOp(cmpRes, "@strcmp", [scrutDataVal; patDataVal])
                     ArithConstantOp(zero32, 0L)
@@ -2276,14 +2293,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let ops = [ ArithConstantOp(cond, 1L) ]
                 (cond, ops)
             | MatchCompiler.AdtCtor(name, _, _) ->
-                // Look up real tag from TypeEnv; load tag slot 0 and compare
+                // Phase 93: ADT ctor tag at slot 1 (heap_tag at slot 0)
                 let info     = Map.find name env.TypeEnv
                 let tagSlot  = { Name = freshName env; Type = Ptr }
                 let tagLoad  = { Name = freshName env; Type = I64 }
                 let tagConst = { Name = freshName env; Type = I64 }
                 let cond     = { Name = freshName env; Type = I1 }
                 let ops = [
-                    LlvmGEPLinearOp(tagSlot, scrutVal, 0)
+                    LlvmGEPLinearOp(tagSlot, scrutVal, 1)
                     LlvmLoadOp(tagLoad, tagSlot)
                     ArithConstantOp(tagConst, int64 info.Tag)
                     ArithCmpIOp(cond, "eq", tagLoad, tagConst)
@@ -2296,7 +2313,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 (cond, ops)
 
         // Pre-populate accessor cache for ConsCtor sub-fields with correct types.
-        // field 0 = head (I64), field 1 = tail (Ptr).
+        // Phase 93: field 1 = head (I64), field 2 = tail (Ptr).
         let ensureConsFieldTypes (scrutAcc: MatchCompiler.Accessor) (argAccs: MatchCompiler.Accessor list) : MlirOp list =
             let mutable ops = []
             if argAccs.Length >= 1 then
@@ -2344,7 +2361,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let (parentVal, parentOps) = resolveAccessorTyped scrutAcc Ptr
                     let slotPtr  = { Name = freshName env; Type = Ptr }
                     let fieldVal = { Name = freshName env; Type = I64 }
-                    let gepOp  = LlvmGEPLinearOp(slotPtr, parentVal, declSlotIdx)
+                    let gepOp  = LlvmGEPLinearOp(slotPtr, parentVal, declSlotIdx + 2)  // Phase 93: +2 for tag+count
                     let loadOp = LlvmLoadOp(fieldVal, slotPtr)
                     accessorCache.[argAccs.[i]] <- fieldVal
                     ops <- ops @ parentOps @ [gepOp; loadOp]
@@ -2591,44 +2608,52 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let s = ctorSpan
             elaborateExpr env (Lambda(paramName, Constructor(name, Some(Var(paramName, s)), s), s))
         else
-            // Nullary constructor: allocate 16-byte block with tag and null payload
+            // Phase 93: Nullary constructor: allocate 24-byte block — heap_tag@0, ctor_tag@1, payload@2
             let sizeVal     = { Name = freshName env; Type = I64 }
             let blockPtr    = { Name = freshName env; Type = Ptr }
+            let heapTagSlot = { Name = freshName env; Type = Ptr }
+            let heapTagVal  = { Name = freshName env; Type = I64 }
             let tagSlot     = { Name = freshName env; Type = Ptr }
             let tagVal      = { Name = freshName env; Type = I64 }
             let paySlot     = { Name = freshName env; Type = Ptr }
             let nullPayload = { Name = freshName env; Type = Ptr }
             let ops = [
-                ArithConstantOp(sizeVal, 16L)
+                ArithConstantOp(sizeVal, 24L)
                 LlvmCallOp(blockPtr, "@GC_malloc", [sizeVal])
-                LlvmGEPLinearOp(tagSlot, blockPtr, 0)
+                LlvmGEPLinearOp(heapTagSlot, blockPtr, 0)
+                ArithConstantOp(heapTagVal, 5L)  // LANG_HEAP_TAG_ADT
+                LlvmStoreOp(heapTagVal, heapTagSlot)
+                LlvmGEPLinearOp(tagSlot, blockPtr, 1)
                 ArithConstantOp(tagVal, int64 info.Tag)
                 LlvmStoreOp(tagVal, tagSlot)
-                LlvmGEPLinearOp(paySlot, blockPtr, 1)
+                LlvmGEPLinearOp(paySlot, blockPtr, 2)
                 LlvmNullOp(nullPayload)
                 LlvmStoreOp(nullPayload, paySlot)
             ]
             (blockPtr, ops)
 
-    // Phase 17: ADT constructor — unary/multi-arg variant (e.g. Some 42, Pair(3,4))
-    // Allocates a 16-byte block: slot 0 = i64 tag, slot 1 = argVal (I64 or Ptr).
-    // Multi-arg constructors: the parser produces Constructor("Pair", Some(Tuple([3;4])), _);
-    // elaborating the Tuple arg already yields a heap-allocated Ptr — stored directly at slot 1.
+    // Phase 93: ADT constructor — unary/multi-arg variant (e.g. Some 42, Pair(3,4))
+    // Allocates a 24-byte block: heap_tag@0, ctor_tag@1, payload@2.
     | Constructor(name, Some argExpr, _) ->
         let info     = Map.find name env.TypeEnv
         let (argVal, argOps) = elaborateExpr env argExpr
-        let sizeVal  = { Name = freshName env; Type = I64 }
-        let blockPtr = { Name = freshName env; Type = Ptr }
-        let tagSlot  = { Name = freshName env; Type = Ptr }
-        let tagVal   = { Name = freshName env; Type = I64 }
-        let paySlot  = { Name = freshName env; Type = Ptr }
+        let sizeVal     = { Name = freshName env; Type = I64 }
+        let blockPtr    = { Name = freshName env; Type = Ptr }
+        let heapTagSlot = { Name = freshName env; Type = Ptr }
+        let heapTagVal  = { Name = freshName env; Type = I64 }
+        let tagSlot     = { Name = freshName env; Type = Ptr }
+        let tagVal      = { Name = freshName env; Type = I64 }
+        let paySlot     = { Name = freshName env; Type = Ptr }
         let allocOps = [
-            ArithConstantOp(sizeVal, 16L)
+            ArithConstantOp(sizeVal, 24L)
             LlvmCallOp(blockPtr, "@GC_malloc", [sizeVal])
-            LlvmGEPLinearOp(tagSlot, blockPtr, 0)
+            LlvmGEPLinearOp(heapTagSlot, blockPtr, 0)
+            ArithConstantOp(heapTagVal, 5L)  // LANG_HEAP_TAG_ADT
+            LlvmStoreOp(heapTagVal, heapTagSlot)
+            LlvmGEPLinearOp(tagSlot, blockPtr, 1)
             ArithConstantOp(tagVal, int64 info.Tag)
             LlvmStoreOp(tagVal, tagSlot)
-            LlvmGEPLinearOp(paySlot, blockPtr, 1)
+            LlvmGEPLinearOp(paySlot, blockPtr, 2)
             LlvmStoreOp(argVal, paySlot)
         ]
         (blockPtr, argOps @ allocOps)
@@ -2651,18 +2676,29 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let fieldResults = fields |> List.map (fun (_, e) -> elaborateExpr env e)
         let allFieldOps  = fieldResults |> List.collect snd
         let fieldVals    = fieldResults |> List.map fst
-        let bytesVal  = { Name = freshName env; Type = I64 }
-        let recPtrVal = { Name = freshName env; Type = Ptr }
+        // Phase 93: GC_malloc((n+2) * 8) — slot 0 = RECORD tag, slot 1 = field count, slots 2+ = fields
+        let bytesVal    = { Name = freshName env; Type = I64 }
+        let recPtrVal   = { Name = freshName env; Type = Ptr }
+        let recTagSlot  = { Name = freshName env; Type = Ptr }
+        let recTagVal   = { Name = freshName env; Type = I64 }
+        let recCountSlot = { Name = freshName env; Type = Ptr }
+        let recCountVal  = { Name = freshName env; Type = I64 }
         let allocOps  = [
-            ArithConstantOp(bytesVal, int64 (n * 8))
+            ArithConstantOp(bytesVal, int64 ((n + 2) * 8))
             LlvmCallOp(recPtrVal, "@GC_malloc", [bytesVal])
+            LlvmGEPLinearOp(recTagSlot, recPtrVal, 0)
+            ArithConstantOp(recTagVal, 3L)  // LANG_HEAP_TAG_RECORD
+            LlvmStoreOp(recTagVal, recTagSlot)
+            LlvmGEPLinearOp(recCountSlot, recPtrVal, 1)
+            ArithConstantOp(recCountVal, int64 n)
+            LlvmStoreOp(recCountVal, recCountSlot)
         ]
         let storeOps =
             fields |> List.collect (fun (fieldName, _) ->
                 let slotIdx = Map.find fieldName fieldMap
                 let fieldVal = List.item (fields |> List.findIndex (fun (fn, _) -> fn = fieldName)) fieldVals
                 let slotPtr = { Name = freshName env; Type = Ptr }
-                [ LlvmGEPLinearOp(slotPtr, recPtrVal, slotIdx)
+                [ LlvmGEPLinearOp(slotPtr, recPtrVal, slotIdx + 2)
                   LlvmStoreOp(fieldVal, slotPtr) ]
             )
         (recPtrVal, allFieldOps @ allocOps @ storeOps)
@@ -2707,7 +2743,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let slotPtr  = { Name = freshName env; Type = Ptr }
         let fieldVal = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPLinearOp(slotPtr, recPtr, slotIdx)
+            LlvmGEPLinearOp(slotPtr, recPtr, slotIdx + 2)  // Phase 93: +2 for tag+count header
             LlvmLoadOp(fieldVal, slotPtr)
         ]
         (fieldVal, recOps @ recCoerce @ ops)
@@ -2734,25 +2770,36 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let overrideResults = overrides |> List.map (fun (fn, e) -> (fn, elaborateExpr env e))
         let overrideOps     = overrideResults |> List.collect (fun (_, (_, ops)) -> ops)
         let overrideVals    = overrideResults |> List.map (fun (fn, (v, _)) -> (fn, v)) |> Map.ofList
-        let bytesVal  = { Name = freshName env; Type = I64 }
-        let newPtrVal = { Name = freshName env; Type = Ptr }
+        // Phase 93: GC_malloc((n+2) * 8) — slot 0 = RECORD tag, slot 1 = field count, slots 2+ = fields
+        let bytesVal     = { Name = freshName env; Type = I64 }
+        let newPtrVal    = { Name = freshName env; Type = Ptr }
+        let ruTagSlot    = { Name = freshName env; Type = Ptr }
+        let ruTagVal     = { Name = freshName env; Type = I64 }
+        let ruCountSlot  = { Name = freshName env; Type = Ptr }
+        let ruCountVal   = { Name = freshName env; Type = I64 }
         let allocOps  = [
-            ArithConstantOp(bytesVal, int64 (n * 8))
+            ArithConstantOp(bytesVal, int64 ((n + 2) * 8))
             LlvmCallOp(newPtrVal, "@GC_malloc", [bytesVal])
+            LlvmGEPLinearOp(ruTagSlot, newPtrVal, 0)
+            ArithConstantOp(ruTagVal, 3L)  // LANG_HEAP_TAG_RECORD
+            LlvmStoreOp(ruTagVal, ruTagSlot)
+            LlvmGEPLinearOp(ruCountSlot, newPtrVal, 1)
+            ArithConstantOp(ruCountVal, int64 n)
+            LlvmStoreOp(ruCountVal, ruCountSlot)
         ]
         let copyOps =
             fieldMap |> Map.toList |> List.collect (fun (fieldName, slotIdx) ->
                 let dstSlotPtr = { Name = freshName env; Type = Ptr }
                 match Map.tryFind fieldName overrideVals with
                 | Some newVal ->
-                    [ LlvmGEPLinearOp(dstSlotPtr, newPtrVal, slotIdx)
+                    [ LlvmGEPLinearOp(dstSlotPtr, newPtrVal, slotIdx + 2)
                       LlvmStoreOp(newVal, dstSlotPtr) ]
                 | None ->
                     let srcSlotPtr = { Name = freshName env; Type = Ptr }
                     let srcFieldVal = { Name = freshName env; Type = I64 }
-                    [ LlvmGEPLinearOp(srcSlotPtr, srcVal, slotIdx)
+                    [ LlvmGEPLinearOp(srcSlotPtr, srcVal, slotIdx + 2)
                       LlvmLoadOp(srcFieldVal, srcSlotPtr)
-                      LlvmGEPLinearOp(dstSlotPtr, newPtrVal, slotIdx)
+                      LlvmGEPLinearOp(dstSlotPtr, newPtrVal, slotIdx + 2)
                       LlvmStoreOp(srcFieldVal, dstSlotPtr) ]
             )
         (newPtrVal, srcOps @ overrideOps @ allocOps @ copyOps)
@@ -2778,7 +2825,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let slotPtr = { Name = freshName env; Type = Ptr }
         let unitVal = { Name = freshName env; Type = I64 }
         let ops = [
-            LlvmGEPLinearOp(slotPtr, recPtr, slotIdx)
+            LlvmGEPLinearOp(slotPtr, recPtr, slotIdx + 2)  // Phase 93: +2 for tag+count header
             LlvmStoreOp(newVal, slotPtr)
             ArithConstantOp(unitVal, 1L)
         ]
@@ -2996,9 +3043,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let zero32  = { Name = freshName env; Type = I32 }
                 let cond    = { Name = freshName env; Type = I1 }
                 let ops = patStrOps @ [
-                    LlvmGEPStructOp(patDataPtrVal, patStrVal, 1)
+                    LlvmGEPStructOp(patDataPtrVal, patStrVal, 2)
                     LlvmLoadOp(patDataVal, patDataPtrVal)
-                    LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 1)
+                    LlvmGEPStructOp(scrutDataPtrVal, scrutVal, 2)
                     LlvmLoadOp(scrutDataVal, scrutDataPtrVal)
                     LlvmCallOp(cmpRes, "@strcmp", [scrutDataVal; patDataVal])
                     ArithConstantOp(zero32, 0L)
@@ -3020,13 +3067,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let ops = [ ArithConstantOp(cond, 1L) ]
                 (cond, ops)
             | MatchCompiler.AdtCtor(name, _, _) ->
+                // Phase 93: ADT ctor tag at slot 1 (heap_tag at slot 0)
                 let info     = Map.find name env.TypeEnv
                 let tagSlot  = { Name = freshName env; Type = Ptr }
                 let tagLoad  = { Name = freshName env; Type = I64 }
                 let tagConst = { Name = freshName env; Type = I64 }
                 let cond     = { Name = freshName env; Type = I1 }
                 let ops = [
-                    LlvmGEPLinearOp(tagSlot, scrutVal, 0)
+                    LlvmGEPLinearOp(tagSlot, scrutVal, 1)
                     LlvmLoadOp(tagLoad, tagSlot)
                     ArithConstantOp(tagConst, int64 info.Tag)
                     ArithCmpIOp(cond, "eq", tagLoad, tagConst)
@@ -3075,7 +3123,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let (parentVal, parentOps) = resolveAccessorTyped2 scrutAcc Ptr
                     let slotPtr  = { Name = freshName env; Type = Ptr }
                     let fieldVal = { Name = freshName env; Type = I64 }
-                    let gepOp  = LlvmGEPLinearOp(slotPtr, parentVal, declSlotIdx)
+                    let gepOp  = LlvmGEPLinearOp(slotPtr, parentVal, declSlotIdx + 2)  // Phase 93: +2 for tag+count
                     let loadOp = LlvmLoadOp(fieldVal, slotPtr)
                     accessorCache2.[argAccs.[i]] <- fieldVal
                     ops <- ops @ parentOps @ [gepOp; loadOp]

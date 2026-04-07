@@ -134,7 +134,8 @@ let private printOp (indent: string) (op: MlirOp) : string =
         sprintf "%s%s = llvm.getelementptr %s[%d] : (!llvm.ptr) -> !llvm.ptr, i64"
             indent result.Name ptr.Name index
     | LlvmGEPStructOp(result, ptr, fieldIndex) ->
-        sprintf "%s%s = llvm.getelementptr inbounds %s[0, %d] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i64, ptr)>"
+        // Phase 93: String struct is now {i64 heap_tag, i64 length, ptr data}
+        sprintf "%s%s = llvm.getelementptr inbounds %s[0, %d] : (!llvm.ptr) -> !llvm.ptr, !llvm.struct<(i64, i64, ptr)>"
             indent result.Name ptr.Name fieldIndex
     | LlvmGEPDynamicOp(result, ptr, index) ->
         sprintf "%s%s = llvm.getelementptr %s[%s] : (!llvm.ptr, i64) -> !llvm.ptr, i64"

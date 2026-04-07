@@ -118,7 +118,7 @@ let rec desugarPattern (acc: Accessor) (pat: Pattern) : Test list * (string * Ac
         |> ignore  // discard the above
         let subResults =
             pats |> List.mapi (fun i subPat ->
-                desugarPattern (Field(acc, i)) subPat
+                desugarPattern (Field(acc, i + 2)) subPat  // Phase 93: +2 for tag+count header
             )
         let subTests = subResults |> List.collect fst
         let subBinds = subResults |> List.collect snd
@@ -179,12 +179,16 @@ let private splitClauses (selected: Test) (clauses: Clause list)
         match selected.Pattern with
         | CtorTest(tag, subPats) -> (tag, subPats)
     let arity = ctorArity selTag
-    // Generate accessor paths for constructor arguments.
-    // ADT layout: slot 0 = tag (i64), slot 1..N = payload fields.
-    // For AdtCtor the payload starts at slot 1, so offset by 1.
+    // Phase 93: Generate accessor paths for constructor arguments.
+    // All tagged heap types have heap_tag at slot 0.
+    // ADT: heap_tag@0, ctor_tag@1, payload@2+  → offset by 2
+    // Cons: heap_tag@0, head@1, tail@2         → offset by 1
+    // Tuple/Record: heap_tag@0, count@1, fields@2+ → offset by 2
     let argAccessors =
         match selTag with
-        | AdtCtor _ -> List.init arity (fun i -> Field(selAcc, i + 1))
+        | AdtCtor _ -> List.init arity (fun i -> Field(selAcc, i + 2))
+        | ConsCtor -> List.init arity (fun i -> Field(selAcc, i + 1))
+        | TupleCtor _ | RecordCtor _ -> List.init arity (fun i -> Field(selAcc, i + 2))
         | _ -> List.init arity (fun i -> Field(selAcc, i))
 
     let matchClauses = ResizeArray<Clause>()
