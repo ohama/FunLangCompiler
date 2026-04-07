@@ -215,12 +215,12 @@ let emitStrPredicate (env: ElabEnv) (cFunc: string) (strExpr: Ast.Expr) (argExpr
 /// Used by char_is_digit, char_is_letter, char_is_upper, char_is_lower.
 let emitCharPredicate (env: ElabEnv) (cFunc: string) (charExpr: Ast.Expr) (elaborateExpr: ElabEnv -> Ast.Expr -> MlirValue * MlirOp list) : MlirValue * MlirOp list =
     let (charVal, charOps) = elaborateExpr env charExpr
-    let (rawChar, untagOps) = emitUntag env charVal
+    // Phase 92: C function now untags internally
     let rawResult  = { Name = freshName env; Type = I64 }
     let zeroVal    = { Name = freshName env; Type = I64 }
     let boolResult = { Name = freshName env; Type = I1 }
-    (boolResult, charOps @ untagOps @ [
-        LlvmCallOp(rawResult, cFunc, [rawChar])
+    (boolResult, charOps @ [
+        LlvmCallOp(rawResult, cFunc, [charVal])
         ArithConstantOp(zeroVal, 0L)
         ArithCmpIOp(boolResult, "ne", rawResult, zeroVal)
     ])
@@ -462,7 +462,7 @@ let fmtSpecTypes (fmt: string) : FmtSpec list =
 /// I1 → zext to I64 (raw 0/1); I64 → untag; Ptr → ptrtoint; I32 → pass through.
 let coerceToI64Arg (env: ElabEnv) (v: MlirValue) : (MlirValue * MlirOp list) =
     match v.Type with
-    | I64 -> emitUntag env v
+    | I64 -> (v, [])  // Phase 92: C sprintf wrappers untag internally
     | I1  ->
         let ext = { Name = freshName env; Type = I64 }
         (ext, [ArithExtuIOp(ext, v)])

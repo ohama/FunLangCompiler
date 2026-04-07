@@ -961,18 +961,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let isBool = argVal.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs env.AnnotationMap argExpr
         if isBool then
             if argVal.Type = I1 then
+                // Phase 92: zext I1 to I64 then retag — C now expects tagged bool
                 let extVal = { Name = freshName env; Type = I64 }
-                (result, argOps @ [ArithExtuIOp(extVal, argVal); LlvmCallOp(result, "@lang_to_string_bool", [extVal])])
+                let (taggedExt, retagOps) = emitRetag env extVal
+                (result, argOps @ [ArithExtuIOp(extVal, argVal)] @ retagOps @ [LlvmCallOp(result, "@lang_to_string_bool", [taggedExt])])
             else
-                // Phase 88: Untag I64 bool before passing to C
-                let (rawBool, untagOps) = emitUntag env argVal
-                (result, argOps @ untagOps @ [LlvmCallOp(result, "@lang_to_string_bool", [rawBool])])
+                // Phase 92: C function now untags internally
+                (result, argOps @ [LlvmCallOp(result, "@lang_to_string_bool", [argVal])])
         elif argVal.Type = Ptr then
             (argVal, argOps)
         else
-            // Phase 88: Untag I64 int before passing to C
-            let (rawInt, untagOps) = emitUntag env argVal
-            (result, argOps @ untagOps @ [LlvmCallOp(result, "@lang_to_string_int", [rawInt])])
+            // Phase 92: C function now untags internally
+            (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
 
     // Phase 53: eq builtin — polymorphic equality, dispatches on static argument type.
     // Fires when arguments are string literals or non-Ptr values.
@@ -1032,19 +1032,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let isBool = argVal.Type = I1 || isBoolExpr env.BoolVars env.KnownFuncs env.AnnotationMap argExpr
         if isBool then
             if argVal.Type = I1 then
-                // Zero-extend I1 to I64 for C ABI compatibility (lang_to_string_bool takes int64_t)
+                // Phase 92: zext I1 to I64 then retag — C now expects tagged bool
                 let extVal = { Name = freshName env; Type = I64 }
-                (result, argOps @ [ArithExtuIOp(extVal, argVal); LlvmCallOp(result, "@lang_to_string_bool", [extVal])])
+                let (taggedExt, retagOps) = emitRetag env extVal
+                (result, argOps @ [ArithExtuIOp(extVal, argVal)] @ retagOps @ [LlvmCallOp(result, "@lang_to_string_bool", [taggedExt])])
             else
-                // Phase 88: Untag I64 bool before passing to C (tagged 1→0 false, 3→1 true)
-                let (rawBool, untagOps) = emitUntag env argVal
-                (result, argOps @ untagOps @ [LlvmCallOp(result, "@lang_to_string_bool", [rawBool])])
+                // Phase 92: C function now untags internally
+                (result, argOps @ [LlvmCallOp(result, "@lang_to_string_bool", [argVal])])
         elif argVal.Type = Ptr then
             (argVal, argOps)
         else
-            // Phase 88: Untag I64 int before passing to C
-            let (rawInt, untagOps) = emitUntag env argVal
-            (result, argOps @ untagOps @ [LlvmCallOp(result, "@lang_to_string_int", [rawInt])])
+            // Phase 92: C function now untags internally
+            (result, argOps @ [LlvmCallOp(result, "@lang_to_string_int", [argVal])])
 
     // Phase 8: string_length builtin — GEP field 0 and load
     | App (Var ("string_length", _), strExpr, _) ->
@@ -1564,8 +1563,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let i64Val = { Name = freshName env; Type = I64 }
                 [LlvmPtrToIntOp(i64Val, argVal); LlvmCallOp(strVal, "@lang_to_string_int", [i64Val])]
             else
-                let (rawVal, untagOps) = emitUntag env argVal
-                untagOps @ [LlvmCallOp(strVal, "@lang_to_string_int", [rawVal])]
+                // Phase 92: C function now untags internally
+                [LlvmCallOp(strVal, "@lang_to_string_int", [argVal])]
         // eprint("[file:line] "); eprintln(to_string(arg)); return original value
         (argVal, argOps @ locOps @ toStrOps @ [LlvmCallVoidOp("@lang_eprint", [locVal]); LlvmCallVoidOp("@lang_eprintln", [strVal])])
 
@@ -1777,20 +1776,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 31: char_to_upper — pass-through (returns i64 char code)
     | App (Var ("char_to_upper", _), charExpr, _) ->
         let (charVal, charOps) = elaborateExpr env charExpr
-        // Phase 88: Untag char before C, retag result
-        let (rawChar, untagOps) = emitUntag env charVal
-        let rawResult = { Name = freshName env; Type = I64 }
-        let (result, retagOps) = emitRetag env rawResult
-        (result, charOps @ untagOps @ [LlvmCallOp(rawResult, "@lang_char_to_upper", [rawChar])] @ retagOps)
+        // Phase 92: C function now untags input and tags result internally
+        let result = { Name = freshName env; Type = I64 }
+        (result, charOps @ [LlvmCallOp(result, "@lang_char_to_upper", [charVal])])
 
     // Phase 31: char_to_lower — pass-through (returns i64 char code)
     | App (Var ("char_to_lower", _), charExpr, _) ->
         let (charVal, charOps) = elaborateExpr env charExpr
-        // Phase 88: Untag char before C, retag result
-        let (rawChar, untagOps) = emitUntag env charVal
-        let rawResult = { Name = freshName env; Type = I64 }
-        let (result, retagOps) = emitRetag env rawResult
-        (result, charOps @ untagOps @ [LlvmCallOp(rawResult, "@lang_char_to_lower", [rawChar])] @ retagOps)
+        // Phase 92: C function now untags input and tags result internally
+        let result = { Name = freshName env; Type = I64 }
+        (result, charOps @ [LlvmCallOp(result, "@lang_char_to_lower", [charVal])])
 
     // Phase 7: print/println builtins — static literal fast path (keep before general case)
     | App (Var ("print", _), String (s, _), _) ->

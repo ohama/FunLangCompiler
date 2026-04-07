@@ -34,6 +34,7 @@ LangString* lang_string_concat(LangString* a, LangString* b) {
 }
 
 LangString* lang_to_string_int(int64_t n) {
+    n = LANG_UNTAG_INT(n);
     char tmp[32];
     int len = snprintf(tmp, sizeof(tmp), "%ld", (long)n);
     char* buf = (char*)GC_malloc((size_t)(len + 1));
@@ -45,6 +46,7 @@ LangString* lang_to_string_int(int64_t n) {
 }
 
 LangString* lang_to_string_bool(int64_t b) {
+    b = LANG_UNTAG_INT(b);
     const char* str = b ? "true" : "false";
     int64_t len = (int64_t)strlen(str);
     char* buf = (char*)GC_malloc((size_t)(len + 1));
@@ -203,22 +205,28 @@ int64_t lang_string_to_int(LangString* s) {
 }
 
 int64_t lang_char_is_digit(int64_t c) {
+    c = LANG_UNTAG_INT(c);
     return isdigit((int)c) ? 1 : 0;
 }
 int64_t lang_char_is_letter(int64_t c) {
+    c = LANG_UNTAG_INT(c);
     return isalpha((int)c) ? 1 : 0;
 }
 int64_t lang_char_is_upper(int64_t c) {
+    c = LANG_UNTAG_INT(c);
     return isupper((int)c) ? 1 : 0;
 }
 int64_t lang_char_is_lower(int64_t c) {
+    c = LANG_UNTAG_INT(c);
     return islower((int)c) ? 1 : 0;
 }
 int64_t lang_char_to_upper(int64_t c) {
-    return (int64_t)toupper((int)c);
+    c = LANG_UNTAG_INT(c);
+    return LANG_TAG_INT((int64_t)toupper((int)c));
 }
 int64_t lang_char_to_lower(int64_t c) {
-    return (int64_t)tolower((int)c);
+    c = LANG_UNTAG_INT(c);
+    return LANG_TAG_INT((int64_t)tolower((int)c));
 }
 
 /* Cons cell layout: {int64_t head @ offset 0, ConsCell* tail @ offset 8} — 16 bytes total */
@@ -1275,6 +1283,7 @@ LangCons* lang_dir_files(LangString* path) {
 /* Phase 38: CLI argument support */
 /* Phase 39: Format string wrappers (snprintf delegation) */
 LangString* lang_sprintf_1i(char* fmt, int64_t a) {
+    a = LANG_UNTAG_INT(a);
     int len = snprintf(NULL, 0, fmt, (long)a);
     if (len < 0) len = 0;
     char* buf = (char*)GC_malloc((size_t)(len + 1));
@@ -1297,6 +1306,8 @@ LangString* lang_sprintf_1s(char* fmt, char* a) {
 }
 
 LangString* lang_sprintf_2ii(char* fmt, int64_t a, int64_t b) {
+    a = LANG_UNTAG_INT(a);
+    b = LANG_UNTAG_INT(b);
     int len = snprintf(NULL, 0, fmt, (long)a, (long)b);
     if (len < 0) len = 0;
     char* buf = (char*)GC_malloc((size_t)(len + 1));
@@ -1308,6 +1319,7 @@ LangString* lang_sprintf_2ii(char* fmt, int64_t a, int64_t b) {
 }
 
 LangString* lang_sprintf_2si(char* fmt, char* a, int64_t b) {
+    b = LANG_UNTAG_INT(b);
     int len = snprintf(NULL, 0, fmt, a, (long)b);
     if (len < 0) len = 0;
     char* buf = (char*)GC_malloc((size_t)(len + 1));
@@ -1319,6 +1331,7 @@ LangString* lang_sprintf_2si(char* fmt, char* a, int64_t b) {
 }
 
 LangString* lang_sprintf_2is(char* fmt, int64_t a, char* b) {
+    a = LANG_UNTAG_INT(a);
     int len = snprintf(NULL, 0, fmt, (long)a, b);
     if (len < 0) len = 0;
     char* buf = (char*)GC_malloc((size_t)(len + 1));
