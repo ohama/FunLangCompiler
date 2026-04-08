@@ -1,0 +1,13 @@
+// Test: nested control flow — while+if-then, while+if-else, nested while, while+&&, while>if>while
+// Regression test for issue #18 (if-then continuation dead code)
+// --- Command: bash %S/93-04-nested-control-flow.sh
+// --- Input:
+// --- Output:
+hit
+3
+8
+9
+6
+3
+22
+12
