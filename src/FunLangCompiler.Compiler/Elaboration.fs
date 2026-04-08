@@ -151,7 +151,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               GlobalCounter = env.GlobalCounter
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
+              // Remove param name from MutableVars so lambda param shadows outer mutable var
+              MutableVars = Set.remove innerParam env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
               BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
 
         // For each capture at index i: GEP to slot i+1, then load
@@ -2520,7 +2521,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               GlobalCounter = env.GlobalCounter
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
+              // Remove param name from MutableVars so lambda param shadows outer mutable var
+              MutableVars = Set.remove param env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
               BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
