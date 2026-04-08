@@ -2464,8 +2464,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some bodyLabel; Args = [];
                         Body = terminatedOps } ]
-                // 5. Return: bind ops + guard eval + conditional branch
-                bindOps @ guardOps @ [CfCondBrOp(guardVal, bodyLabel, [], guardFailLabel, [])]
+                // 5. Coerce guard to I1 (may be I64 from function call like List.contains)
+                let (i1Guard, coerceGuardOps) = coerceToI1 bindEnv guardVal
+                // 6. Return: bind ops + guard eval + coerce + conditional branch
+                bindOps @ guardOps @ coerceGuardOps @ [CfCondBrOp(i1Guard, bodyLabel, [], guardFailLabel, [])]
 
         let chainEntryOps = emitDecisionTree tree
 
