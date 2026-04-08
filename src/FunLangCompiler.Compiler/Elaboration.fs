@@ -2585,7 +2585,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 20: If arity >= 1, the constructor is used as a first-class value (e.g. `apply Some 42`).
     // In that case, wrap as Lambda(param, Constructor(name, Some(Var(param)), _)) and re-elaborate.
     | Constructor(name, None, ctorSpan) ->
-        let info = Map.find name env.TypeEnv
+        match Map.tryFind name env.TypeEnv with
+        | None ->
+            failWithSpan ctorSpan "undefined constructor '%s'. Uppercase names are reserved for constructors — use lowercase for variables (e.g., 'const_val' instead of 'CONST_VAL')" name
+        | Some info ->
         if info.Arity >= 1 then
             // First-class unary+ constructor: produce a closure fun __ctor_N_Name x -> Name x
             let n = env.Counter.Value
@@ -2620,8 +2623,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 93: ADT constructor — unary/multi-arg variant (e.g. Some 42, Pair(3,4))
     // Allocates a 24-byte block: heap_tag@0, ctor_tag@1, payload@2.
-    | Constructor(name, Some argExpr, _) ->
-        let info     = Map.find name env.TypeEnv
+    | Constructor(name, Some argExpr, ctorSpan) ->
+        let info = match Map.tryFind name env.TypeEnv with
+                   | Some i -> i
+                   | None -> failWithSpan ctorSpan "undefined constructor '%s'. Uppercase names are reserved for constructors — use lowercase for variables" name
         let (argVal, argOps) = elaborateExpr env argExpr
         let sizeVal     = { Name = freshName env; Type = I64 }
         let blockPtr    = { Name = freshName env; Type = Ptr }
@@ -3223,7 +3228,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     //   ^while_body — elaborate body (discard value), re-elaborate cond, cf.cond_br back or exit
     //   ^while_exit(%exitArg : i64) — empty body, patched by LetPat/Let continuation
     | WhileExpr (condExpr, bodyExpr, _) ->
-        eprintfn "DEBUG WhileExpr: entry, blocks=%d" env.Blocks.Value.Length
+        // WhileExpr elaboration
         let headerLabel = freshLabel env "while_header"
         let bodyLabel   = freshLabel env "while_body"
         let exitLabel   = freshLabel env "while_exit"
@@ -3327,7 +3332,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             // The back-cond side blocks are at indices (allBlocks.Length - 4 - backCondSideBlocks) to (allBlocks.Length - 4 - 1)
             // backEdgeBrOp should be in the last of those (already patched above in the backCondSideBlocks > 0 branch)
         // Entry fragment: define unit constant (dominates all loop blocks), then branch to header
-        eprintfn "DEBUG WhileExpr: exit, blocks=%d" env.Blocks.Value.Length
+        // Entry fragment: define unit constant, branch to header
         (exitArg, [ ArithConstantOp(unitConst, 1L); CfBrOp(headerLabel, []) ])
 
     // Phase 29: ForExpr — block-argument CFG pattern for loop counter
