@@ -203,10 +203,9 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
             | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, ElabProgram.elaborateTypeclasses ds, s)
             | Ast.EmptyModule s -> Ast.EmptyModule s
         // Phase 67: Run FunLang type inference to get per-expression type annotations.
-        // This runs independently from the compilation pipeline — errors are non-fatal
-        // (type checker may reject code that the compiler handles via heuristics).
-        // Stderr is suppressed during type checking because Prelude may contain
-        // compiler-specific builtins unknown to FunLang's type checker.
+        // Type errors are currently non-fatal (issue #21) because FunLang parser changes
+        // (if-then-else Expr fix) cause parse regressions on some valid code patterns.
+        // TODO: Make fatal after FunLang parser is fixed.
         let annotationMap =
             try
                 let savedErr = System.Console.Error
@@ -216,7 +215,7 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                     typedModule.AnnotationMap
                 finally
                     System.Console.SetError(savedErr)
-            with _ -> Map.empty  // Type check failed — fall back to heuristics
+            with _ -> Map.empty
         let mlirMod = ElabProgram.elaborateProgram tcAst annotationMap
         match Pipeline.compile mlirMod outputPath optLevel with
         | Ok () ->
