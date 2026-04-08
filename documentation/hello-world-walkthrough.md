@@ -253,3 +253,38 @@ FunLangCompiler/
 └── src/FunLangCompiler.Cli/
     └── Program.fs           # CLI entry point
 ```
+
+## 8. 응용: 이름을 인자로 받기
+
+커맨드라인 인자를 받아 `hello <name>` 형태로 출력하는 프로그램:
+
+```fsharp
+// hello.fun
+let _ =
+    match get_args () with
+    | name :: _ -> println ("hello " ^^ name)
+    | []        -> println "hello world"
+```
+
+```bash
+$ fnc hello.fun -o hello
+
+$ ./hello
+hello world
+
+$ ./hello Alice
+hello Alice
+
+$ ./hello 세계
+hello 세계
+```
+
+**사용된 기능:**
+
+| 기능 | 설명 |
+|------|------|
+| `get_args ()` | 커맨드라인 인자를 `string list`로 반환 (argv[0] 프로그램명 제외) |
+| `match ... with` | 패턴 매칭으로 리스트 분해 |
+| `name :: _` | 첫 번째 원소 추출 (나머지 무시) |
+| `^^` | 문자열 연결 연산자 (`string_concat`) |
+| `println` | 문자열 출력 + 개행 |
