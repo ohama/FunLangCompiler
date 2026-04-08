@@ -86,27 +86,31 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 21: Mutable variable allocation
     | LetMut (name, initExpr, bodyExpr, _) ->
         let (initVal, initOps) = elaborateExpr env initExpr
+        // Coerce init value to I64 for uniform mutable cell storage (I1→tagged, Ptr→ptrtoint)
+        let (storeVal, coerceOps) = coerceToI64 env initVal
         let sizeVal  = { Name = freshName env; Type = I64 }
         let cellPtr  = { Name = freshName env; Type = Ptr }
         let allocOps = [
             ArithConstantOp(sizeVal, 8L)
             LlvmCallOp(cellPtr, "@GC_malloc", [sizeVal])
-            LlvmStoreOp(initVal, cellPtr)
+            LlvmStoreOp(storeVal, cellPtr)
         ]
         let env' = { env with
                         Vars        = Map.add name cellPtr env.Vars
                         MutableVars = Set.add name env.MutableVars }
         let (bodyVal, bodyOps) = elaborateExpr env' bodyExpr
-        (bodyVal, initOps @ allocOps @ bodyOps)
+        (bodyVal, initOps @ coerceOps @ allocOps @ bodyOps)
     // Phase 21: Mutable variable assignment
     | Assign (name, valExpr, span) ->
         let (newVal, valOps) = elaborateExpr env valExpr
+        // Coerce assigned value to I64 for uniform mutable cell storage
+        let (storeVal, coerceOps) = coerceToI64 env newVal
         let cellPtr =
             match Map.tryFind name env.Vars with
             | Some v -> v
             | None -> failWithSpan span "Elaboration: unbound mutable variable '%s' in Assign" name
         let unitVal = { Name = freshName env; Type = I64 }
-        (unitVal, valOps @ [LlvmStoreOp(newVal, cellPtr); ArithConstantOp(unitVal, 1L)])
+        (unitVal, valOps @ coerceOps @ [LlvmStoreOp(storeVal, cellPtr); ArithConstantOp(unitVal, 1L)])
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     // Phase 43: StripAnnot sees through Annot/LambdaAnnot wrappers from type annotations
