@@ -145,6 +145,7 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_hashset_add";       ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashset_contains";  ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashset_count";     ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashset_keys";      ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 33-02: COL-03 Queue
         { ExtName = "@lang_queue_create";      ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_queue_enqueue";     ExtParams = [Ptr; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
@@ -156,6 +157,7 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_mlist_get";         ExtParams = [Ptr; I64];      ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_mlist_set";         ExtParams = [Ptr; I64; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_mlist_count";       ExtParams = [Ptr];           ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_to_list";   ExtParams = [Ptr];           ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 34-01: LANG-01 String slicing
         { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 66: String character access — s.[i] returns byte at index as i64
@@ -576,6 +578,7 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         { ExtName = "@lang_hashset_add";       ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashset_contains";  ExtParams = [Ptr; I64];  ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_hashset_count";     ExtParams = [Ptr];       ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_hashset_keys";      ExtParams = [Ptr];       ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 33-02: COL-03 Queue
         { ExtName = "@lang_queue_create";      ExtParams = [];          ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_queue_enqueue";     ExtParams = [Ptr; I64];  ExtReturn = None;     IsVarArg = false; Attrs = [] }
@@ -587,6 +590,7 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         { ExtName = "@lang_mlist_get";         ExtParams = [Ptr; I64];      ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_mlist_set";         ExtParams = [Ptr; I64; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_mlist_count";       ExtParams = [Ptr];           ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_mlist_to_list";   ExtParams = [Ptr];           ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 34-01: LANG-01 String slicing
         { ExtName = "@lang_string_slice"; ExtParams = [Ptr; I64; I64]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         // Phase 66: String character access — s.[i] returns byte at index as i64

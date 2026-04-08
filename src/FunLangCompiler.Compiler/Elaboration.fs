@@ -1341,9 +1341,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("hashset_count", _), hsExpr, _) ->
         let (hsVal, hsOps) = elaborateExpr env hsExpr
         let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
-        // Phase 92: C function now returns tagged result
         let result = { Name = freshName env; Type = I64 }
         (result, hsOps @ hsCoerce @ [LlvmCallOp(result, "@lang_hashset_count", [hsPtr])])
+
+    | App (Var ("hashset_keys", _), hsExpr, _) ->
+        let (hsVal, hsOps) = elaborateExpr env hsExpr
+        let (hsPtr, hsCoerce) = coerceToPtrArg env hsVal
+        let result = { Name = freshName env; Type = Ptr }
+        (result, hsOps @ hsCoerce @ [LlvmCallOp(result, "@lang_hashset_keys", [hsPtr])])
 
     // Phase 33-02: COL-03 Queue
     | App (Var ("queue_create", _), unitExpr, _) ->
@@ -1406,9 +1411,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("mutablelist_count", _), mlExpr, _) ->
         let (mlVal, mlOps) = elaborateExpr env mlExpr
         let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
-        // Phase 92: C function now returns tagged result
         let result = { Name = freshName env; Type = I64 }
         (result, mlOps @ mlCoerce @ [LlvmCallOp(result, "@lang_mlist_count", [mlPtr])])
+
+    | App (Var ("mutablelist_tolist", _), mlExpr, _) ->
+        let (mlVal, mlOps) = elaborateExpr env mlExpr
+        let (mlPtr, mlCoerce) = coerceToPtrArg env mlVal
+        let result = { Name = freshName env; Type = Ptr }
+        (result, mlOps @ mlCoerce @ [LlvmCallOp(result, "@lang_mlist_to_list", [mlPtr])])
 
     // write_file — two-arg, void return
     | App (App (Var ("write_file", _), pathExpr, _), contentExpr, _) ->
@@ -1944,9 +1954,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         "hashtable_containsKey"; "hashtable_keys"
                         "hashtable_remove"; "hashtable_trygetvalue"; "hashtable_count"
                         "stringbuilder_create"; "stringbuilder_append"; "stringbuilder_tostring"
-                        "hashset_create"; "hashset_add"; "hashset_contains"; "hashset_count"
+                        "hashset_create"; "hashset_add"; "hashset_contains"; "hashset_count"; "hashset_keys"
                         "queue_create"; "queue_enqueue"; "queue_dequeue"; "queue_count"
-                        "mutablelist_create"; "mutablelist_add"; "mutablelist_count"
+                        "mutablelist_create"; "mutablelist_add"; "mutablelist_count"; "mutablelist_tolist"
                         "list_sort_by"; "list_of_seq"
                     ]
                     let allNames =

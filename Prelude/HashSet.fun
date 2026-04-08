@@ -3,3 +3,5 @@ module HashSet =
     let add hs v      = hashset_add hs v
     let contains hs v = hashset_contains hs v
     let count hs      = hashset_count hs
+    let keys hs       = hashset_keys hs
+    let toList hs     = hashset_keys hs

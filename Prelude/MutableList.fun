@@ -4,3 +4,4 @@ module MutableList =
     let get ml i      = mutablelist_get ml i
     let set ml i v    = mutablelist_set ml i v
     let count ml      = mutablelist_count ml
+    let toList ml     = mutablelist_tolist ml

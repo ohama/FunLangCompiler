@@ -149,6 +149,7 @@ LangHashSet* lang_hashset_create(void);
 int64_t lang_hashset_add(LangHashSet* hs, int64_t key);
 int64_t lang_hashset_contains(LangHashSet* hs, int64_t key);
 int64_t lang_hashset_count(LangHashSet* hs);
+LangCons* lang_hashset_keys(LangHashSet* hs);
 
 /* Phase 33-02: COL-03 Queue */
 typedef struct LangQueueNode {
@@ -179,6 +180,7 @@ void             lang_mlist_add(LangMutableList* ml, int64_t value);
 int64_t          lang_mlist_get(LangMutableList* ml, int64_t index);
 void             lang_mlist_set(LangMutableList* ml, int64_t index, int64_t value);
 int64_t          lang_mlist_count(LangMutableList* ml);
+LangCons*        lang_mlist_to_list(LangMutableList* ml);
 
 /* Phase 34-03: LANG-03/04 — for-in loop over Phase 33 collection types */
 void lang_for_in_hashset(void* closure, LangHashSet* hs);

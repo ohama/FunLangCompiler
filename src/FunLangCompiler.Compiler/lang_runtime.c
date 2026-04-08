@@ -1093,6 +1093,22 @@ int64_t lang_hashset_contains(LangHashSet* hs, int64_t key) {
 
 int64_t lang_hashset_count(LangHashSet* hs) { return LANG_TAG_INT(hs->size); }
 
+LangCons* lang_hashset_keys(LangHashSet* hs) {
+    LangCons* result = NULL;
+    for (int64_t i = 0; i < hs->capacity; i++) {
+        LangHashSetEntry* e = hs->buckets[i];
+        while (e != NULL) {
+            LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+            cell->heap_tag = LANG_HEAP_TAG_LIST;
+            cell->head = e->key;
+            cell->tail = result;
+            result = cell;
+            e = e->next;
+        }
+    }
+    return result;
+}
+
 /* Phase 33-02: COL-03 Queue (struct defined in lang_runtime.h) */
 LangQueue* lang_queue_create(void) {
     LangQueue* q = (LangQueue*)GC_malloc(sizeof(LangQueue));
@@ -1167,6 +1183,18 @@ void lang_mlist_set(LangMutableList* ml, int64_t index, int64_t value) {
 }
 
 int64_t lang_mlist_count(LangMutableList* ml) { return LANG_TAG_INT(ml->len); }
+
+LangCons* lang_mlist_to_list(LangMutableList* ml) {
+    LangCons* result = NULL;
+    for (int64_t i = ml->len - 1; i >= 0; i--) {
+        LangCons* cell = (LangCons*)GC_malloc(sizeof(LangCons));
+        cell->heap_tag = LANG_HEAP_TAG_LIST;
+        cell->head = ml->data[i];
+        cell->tail = result;
+        result = cell;
+    }
+    return result;
+}
 
 /* File I/O runtime functions */
 
