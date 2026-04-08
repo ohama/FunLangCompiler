@@ -445,7 +445,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let innerBlocks = env.Blocks.Value
             let targetIdx = blocksAfterBind - 1
             let targetBlock = innerBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = rops @ targetBlock.Body }
+            let patchedTarget = { targetBlock with Body = targetBlock.Body @ rops }
             env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (rv, bops)  // bops alone (terminator as last op — valid MLIR block ending)
         | _ ->
@@ -467,7 +467,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let innerBlocks = env.Blocks.Value
             let targetIdx = blocksAfterBind - 1
             let targetBlock = innerBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = rops @ targetBlock.Body }
+            let patchedTarget = { targetBlock with Body = targetBlock.Body @ rops }
             env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (rv, bops)
         | _ ->
@@ -490,7 +490,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             let innerBlocks = env.Blocks.Value
             let targetIdx = blocksAfterBind - 1
             let targetBlock = innerBlocks.[targetIdx]
-            let patchedTarget = { targetBlock with Body = rops @ targetBlock.Body }
+            let patchedTarget = { targetBlock with Body = targetBlock.Body @ rops }
             env.Blocks.Value <- innerBlocks |> List.mapi (fun i b -> if i = targetIdx then patchedTarget else b)
             (rv, bops)
         | _ ->
@@ -2455,12 +2455,20 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 env.Blocks.Value <- env.Blocks.Value @
                     [ { Label = Some guardFailLabel; Args = []; Body = guardFailOps } ]
                 // 4. Emit the body block (same as Leaf, skip merge branch if body already terminated)
+                let blocksBeforeBody = env.Blocks.Value.Length
                 let (bodyVal, bodyOps) = elaborateExpr bindEnv bodyExpr
                 // Coerce arm value to I64 for uniform merge block type (same as function body ABI)
                 let (coercedVal, coerceOps) = coerceToI64 bindEnv bodyVal
                 resultType.Value <- I64
                 let terminatedOps =
                     match List.tryLast bodyOps with
+                    | Some op when isTerminatorOp op && env.Blocks.Value.Length > blocksBeforeBody ->
+                        // Body ended with a block terminator (e.g., nested if/match).
+                        // Patch coerce + branch to merge into the last side block.
+                        let targetIdx = env.Blocks.Value.Length - 1
+                        let contOps = coerceOps @ [CfBrOp(mergeLabel, [coercedVal])]
+                        appendToBlock env targetIdx contOps
+                        bodyOps
                     | Some LlvmUnreachableOp -> bodyOps
                     | Some (CfBrOp _) | Some (CfCondBrOp _) -> bodyOps
                     | _ -> bodyOps @ coerceOps @ [CfBrOp(mergeLabel, [coercedVal])]

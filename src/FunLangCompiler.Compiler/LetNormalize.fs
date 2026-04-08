@@ -25,9 +25,12 @@ let private freshName () =
     sprintf "__anf_%d" n
 
 /// Returns true if an expression may produce control flow (multiple basic blocks).
-let private isComplexExpr (e: Expr) : bool =
+/// Also detects Let/LetPat/LetMut wrappers around complex bodies, since they pass through
+/// the terminator from the inner expression.
+let rec private isComplexExpr (e: Expr) : bool =
     match e with
     | If _ | Match _ | And _ | Or _ | TryWith _ -> true
+    | Let(_, bind, body, _) | LetPat(_, bind, body, _) | LetMut(_, bind, body, _) -> isComplexExpr bind || isComplexExpr body
     | _ -> false
 
 /// Wrap a complex expression in a let-binding, returning the bound variable.
