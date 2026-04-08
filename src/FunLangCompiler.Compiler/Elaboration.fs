@@ -3265,15 +3265,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // and the back-edge branch must go into the last back-cond side block.
         let bodyBlockBody, needPatchLast, backEdgeForBody =
             if backCondSideBlocks > 0 then
-                // Back-cond has side blocks; backEdgeBrOp goes into the last of those blocks.
-                // The "back-edge ops for body" are just condOps2 (entry fragment going to first side block).
-                // After body block, we push back-cond side blocks (already in env.Blocks.Value).
+                // Back-cond has side blocks (And/Or); coerceCondOps2 + backEdgeBrOp go into
+                // the last side block via appendToBlock below — do NOT include inline.
+                // Only condOps2 (entry fragment ending with And's cond_br) goes inline.
                 match List.tryLast bodyOps with
                 | Some op when isTerminatorOp op && env.Blocks.Value.Length > blocksBeforeBody ->
-                    // Body has side blocks too; back-cond entry fragment goes into inner last block.
-                    (bodyOps, true, condOps2 @ coerceCondOps2)
+                    (bodyOps, true, condOps2)
                 | _ ->
-                    (bodyOps @ condOps2 @ coerceCondOps2, false, [])
+                    (bodyOps @ condOps2, false, [])
             else
                 // Simple back-cond: no side blocks.
                 let backEdgeOps = condOps2 @ coerceCondOps2 @ [backEdgeBrOp]
@@ -3283,9 +3282,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 | _ ->
                     (bodyOps @ backEdgeOps, false, [])
         // Build the while_header block.
-        // If condOps created side blocks (short-circuit &&/||), the CfCondBrOp must go into
-        // the last of those side blocks, not the header block body.
-        let headerBody = condOps @ coerceCondOps
+        // If condOps created side blocks (short-circuit &&/||), coerceCondOps + condBrOp go into
+        // the And's merge block via appendToBlock below — exclude from inline header body.
+        let headerBody = if condSideBlocks > 0 then condOps else condOps @ coerceCondOps
         // Push the three while blocks AFTER elaborating both cond and body
         // (so any inner side blocks from nested expressions come first)
         env.Blocks.Value <- env.Blocks.Value @
