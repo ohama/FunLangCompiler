@@ -1587,3 +1587,11 @@ LangCons* lang_get_args(void) {
     }
     return head;
 }
+
+/* C entry point — calls compiler-generated @_fnc_entry.
+ * This allows user code to define a function named "main" without conflict. */
+extern int64_t _fnc_entry(int64_t argc, char** argv);
+
+int main(int argc, char** argv) {
+    return (int)_fnc_entry((int64_t)argc, argv);
+}

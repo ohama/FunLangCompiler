@@ -236,7 +236,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let makerBodyOps = makerOps @ outerParamStoreOps @ [ReturnOp [makerArg1]]
 
         let makerFuncOp : FuncOp =
-            { Name        = "@" + name
+            { Name        = mlirFuncName name
               InputTypes  = [I64; Ptr]
               ReturnType  = Some Ptr
               Body        = { Blocks = [ { Label = None; Args = []; Body = makerBodyOps } ] }
@@ -245,7 +245,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Step 5: Add both FuncOps to env.Funcs
         // Phase 53: If maker function with same name already exists (e.g., from Prelude InstanceDecl
         // shadowing of eq/show), replace it to avoid MLIR "redefinition of symbol" errors.
-        let makerMlirName = "@" + name
+        let makerMlirName = mlirFuncName name
         let existingFuncs = env.Funcs.Value
         if existingFuncs |> List.exists (fun f -> f.Name = makerMlirName) then
             env.Funcs.Value <- (existingFuncs |> List.filter (fun f -> f.Name <> makerMlirName)) @ [innerFuncOp; makerFuncOp]
@@ -257,7 +257,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                             InnerReturnIsBool = bodyReturnsBoolTyped env.AnnotationMap innerBody
                             CaptureNames = captures; OuterParamName = outerParam }
         let sig_ : FuncSignature =
-            { MlirName    = "@" + name
+            { MlirName    = mlirFuncName name
               ParamTypes  = [I64]
               ReturnType  = Ptr
               ClosureInfo = Some closureInfo
@@ -346,7 +346,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let retIsBool = preReturnType = I64 && bodyReturnsBoolTyped env.AnnotationMap body
         let innerRetIsBool = match stripAnnot body with Lambda(_, innerBody, _) -> bodyReturnsBoolTyped env.AnnotationMap innerBody | _ -> false
         let sig_ : FuncSignature =
-            { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
+            { MlirName = mlirFuncName name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
               ReturnIsBool = retIsBool; InnerReturnIsBool = innerRetIsBool }
         let shortNameAlias =
             let idx = name.IndexOf('_')
@@ -383,14 +383,14 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
                 entryBlock :: sideBlocksPatched
         let funcOp : FuncOp =
-            { Name = "@" + name
+            { Name = mlirFuncName name
               InputTypes = [paramType]
               ReturnType = Some finalBodyVal.Type
               Body = { Blocks = allBodyBlocks }
               IsLlvmFunc = false }
         // Phase 53: If a function with the same name already exists (e.g., from Prelude InstanceDecl
         // shadowing), replace it rather than appending, to avoid MLIR "redefinition of symbol" errors.
-        let mlirName = "@" + name
+        let mlirName = mlirFuncName name
         let existingFuncs = env.Funcs.Value
         if existingFuncs |> List.exists (fun f -> f.Name = mlirName) then
             env.Funcs.Value <- existingFuncs |> List.map (fun f -> if f.Name = mlirName then funcOp else f)
@@ -779,7 +779,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
                     else None
                 let sig_ : FuncSignature =
-                    { MlirName = "@" + name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
+                    { MlirName = mlirFuncName name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
                       ReturnIsBool = retIsBool; InnerReturnIsBool = innerRetIsBool }
                 (name, param, body, paramType, sig_, shortNameAlias))
         // Pass 1: Add all signatures to KnownFuncs (pre-return types)
@@ -819,7 +819,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
                         entryBlock :: sideBlocksPatched
                 let funcOp : FuncOp =
-                    { Name = "@" + name
+                    { Name = mlirFuncName name
                       InputTypes = [paramType]
                       ReturnType = Some finalBodyVal.Type
                       Body = { Blocks = allBodyBlocks }

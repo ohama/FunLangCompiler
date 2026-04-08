@@ -53,7 +53,7 @@ let elaborateModule (expr: Expr) : MlirModule =
         | entryBlock :: rest ->
             { entryBlock with Body = initArgsOp :: gcInitOp :: entryBlock.Body } :: rest
     let mainFunc : FuncOp =
-        { Name        = "@main"
+        { Name        = "@_fnc_entry"
           InputTypes  = [I64; Ptr]
           ReturnType  = Some exitVal.Type
           Body        = { Blocks = allBlocksWithGC }
@@ -486,7 +486,7 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         | entryBlock :: rest ->
             { entryBlock with Body = initArgsOp :: gcInitOp :: entryBlock.Body } :: rest
     let mainFunc : FuncOp =
-        { Name        = "@main"
+        { Name        = "@_fnc_entry"
           InputTypes  = [I64; Ptr]
           ReturnType  = Some exitVal.Type
           Body        = { Blocks = allBlocksWithGC }

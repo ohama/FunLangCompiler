@@ -83,6 +83,12 @@ let inline failWithSpan (span: Ast.Span) fmt =
 let inferredType (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : Type.Type option =
     Map.tryFind (Ast.spanOf expr) annotationMap
 
+/// Convert user function name to MLIR symbol.
+/// "main" is mangled to avoid conflict with C runtime's main().
+/// Entry point is @_fnc_entry (separate from user code).
+let mlirFuncName (name: string) : string =
+    if name = "main" then "@_user_main" else "@" + name
+
 /// Phase 67: Check if an expression's inferred type satisfies a predicate.
 /// Returns Some true/false if type is known, None if not in AnnotationMap (use fallback).
 let checkInferredType (annotationMap: Map<Ast.Span, Type.Type>) (predicate: Type.Type -> bool) (expr: Ast.Expr) : bool option =
