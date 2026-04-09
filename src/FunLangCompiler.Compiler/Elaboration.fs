@@ -114,7 +114,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Phase 5: special-case Let(name, Lambda(outerParam, Lambda(innerParam, innerBody)), inExpr)
     // This compiles to an llvm.func body + func.func closure-maker + KnownFuncs entry
     // Phase 43: StripAnnot sees through Annot/LambdaAnnot wrappers from type annotations
-    | Let (name, StripAnnot (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, innerLamSpan)), _)), inExpr, letSpan) ->
+    | Let (name, bindExprOrig2, inExpr, letSpan)
+        when (match stripAnnot bindExprOrig2 with
+              | Lambda (_, StripAnnot (Lambda _), _) -> true
+              | _ -> false) ->
+        let (Lambda (outerParam, StripAnnot (Lambda (innerParam, innerBody, innerLamSpan)), _)) = stripAnnot bindExprOrig2
         // Step 1: Compute free variables of the inner lambda body relative to innerParam only.
         // These are variables that need to come from the closure environment struct.
         // outerParam IS one such variable — it's passed to the closure-maker and stored at env[1+i].
@@ -157,13 +161,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               // Remove param name from MutableVars so lambda param shadows outer mutable var
               MutableVars = Set.remove innerParam env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
+              BoolVars = Set.empty
+              StringVars =
+                (let outerIsString =
+                    match bindExprOrig2 with
+                    | Ast.LambdaAnnot(p, TEString, _, _) when p = outerParam -> true
+                    | Ast.Annot(Ast.LambdaAnnot(p, TEString, _, _), _, _) when p = outerParam -> true
+                    | _ -> false
+                 if outerIsString then Set.singleton outerParam else Set.empty)
+              StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" (captureStartIdx + i); Type = Ptr }
-                let capType = if Set.contains capName env.MutableVars then Ptr else I64
+                let capType = if Set.contains capName env.MutableVars || Set.contains capName env.StringVars then Ptr else I64
                 let capVal = { Name = sprintf "%%t%d" (captureStartIdx + i + numCaptures); Type = capType }
                 (gepVal, capVal, capName, i)
             )
@@ -2562,11 +2574,11 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               // Remove param name from MutableVars so lambda param shadows outer mutable var
               MutableVars = Set.remove param env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
+              BoolVars = Set.empty; StringVars = env.StringVars; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i); Type = Ptr }
-                let capType = if Set.contains capName env.MutableVars then Ptr else I64
+                let capType = if Set.contains capName env.MutableVars || Set.contains capName env.StringVars then Ptr else I64
                 let capVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i + numCaptures); Type = capType }
                 (gepVal, capVal, capName, i)
             )
