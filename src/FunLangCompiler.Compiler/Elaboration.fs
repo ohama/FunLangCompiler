@@ -1189,7 +1189,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Phase 66: String char-at dispatch — s.[i] returns the byte at index i as i64
         if isStringExpr env.StringVars env.StringFields env.AnnotationMap collExpr then
             // Phase 92: C function now untags index and tags result internally
-            (rawResult, collOps @ collCoerce @ idxOps @ [LlvmCallOp(rawResult, "@lang_string_char_at", [collPtr; idxVal])])
+            // Phase 94: coerce index to I64 if Ptr (closure param uniform ABI)
+            let (idxI64, idxCoerce) =
+                if idxVal.Type = Ptr then
+                    let v = { Name = freshName env; Type = I64 } in (v, [LlvmPtrToIntOp(v, idxVal)])
+                else (idxVal, [])
+            (rawResult, collOps @ collCoerce @ idxOps @ idxCoerce @ [LlvmCallOp(rawResult, "@lang_string_char_at", [collPtr; idxI64])])
         else
         match idxVal.Type with
         | Ptr ->
