@@ -1,0 +1,7 @@
+// Test: Issue #22 — string parameter indexing returns correct char code
+// --- Command: bash %S/94-01-string-param-indexing.sh
+// --- Input:
+// --- Output:
+104
+104
+104
