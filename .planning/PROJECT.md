@@ -21,9 +21,19 @@ v19.0: 3-Lambda SSA Scope Fix — Issue #4 해결. 244 E2E tests.
 
 ## Current State
 
-v22.0 shipped. 250 E2E tests. Issues #6, #7 resolved.
-~4,700 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 13 Prelude .fun files.
+v22.0 shipped. 261 E2E tests. Issues #6, #7, #14, #18, #19 resolved.
+~4,700 lines F# (Elaboration.fs), ~1,450 lines C (lang_runtime.c), 14 Prelude .fun files.
 MutablePtrGlobal for cross-func-func template env access.
+
+## Current Milestone: v23.0 FunLang v14.0 Sync + Prelude Unification
+
+**Goal:** FunLang v14.0 서브모듈 동기화 및 Prelude를 FunLang과 통합하여 동일 소스 사용
+
+**Target features:**
+- FunLang 서브모듈 v14.0 업데이트 (type annotation 파서 확장, 새 타입 등록)
+- Prelude type annotation 지원 — annotated Prelude 파일을 컴파일러가 정상 처리
+- Prelude 통합 — FunLang Prelude를 그대로 사용 (컴파일러 전용 함수 보존)
+- THashSet 등 FunLang v14.0 새 타입에 대한 컴파일러 경고 해소
 
 ## Requirements
 
