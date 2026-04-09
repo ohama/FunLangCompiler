@@ -805,7 +805,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     | _ ->
                     match paramTypeAnnot with
                     | Some TEString -> true
-                    | _ -> false
+                    | _ ->
+                    // Phase 96: Lambda-lifted LetRec — captures become prepended params with
+                    // paramTypeAnnot=None. If param was a string var in the outer scope, preserve it.
+                    Set.contains param env.StringVars
                 let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
                 let retIsBool = preReturnType = I64 && bodyReturnsBoolTyped env.AnnotationMap body
                 let innerRetIsBool = match stripAnnot body with Lambda(_, ib, _) -> bodyReturnsBoolTyped env.AnnotationMap ib | _ -> false
@@ -813,8 +816,18 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     let idx = name.IndexOf('_')
                     if idx > 0 && System.Char.IsUpper(name.[0]) then Some (name.Substring(idx + 1))
                     else None
+                // Phase 96: Generate a unique MLIR name to avoid collisions with identically-named
+                // functions emitted from Prelude (e.g. local `let rec go` conflicting with List.go).
+                // Lambda-lifted LetRecs inside function bodies can share names with top-level functions.
+                let baseMlirName = mlirFuncName name
+                let mlirName =
+                    if env.Funcs.Value |> List.exists (fun f -> f.Name = baseMlirName) then
+                        let idx = env.ClosureCounter.Value
+                        env.ClosureCounter.Value <- idx + 1
+                        sprintf "@_letrec_%d_%s" idx name
+                    else baseMlirName
                 let sig_ : FuncSignature =
-                    { MlirName = mlirFuncName name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
+                    { MlirName = mlirName; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
                       ReturnIsBool = retIsBool; InnerReturnIsBool = innerRetIsBool }
                 (name, param, body, paramType, sig_, shortNameAlias, paramIsString))
         // Pass 1: Add all signatures to KnownFuncs (pre-return types)
@@ -856,7 +869,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                         let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
                         entryBlock :: sideBlocksPatched
                 let funcOp : FuncOp =
-                    { Name = mlirFuncName name
+                    { Name = sig_.MlirName  // Phase 96: use the (possibly unique) MLIR name from sig_
                       InputTypes = [paramType]
                       ReturnType = Some finalBodyVal.Type
                       Body = { Blocks = allBodyBlocks }

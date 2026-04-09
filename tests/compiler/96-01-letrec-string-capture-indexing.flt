@@ -1,0 +1,9 @@
+// Test: Issue #22 extension — inner let rec capturing string param uses s.[i] correctly
+// Lambda-lifted local let rec with captured string param must use lang_string_char_at, not lang_index_get.
+// --- Command: bash %S/96-01-letrec-string-capture-indexing.sh
+// --- Input:
+// --- Output:
+2
+5
+-1
+0
