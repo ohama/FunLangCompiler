@@ -42,9 +42,9 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | BUG-01 | Phase 94 | Complete |
-| TYPE-01 | Phase 95 | Pending |
-| TYPE-02 | Phase 95 | Pending |
-| SUB-01 | Phase 95 | Pending |
+| TYPE-01 | Phase 95 | Complete |
+| TYPE-02 | Phase 95 | Complete |
+| SUB-01 | Phase 95 | Complete |
 | PRE-01 | Phase 96 | Pending |
 | PRE-02 | Phase 96 | Pending |
 | PRE-03 | Phase 96 | Pending |

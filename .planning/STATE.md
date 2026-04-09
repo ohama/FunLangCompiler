@@ -19,7 +19,7 @@ Progress: v1.0–v23.0 in progress [██████████████�
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 121
+- Total plans completed: 122
 - v13.1: 3 phases, 6 plans in 1 day
 - v13.0: 3 phases, 7 plans in 1 day
 
