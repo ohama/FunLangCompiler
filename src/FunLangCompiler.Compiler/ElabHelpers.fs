@@ -558,6 +558,8 @@ let rec isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
                 | ConstructorPat _ -> true  // ADT constructor pattern → param is Ptr
                 | ConstPat(StringConst _, _) -> true  // string constant pattern → param is string (Ptr)
                 | _ -> false)
+        // Phase 94: IndexGet on param → param is Ptr (string/array/hashtable all need Ptr)
+        | IndexGet(Var(v, _), _, _) when v = paramName -> true
         // Constructor call with param as argument → param is ADT/Ptr
         | Constructor(_, Some(Var(v, _)), _) when v = paramName -> true
         | Constructor(_, Some arg, _) -> hasParamPtrUse strVars arg

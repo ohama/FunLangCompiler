@@ -337,11 +337,25 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // Single-arg Let-Lambda: compile as named func.func and add to KnownFuncs (not Vars).
     // This prevents the function value being captured as a closure in nested two-arg functions,
     // which would cause MLIR "value defined outside region" errors.
-    | Let (name, StripAnnot (Lambda (param, body, lamSpan)), inExpr, _)
-        when (freeVars (Set.singleton param) body
-              |> Set.filter (fun v -> Map.containsKey v env.Vars)
-              |> Set.isEmpty) ->
+    | Let (name, bindExprOrig, inExpr, _)
+        when (match stripAnnot bindExprOrig with
+              | Lambda (param, body, _) ->
+                  freeVars (Set.singleton param) body
+                  |> Set.filter (fun v -> Map.containsKey v env.Vars)
+                  |> Set.isEmpty
+              | _ -> false) ->
+        let (param, body, lamSpan) =
+            match stripAnnot bindExprOrig with
+            | Lambda (p, b, s) -> (p, b, s)
+            | _ -> failwith "impossible: guard ensures Lambda"
         let paramType = if isPtrParamTyped env.AnnotationMap lamSpan param body then Ptr else I64
+        let paramIsString =
+            match Map.tryFind lamSpan env.AnnotationMap with
+            | Some (Type.TArrow(Type.TString, _)) -> true
+            | _ ->
+            match bindExprOrig with
+            | LambdaAnnot(p, TEString, _, _) when p = param -> true
+            | _ -> false
         let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
         let retIsBool = preReturnType = I64 && bodyReturnsBoolTyped env.AnnotationMap body
         let innerRetIsBool = match stripAnnot body with Lambda(_, innerBody, _) -> bodyReturnsBoolTyped env.AnnotationMap innerBody | _ -> false
@@ -365,7 +379,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TplGlobals = env.TplGlobals
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
+              BoolVars = Set.empty
+              StringVars = (if paramIsString then Set.singleton param else Set.empty)
+              StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         // Phase 88: Retag I1 returns to I64 tagged for uniform ABI.
         // Only I1 needs retag; I64/Ptr stay as-is.
@@ -769,8 +785,15 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Pass 1: Pre-register ALL binding signatures in KnownFuncs so every body can call every sibling.
         // Pass 2: Elaborate each body with the full KnownFuncs, then update with actual return types.
         let bindingInfos =
-            bindings |> List.map (fun (name, param, _paramTypeAnnot, body, bindingSpan) ->
+            bindings |> List.map (fun (name, param, paramTypeAnnot, body, bindingSpan) ->
                 let paramType = if isPtrParamTyped env.AnnotationMap bindingSpan param body then Ptr else I64
+                let paramIsString =
+                    match Map.tryFind bindingSpan env.AnnotationMap with
+                    | Some (Type.TArrow(Type.TString, _)) -> true
+                    | _ ->
+                    match paramTypeAnnot with
+                    | Some TEString -> true
+                    | _ -> false
                 let preReturnType = match stripAnnot body with | Lambda _ -> Ptr | _ -> I64
                 let retIsBool = preReturnType = I64 && bodyReturnsBoolTyped env.AnnotationMap body
                 let innerRetIsBool = match stripAnnot body with Lambda(_, ib, _) -> bodyReturnsBoolTyped env.AnnotationMap ib | _ -> false
@@ -781,16 +804,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 let sig_ : FuncSignature =
                     { MlirName = mlirFuncName name; ParamTypes = [paramType]; ReturnType = preReturnType; ClosureInfo = None
                       ReturnIsBool = retIsBool; InnerReturnIsBool = innerRetIsBool }
-                (name, param, body, paramType, sig_, shortNameAlias))
+                (name, param, body, paramType, sig_, shortNameAlias, paramIsString))
         // Pass 1: Add all signatures to KnownFuncs (pre-return types)
         let allKnownFuncs =
-            bindingInfos |> List.fold (fun kf (name, _, _, _, sig_, shortAlias) ->
+            bindingInfos |> List.fold (fun kf (name, _, _, _, sig_, shortAlias, _) ->
                 let kf' = Map.add name sig_ kf
                 match shortAlias with Some sn -> Map.add sn sig_ kf' | None -> kf'
             ) env.KnownFuncs
         // Pass 2: Elaborate each body with full KnownFuncs, emit func.func, collect final sigs
         let finalKnownFuncs =
-            bindingInfos |> List.fold (fun kfAcc (name, param, body, paramType, sig_, shortAlias) ->
+            bindingInfos |> List.fold (fun kfAcc (name, param, body, paramType, sig_, shortAlias, paramIsString) ->
                 let bodyEnv : ElabEnv =
                     { Vars = Map.ofList [(param, { Name = "%arg0"; Type = paramType })]
                       Counter = ref 0; LabelCounter = ref 0; Blocks = ref []
@@ -802,7 +825,9 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                       TplGlobals = env.TplGlobals
                       TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
                       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
-                      BoolVars = Set.empty; StringVars = Set.empty; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
+                      BoolVars = Set.empty
+                      StringVars = (if paramIsString then Set.singleton param else Set.empty)
+                      StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
                 let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
                 // Phase 88: Retag I1 returns to I64 tagged for uniform ABI.
                 let (finalBodyVal, coerceRetOps) =
