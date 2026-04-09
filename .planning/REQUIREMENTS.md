@@ -41,7 +41,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUG-01 | Phase 94 | Pending |
+| BUG-01 | Phase 94 | Complete |
 | TYPE-01 | Phase 95 | Pending |
 | TYPE-02 | Phase 95 | Pending |
 | SUB-01 | Phase 95 | Pending |
