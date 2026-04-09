@@ -34,6 +34,7 @@ MutablePtrGlobal for cross-func-func template env access.
 - Prelude type annotation 지원 — annotated Prelude 파일을 컴파일러가 정상 처리
 - Prelude 통합 — FunLang Prelude를 그대로 사용 (컴파일러 전용 함수 보존)
 - THashSet 등 FunLang v14.0 새 타입에 대한 컴파일러 경고 해소
+- Issue #22: 함수 파라미터로 받은 string의 s.[i] 인덱싱이 잘못된 값 반환 — FunLexYacc 런타임 블로킹
 
 ## Requirements
 
