@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-04-09)
 
 **Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** Phase 95 — Type System Sync (FunLang v14.0)
+**Current focus:** Phase 96 — Prelude Copy
 
 ## Current Position
 
-Phase: 94 of 97 (String Parameter Indexing Bug Fix) — COMPLETE
+Phase: 95 of 97 (FunLang v14.0 Type System Sync) — COMPLETE
 Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-04-09 — Completed 94-01-PLAN.md (Issue #22 fix)
+Last activity: 2026-04-09 — Completed 95-01-PLAN.md (v14.0 type system sync)
 
-Progress: v1.0–v22.0 complete [███████████████████████] 94 phases done / 3 phases remaining in v23.0
+Progress: v1.0–v23.0 in progress [████████████████████████] 95 phases done / 2 phases remaining in v23.0
 
 ## Performance Metrics
 
@@ -33,6 +33,8 @@ Progress: v1.0–v22.0 complete [███████████████�
 - Phase 94: TEString (not TEName "string") is FunLang's AST TypeExpr for the string primitive — use TEString in all pattern matches on type annotations
 - Phase 94: Build warnings from `dotnet run` go to stdout — test scripts must use `>/dev/null 2>/dev/null`
 - Phase 94: StringVars must be populated at bodyEnv construction for function parameters; heuristic inference alone is insufficient for IndexGet dispatch
+- Phase 95: TStringBuilder is not a CollectionKind — add to typeNeedsPtr only, not detectCollectionKind
+- Phase 95: Keep TData("HashSet"/"Queue"/"MutableList") fallback arms after new v14.0 union case arms for backward compatibility
 
 ### Pending Todos
 
@@ -40,11 +42,11 @@ Progress: v1.0–v22.0 complete [███████████████�
 
 ### Blockers/Concerns
 
-- None (Issue #22 resolved)
+- None
 
 ## Session Continuity
 
-Last session: 2026-04-09T02:47:22Z
-Stopped at: Completed 94-01-PLAN.md — Issue #22 string parameter indexing fixed
+Last session: 2026-04-09T03:05:00Z
+Stopped at: Completed 95-01-PLAN.md — FunLang v14.0 type system sync, submodule at 8da0af2
 Resume file: None
-Next action: /gsd:plan-phase 95 (Type System Sync — FunLang v14.0)
+Next action: /gsd:plan-phase 96 (Prelude Copy)
