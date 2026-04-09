@@ -51,10 +51,10 @@ Plans:
   2. `detectCollectionKind` handles all v14.0 collection union cases without falling through to default
   3. `git submodule status` shows FunLang pinned at 8da0af2
 
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 95-01: Patch ElabHelpers.fs typeNeedsPtr + detectCollectionKind; commit submodule
+- [ ] 95-01-PLAN.md — Patch ElabHelpers.fs typeNeedsPtr + detectCollectionKind; commit submodule
 
 ---
 
@@ -102,6 +102,6 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 94. String Parameter Indexing Bug Fix | v23.0 | 1/1 | ✓ Complete | 2026-04-09 |
-| 95. FunLang v14.0 Type System Sync | v23.0 | 0/TBD | Not started | - |
+| 95. FunLang v14.0 Type System Sync | v23.0 | 0/1 | Not started | - |
 | 96. Prelude Trivial Sync (9 files) | v23.0 | 0/TBD | Not started | - |
 | 97. Prelude Manual Merge (5 files) | v23.0 | 0/TBD | Not started | - |
