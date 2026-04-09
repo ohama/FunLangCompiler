@@ -34,10 +34,10 @@ See MILESTONES.md for full history. Last phase: 93 (v13.1).
   2. FunLexYacc programs that use string parameter indexing compile and produce correct output
   3. An E2E test exercises the bug scenario and passes
 
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 94-01: Diagnose root cause of string parameter indexing and fix
+- [ ] 94-01-PLAN.md — Fix isPtrParamBody + StringVars heuristics, add E2E test
 
 ---
 
@@ -101,7 +101,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 94. String Parameter Indexing Bug Fix | v23.0 | 0/TBD | Not started | - |
+| 94. String Parameter Indexing Bug Fix | v23.0 | 0/1 | Not started | - |
 | 95. FunLang v14.0 Type System Sync | v23.0 | 0/TBD | Not started | - |
 | 96. Prelude Trivial Sync (9 files) | v23.0 | 0/TBD | Not started | - |
 | 97. Prelude Manual Merge (5 files) | v23.0 | 0/TBD | Not started | - |
