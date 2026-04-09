@@ -133,9 +133,6 @@ let rec detectCollectionKind (collVars: Map<string, CollectionKind>) (annotation
     | Some (Type.THashSet _) -> Some HashSet
     | Some (Type.TQueue _) -> Some Queue
     | Some (Type.TMutableList _) -> Some MutableList
-    | Some (Type.TData("HashSet", _)) -> Some HashSet
-    | Some (Type.TData("Queue", _)) -> Some Queue
-    | Some (Type.TData("MutableList", _)) -> Some MutableList
     | Some (Type.THashtable _) -> Some Hashtable
     | Some _ -> None
     | None ->
@@ -545,12 +542,12 @@ let rec isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
         // fst/snd on param → param is a tuple (Ptr)
         | App(Var("fst", _), Var(v, _), _) when v = paramName -> true
         | App(Var("snd", _), Var(v, _), _) when v = paramName -> true
-        // Passing param to eprintfn/eprintln/println/printfn → param is likely a string (Ptr)
+        // Passing param to println/eprintln/eprint → param is a string (direct output, needs Ptr)
         | App(Var("eprintln", _), Var(v, _), _) when v = paramName -> true
         | App(Var("eprint", _), Var(v, _), _) when v = paramName -> true
         | App(Var("println", _), Var(v, _), _) when v = paramName -> true
-        | App(App(Var("eprintfn", _), _, _), Var(v, _), _) when v = paramName -> true
-        | App(App(Var("printfn", _), _, _), Var(v, _), _) when v = paramName -> true
+        // Note: printfn/eprintfn format args can be any type (%d = int, %s = string)
+        // so we do NOT treat them as evidence of Ptr param type.
         // Note: Add(Var(v), _) is NOT treated as Ptr — Add is integer arith (arith.addi).
         // String concat uses string_concat builtin, not Add.
         // Check match arms on param (for string or non-list param)
@@ -615,6 +612,19 @@ let rec isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
         | Raise(e, _) -> hasParamPtrUse strVars e
         | _ -> false
     hasParamPtrUse Set.empty bodyExpr
+
+/// Determine if a TypeExpr (source-level annotation) needs Ptr representation.
+/// Used by LambdaAnnot handler to bypass annotationMap (which may have stale outer-type).
+let rec typeExprNeedsPtr (te: TypeExpr) : bool =
+    match te with
+    | TEString -> true
+    | TEList _ | TETuple (_ :: _ :: _) -> true   // list / non-unit tuple → Ptr
+    | TETuple [] -> false  // unit
+    | TETuple [_] -> false  // singleton tuple — treat as I64 (rare)
+    | TEArrow _ -> true    // closure → Ptr
+    | TEData _ -> true     // ADT/record → Ptr
+    | TEInt | TEBool | TEChar -> false
+    | _ -> false  // TEVar, TEConstrained, etc. → fallback I64
 
 /// Phase 67: Determine if a FunLang Type needs Ptr representation (vs I64).
 /// String, list, array, tuple (non-unit), record, ADT, hashtable, closures → Ptr.
