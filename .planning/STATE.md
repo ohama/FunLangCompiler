@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-04-09)
 
 **Core value:** FunLang 소스 코드를 입력받아 네이티브 실행 바이너리를 출력한다
-**Current focus:** v23.0 FunLang v14.0 Sync + Prelude Unification
+**Current focus:** Phase 94 — String Parameter Indexing Bug Fix (Issue #22)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-09 — Milestone v23.0 started
+Phase: 94 of 97 (String Parameter Indexing Bug Fix)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-04-09 — Roadmap created for v23.0
 
-Progress: v1.0-v22.0 + v13.0-v13.1 [██████████████████████] 72 phases / 120 plans
+Progress: v1.0–v22.0 complete [██████████████████████] 93 phases done / 4 phases remaining in v23.0
 
 ## Performance Metrics
 
@@ -27,7 +27,9 @@ Progress: v1.0-v22.0 + v13.0-v13.1 [██████████████�
 
 ### Decisions
 
-(New milestone — starting fresh)
+- v23.0: Phase 94 first (BUG-01 blocks FunLexYacc runtime — user explicit priority)
+- v23.0: Type system sync (Phase 95) before Prelude copy (Phase 96) — submodule must be at v14.0 first
+- v23.0: Option.fun validated first as canary for multi-param style (Phase 97)
 
 ### Pending Todos
 
@@ -35,11 +37,11 @@ Progress: v1.0-v22.0 + v13.0-v13.1 [██████████████�
 
 ### Blockers/Concerns
 
-- Build warning: THashSet incomplete pattern match in ElabHelpers.fs:618
+- Issue #22: string parameter indexing root cause unknown (confidence LOW per research) — diagnose first
 
 ## Session Continuity
 
 Last session: 2026-04-09
-Stopped at: Defining requirements for v23.0
+Stopped at: Roadmap written, ready to plan Phase 94
 Resume file: None
-Next action: Define requirements → create roadmap
+Next action: /gsd:plan-phase 94

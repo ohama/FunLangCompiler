@@ -41,23 +41,23 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUG-01 | TBD | Pending |
-| TYPE-01 | TBD | Pending |
-| TYPE-02 | TBD | Pending |
-| PRE-01 | TBD | Pending |
-| PRE-02 | TBD | Pending |
-| PRE-03 | TBD | Pending |
-| PRE-04 | TBD | Pending |
-| PRE-05 | TBD | Pending |
-| PRE-06 | TBD | Pending |
-| PRE-07 | TBD | Pending |
-| PRE-08 | TBD | Pending |
-| SUB-01 | TBD | Pending |
+| BUG-01 | Phase 94 | Pending |
+| TYPE-01 | Phase 95 | Pending |
+| TYPE-02 | Phase 95 | Pending |
+| SUB-01 | Phase 95 | Pending |
+| PRE-01 | Phase 96 | Pending |
+| PRE-02 | Phase 96 | Pending |
+| PRE-03 | Phase 96 | Pending |
+| PRE-04 | Phase 97 | Pending |
+| PRE-05 | Phase 97 | Pending |
+| PRE-06 | Phase 97 | Pending |
+| PRE-07 | Phase 97 | Pending |
+| PRE-08 | Phase 97 | Pending |
 
 **Coverage:**
 - v23.0 requirements: 12 total
-- Mapped to phases: 0
-- Unmapped: 12 ⚠️
+- Mapped to phases: 12
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-04-09*
