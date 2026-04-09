@@ -130,6 +130,9 @@ let rec isStringExpr (stringVars: Set<string>) (stringFields: Set<string>) (anno
 /// Returns Some kind if the expression is a known collection-creating call or variable.
 let rec detectCollectionKind (collVars: Map<string, CollectionKind>) (annotationMap: Map<Ast.Span, Type.Type>) (expr: Ast.Expr) : CollectionKind option =
     match inferredType annotationMap expr with
+    | Some (Type.THashSet _) -> Some HashSet
+    | Some (Type.TQueue _) -> Some Queue
+    | Some (Type.TMutableList _) -> Some MutableList
     | Some (Type.TData("HashSet", _)) -> Some HashSet
     | Some (Type.TData("Queue", _)) -> Some Queue
     | Some (Type.TData("MutableList", _)) -> Some MutableList
@@ -619,6 +622,7 @@ let rec isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
 let typeNeedsPtr (ty: Type.Type) : bool =
     match ty with
     | Type.TString | Type.TList _ | Type.TArray _ | Type.THashtable _
+    | Type.THashSet _ | Type.TQueue _ | Type.TMutableList _ | Type.TStringBuilder
     | Type.TArrow _ | Type.TExn -> true
     | Type.TTuple elems -> not elems.IsEmpty  // non-unit tuple → Ptr
     | Type.TData _ -> true                    // ADT/record → Ptr
