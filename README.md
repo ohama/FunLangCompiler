@@ -1,5 +1,7 @@
 # FunLangCompiler
 
+[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+
 FunLang 소스 코드를 네이티브 x86-64 바이너리로 컴파일하는 컴파일러 백엔드.
 
 F#으로 구현되며, [FunLang](deps/FunLang) 프론트엔드(파서/타입체커)를 재사용한다. 내부 IR(MlirIR)을 MLIR 텍스트로 직렬화한 뒤 `mlir-opt` → `mlir-translate` → `clang` 파이프라인으로 네이티브 바이너리를 생성한다.
@@ -27,6 +29,10 @@ fnc hello.fun -o hello
 fnc hello.fun -O0    # no optimization
 fnc hello.fun -O2    # default
 fnc hello.fun -O3    # aggressive
+
+# Function entry tracing (for debugging)
+fnc --trace hello.fun -o hello
+./hello 2>trace.log  # stderr에 [TRACE] @funcName 출력
 
 # Run the compiled binary
 ./hello
@@ -81,13 +87,13 @@ fnc test unit          # 특정 테스트만
 | Strings | Heap-allocated `{heap_tag, length, data}` structs, `string_length`, `string_concat`, `to_string` |
 | Tuples | N-ary tuple construction, `let (a, b) = ...` destructuring |
 | Lists | `[]`, `h :: t` cons, `[e1; e2; ...]` literals, recursive processing |
-| Pattern Matching | `match` compiled via [Jacobs decision tree algorithm](#pattern-matching-compilation); constant, wildcard, variable, tuple, list, string patterns; non-exhaustive match runtime error |
+| Pattern Matching | `match` compiled via [Jacobs decision tree algorithm](#pattern-matching-compilation); constant, wildcard, variable, tuple, list, string patterns; [non-exhaustive match diagnostics](#match-failure-diagnostics) |
 | Equality | Generic structural equality (`=`, `<>`) for int, string, tuple, record, list, ADT |
 | Tagged Values | OCaml-style LSB 1-bit tagging (int=2n+1, ptr=LSB 0) for runtime type dispatch |
 | Heap Tags | Slot-0 type tag (STRING=1, TUPLE=2, RECORD=3, LIST=4, ADT=5) for generic hash/equality |
 | Collections | Hashtable, HashSet, Queue, MutableList, StringBuilder, Array — all with unified LSB dispatch |
 | I/O | `print`, `println`, `printf`, `sprintf`, file I/O (14 builtins) |
-| Debugging | `dbg expr` — prints `[file:line] value` to stderr, returns value (pass-through) |
+| Debugging | `dbg expr` — prints `[file:line] value` to stderr, returns value (pass-through); `--trace` flag for function entry tracing; match failure shows source location + backtrace |
 | GC | Boehm GC (`libgc`) for all heap allocation |
 
 ## Architecture
@@ -122,11 +128,11 @@ clang + libgc         -- Native binary linking
 | `MatchCompiler.fs` | ~150 | Decision tree pattern matching compiler ([Jacobs algorithm](#pattern-matching-compilation)) |
 | `Printer.fs` | ~180 | Pure serializer: MlirIR -> `.mlir` text |
 | `ElabHelpers.fs` | ~800 | Helpers: coerce, tag/untag, string/char predicates |
-| `Elaboration.fs` | ~3500 | AST -> MlirIR recursive pass with `ElabEnv` |
+| `Elaboration.fs` | ~3600 | AST -> MlirIR recursive pass with `ElabEnv` |
 | `Pipeline.fs` | ~130 | Shell pipeline: `mlir-opt` -> `mlir-translate` -> `clang` (-O0~O3) |
 | `ProjectFile.fs` | ~100 | funproj.toml TOML subset parser |
-| `lang_runtime.c` | ~1560 | C runtime: string, array, hashtable, collection, I/O, generic hash/equality |
-| `Program.fs` | ~300 | CLI entry point: build/test/single-file modes |
+| `lang_runtime.c` | ~1600 | C runtime: string, array, hashtable, collection, I/O, generic hash/equality, call stack |
+| `Program.fs` | ~400 | CLI entry point: build/test/single-file modes, --trace flag |
 
 ## Dependencies
 
@@ -161,7 +167,7 @@ sudo apt install libgc-dev
 
 ## Testing
 
-260+개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
+263개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
 
 ```bash
 # Run all tests
@@ -247,6 +253,26 @@ type DecisionTree =
 ### Code Generation
 
 The `DecisionTree` is lowered to MLIR `cf.cond_br` chains in `Elaboration.fs`. Each `Switch` node becomes a conditional branch; `Leaf` nodes emit variable bindings and elaborate the body expression; `Fail` nodes call `@lang_match_failure`.
+
+## Match Failure Diagnostics
+
+non-exhaustive match 발생 시 소스 위치, 매치 대상 값, 콜 스택 backtrace를 출력한다:
+
+```
+Fatal: non-exhaustive match at src/Parser.fun:42 (value=4303998752)
+Backtrace (most recent call last):
+  0: @_fnc_entry
+  1: @parseExpr
+  2: @parseAtom
+```
+
+- **소스 위치**: match 표현식이 정의된 파일과 줄 번호
+- **value**: scrutinee의 i64 표현 (홀수=tagged 정수, 짝수=힙 포인터)
+- **Backtrace**: 에러 시점의 함수 호출 스택
+
+`--trace` 플래그를 함께 사용하면 모든 함수 진입이 stderr에 기록되어 더 상세한 추적이 가능하다.
+
+상세 문서: [documentation/match-failure-diagnostics.md](documentation/match-failure-diagnostics.md)
 
 ## MLIR Pipeline
 

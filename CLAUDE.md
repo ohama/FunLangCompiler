@@ -6,7 +6,7 @@
 # Build
 dotnet build src/FunLangCompiler.Cli
 
-# Run all E2E tests (260+ tests)
+# Run all E2E tests (263 tests)
 dotnet run --project deps/fslit/FsLit/FsLit.fsproj -- tests/compiler/
 
 # Run a specific test
@@ -43,6 +43,25 @@ let x = dbg (expensive_computation 42)
 // stderr: [file.fun:1] 1764
 // x = 1764
 ```
+
+`--trace` — 함수 진입 트레이싱. stderr에 `[TRACE] @funcName` 출력.
+
+```bash
+fnc --trace myapp.fun -o myapp
+./myapp 2>trace.log   # 모든 함수 진입 기록
+tail -20 trace.log    # 마지막 20줄 확인
+```
+
+Match failure diagnostics — non-exhaustive match 시 소스 위치 + 콜 스택 출력.
+
+```
+Fatal: non-exhaustive match at file.fun:42 (value=3)
+Backtrace (most recent call last):
+  0: @_fnc_entry
+  1: @myFunc
+```
+
+상세: [documentation/match-failure-diagnostics.md](documentation/match-failure-diagnostics.md)
 
 ## Binary Names
 
