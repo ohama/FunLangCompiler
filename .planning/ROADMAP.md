@@ -118,9 +118,34 @@ CLI에서 --trace 플래그 파싱 → ElabEnv에 traceEnabled 전달 → func e
 
 ---
 
+#### Phase 99: Match Failure Diagnostics — 소스 위치, 값, 콜 스택
+
+**Goal**: non-exhaustive match 에러 발생 시 소스 위치(file:line), 매치 대상 값의 태그/표현, 콜 스택 backtrace를 stderr에 출력하여 디버깅을 즉시 가능하게 함
+**Depends on**: Phase 98
+**Requirements**: DEBUG-02
+**Success Criteria** (what must be TRUE):
+  1. match 실패 시 `Fatal: non-exhaustive match at file.fun:42` 형태로 소스 위치가 출력됨
+  2. match 실패 시 매치 대상 값의 태그 또는 정수 표현이 함께 출력됨 (예: `value=3`, `tag=Cons`)
+  3. 런타임 콜 스택이 유지되어 match 실패 시 `Backtrace:` 섹션에 호출 경로가 출력됨
+  4. 기존 263+ E2E 테스트 모두 통과 (regression 없음)
+  5. FunLexYacc의 "non-exhaustive match" 에러에서 정확한 소스 위치와 콜 스택 확인 가능
+
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 99 to break down)
+
+**Details:**
+현재 `lang_match_failure()`는 인자 없이 "Fatal: non-exhaustive match"만 출력.
+개선: (1) Elaboration에서 match 실패 분기에 소스 span 정보를 string global로 전달,
+(2) 매치 대상 값을 i64로 전달하여 태그/값 출력,
+(3) 런타임에 간단한 콜 스택 push/pop (`lang_trace_push`/`lang_trace_pop`) 유지 + 에러 시 출력.
+
+---
+
 ## Progress
 
-**Execution Order:** 94 → 95 → 96 → 97 → 98
+**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -129,3 +154,4 @@ CLI에서 --trace 플래그 파싱 → ElabEnv에 traceEnabled 전달 → func e
 | 96. Prelude Trivial Sync (9 files) | v23.0 | 0/TBD | Not started | - |
 | 97. Prelude Manual Merge (5 files) | v23.0 | 0/TBD | Not started | - |
 | 98. --trace Compiler Flag | v23.0 | 0/TBD | Not started | - |
+| 99. Match Failure Diagnostics | v23.0 | 0/TBD | Not started | - |

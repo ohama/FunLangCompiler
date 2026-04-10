@@ -217,6 +217,7 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                     System.Console.SetError(savedErr)
             with _ -> Map.empty
         let mlirMod = ElabProgram.elaborateProgram tcAst annotationMap
+        let mlirMod = ElabProgram.insertCallStack mlirMod
         let mlirMod = if traceEnabled then ElabProgram.insertTraceEntries mlirMod else mlirMod
         match Pipeline.compile mlirMod outputPath optLevel with
         | Ok () ->

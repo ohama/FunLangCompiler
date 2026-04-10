@@ -61,8 +61,36 @@ LangString* lang_to_string_bool(int64_t b) {
     return s;
 }
 
-void lang_match_failure(void) {
-    fprintf(stderr, "Fatal: non-exhaustive match\n");
+// Phase 99: Runtime call stack for backtrace on match failure / failwith.
+// Simple fixed-size stack of function name C strings.
+#define LANG_CALLSTACK_MAX 256
+static const char* lang_callstack[LANG_CALLSTACK_MAX];
+static int lang_callstack_depth = 0;
+
+void lang_trace_push(const char* funcName) {
+    if (lang_callstack_depth < LANG_CALLSTACK_MAX)
+        lang_callstack[lang_callstack_depth] = funcName;
+    lang_callstack_depth++;
+}
+
+void lang_trace_pop(void) {
+    if (lang_callstack_depth > 0)
+        lang_callstack_depth--;
+}
+
+static void lang_print_backtrace(void) {
+    int depth = lang_callstack_depth;
+    if (depth > LANG_CALLSTACK_MAX) depth = LANG_CALLSTACK_MAX;
+    if (depth == 0) return;
+    fprintf(stderr, "Backtrace (most recent call last):\n");
+    for (int i = 0; i < depth; i++) {
+        fprintf(stderr, "  %d: %s\n", i, lang_callstack[i]);
+    }
+}
+
+void lang_match_failure(const char* location, int64_t value) {
+    fprintf(stderr, "Fatal: non-exhaustive match at %s (value=%lld)\n", location, (long long)value);
+    lang_print_backtrace();
     exit(1);
 }
 

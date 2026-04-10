@@ -70,7 +70,9 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_match_failure";   ExtParams = [Ptr; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_trace_push";      ExtParams = [Ptr];      ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_trace_pop";       ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
@@ -503,7 +505,9 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         { ExtName = "@lang_string_concat";   ExtParams = [Ptr; Ptr]; ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_to_string_int";   ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_to_string_bool";  ExtParams = [I64];      ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_match_failure";   ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_match_failure";   ExtParams = [Ptr; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_trace_push";      ExtParams = [Ptr];      ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_trace_pop";       ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
@@ -652,3 +656,35 @@ let insertTraceEntries (mlirMod: MlirModule) : MlirModule =
         Globals = mlirMod.Globals @ traceGlobals
         ExternalFuncs = extFuncs
         Funcs = tracedFuncs }
+
+/// Phase 99: Insert call stack push/pop into all FuncOps for backtrace on match failure.
+/// Push function name at entry, pop before every ReturnOp/LlvmReturnOp.
+let insertCallStack (mlirMod: MlirModule) : MlirModule =
+    let mutable csGlobals = []
+    let mutable counter = 0
+    let instrumentedFuncs =
+        mlirMod.Funcs |> List.map (fun func ->
+            let globalName = sprintf "@__cs_%d" counter
+            counter <- counter + 1
+            csGlobals <- csGlobals @ [StringConstant(globalName, func.Name)]
+            let addrVal = { Name = "%__cs_addr"; Type = Ptr }
+            let pushOps : MlirOp list = [
+                LlvmAddressOfOp(addrVal, globalName)
+                LlvmCallVoidOp("@lang_trace_push", [addrVal])
+            ]
+            // Insert pop before every return in all blocks
+            let insertPops (ops: MlirOp list) =
+                ops |> List.collect (fun op ->
+                    match op with
+                    | ReturnOp _ | LlvmReturnOp _ ->
+                        [LlvmCallVoidOp("@lang_trace_pop", []); op]
+                    | _ -> [op])
+            match func.Body.Blocks with
+            | entryBlock :: rest ->
+                let newEntry = { entryBlock with Body = pushOps @ (insertPops entryBlock.Body) }
+                let patchedRest = rest |> List.map (fun b -> { b with Body = insertPops b.Body })
+                { func with Body = { Blocks = newEntry :: patchedRest } }
+            | [] -> func)
+    { mlirMod with
+        Globals = mlirMod.Globals @ csGlobals
+        Funcs = instrumentedFuncs }

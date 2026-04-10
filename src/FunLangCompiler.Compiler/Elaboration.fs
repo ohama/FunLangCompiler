@@ -2571,11 +2571,22 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
         let chainEntryOps = emitDecisionTree tree
 
-        // Failure block
+        // Phase 99: Failure block with source location and scrutinee value
+        let locStr = sprintf "%s:%d" matchSpan.FileName matchSpan.StartLine
+        let locGlobal = addStringGlobal env locStr
+        let locAddrVal = { Name = freshName env; Type = Ptr }
+        // Coerce scrutinee to I64 for diagnostic output
+        let (failScrutVal, failScrutOps) =
+            if scrutVal.Type = I64 then (scrutVal, [])
+            else
+                let coerced = { Name = freshName env; Type = I64 }
+                (coerced, [LlvmPtrToIntOp(coerced, scrutVal)])
         env.Blocks.Value <- env.Blocks.Value @
             [ { Label = Some failLabel
                 Args   = []
-                Body   = [ LlvmCallVoidOp("@lang_match_failure", [])
+                Body   = failScrutOps @
+                         [ LlvmAddressOfOp(locAddrVal, locGlobal)
+                           LlvmCallVoidOp("@lang_match_failure", [locAddrVal; failScrutVal])
                            LlvmUnreachableOp ] } ]
 
         // Merge block

@@ -86,7 +86,9 @@ void        lang_file_append(LangString* path, LangString* content);
 int64_t     lang_file_exists(LangString* path);
 void        lang_eprint(LangString* s);
 void        lang_eprintln(LangString* s);
-void        lang_trace(const char* s);  // Phase 98: raw C string trace to stderr
+void        lang_trace(const char* s);       // Phase 98: raw C string trace to stderr
+void        lang_trace_push(const char* fn); // Phase 99: push function name onto call stack
+void        lang_trace_pop(void);            // Phase 99: pop function name from call stack
 
 LangCons*   lang_read_lines(LangString* path);
 void        lang_write_lines(LangString* path, LangCons* lines);
