@@ -73,7 +73,7 @@ let elaborateModule (expr: Expr) : MlirModule =
         { ExtName = "@lang_match_failure";   ExtParams = [Ptr; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_trace_push";      ExtParams = [Ptr];      ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_trace_pop";       ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_failwith";        ExtParams = [Ptr; Ptr];          ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
@@ -508,7 +508,7 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         { ExtName = "@lang_match_failure";   ExtParams = [Ptr; I64]; ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_trace_push";      ExtParams = [Ptr];      ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_trace_pop";       ExtParams = [];         ExtReturn = None;     IsVarArg = false; Attrs = [] }
-        { ExtName = "@lang_failwith";        ExtParams = [Ptr];               ExtReturn = None;     IsVarArg = false; Attrs = [] }
+        { ExtName = "@lang_failwith";        ExtParams = [Ptr; Ptr];          ExtReturn = None;     IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_sub";      ExtParams = [Ptr; I64; I64];     ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_contains"; ExtParams = [Ptr; Ptr];          ExtReturn = Some I64; IsVarArg = false; Attrs = [] }
         { ExtName = "@lang_string_to_int";   ExtParams = [Ptr];               ExtReturn = Some I64; IsVarArg = false; Attrs = [] }

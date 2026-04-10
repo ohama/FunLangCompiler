@@ -4,4 +4,6 @@ exception Failure of string
 let _ = raise (Failure "boom")
 // --- Output:
 Fatal: unhandled exception
+Backtrace (most recent call last):
+  0: @_fnc_entry
 1

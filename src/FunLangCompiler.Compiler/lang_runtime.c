@@ -94,8 +94,9 @@ void lang_match_failure(const char* location, int64_t value) {
     exit(1);
 }
 
-void lang_failwith(const char* msg) {
-    fprintf(stderr, "%s\n", msg);
+void lang_failwith(const char* msg, const char* location) {
+    fprintf(stderr, "Fatal: %s at %s\n", msg, location);
+    lang_print_backtrace();
     exit(1);
 }
 
@@ -431,6 +432,7 @@ void lang_throw(void *exn_val) {
     lang_current_exception_val = exn_val;
     if (lang_exn_top == NULL) {
         fprintf(stderr, "Fatal: unhandled exception\n");
+        lang_print_backtrace();
         exit(1);
     }
     LangExnFrame *frame = lang_exn_top;
@@ -454,7 +456,7 @@ int lang_try_enter(LangExnFrame *frame) {
 int64_t* lang_array_create(int64_t n, int64_t default_val) {
     n = LANG_UNTAG_INT(n);
     if (n < 0) {
-        lang_failwith("array_create: negative length");
+        lang_failwith("array_create: negative length", "<runtime>");
     }
     int64_t* arr = (int64_t*)GC_malloc((size_t)((n + 1) * 8));
     arr[0] = n;
@@ -972,7 +974,7 @@ int64_t lang_array_fold(void* closure, int64_t init, int64_t* arr) {
 int64_t* lang_array_init(int64_t n, void* closure) {
     n = LANG_UNTAG_INT(n);
     if (n < 0) {
-        lang_failwith("array_init: negative length");
+        lang_failwith("array_init: negative length", "<runtime>");
     }
     LangClosureFn fn = *(LangClosureFn*)closure;
     int64_t* out = (int64_t*)GC_malloc((size_t)((n + 1) * 8));
@@ -1164,7 +1166,7 @@ void lang_queue_enqueue(LangQueue* q, int64_t value) {
 
 int64_t lang_queue_dequeue(LangQueue* q) {
     if (q->head == NULL) {
-        lang_failwith("Queue.Dequeue: queue is empty");
+        lang_failwith("Queue.Dequeue: queue is empty", "<runtime>");
     }
     LangQueueNode* node = q->head;
     int64_t value       = node->value;
@@ -1199,7 +1201,7 @@ void lang_mlist_add(LangMutableList* ml, int64_t value) {
 int64_t lang_mlist_get(LangMutableList* ml, int64_t index) {
     index = LANG_UNTAG_INT(index);
     if (index < 0 || index >= ml->len) {
-        lang_failwith("MutableList.get: index out of bounds");
+        lang_failwith("MutableList.get: index out of bounds", "<runtime>");
     }
     return ml->data[index];
 }
@@ -1207,7 +1209,7 @@ int64_t lang_mlist_get(LangMutableList* ml, int64_t index) {
 void lang_mlist_set(LangMutableList* ml, int64_t index, int64_t value) {
     index = LANG_UNTAG_INT(index);
     if (index < 0 || index >= ml->len) {
-        lang_failwith("MutableList.set: index out of bounds");
+        lang_failwith("MutableList.set: index out of bounds", "<runtime>");
     }
     ml->data[index] = value;
 }

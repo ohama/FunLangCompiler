@@ -4,4 +4,6 @@ exception ParseError of string
 let _ = raise (ParseError "bad input")
 // --- Output:
 Fatal: unhandled exception
+Backtrace (most recent call last):
+  0: @_fnc_entry
 1

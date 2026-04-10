@@ -166,9 +166,30 @@ Plans:
 
 ---
 
+#### Phase 101: failwith/unhandled exception Backtrace
+
+**Goal**: `failwith "msg"` 및 unhandled exception (`lang_throw`) 발생 시에도 콜 스택 backtrace를 stderr에 출력
+**Depends on**: Phase 99
+**Requirements**: DEBUG-03
+**Success Criteria** (what must be TRUE):
+  1. `failwith "error"` 호출 시 에러 메시지와 함께 `Backtrace:` 출력
+  2. unhandled exception (try-with 없이 raise) 시에도 `Backtrace:` 출력
+  3. 기존 264+ E2E 테스트 모두 통과
+
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 101 to break down)
+
+**Details:**
+Phase 99에서 추가한 `lang_trace_push`/`lang_trace_pop` + `lang_print_backtrace()` 인프라 재활용.
+`lang_failwith()`와 `lang_throw()` (unhandled 경로)에 `lang_print_backtrace()` 호출 1줄씩 추가.
+
+---
+
 ## Progress
 
-**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99 → 100
+**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99 → 100 → 101
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -179,3 +200,4 @@ Plans:
 | 98. --trace Compiler Flag | v23.0 | 0/TBD | Not started | - |
 | 99. Match Failure Diagnostics | v23.0 | 0/TBD | Not started | - |
 | 100. Hashtable.tryGetValue Option Fix | v23.0 | 0/TBD | Not started | - |
+| 101. failwith/exception Backtrace | v23.0 | 0/TBD | Not started | - |

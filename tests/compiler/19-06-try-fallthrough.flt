@@ -8,4 +8,6 @@ let _ =
   | Failure msg -> 0
 // --- Output:
 Fatal: unhandled exception
+Backtrace (most recent call last):
+  0: @_fnc_entry
 1

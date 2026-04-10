@@ -1114,16 +1114,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         (result, strOps @ strCoerce @ [LlvmCallOp(result, "@lang_string_length", [strPtr])])
 
     // Phase 14: failwith builtin — extract char* from LangString, call lang_failwith (noreturn)
-    | App (Var ("failwith", _), msgExpr, _) ->
+    // Phase 101: pass source location for backtrace diagnostics
+    | App (Var ("failwith", _), msgExpr, failSpan) ->
         let (msgVal, msgOps) = elaborateExpr env msgExpr
         let (msgPtr, msgCoerce) = coerceToPtrArg env msgVal
         let dataPtrVal  = { Name = freshName env; Type = Ptr }
         let dataAddrVal = { Name = freshName env; Type = Ptr }
+        let locStr = sprintf "%s:%d" failSpan.FileName failSpan.StartLine
+        let locGlobal = addStringGlobal env locStr
+        let locAddrVal = { Name = freshName env; Type = Ptr }
         let unitVal     = { Name = freshName env; Type = I64 }
         let ops = [
             LlvmGEPStructOp(dataPtrVal, msgPtr, 2)
             LlvmLoadOp(dataAddrVal, dataPtrVal)
-            LlvmCallVoidOp("@lang_failwith", [dataAddrVal])
+            LlvmAddressOfOp(locAddrVal, locGlobal)
+            LlvmCallVoidOp("@lang_failwith", [dataAddrVal; locAddrVal])
             ArithConstantOp(unitVal, 1L)
         ]
         (unitVal, msgOps @ msgCoerce @ ops)
