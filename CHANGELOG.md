@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-04-10
+
+### Added
+- `failwith "msg"` 호출 시 소스 위치(`at file.fun:42`)와 콜 스택 backtrace 출력 (Phase 101)
+- Unhandled exception (`raise` without `try-with`) 시에도 콜 스택 backtrace 출력
+
 ## [0.1.1] - 2026-04-10
 
 ### Fixed
