@@ -622,7 +622,8 @@ let rec typeExprNeedsPtr (te: TypeExpr) : bool =
     | TETuple [] -> false  // unit
     | TETuple [_] -> false  // singleton tuple — treat as I64 (rare)
     | TEArrow _ -> true    // closure → Ptr
-    | TEData _ -> true     // ADT/record → Ptr
+    | TEData _ -> true     // ADT/record (parameterized) → Ptr
+    | TEName _ -> true     // ADT/record (simple named type) → Ptr
     | TEInt | TEBool | TEChar -> false
     | _ -> false  // TEVar, TEConstrained, etc. → fallback I64
 

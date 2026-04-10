@@ -3515,7 +3515,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               MutableVars = Set.remove param env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
               BoolVars = Set.empty
-              StringVars = (if paramNeedsPtr && (match paramTyExpr with TEString -> true | _ -> false) then Set.singleton param else env.StringVars)
+              StringVars = (if paramNeedsPtr && (match paramTyExpr with TEString -> true | _ -> false) then Set.add param env.StringVars else env.StringVars)
               StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
