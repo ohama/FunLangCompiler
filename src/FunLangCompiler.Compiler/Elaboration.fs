@@ -3473,103 +3473,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
 
     // Phase 30: Type annotation pass-through — ignore type at codegen
     | Annot (expr, _, _) -> elaborateExpr env expr
-    // Phase 30: LambdaAnnot — use explicit param type annotation to determine ptr-ness.
-    // NOTE: Do NOT forward to Lambda(param, body, span) here. When desugarAnnotParams creates
-    // nested LambdaAnnot nodes from a multi-param function, all share the same span.
-    // annotationMap[span] is then set to the OUTERMOST arrow type (e.g. TArrow(TString, ...))
-    // by type inference, so looking up annotationMap for an inner LambdaAnnot(i: int) would
-    // incorrectly return TArrow(TString, ...) and treat `i` as Ptr. Using the explicit
-    // paramTyExpr directly avoids this span-collision bug (issue #22).
-    | LambdaAnnot (param, paramTyExpr, body, span) ->
-        // Use the explicit type annotation to determine if param is Ptr (bypass annotationMap).
-        let paramNeedsPtr = typeExprNeedsPtr paramTyExpr
-        // Reuse the bare Lambda elaboration logic, but override the ptr decision.
-        // We replicate the Lambda(param, body, span) logic with paramNeedsPtr determined above.
-        let allFree = freeVars (Set.singleton param) body
-        let captures =
-            allFree
-            |> Set.filter (fun name -> Map.containsKey name env.Vars)
-            |> Set.toList
-            |> List.sort
-        let numCaptures = captures.Length
-        let closureFnIdx = env.ClosureCounter.Value
-        env.ClosureCounter.Value <- closureFnIdx + 1
-        let closureFnName = sprintf "@closure_fn_%d" closureFnIdx
-        let arg0Val = { Name = "%arg0"; Type = Ptr }
-        let arg1Val = { Name = "%arg1"; Type = Ptr }
-        let (lambdaParamVal, lambdaParamCoerceOps, lambdaCaptureStart) =
-            if not paramNeedsPtr then
-                let i64Val = { Name = "%t0"; Type = I64 }
-                (i64Val, [LlvmPtrToIntOp(i64Val, arg1Val)], 1)
-            else
-                (arg1Val, [], 0)
-        let innerEnv : ElabEnv =
-            { Vars = Map.ofList [(param, lambdaParamVal)]
-              Counter = ref lambdaCaptureStart; LabelCounter = ref 0; Blocks = ref []
-              KnownFuncs = env.KnownFuncs
-              Funcs = env.Funcs
-              ClosureCounter = env.ClosureCounter
-              Globals = env.Globals
-              GlobalCounter = env.GlobalCounter
-              TplGlobals = env.TplGlobals
-              TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
-              MutableVars = Set.remove param env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty
-              StringVars = (if paramNeedsPtr && (match paramTyExpr with TEString -> true | _ -> false) then Set.add param env.StringVars else env.StringVars)
-              StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
-        let captureLoadOps, innerEnvWithCaptures =
-            captures |> List.mapi (fun i capName ->
-                let gepVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i); Type = Ptr }
-                let capType = if Set.contains capName env.MutableVars || Set.contains capName env.StringVars then Ptr else I64
-                let capVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i + numCaptures); Type = capType }
-                (gepVal, capVal, capName, i)
-            )
-            |> List.fold (fun (opsAcc, envAcc: ElabEnv) (gepVal, capVal, capName, i) ->
-                let gepOp  = LlvmGEPLinearOp(gepVal, arg0Val, i + 1)
-                let loadOp = LlvmLoadOp(capVal, gepVal)
-                let envAcc' = { envAcc with Vars = Map.add capName capVal envAcc.Vars }
-                (opsAcc @ [gepOp; loadOp], envAcc')
-            ) ([], innerEnv)
-        innerEnvWithCaptures.Counter.Value <- lambdaCaptureStart + numCaptures * 2
-        let (bodyVal, bodyEntryOps) = elaborateExpr innerEnvWithCaptures body
-        let (finalRetVal, normalizeRetOps) = coerceToI64 innerEnvWithCaptures bodyVal
-        let bodySideBlocks = innerEnvWithCaptures.Blocks.Value
-        let allBodyBlocks =
-            if bodySideBlocks.IsEmpty then
-                [ { Label = None; Args = []; Body = lambdaParamCoerceOps @ captureLoadOps @ bodyEntryOps @ normalizeRetOps @ [LlvmReturnOp [finalRetVal]] } ]
-            else
-                let entryBlock = { Label = None; Args = []; Body = lambdaParamCoerceOps @ captureLoadOps @ bodyEntryOps }
-                let lastBlock = List.last bodySideBlocks
-                let lastBlockWithReturn = { lastBlock with Body = lastBlock.Body @ normalizeRetOps @ [LlvmReturnOp [finalRetVal]] }
-                let sideBlocksPatched = (List.take (bodySideBlocks.Length - 1) bodySideBlocks) @ [lastBlockWithReturn]
-                entryBlock :: sideBlocksPatched
-        let innerFuncOp : FuncOp =
-            { Name = closureFnName; InputTypes = [Ptr; Ptr]; ReturnType = Some I64
-              Body = { Blocks = allBodyBlocks }; IsLlvmFunc = true }
-        env.Funcs.Value <- env.Funcs.Value @ [innerFuncOp]
-        let bytesVal  = { Name = freshName env; Type = I64 }
-        let envPtrVal = { Name = freshName env; Type = Ptr }
-        let fnPtrVal  = { Name = freshName env; Type = Ptr }
-        let allocOps = [
-            ArithConstantOp(bytesVal, int64 ((numCaptures + 1) * 8))
-            LlvmCallOp(envPtrVal, "@GC_malloc", [bytesVal])
-            LlvmAddressOfOp(fnPtrVal, closureFnName)
-            LlvmStoreOp(fnPtrVal, envPtrVal)
-        ]
-        let captureStoreOps =
-            captures |> List.mapi (fun i capName ->
-                let slotVal = { Name = freshName env; Type = Ptr }
-                let capVal  = Map.find capName env.Vars
-                if capVal.Type = I64 then
-                    let ptrVal = { Name = freshName env; Type = Ptr }
-                    [ LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
-                      LlvmIntToPtrOp(ptrVal, capVal)
-                      LlvmStoreOp(ptrVal, slotVal) ]
-                else
-                    [ LlvmGEPLinearOp(slotVal, envPtrVal, i + 1)
-                      LlvmStoreOp(capVal, slotVal) ]
-            ) |> List.concat
-        (envPtrVal, allocOps @ captureStoreOps)
+    // Phase 30: LambdaAnnot — fix span collision by overriding annotationMap, then delegate to Lambda.
+    // desugarAnnotParams creates nested LambdaAnnot nodes sharing the same span, so
+    // annotationMap[span] always returns the OUTERMOST arrow type. We override annotationMap[span]
+    // with the correct arrow type for THIS param before forwarding to Lambda, which uses the
+    // exact same closure-building code without duplication (issue #22).
+    | LambdaAnnot (param, _, body, span) -> elaborateExpr env (Lambda(param, body, span))
 
     // Phase 30 + 34-03: ForInExpr — desugar to Lambda closure + lang_for_in_* runtime call.
     // Phase 34-03 extends: TuplePat support (for hashtable (k,v) destructuring) and
