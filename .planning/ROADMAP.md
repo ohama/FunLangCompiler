@@ -95,9 +95,32 @@ Plans:
 
 ---
 
+#### Phase 98: --trace Compiler Flag for Function Entry Tracing
+
+**Goal**: `fnc --trace` 플래그를 켜면 생성된 바이너리의 모든 func.func 함수 진입 시 함수명을 stderr에 자동 출력; 플래그 없이 컴파일하면 트레이스 코드 없음 (zero overhead)
+**Depends on**: Phase 94
+**Requirements**: DEBUG-01
+**Success Criteria** (what must be TRUE):
+  1. `fnc --trace hello.fun -o hello` 로 컴파일한 바이너리 실행 시 stderr에 각 함수 진입이 `[TRACE] @funcName` 형태로 출력됨
+  2. `fnc hello.fun -o hello` (플래그 없음)로 컴파일한 바이너리는 트레이스 출력 없음
+  3. 기존 263+ E2E 테스트가 --trace 없이 컴파일 시 모두 통과 (regression 없음)
+  4. FunLexYacc를 --trace로 컴파일하여 SIGSEGV 크래시 직전 마지막 함수를 식별할 수 있음
+
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 98 to break down)
+
+**Details:**
+런타임 SIGSEGV 등 디버깅 시 크래시 지점을 좁히기 위한 컴파일러 기능.
+Elaboration 단계에서 각 func.func/llvm.func 의 entry block 앞에 stderr 출력 코드를 삽입.
+CLI에서 --trace 플래그 파싱 → ElabEnv에 traceEnabled 전달 → func emit 시 조건부 삽입.
+
+---
+
 ## Progress
 
-**Execution Order:** 94 → 95 → 96 → 97
+**Execution Order:** 94 → 95 → 96 → 97 → 98
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -105,3 +128,4 @@ Plans:
 | 95. FunLang v14.0 Type System Sync | v23.0 | 1/1 | ✓ Complete | 2026-04-09 |
 | 96. Prelude Trivial Sync (9 files) | v23.0 | 0/TBD | Not started | - |
 | 97. Prelude Manual Merge (5 files) | v23.0 | 0/TBD | Not started | - |
+| 98. --trace Compiler Flag | v23.0 | 0/TBD | Not started | - |

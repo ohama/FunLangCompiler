@@ -142,7 +142,29 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let arg1Val = { Name = "%arg1"; Type = Ptr }
         // If innerParam needs I64 type, coerce ptr arg1 to i64 via ptrtoint.
         // The coerced value gets name %t0 (first SSA name after captures).
-        let innerParamNeedsI64 = not (isPtrParamTyped env.AnnotationMap innerLamSpan innerParam innerBody)
+        // Phase 30: Extract inner param type annotation from original LambdaAnnot chain
+        // to avoid relying solely on annotationMap+heuristic when annotation is explicit.
+        let innerParamTyExprOpt =
+            let rec findInnerAnnot expr =
+                match expr with
+                | Ast.LambdaAnnot(_, _, inner, _) | Ast.Annot(inner, _, _) -> findInnerAnnot inner
+                | _ -> None
+            match bindExprOrig2 with
+            | Ast.LambdaAnnot(_, _, inner, _) ->
+                match inner with
+                | Ast.LambdaAnnot(_, te, _, _) -> Some te
+                | Ast.Annot(Ast.LambdaAnnot(_, te, _, _), _, _) -> Some te
+                | _ -> None
+            | Ast.Annot(Ast.LambdaAnnot(_, _, inner, _), _, _) ->
+                match inner with
+                | Ast.LambdaAnnot(_, te, _, _) -> Some te
+                | Ast.Annot(Ast.LambdaAnnot(_, te, _, _), _, _) -> Some te
+                | _ -> None
+            | _ -> None
+        let innerParamNeedsI64 =
+            match innerParamTyExprOpt with
+            | Some te -> not (typeExprNeedsPtr te)
+            | None -> not (isPtrParamTyped env.AnnotationMap innerLamSpan innerParam innerBody)
         let (innerParamVal, paramCoerceOps, captureStartIdx) =
             if innerParamNeedsI64 then
                 let i64Val = { Name = "%t0"; Type = I64 }
@@ -360,7 +382,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             match stripAnnot bindExprOrig with
             | Lambda (p, b, s) -> (p, b, s)
             | _ -> failwith "impossible: guard ensures Lambda"
-        let paramType = if isPtrParamTyped env.AnnotationMap lamSpan param body then Ptr else I64
+        // Phase 30: When bindExprOrig is LambdaAnnot, use explicit paramTyExpr for type determination.
+        // This handles cases where annotationMap has no entry and heuristic fails (e.g., tuple params
+        // accessed via fst/snd chains with field access: `(fst (fst triple)).start`).
+        let paramType =
+            match bindExprOrig with
+            | LambdaAnnot(_, paramTyExpr, _, _) when typeExprNeedsPtr paramTyExpr -> Ptr
+            | _ -> if isPtrParamTyped env.AnnotationMap lamSpan param body then Ptr else I64
         let paramIsString =
             match Map.tryFind lamSpan env.AnnotationMap with
             | Some (Type.TArrow(Type.TString, _)) -> true
@@ -798,7 +826,12 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Pass 2: Elaborate each body with the full KnownFuncs, then update with actual return types.
         let bindingInfos =
             bindings |> List.map (fun (name, param, paramTypeAnnot, _firstSp, body, bindingSpan) ->
-                let paramType = if isPtrParamTyped env.AnnotationMap bindingSpan param body then Ptr else I64
+                // Phase 30: Use explicit paramTypeAnnot from LambdaAnnot when available,
+                // before falling back to annotationMap + heuristic.
+                let paramType =
+                    match paramTypeAnnot with
+                    | Some te when typeExprNeedsPtr te -> Ptr
+                    | _ -> if isPtrParamTyped env.AnnotationMap bindingSpan param body then Ptr else I64
                 let paramIsString =
                     match Map.tryFind bindingSpan env.AnnotationMap with
                     | Some (Type.TArrow(Type.TString, _)) -> true
@@ -2789,15 +2822,35 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | FieldAccess(recExpr, fieldName, faSpan) ->
         let (recVal, recOps) = elaborateExpr env recExpr
         let slotIdx =
-            env.RecordEnv
-            |> Map.toSeq
-            |> Seq.tryPick (fun (_, fmap) -> Map.tryFind fieldName fmap)
-            |> Option.defaultWith (fun () ->
+            // Phase 30: Disambiguate field access when multiple record types share a field name.
+            // 1. Try annotationMap to get the record expression's type (most reliable).
+            // 2. If ambiguous, use the LAST declared record type (matches ML shadowing semantics).
+            // 3. If only one record type has the field, use it directly.
+            let candidates =
+                env.RecordEnv
+                |> Map.toList
+                |> List.choose (fun (typeName, fmap) ->
+                    Map.tryFind fieldName fmap |> Option.map (fun idx -> (typeName, idx)))
+            match candidates with
+            | [(_, idx)] -> idx   // unique — no ambiguity
+            | _ when candidates.Length > 1 ->
+                // Try annotationMap for record expression type
+                let inferredIdx =
+                    match Map.tryFind (Ast.spanOf recExpr) env.AnnotationMap with
+                    | Some (Type.TData(typeName, _)) ->
+                        candidates |> List.tryPick (fun (tn, idx) -> if tn = typeName then Some idx else None)
+                    | _ -> None
+                match inferredIdx with
+                | Some idx -> idx
+                | None ->
+                    // Fallback: pick the LAST candidate (approximates "most recent declaration wins")
+                    snd (List.last candidates)
+            | _ ->
                 let hint =
                     env.RecordEnv |> Map.toList
                     |> List.map (fun (name, fields) -> sprintf "%s: {%s}" name (fields |> Map.toList |> List.map fst |> String.concat "; "))
                     |> String.concat " | "
-                failWithSpan faSpan "FieldAccess: unknown field '%s'. Known records: %s" fieldName hint)
+                failWithSpan faSpan "FieldAccess: unknown field '%s'. Known records: %s" fieldName hint
         // Coerce record to Ptr if it came in as I64 (e.g., through a closure argument)
         let (recPtr, recCoerce) =
             if recVal.Type = Ptr then (recVal, [])

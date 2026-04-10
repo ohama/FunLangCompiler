@@ -116,7 +116,7 @@ let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<
 /// inputPath: path to the .fun source file
 /// outputPath: path for the output binary
 /// optLevel: optimization level 0-3
-let compileFile (preludeDir: string option) (inputPath: string) (outputPath: string) (optLevel: int) : int =
+let compileFile (preludeDir: string option) (inputPath: string) (outputPath: string) (optLevel: int) (traceEnabled: bool) : int =
     try
         let src = File.ReadAllText(inputPath)
 
@@ -217,6 +217,7 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                     System.Console.SetError(savedErr)
             with _ -> Map.empty
         let mlirMod = ElabProgram.elaborateProgram tcAst annotationMap
+        let mlirMod = if traceEnabled then ElabProgram.insertTraceEntries mlirMod else mlirMod
         match Pipeline.compile mlirMod outputPath optLevel with
         | Ok () ->
             0
@@ -279,7 +280,7 @@ let private handleBuild (optLevel: int) (args: string list) : int =
                     else
                         let outputPath = Path.Combine(config.ProjectDir, "build", target.Name)
                         let sw = Stopwatch.StartNew()
-                        let result = compileFile preludeDir srcPath outputPath optLevel
+                        let result = compileFile preludeDir srcPath outputPath optLevel false
                         if result = 0 then
                             printfn "OK: %s -> build/%s (%.1fs)" target.Name target.Name sw.Elapsed.TotalSeconds
                         else
@@ -328,7 +329,7 @@ let private handleTest (optLevel: int) (args: string list) : int =
                 else
                     let outputPath = Path.Combine(config.ProjectDir, "build", target.Name)
                     let sw = Stopwatch.StartNew()
-                    let compileResult = compileFile preludeDir srcPath outputPath optLevel
+                    let compileResult = compileFile preludeDir srcPath outputPath optLevel false
                     if compileResult <> 0 then
                         printfn "FAIL: %s (compile error)" target.Name
                     else
@@ -352,20 +353,21 @@ let private handleTest (optLevel: int) (args: string list) : int =
 let private mainImpl (argv: string[]) =
     let args = argv |> Array.toList
 
-    // Parse flags: -o <output>, -O0/-O1/-O2/-O3
-    let rec parseArgs args outputOpt optLevel =
+    // Parse flags: -o <output>, -O0/-O1/-O2/-O3, --trace
+    let rec parseArgs args outputOpt optLevel traceEnabled =
         match args with
-        | "-o" :: out :: rest -> parseArgs rest (Some out) optLevel
-        | "-O0" :: rest -> parseArgs rest outputOpt 0
-        | "-O1" :: rest -> parseArgs rest outputOpt 1
-        | "-O2" :: rest -> parseArgs rest outputOpt 2
-        | "-O3" :: rest -> parseArgs rest outputOpt 3
+        | "-o" :: out :: rest -> parseArgs rest (Some out) optLevel traceEnabled
+        | "-O0" :: rest -> parseArgs rest outputOpt 0 traceEnabled
+        | "-O1" :: rest -> parseArgs rest outputOpt 1 traceEnabled
+        | "-O2" :: rest -> parseArgs rest outputOpt 2 traceEnabled
+        | "-O3" :: rest -> parseArgs rest outputOpt 3 traceEnabled
+        | "--trace" :: rest -> parseArgs rest outputOpt optLevel true
         | x :: rest ->
-            let (o, ol, r) = parseArgs rest outputOpt optLevel
-            (o, ol, x :: r)
-        | [] -> (outputOpt, optLevel, [])
+            let (o, ol, t, r) = parseArgs rest outputOpt optLevel traceEnabled
+            (o, ol, t, x :: r)
+        | [] -> (outputOpt, optLevel, traceEnabled, [])
 
-    let (outputOpt, optLevel, remaining) = parseArgs args None 2
+    let (outputOpt, optLevel, traceEnabled, remaining) = parseArgs args None 2 false
 
     match remaining with
     | "build" :: rest -> handleBuild optLevel rest
@@ -384,7 +386,7 @@ let private mainImpl (argv: string[]) =
             eprintfn "Error: file not found: %s" inputPath
             1
         else
-            compileFile None inputPath outputPath optLevel
+            compileFile None inputPath outputPath optLevel traceEnabled
     | [] ->
         eprintfn "Usage: fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3]"
         eprintfn "       fnc build [<target>] [-O0|-O1|-O2|-O3]"

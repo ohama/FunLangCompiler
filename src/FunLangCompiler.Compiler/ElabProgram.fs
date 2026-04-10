@@ -620,3 +620,35 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
         { ExtName = "@lang_sprintf_2ss"; ExtParams = [Ptr; Ptr; Ptr];  ExtReturn = Some Ptr; IsVarArg = false; Attrs = [] }
     ]
     { Globals = globals; ExternalFuncs = externalFuncs; Funcs = env.Funcs.Value @ [mainFunc] }
+
+/// Phase 98: Insert function entry trace calls into all FuncOps.
+/// Each function gets a "[TRACE] @funcName\00" raw C string global and a @lang_trace call at entry.
+/// @lang_trace takes a raw const char* (not LangString*), so it works before GC_init.
+let insertTraceEntries (mlirMod: MlirModule) : MlirModule =
+    let mutable traceGlobals = []
+    let mutable counter = 0
+    let tracedFuncs =
+        mlirMod.Funcs |> List.map (fun func ->
+            let globalName = sprintf "@__trace_%d" counter
+            counter <- counter + 1
+            let traceStr = sprintf "[TRACE] %s" func.Name
+            traceGlobals <- traceGlobals @ [StringConstant(globalName, traceStr)]
+            let addrVal = { Name = "%__trace_addr"; Type = Ptr }
+            let traceOps : MlirOp list = [
+                LlvmAddressOfOp(addrVal, globalName)
+                LlvmCallVoidOp("@lang_trace", [addrVal])
+            ]
+            match func.Body.Blocks with
+            | entryBlock :: rest ->
+                let newEntry = { entryBlock with Body = traceOps @ entryBlock.Body }
+                { func with Body = { Blocks = newEntry :: rest } }
+            | [] -> func)
+    // Add @lang_trace external declaration if not already present
+    let hasTrace = mlirMod.ExternalFuncs |> List.exists (fun e -> e.ExtName = "@lang_trace")
+    let extFuncs =
+        if hasTrace then mlirMod.ExternalFuncs
+        else mlirMod.ExternalFuncs @ [{ ExtName = "@lang_trace"; ExtParams = [Ptr]; ExtReturn = None; IsVarArg = false; Attrs = [] }]
+    { mlirMod with
+        Globals = mlirMod.Globals @ traceGlobals
+        ExternalFuncs = extFuncs
+        Funcs = tracedFuncs }

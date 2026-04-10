@@ -51,6 +51,10 @@ let x = dbg (expensive_computation 42)
 | `fn` | FunLang | 인터프리터 |
 | `fnc` | FunLangCompiler | 네이티브 컴파일러 |
 
+## Language
+
+일본어 사용 금지. 한글로만 대화한다.
+
 ## Telegram
 
 Telegram 메시지가 오면 간단히 답장하고 현재 작업을 계속 진행한다. 작업을 중단하지 않는다.

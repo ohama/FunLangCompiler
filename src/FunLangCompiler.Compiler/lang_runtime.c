@@ -1260,6 +1260,13 @@ void lang_eprintln(LangString* s) {
     fflush(stderr);
 }
 
+// Phase 98: Raw C string trace to stderr (for --trace flag, no GC/LangString needed)
+void lang_trace(const char* s) {
+    fputs(s, stderr);
+    fputc('\n', stderr);
+    fflush(stderr);
+}
+
 /* Extended File I/O and system runtime functions */
 
 LangCons* lang_read_lines(LangString* path) {

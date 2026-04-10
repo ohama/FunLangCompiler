@@ -40,6 +40,10 @@ Progress: v1.0–v23.0 in progress [██████████████�
 
 - None
 
+### Roadmap Evolution
+
+- Phase 98 added: --trace compiler flag for function entry tracing (DEBUG-01)
+
 ### Blockers/Concerns
 
 - None
