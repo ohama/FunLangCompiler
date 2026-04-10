@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-04-10
+
+### Fixed
+- `Hashtable.tryGetValue` returns proper ADT option (`Some v` / `None`) instead of tuple — fixes `match` failure at runtime (Issue #23, Phase 100)
+- FunLexYacc DFA subset construction `non-exhaustive match` 해결 (root cause of Issue #23)
+
+### Changed
+- Updated `32-01-hashtable-trygetvalue` and `35-02-hashtable-module` E2E tests to use option match pattern
+
 ## [0.1.0] - 2026-04-10
 
 ### Added
