@@ -262,7 +262,7 @@ let private collectModuleMembers (decls: Ast.Decl list) : Map<string, string lis
                 let existing = match Map.tryFind dotPath result with Some xs -> xs | None -> []
                 result <- Map.add dotPath (existing @ [qualifiedName]) result
             | Ast.Decl.LetRecDecl(bindings, _) when underPath <> "" ->
-                for (name, _, _, _, _) in bindings do
+                for (name, _, _, _, _, _) in bindings do
                     let qualifiedName = underPath + "_" + name
                     let existing = match Map.tryFind dotPath result with Some xs -> xs | None -> []
                     result <- Map.add dotPath (existing @ [qualifiedName]) result
@@ -288,7 +288,7 @@ let rec private flattenDecls (moduleMembers: Map<string, string list>) (modName:
         | Ast.Decl.InfixDecl(attrs, name, body, s) when modName <> "" ->
             [Ast.Decl.InfixDecl(attrs, modName + "_" + name, body, s)]
         | Ast.Decl.LetRecDecl(bindings, s) when modName <> "" ->
-            let prefixed = bindings |> List.map (fun (name, param, pt, body, s2) -> (modName + "_" + name, param, pt, body, s2))
+            let prefixed = bindings |> List.map (fun (name, param, pt, sp, body, s2) -> (modName + "_" + name, param, pt, sp, body, s2))
             [Ast.Decl.LetRecDecl(prefixed, s)]
         | Ast.Decl.OpenDecl(path, s) when not (List.isEmpty path) ->
             // Phase 59: Join ALL path segments with "." for the map key (e.g., "Outer.Inner").

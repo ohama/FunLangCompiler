@@ -797,7 +797,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         // Pass 1: Pre-register ALL binding signatures in KnownFuncs so every body can call every sibling.
         // Pass 2: Elaborate each body with the full KnownFuncs, then update with actual return types.
         let bindingInfos =
-            bindings |> List.map (fun (name, param, paramTypeAnnot, body, bindingSpan) ->
+            bindings |> List.map (fun (name, param, paramTypeAnnot, _firstSp, body, bindingSpan) ->
                 let paramType = if isPtrParamTyped env.AnnotationMap bindingSpan param body then Ptr else I64
                 let paramIsString =
                     match Map.tryFind bindingSpan env.AnnotationMap with
@@ -3478,7 +3478,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     // annotationMap[span] always returns the OUTERMOST arrow type. We override annotationMap[span]
     // with the correct arrow type for THIS param before forwarding to Lambda, which uses the
     // exact same closure-building code without duplication (issue #22).
-    | LambdaAnnot (param, _, body, span) -> elaborateExpr env (Lambda(param, body, span))
+    // Phase 30: LambdaAnnot — override annotationMap with correct type from explicit annotation,
+    // then delegate to Lambda. This fixes span collision (#22) and handles cases where
+    // annotationMap has no entry for the LambdaAnnot span.
+    | LambdaAnnot (param, paramTyExpr, body, span) ->
+        // FunLang #19 ensures annotationMap has correct arrow type for each LambdaAnnot span.
+        // Use it when available; fall back to synthetic type from paramTyExpr otherwise.
+        let correctedMap =
+            match Map.tryFind span env.AnnotationMap with
+            | Some (Type.TArrow _) -> env.AnnotationMap  // already correct from typechecker
+            | _ ->
+                let syntheticParamType = if typeExprNeedsPtr paramTyExpr then Type.TString else Type.TInt
+                Map.add span (Type.TArrow(syntheticParamType, Type.TInt)) env.AnnotationMap
+        let stringVars = if (match paramTyExpr with TEString -> true | _ -> false) then Set.add param env.StringVars else env.StringVars
+        let env' = { env with AnnotationMap = correctedMap; StringVars = stringVars }
+        elaborateExpr env' (Lambda(param, body, span))
 
     // Phase 30 + 34-03: ForInExpr — desugar to Lambda closure + lang_for_in_* runtime call.
     // Phase 34-03 extends: TuplePat support (for hashtable (k,v) destructuring) and

@@ -277,9 +277,9 @@ let rec freeVars (boundVars: Set<string>) (expr: Expr) : Set<string> =
     | App (f, a, _) ->
         Set.union (freeVars boundVars f) (freeVars boundVars a)
     | LetRec (bindings, inExpr, _) ->
-        let names = bindings |> List.map (fun (n, _, _, _, _) -> n) |> Set.ofList
-        let innerBound = bindings |> List.fold (fun s (n, p, _, _, _) -> Set.add n (Set.add p s)) boundVars
-        let bodyFree = bindings |> List.map (fun (_, _, _, body, _) -> freeVars innerBound body) |> Set.unionMany
+        let names = bindings |> List.map (fun (n, _, _, _, _, _) -> n) |> Set.ofList
+        let innerBound = bindings |> List.fold (fun s (n, p, _, _, _, _) -> Set.add n (Set.add p s)) boundVars
+        let bodyFree = bindings |> List.map (fun (_, _, _, _, body, _) -> freeVars innerBound body) |> Set.unionMany
         let inFree = freeVars (Set.union boundVars names) inExpr
         Set.union bodyFree inFree
     | String _ -> Set.empty
@@ -602,7 +602,7 @@ let rec isPtrParamBody (paramName: string) (bodyExpr: Expr) : bool =
         | LetMut(_, v, b, _) -> hasParamPtrUse strVars v || hasParamPtrUse strVars b
         | Assign(_, v, _) -> hasParamPtrUse strVars v
         | TryWith(b, clauses, _) -> hasParamPtrUse strVars b || clauses |> List.exists (fun (_, _, arm) -> hasParamPtrUse strVars arm)
-        | LetRec(bindings, body, _) -> hasParamPtrUse strVars body || bindings |> List.exists (fun (_, _, _, b, _) -> hasParamPtrUse strVars b)
+        | LetRec(bindings, body, _) -> hasParamPtrUse strVars body || bindings |> List.exists (fun (_, _, _, _, b, _) -> hasParamPtrUse strVars b)
         | ForInExpr(_, coll, body, _) -> hasParamPtrUse strVars coll || hasParamPtrUse strVars body
         | WhileExpr(cond, body, _) -> hasParamPtrUse strVars cond || hasParamPtrUse strVars body
         | ForExpr(_, s, _, e, body, _) -> hasParamPtrUse strVars s || hasParamPtrUse strVars e || hasParamPtrUse strVars body

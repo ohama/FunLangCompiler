@@ -180,7 +180,7 @@ let rec private norm (e: Expr) : Expr =
     | LetPat(pat, bind, body, s) -> LetPat(pat, norm bind, norm body, s)
     | LetMut(name, init, body, s) -> LetMut(name, norm init, norm body, s)
     | LetRec(bindings, body, s) ->
-        let bindings' = bindings |> List.map (fun (n, p, pt, b, bs) -> (n, p, pt, norm b, bs))
+        let bindings' = bindings |> List.map (fun (n, p, pt, sp, b, bs) -> (n, p, pt, sp, norm b, bs))
         LetRec(bindings', norm body, s)
     | Lambda(p, body, s) -> Lambda(p, norm body, s)
     | LambdaAnnot(p, ty, body, s) -> LambdaAnnot(p, ty, norm body, s)

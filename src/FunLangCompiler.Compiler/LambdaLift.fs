@@ -34,11 +34,11 @@ let rec private prependCaptures (target: string) (caps: string list) (e: Expr) :
     | LambdaAnnot(p, ty, body, s) ->
         LambdaAnnot(p, ty, (if p = target then body else f body), s)
     | LetRec(bindings, body, s) ->
-        let names = bindings |> List.map (fun (n,_,_,_,_) -> n)
+        let names = bindings |> List.map (fun (n,_,_,_,_,_) -> n)
         if List.contains target names then LetRec(bindings, body, s)  // shadowed
         else
-            let bindings' = bindings |> List.map (fun (n, p, pt, b, bs) ->
-                (n, p, pt, (if p = target then b else f b), bs))
+            let bindings' = bindings |> List.map (fun (n, p, pt, sp, b, bs) ->
+                (n, p, pt, sp, (if p = target then b else f b), bs))
             LetRec(bindings', f body, s)
     | LetMut(n, v, body, s) ->
         LetMut(n, f v, (if n = target then body else f body), s)
@@ -93,11 +93,11 @@ let liftExpr (expr: Expr) : Expr =
         match e with
         | LetRec(bindings, body, span) ->
             // All binding names in this LetRec group
-            let bindingNames = bindings |> List.map (fun (n,_,_,_,_) -> n) |> Set.ofList
+            let bindingNames = bindings |> List.map (fun (n,_,_,_,_,_) -> n) |> Set.ofList
 
             // Compute captures for each binding: free vars ∩ localVars
             let perBindingCaptures =
-                bindings |> List.map (fun (name, param, _, bindBody, _) ->
+                bindings |> List.map (fun (name, param, _, _, bindBody, _) ->
                     let boundInBinding = Set.union bindingNames (Set.singleton param)
                     let freeInBody = ElabHelpers.freeVars boundInBinding bindBody
                     Set.intersect freeInBody localVars)
@@ -108,13 +108,13 @@ let liftExpr (expr: Expr) : Expr =
             if allCaptures.IsEmpty then
                 // No captures — just recurse into binding bodies and continuation.
                 // LetRec binding names become KnownFuncs, NOT localVars.
-                let bindings' = bindings |> List.map (fun (n, p, pt, b, s) ->
+                let bindings' = bindings |> List.map (fun (n, p, pt, sp, b, s) ->
                     let localVars' = Set.add p localVars
-                    (n, p, pt, lift localVars' b, s))
+                    (n, p, pt, sp, lift localVars' b, s))
                 LetRec(bindings', lift localVars body, span)
             else
                 // Lambda-lift: add captures as prepended parameters
-                let bindings' = bindings |> List.map (fun (name, param, paramType, bindBody, bspan) ->
+                let bindings' = bindings |> List.map (fun (name, param, paramType, _firstSp, bindBody, bspan) ->
                     // 1. Rewrite self/sibling references in body to pass captures
                     let rewrittenBody =
                         bindingNames |> Set.fold (fun acc bname ->
@@ -130,7 +130,7 @@ let liftExpr (expr: Expr) : Expr =
                     let wrappedBody =
                         (List.tail allCaptures @ [param])
                         |> List.foldBack (fun p acc -> Lambda(p, acc, bspan)) <| liftedBody
-                    (name, List.head allCaptures, None, wrappedBody, bspan))
+                    (name, List.head allCaptures, None, None, wrappedBody, bspan))
 
                 // 4. Rewrite references in continuation to pass captures
                 let rewrittenCont =
