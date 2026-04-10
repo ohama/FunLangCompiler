@@ -44,6 +44,7 @@ Progress: v1.0–v23.0 in progress [██████████████�
 
 - Phase 98 added: --trace compiler flag for function entry tracing (DEBUG-01)
 - Phase 99 added: match failure diagnostics — 소스 위치, 값, 콜 스택 backtrace (DEBUG-02)
+- Phase 100 added: Hashtable.tryGetValue option 태그 불일치 수정 (BUG-02, Issue #23)
 
 ### Blockers/Concerns
 

@@ -1,0 +1,7 @@
+// Test: Issue #23 — Hashtable.tryGetValue returns proper option ADT
+// --- Command: bash %S/100-01-hashtable-trygetvalue-option.sh
+// --- Input:
+// --- Output:
+42
+-1
+99

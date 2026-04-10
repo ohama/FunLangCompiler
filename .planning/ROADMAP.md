@@ -143,9 +143,32 @@ Plans:
 
 ---
 
+#### Phase 100: Hashtable.tryGetValue Option Tag Fix (Issue #23)
+
+**Goal**: `Hashtable.tryGetValue`가 FunLang의 option ADT 형식(`{heap_tag=5, constructor_tag, payload}`)으로 반환하여 `match r with Some v -> ... | None -> ...` 패턴이 정상 동작하게 함
+**Depends on**: Phase 99
+**Requirements**: BUG-02
+**Success Criteria** (what must be TRUE):
+  1. `Hashtable.tryGetValue ht key`의 반환값이 `match` 문에서 `Some v` / `None`으로 올바르게 매칭됨
+  2. C 런타임의 `lang_hashtable_trygetvalue`가 ADT option 형식 (`heap_tag=5`, `tag=Some_tag`/`tag=None_tag`) 으로 반환
+  3. FunLexYacc의 `Dfa.fun:246` match 실패가 해결됨
+  4. 기존 263+ E2E 테스트 모두 통과 (regression 없음)
+  5. option match를 사용하는 E2E 테스트 추가
+
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 100 to break down)
+
+**Details:**
+근본 원인: `lang_hashtable_trygetvalue`가 `{heap_tag=TUPLE(2), count=2, bool, value}` 형태의 tuple을 반환하지만, 컴파일러의 option match는 `{heap_tag=ADT(5), constructor_tag, payload}` 형태의 ADT를 기대.
+수정: C 런타임에서 Some/None의 constructor tag를 알아야 함. Option의 TypeDecl 순서에서 None=tag0, Some=tag1 (Prelude/Option.fun의 `type 'a option = None | Some of 'a` 선언 순서). `lang_hashtable_trygetvalue`가 이 형식으로 반환하도록 수정.
+
+---
+
 ## Progress
 
-**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99
+**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99 → 100
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -155,3 +178,4 @@ Plans:
 | 97. Prelude Manual Merge (5 files) | v23.0 | 0/TBD | Not started | - |
 | 98. --trace Compiler Flag | v23.0 | 0/TBD | Not started | - |
 | 99. Match Failure Diagnostics | v23.0 | 0/TBD | Not started | - |
+| 100. Hashtable.tryGetValue Option Fix | v23.0 | 0/TBD | Not started | - |

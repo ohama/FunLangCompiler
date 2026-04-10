@@ -1,14 +1,13 @@
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
+type Option 'a = None | Some of 'a
 let ht = hashtable_create () in
 let _ = hashtable_set ht 42 100 in
-let (found, v) = hashtable_trygetvalue ht 42 in
-let _ = println (to_string found) in
+let v = match hashtable_trygetvalue ht 42 with | Some x -> x | None -> -1 in
 let _ = println (to_string v) in
-let (found2, v2) = hashtable_trygetvalue ht 99 in
-println (to_string found2)
+let v2 = match hashtable_trygetvalue ht 99 with | Some x -> x | None -> -1 in
+println (to_string v2)
 // --- Output:
-true
 100
-false
+-1
 0

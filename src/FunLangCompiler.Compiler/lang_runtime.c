@@ -661,18 +661,20 @@ static LangHashEntry* lang_ht_find(LangHashtable* ht, int64_t key) {
 }
 
 int64_t* lang_hashtable_trygetvalue(LangHashtable* ht, int64_t key) {
-    int64_t* tup = (int64_t*)GC_malloc(32);  /* Phase 93: 4 slots x 8 = tag + count + 2 fields */
-    tup[0] = LANG_HEAP_TAG_TUPLE;
-    tup[1] = 2;  /* field count */
+    /* Phase 100: Return ADT option format matching FunLang's type Option 'a = None | Some of 'a
+     * Layout: { heap_tag=ADT(5), constructor_tag, payload }
+     * None = tag 0, Some = tag 1 (declaration order in Prelude/Option.fun) */
+    int64_t* block = (int64_t*)GC_malloc(24);  /* 3 slots x 8 bytes */
+    block[0] = LANG_HEAP_TAG_ADT;
     LangHashEntry* e = lang_ht_find(ht, key);
     if (e != NULL) {
-        tup[2] = LANG_TAG_INT(1);  /* tagged true = 3 */
-        tup[3] = e->val;           /* already tagged */
+        block[1] = 1;       /* Some constructor tag */
+        block[2] = e->val;  /* payload (already tagged) */
     } else {
-        tup[2] = LANG_TAG_INT(0);  /* tagged false = 1 */
-        tup[3] = LANG_TAG_INT(0);  /* tagged zero = 1 */
+        block[1] = 0;       /* None constructor tag */
+        block[2] = 0;
     }
-    return tup;
+    return block;
 }
 
 LangHashtable* lang_hashtable_create(void) {

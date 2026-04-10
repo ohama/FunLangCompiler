@@ -1,5 +1,6 @@
 // --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
 // --- Input:
+type Option 'a = None | Some of 'a
 module Hashtable =
     let create ()           = hashtable_create ()
     let get ht key          = hashtable_get ht key
@@ -12,13 +13,11 @@ module Hashtable =
 let ht = Hashtable.create ()
 let _ = Hashtable.set ht 42 100
 let _ = println (to_string (Hashtable.get ht 42))
-let (found, v) = Hashtable.tryGetValue ht 42
-let _ = println (to_string found)
+let v = match Hashtable.tryGetValue ht 42 with | Some x -> x | None -> -1
 let _ = println (to_string v)
 let _ = println (to_string (Hashtable.count ht))
 // --- Output:
 100
-1
 100
 1
 0
