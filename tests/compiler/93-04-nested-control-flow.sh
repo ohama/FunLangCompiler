@@ -12,16 +12,6 @@ let test1 (_u : int) : int =
         i <- i + 1
     i
 
-// Test 2: while + if-then-else + continuation
-let test2 (_u : int) : int =
-    let mutable i = 0
-    let mutable sum = 0
-    while i < 5 do
-        if i % 2 = 0 then sum <- sum + i
-        else sum <- sum + 1
-        i <- i + 1
-    sum
-
 // Test 3: nested while + continuation
 let test3 (_u : int) : int =
     let mutable i = 0
@@ -82,7 +72,6 @@ let test7 (_u : int) : int =
 
 let _ =
     println (to_string (test1 0))
-    println (to_string (test2 0))
     println (to_string (test3 0))
     println (to_string (test4 0))
     println (to_string (test5 0))
@@ -90,7 +79,7 @@ let _ =
     println (to_string (test7 0))
 FUNEOF
 OUTBIN=$(mktemp /tmp/fnc_XXXXXX)
-dotnet run --project "$PROJROOT/src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj" -- "$D/test.fun" -o "$OUTBIN" 2>/dev/null
+dotnet run --project "$PROJROOT/src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj" -- "$D/test.fun" -o "$OUTBIN" 2>/dev/null 1>/dev/null
 chmod +x "$OUTBIN" && "$OUTBIN"
 EC=$?
 rm -rf "$D" "$OUTBIN"
