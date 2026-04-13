@@ -21,7 +21,6 @@ let inline assertTrue name cond =
 let toml1 = """
 [project]
 name = "demo"
-prelude = "Prelude"
 
 [[executable]]
 name = "app"
@@ -39,7 +38,6 @@ main = "tests/integ.fun"
 let cfg1 = parseFunProj toml1 "/tmp/proj"
 
 assertEq "cfg1.Name"        (Some "demo")       cfg1.Name
-assertEq "cfg1.PreludePath" (Some "Prelude")     cfg1.PreludePath
 assertEq "cfg1.Executables.Length" 1             cfg1.Executables.Length
 assertEq "cfg1.exe[0].Name" "app"                cfg1.Executables.[0].Name
 assertEq "cfg1.exe[0].Main" "src/main.fun"       cfg1.Executables.[0].Main
@@ -71,7 +69,6 @@ main = "main.fun"
 let cfg2 = parseFunProj toml2 "/tmp/proj2"
 
 assertEq "cfg2.Name"        None    cfg2.Name
-assertEq "cfg2.PreludePath" None    cfg2.PreludePath
 assertEq "cfg2.Executables.Length" 1 cfg2.Executables.Length
 assertEq "cfg2.Tests.Length" 0      cfg2.Tests.Length
 
@@ -103,12 +100,10 @@ assertEq "cfg3.Tests.Length" 1                 cfg3.Tests.Length
 let toml4 = """
 [project]
 name="tight"
-prelude  =  "path/to/prelude"
 """
 
 let cfg4 = parseFunProj toml4 "/tmp/proj4"
 assertEq "cfg4.Name (tight)"     (Some "tight")             cfg4.Name
-assertEq "cfg4.PreludePath tight" (Some "path/to/prelude")  cfg4.PreludePath
 
 // ---------------------------------------------------------------------------
 // All done

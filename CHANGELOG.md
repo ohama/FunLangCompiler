@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.5] - 2026-04-13
+
+### Removed
+- **`funproj.toml`의 `prelude` 키 지원 제거** — Phase 103 embedded Prelude + walkUp 검색으로 대체됨. `ProjectFile.fs`의 `PreludePath` 필드, `compileFile`의 `preludeDir` 파라미터 모두 제거. 기존 `funproj.toml`의 `prelude = "..."` 라인은 이제 무시되며 경고 없음 (backward-compatible).
+
+### Changed
+- `PROJECTFILE.md` 문서 업데이트 — `prelude` 키 관련 설명 제거, Prelude 로딩 메커니즘(embedded + walkUp) 설명 추가.
+
 ## [0.1.4] - 2026-04-13
 
 ### Added

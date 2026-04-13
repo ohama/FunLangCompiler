@@ -10,7 +10,6 @@
 # funproj.toml
 [project]
 name = "myproject"
-prelude = "Prelude"
 
 [[executable]]
 name = "myapp"
@@ -32,24 +31,18 @@ fnc test           # 모든 test 컴파일 + 실행
 
 ### [project] Section
 
-프로젝트 메타데이터와 설정.
+프로젝트 메타데이터.
 
 ```toml
 [project]
 name = "myproject"
-prelude = "lib/prelude"
 ```
 
 | 필드 | 타입 | 필수 | 설명 |
 |------|------|------|------|
 | `name` | string | 선택 | 프로젝트 이름 |
-| `prelude` | string | 선택 | Prelude 디렉토리 경로 (`funproj.toml` 기준 상대 경로) |
 
-**Prelude 경로 우선순위:**
-
-```
-funproj.toml prelude  >  입력 파일 디렉토리에서 Prelude/ 상위 탐색  >  assembly 디렉토리/Prelude
-```
+**Prelude 로딩** (v0.1.5+): Prelude는 컴파일러 바이너리에 내장되어 있으므로 별도 설정 불필요. 개발 중 Prelude 수정 시, 입력 파일 디렉토리에서 상위 방향으로 `Prelude/` 디렉토리를 찾으면 우선 사용됨 (hot-edit 지원).
 
 ### [[executable]] Section
 
@@ -188,8 +181,8 @@ fnc build -O2             # 최적화된 바이너리 생성
 
 ```
 myproject/
-├── funproj.toml          # prelude = "Prelude"
-├── Prelude/              #   → /abs/path/myproject/Prelude
+├── funproj.toml
+├── Prelude/              # 선택 — hot-edit 시 우선 사용 (없어도 내장 Prelude로 동작)
 │   └── MyLib.fun
 ├── src/
 │   ├── main.fun          # main = "src/main.fun"
@@ -237,7 +230,6 @@ calculator/
 ```toml
 [project]
 name = "calculator"
-prelude = "Prelude"
 
 [[executable]]
 name = "calc"

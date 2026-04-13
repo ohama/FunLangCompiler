@@ -9,7 +9,6 @@ type Target = { Name: string; Main: string }
 /// Parsed representation of a funproj.toml file
 type FunProjConfig = {
     Name: string option
-    PreludePath: string option
     Executables: Target list
     Tests: Target list
     ProjectDir: string
@@ -51,7 +50,6 @@ let parseFunProj (content: string) (projectDir: string) : FunProjConfig =
 
     let mutable section     = Section.None
     let mutable projName    : string option = None
-    let mutable prelude     : string option = None
     let mutable executables : Target list   = []
     let mutable tests       : Target list   = []
 
@@ -98,8 +96,7 @@ let parseFunProj (content: string) (projectDir: string) : FunProjConfig =
                 | Section.Project ->
                     match key with
                     | "name"    -> projName <- Some value
-                    | "prelude" -> prelude  <- Some value
-                    | _         -> ()   // unknown key ignored
+                    | _         -> ()   // unknown key ignored (prelude removed in v0.1.5 — embedded)
                 | Section.Executable | Section.Test ->
                     match key with
                     | "name" -> curName <- Some value
@@ -111,7 +108,6 @@ let parseFunProj (content: string) (projectDir: string) : FunProjConfig =
     finishTarget ()
 
     { Name        = projName
-      PreludePath = prelude
       Executables = executables
       Tests       = tests
       ProjectDir  = projectDir }

@@ -112,11 +112,12 @@ let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<
         | other -> [other])
 
 /// Compile a single .fun file to a native binary.
-/// preludeDir: explicit prelude directory path (Some from funproj.toml or None for walkUp search)
+/// Prelude loading: walkUp from input path finds filesystem Prelude/ (enables hot-editing
+/// during development). Falls back to embedded resources (Phase 103).
 /// inputPath: path to the .fun source file
 /// outputPath: path for the output binary
 /// optLevel: optimization level 0-3
-let compileFile (preludeDir: string option) (inputPath: string) (outputPath: string) (optLevel: int) (traceEnabled: bool) (logEnabled: bool) : int =
+let compileFile (inputPath: string) (outputPath: string) (optLevel: int) (traceEnabled: bool) (logEnabled: bool) : int =
     try
         let src = File.ReadAllText(inputPath)
 
@@ -126,24 +127,20 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                               "Hashtable.fun"; "HashSet.fun"; "MutableList.fun"; "Queue.fun";
                               "StringBuilder.fun"; "List.fun"; "Array.fun" |]
         let preludeSrc =
+            // Search for Prelude/ starting from the input file's directory and walking up.
+            // Enables hot-editing Prelude source without rebuilding the compiler.
             let findPreludeDir () =
-                match preludeDir with
-                | Some dir ->
-                    // Explicit prelude directory from funproj.toml
-                    if Directory.Exists dir then dir else ""
-                | None ->
-                    // Search for Prelude/ starting from the input file's directory and walking up.
-                    let inputDir = Path.GetDirectoryName(Path.GetFullPath(inputPath))
-                    let rec walkUp (dir: string) =
-                        if dir = null || dir = "" then ""
+                let inputDir = Path.GetDirectoryName(Path.GetFullPath(inputPath))
+                let rec walkUp (dir: string) =
+                    if dir = null || dir = "" then ""
+                    else
+                        let candidate = Path.Combine(dir, "Prelude")
+                        if Directory.Exists candidate then candidate
                         else
-                            let candidate = Path.Combine(dir, "Prelude")
-                            if Directory.Exists candidate then candidate
-                            else
-                                let parent = Path.GetDirectoryName(dir)
-                                if parent = dir then ""
-                                else walkUp parent
-                    walkUp inputDir
+                            let parent = Path.GetDirectoryName(dir)
+                            if parent = dir then ""
+                            else walkUp parent
+                walkUp inputDir
             let loadEmbedded () =
                 // Phase 103: Load from embedded resources in the assembly.
                 let asm = Reflection.Assembly.GetExecutingAssembly()
@@ -283,10 +280,6 @@ let private handleBuild (optLevel: int) (args: string list) : int =
         | Some ts ->
             Directory.CreateDirectory(Path.Combine(config.ProjectDir, "build")) |> ignore
 
-            let preludeDir =
-                config.PreludePath
-                |> Option.map (fun p -> Path.GetFullPath(Path.Combine(config.ProjectDir, p)))
-
             let mutable exitCode = 0
             for target in ts do
                 if exitCode = 0 then
@@ -297,7 +290,7 @@ let private handleBuild (optLevel: int) (args: string list) : int =
                     else
                         let outputPath = Path.Combine(config.ProjectDir, "build", target.Name)
                         let sw = Stopwatch.StartNew()
-                        let result = compileFile preludeDir srcPath outputPath optLevel false false
+                        let result = compileFile srcPath outputPath optLevel false false
                         if result = 0 then
                             printfn "OK: %s -> build/%s (%.1fs)" target.Name target.Name sw.Elapsed.TotalSeconds
                         else
@@ -330,10 +323,6 @@ let private handleTest (optLevel: int) (args: string list) : int =
         | Some ts ->
             Directory.CreateDirectory(Path.Combine(config.ProjectDir, "build")) |> ignore
 
-            let preludeDir =
-                config.PreludePath
-                |> Option.map (fun p -> Path.GetFullPath(Path.Combine(config.ProjectDir, p)))
-
             let mutable passCount = 0
             let mutable totalCount = 0
 
@@ -346,7 +335,7 @@ let private handleTest (optLevel: int) (args: string list) : int =
                 else
                     let outputPath = Path.Combine(config.ProjectDir, "build", target.Name)
                     let sw = Stopwatch.StartNew()
-                    let compileResult = compileFile preludeDir srcPath outputPath optLevel false false
+                    let compileResult = compileFile srcPath outputPath optLevel false false
                     if compileResult <> 0 then
                         printfn "FAIL: %s (compile error)" target.Name
                     else
@@ -444,7 +433,7 @@ let private mainImpl (argv: string[]) =
             eprintfn "Error: file not found: %s" inputPath
             1
         else
-            compileFile None inputPath outputPath optLevel traceEnabled logEnabled
+            compileFile inputPath outputPath optLevel traceEnabled logEnabled
     | [] ->
         eprintfn "Usage: fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3] [--trace] [--log]"
         eprintfn "       fnc build [<target>] [-O0|-O1|-O2|-O3]"
