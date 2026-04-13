@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] - 2026-04-13
+
+### Fixed
+- Record field disambiguation across same-named fields in different record types (Issue #24) — FunLang submodule bump to v0.1.2 which includes FunLang#20 (FieldAccess TData annotation) and FunLang#21 (remove E0311 DuplicateRecordField check). Compiler의 disambiguation 로직은 이미 존재했으며 annotationMap이 채워지면서 자동으로 동작.
+
+### Changed
+- `deps/FunLang` submodule: `8654e64` → `335013c` (v0.1.2)
+
 ## [0.1.2] - 2026-04-10
 
 ### Added
