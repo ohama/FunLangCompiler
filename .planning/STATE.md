@@ -46,6 +46,8 @@ Progress: v1.0–v23.0 in progress [██████████████�
 - Phase 99 added: match failure diagnostics — 소스 위치, 값, 콜 스택 backtrace (DEBUG-02)
 - Phase 100 added: Hashtable.tryGetValue option 태그 불일치 수정 (BUG-02, Issue #23)
 - Phase 101 added: failwith/unhandled exception backtrace (DEBUG-03)
+- Phase 102 added: Prelude type annotations — `s.[i] : char` semantic 확정 후 Prelude wrapper 함수에 명시 타입 부여 (Issue #24 FunLexYacc 검증 차단 해소)
+- Phase 103 added: Embed Prelude into compiler binary — 현재 파일시스템 walkUp 검색 방식으로 `/tmp/` 등에서 Prelude 미로딩. Phase 102 검증의 선결 조건으로 실행 순서 103 → 102 권장.
 
 ### Blockers/Concerns
 

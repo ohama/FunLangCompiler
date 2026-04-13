@@ -444,7 +444,7 @@ let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
 
 // Phase 16: elaborateProgram — new entry point accepting Ast.Module.
 // Runs prePassDecls to populate TypeEnv/RecordEnv/ExnTags, then elaborates the program body.
-let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>) : MlirModule =
+let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>) (logEnabled: bool) : MlirModule =
     let decls =
         match ast with
         | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) -> decls
@@ -455,7 +455,7 @@ let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>)
     let mainExpr = LambdaLift.liftExpr mainExpr
     // Let-normalization: extract control-flow sub-expressions from operand positions (partial ANF)
     let mainExpr = LetNormalize.normalizeExpr mainExpr
-    let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags; StringFields = stringFields; AnnotationMap = annotationMap }
+    let env = { emptyEnv () with TypeEnv = typeEnv; RecordEnv = recordEnv; ExnTags = exnTags; StringFields = stringFields; AnnotationMap = annotationMap; LogEnabled = logEnabled }
     let (resultVal, entryOps) = elaborateExpr env mainExpr
     // Phase 88: Convert @main return value to raw I64 for process exit code.
     let (exitVal, untagOps) =

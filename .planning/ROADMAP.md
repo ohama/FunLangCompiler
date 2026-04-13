@@ -187,9 +187,87 @@ Phase 99에서 추가한 `lang_trace_push`/`lang_trace_pop` + `lang_print_backtr
 
 ---
 
+#### Phase 102: Prelude Type Annotations
+
+**Goal**: Prelude의 모든 wrapper/identity 함수에 명시적 타입 어노테이션(char/int/string 등)을 부여하여, FunLang 타입 체커가 multi-file import 프로젝트에서 annotationMap을 올바르게 채울 수 있게 함
+**Depends on**: Phase 101
+**Requirements**: PRE-TYPE-01
+**Success Criteria** (what must be TRUE):
+  1. `Prelude/Core.fun`의 `char_to_int : char -> int`, `int_to_char : int -> char` 가 명시적 어노테이션으로 선언됨
+  2. `Prelude/Char.fun`의 모든 wrapper (isDigit, toUpper, isLetter, isUpper, isLower, toLower, toInt, ofInt) 가 `char -> bool` 또는 `char -> char` 형태로 명시 어노테이션
+  3. `Prelude/String.fun`의 모든 wrapper (concat, join, endsWith, startsWith, trim, length, contains, split, indexOf, replace, toUpper, toLower, substring) 가 명시 어노테이션
+  4. 기존 264+ E2E 테스트가 어노테이션 추가 후에도 모두 통과 (regression 없음)
+  5. FunLang `typeCheckFile`이 `s.[i] : char` semantic을 사용하는 minimal multi-file import 예제에서 성공하여 annotationMap에 entries를 생성
+  6. `char_to_int`, `int_to_char` 호출 시 FunLang 타입 체커가 `TArrow(TChar, TInt)` / `TArrow(TInt, TChar)` 로 올바르게 해석
+
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 102 to break down)
+
+**Details:**
+배경:
+- FunLang#15: `s.[i] : char` 로 결정 (FunLexYacc 검증 중 확정)
+- FunLang#22: import 체인 타입 해소 수정 (해결)
+- FunLang#23: char 리터럴과 int 비교 — 올바른 방향은 `char_to_int` 명시 변환
+
+현재 `Prelude/Core.fun`의 `char_to_int`, `int_to_char`는 `let char_to_int c = c` 같이 어노테이션 없이 identity로 정의됨. FunLang 타입 체커가 `'a -> 'a` 로 추론하여 builtin scheme `TArrow(TChar, TInt)` 과 충돌 가능.
+
+작업:
+- Prelude/Core.fun: char_to_int, int_to_char 에 명시적 타입
+- Prelude/Char.fun: 모든 함수 `(c : char)` 파라미터 및 반환 타입 명시
+- Prelude/String.fun: 모든 string 함수 파라미터/반환 타입 명시
+- 필요 시 Prelude/Int.fun, Prelude/Option.fun 등 다른 파일도 검토
+
+Issue #24 재발 완전 해결에 필요 (FunLexYacc의 타입 체크가 실제로 성공해야 annotationMap이 채워져 record field disambiguation이 동작).
+
+---
+
+#### Phase 103: Embed Prelude into Compiler Binary
+
+**Goal**: Prelude 소스 파일을 컴파일러 바이너리에 embedded resource로 포함하여, Prelude 디렉토리 없는 환경에서도 `char_to_int`, `List.map`, `String.trim` 등 모든 Prelude 함수를 자유롭게 사용 가능하게 함
+**Depends on**: Phase 101
+**Requirements**: PRE-EMBED-01
+**Success Criteria** (what must be TRUE):
+  1. `/tmp/` 같이 Prelude 디렉토리가 없는 위치에서 `.fun` 파일을 컴파일해도 Prelude 함수(`char_to_int`, `List.map` 등)가 정상 해석됨
+  2. 컴파일러 바이너리(dotnet DLL)에 14개 Prelude 파일(Typeclass/Core/Option/Result/String/Char/Int/Hashtable/HashSet/MutableList/Queue/StringBuilder/List/Array)이 embedded resource로 포함됨
+  3. 파일시스템 `Prelude/` 디렉토리가 존재하면 여전히 우선 사용됨 (override 가능) — 개발 중 Prelude 수정 시 재빌드 없이 테스트 가능
+  4. 기존 264+ E2E 테스트 모두 통과 (regression 없음)
+  5. `funproj.toml`의 explicit prelude path 역시 여전히 동작
+
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 103 to break down)
+
+**Details:**
+현재 동작 (`src/FunLangCompiler.Cli/Program.fs:123-164`):
+- `findPreludeDir()`가 파일시스템 검색
+  1. 명시적 `preludeDir` (funproj.toml)
+  2. input 파일 디렉토리부터 walkUp하며 `Prelude/` 찾기
+  3. assembly 디렉토리의 `Prelude/` fallback
+- 찾지 못하면 `preludeSrc = ""` → Prelude 함수 사용 불가
+
+문제:
+- `/tmp/` 등 임시 위치에서 테스트 시 Prelude 미로딩 → `char_to_int`, `List.map` undefined
+- 사용자가 FunLangCompiler 바이너리만 설치한 경우 Prelude 디렉토리 별도 배포 필요
+- FunLexYacc는 `Prelude@` 심볼릭 링크로 우회하지만 부적절한 해결책
+
+작업:
+- F# 프로젝트에 `<EmbeddedResource>` 로 Prelude/*.fun 파일 포함
+- `findPreludeDir()` 실패 시 embedded resource에서 로드
+- override 순서: funproj.toml > walkUp > embedded resource (fallback 제거)
+- `dotnet publish` 시 single-file 배포 가능하도록 보장
+
+**실행 순서 주의:** Phase 102 (Prelude 타입 어노테이션) 검증을 임시 파일에서 하려면 Phase 103이 먼저 필요. 권장 실행: 103 → 102.
+
+---
+
 ## Progress
 
-**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99 → 100 → 101
+**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99 → 100 → 101 → 103 → 102
+
+(Phase 103 먼저: Prelude embed으로 임시 위치 테스트 가능. Phase 102: 타입 어노테이션 추가 및 검증.)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -201,3 +279,5 @@ Phase 99에서 추가한 `lang_trace_push`/`lang_trace_pop` + `lang_print_backtr
 | 99. Match Failure Diagnostics | v23.0 | 0/TBD | Not started | - |
 | 100. Hashtable.tryGetValue Option Fix | v23.0 | 0/TBD | Not started | - |
 | 101. failwith/exception Backtrace | v23.0 | 0/TBD | Not started | - |
+| 102. Prelude Type Annotations | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
+| 103. Embed Prelude into Binary | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |

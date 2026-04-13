@@ -1,9 +1,9 @@
 module Char =
-    let isDigit c = char_is_digit c
-    let toUpper c = char_to_upper c
-    let isLetter c = char_is_letter c
-    let isUpper c = char_is_upper c
-    let isLower c = char_is_lower c
-    let toLower c = char_to_lower c
-    let toInt c = char_to_int c
-    let ofInt n = int_to_char n
+    let isDigit (c : char) : bool = char_is_digit c
+    let toUpper (c : char) : char = char_to_upper c
+    let isLetter (c : char) : bool = char_is_letter c
+    let isUpper (c : char) : bool = char_is_upper c
+    let isLower (c : char) : bool = char_is_lower c
+    let toLower (c : char) : char = char_to_lower c
+    let toInt (c : char) : int = char_to_int c
+    let ofInt (n : int) : char = int_to_char n

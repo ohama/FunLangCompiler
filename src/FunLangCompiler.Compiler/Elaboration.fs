@@ -191,7 +191,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                     | Ast.Annot(Ast.LambdaAnnot(p, TEString, _, _), _, _) when p = outerParam -> true
                     | _ -> false
                  if outerIsString then Set.singleton outerParam else Set.empty)
-              StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
+              StringFields = env.StringFields; AnnotationMap = env.AnnotationMap; LogEnabled = env.LogEnabled }
 
         // For each capture at index i: GEP to slot i+1, then load
         let captureLoadOps, innerEnvWithCaptures =
@@ -421,7 +421,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
               BoolVars = Set.empty
               StringVars = (if paramIsString then Set.singleton param else Set.empty)
-              StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
+              StringFields = env.StringFields; AnnotationMap = env.AnnotationMap; LogEnabled = env.LogEnabled }
         let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
         // Phase 88: Retag I1 returns to I64 tagged for uniform ABI.
         // Only I1 needs retag; I64/Ptr stay as-is.
@@ -885,7 +885,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
                       BoolVars = Set.empty
                       StringVars = (if paramIsString then Set.singleton param else Set.empty)
-                      StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
+                      StringFields = env.StringFields; AnnotationMap = env.AnnotationMap; LogEnabled = env.LogEnabled }
                 let (bodyVal, bodyEntryOps) = elaborateExpr bodyEnv body
                 // Phase 88: Retag I1 returns to I64 tagged for uniform ABI.
                 let (finalBodyVal, coerceRetOps) =
@@ -1604,6 +1604,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | App (Var ("printfn", _), String (fmt, _), s) ->
         elaborateExpr env (App(Var("println", s), String(fmt, s), s))
 
+    // Phase 104: printf — formatted stdout without newline. Desugars to print (sprintf ...).
+    | App (App (App (Var ("printf", _), String (fmt, _), _), arg1Expr, _), arg2Expr, s) ->
+        let sprintfExpr = App(App(App(Var("sprintf", s), String(fmt, s), s), arg1Expr, s), arg2Expr, s)
+        elaborateExpr env (App(Var("print", s), sprintfExpr, s))
+    | App (App (Var ("printf", _), String (fmt, _), _), argExpr, s) ->
+        let sprintfExpr = App(App(Var("sprintf", s), String(fmt, s), s), argExpr, s)
+        elaborateExpr env (App(Var("print", s), sprintfExpr, s))
+    | App (Var ("printf", _), String (fmt, _), s) ->
+        elaborateExpr env (App(Var("print", s), String(fmt, s), s))
+
     // Phase 39: sprintf — 2-arg case (MUST come BEFORE 1-arg cases — see Pitfall 1)
     | App (App (App (Var ("sprintf", _), String (fmt, _), _), arg1Expr, _), arg2Expr, sprintfSpan)
         when (let specs = fmtSpecTypes fmt in specs.Length = 2) ->
@@ -1696,9 +1706,63 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let (unitVal, callOps) = emitVoidCall env "@lang_eprintln" [ptrVal]
         (unitVal, argOps @ castOps @ callOps)
 
+    // Phase 104: eprintfn — general N-arg case via sprintf (match BEFORE one-arg literal fallback)
+    | App (App (App (Var ("eprintfn", _), String (fmt, _), _), arg1Expr, _), arg2Expr, s) ->
+        let sprintfExpr = App(App(App(Var("sprintf", s), String(fmt, s), s), arg1Expr, s), arg2Expr, s)
+        elaborateExpr env (App(Var("eprintln", s), sprintfExpr, s))
+    | App (App (Var ("eprintfn", _), String (fmt, _), _), argExpr, s) ->
+        let sprintfExpr = App(App(Var("sprintf", s), String(fmt, s), s), argExpr, s)
+        elaborateExpr env (App(Var("eprintln", s), sprintfExpr, s))
+
     // eprintfn — one-arg case: eprintfn "literal" (desugar to eprintln "literal")
     | App (Var ("eprintfn", _), String (fmt, _), s) ->
         elaborateExpr env (App(Var("eprintln", s), String(fmt, s), s))
+
+    // Phase 104: eprintf — formatted stderr without newline. Desugars to eprint (sprintf ...).
+    | App (App (App (Var ("eprintf", _), String (fmt, _), _), arg1Expr, _), arg2Expr, s) ->
+        let sprintfExpr = App(App(App(Var("sprintf", s), String(fmt, s), s), arg1Expr, s), arg2Expr, s)
+        elaborateExpr env (App(Var("eprint", s), sprintfExpr, s))
+    | App (App (Var ("eprintf", _), String (fmt, _), _), argExpr, s) ->
+        let sprintfExpr = App(App(Var("sprintf", s), String(fmt, s), s), argExpr, s)
+        elaborateExpr env (App(Var("eprint", s), sprintfExpr, s))
+    | App (Var ("eprintf", _), String (fmt, _), s) ->
+        elaborateExpr env (App(Var("eprint", s), String(fmt, s), s))
+
+    // Phase 104: log — conditional stderr print with newline.
+    // Enabled by CLI --log flag; when disabled, compiles to unit (zero cost, still
+    // evaluates the string argument for side-effects? No — argument is discarded entirely).
+    // log : string -> unit
+    | App (Var ("log", _), argExpr, s) ->
+        if env.LogEnabled then
+            elaborateExpr env (App(Var("eprintln", s), argExpr, s))
+        else
+            // Discard the argument (no evaluation — matches #ifdef-style gating; common for
+            // debug logs where the message itself may be expensive to compute).
+            let unitVal = { Name = freshName env; Type = I64 }
+            (unitVal, [ArithConstantOp(unitVal, 0L)])
+
+    // Phase 104: logf — conditional formatted stderr print with newline.
+    // Accepts any sprintf-compatible format + args. logf : string -> 'a -> ... -> unit
+    | App (App (App (Var ("logf", _), String (fmt, _), _), arg1Expr, _), arg2Expr, s) ->
+        if env.LogEnabled then
+            let sprintfExpr = App(App(App(Var("sprintf", s), String(fmt, s), s), arg1Expr, s), arg2Expr, s)
+            elaborateExpr env (App(Var("eprintln", s), sprintfExpr, s))
+        else
+            let unitVal = { Name = freshName env; Type = I64 }
+            (unitVal, [ArithConstantOp(unitVal, 0L)])
+    | App (App (Var ("logf", _), String (fmt, _), _), argExpr, s) ->
+        if env.LogEnabled then
+            let sprintfExpr = App(App(Var("sprintf", s), String(fmt, s), s), argExpr, s)
+            elaborateExpr env (App(Var("eprintln", s), sprintfExpr, s))
+        else
+            let unitVal = { Name = freshName env; Type = I64 }
+            (unitVal, [ArithConstantOp(unitVal, 0L)])
+    | App (Var ("logf", _), String (fmt, _), s) ->
+        if env.LogEnabled then
+            elaborateExpr env (App(Var("eprintln", s), String(fmt, s), s))
+        else
+            let unitVal = { Name = freshName env; Type = I64 }
+            (unitVal, [ArithConstantOp(unitVal, 0L)])
 
     // Phase 27: write_lines — two-arg, void return (MUST come before one-arg arms)
     | App (App (Var ("write_lines", _), pathExpr, _), linesExpr, _) ->
@@ -1763,7 +1827,13 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
         let result = { Name = freshName env; Type = Ptr }
         (result, uOps @ [LlvmCallOp(result, "@lang_get_args", [])])
 
-    // Phase 14/67: char_to_int/int_to_char moved to Prelude/Core.fun as identity functions
+    // Phase 102: char_to_int/int_to_char — identity pass-through (char/int both represented as I64 at runtime).
+    // Made compiler-level builtins so FunLang's TArrow(TChar, TInt) / TArrow(TInt, TChar) schemes are used
+    // directly without the Prelude identity definitions shadowing the builtin.
+    | App (Var ("char_to_int", _), argExpr, _) ->
+        elaborateExpr env argExpr
+    | App (Var ("int_to_char", _), argExpr, _) ->
+        elaborateExpr env argExpr
 
     // Phase 31: char_is_digit — returns bool (bool-wrapping pattern)
     | App (Var ("char_is_digit", _), charExpr, _) ->
@@ -2034,7 +2104,8 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                 | _ ->
                     // Collect all known names for "Did you mean?" suggestion
                     let builtinNames = [
-                        "print"; "println"; "printfn"; "eprint"; "eprintln"; "eprintfn"; "sprintf"
+                        "print"; "println"; "printf"; "printfn"; "eprint"; "eprintln"; "eprintf"; "eprintfn"; "sprintf"
+                        "log"; "logf"
                         "failwith"; "dbg"; "to_string"
                         "string_length"; "string_concat"; "string_sub"; "string_contains"
                         "string_startswith"; "string_endswith"; "string_trim"; "string_to_int"
@@ -2641,7 +2712,7 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
               TypeEnv = env.TypeEnv; RecordEnv = env.RecordEnv; ExnTags = env.ExnTags
               // Remove param name from MutableVars so lambda param shadows outer mutable var
               MutableVars = Set.remove param env.MutableVars; ArrayVars = Set.empty; CollectionVars = Map.empty
-              BoolVars = Set.empty; StringVars = env.StringVars; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap }
+              BoolVars = Set.empty; StringVars = env.StringVars; StringFields = env.StringFields; AnnotationMap = env.AnnotationMap; LogEnabled = env.LogEnabled }
         let captureLoadOps, innerEnvWithCaptures =
             captures |> List.mapi (fun i capName ->
                 let gepVal = { Name = sprintf "%%t%d" (lambdaCaptureStart + i); Type = Ptr }

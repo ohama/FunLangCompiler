@@ -14,4 +14,21 @@
     <ProjectReference Include="..\FunLangCompiler.Compiler\FunLangCompiler.Compiler.fsproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\Prelude\Typeclass.fun"     LogicalName="Prelude.Typeclass.fun" />
+    <EmbeddedResource Include="..\..\Prelude\Core.fun"          LogicalName="Prelude.Core.fun" />
+    <EmbeddedResource Include="..\..\Prelude\Option.fun"        LogicalName="Prelude.Option.fun" />
+    <EmbeddedResource Include="..\..\Prelude\Result.fun"        LogicalName="Prelude.Result.fun" />
+    <EmbeddedResource Include="..\..\Prelude\String.fun"        LogicalName="Prelude.String.fun" />
+    <EmbeddedResource Include="..\..\Prelude\Char.fun"          LogicalName="Prelude.Char.fun" />
+    <EmbeddedResource Include="..\..\Prelude\Int.fun"           LogicalName="Prelude.Int.fun" />
+    <EmbeddedResource Include="..\..\Prelude\Hashtable.fun"     LogicalName="Prelude.Hashtable.fun" />
+    <EmbeddedResource Include="..\..\Prelude\HashSet.fun"       LogicalName="Prelude.HashSet.fun" />
+    <EmbeddedResource Include="..\..\Prelude\MutableList.fun"   LogicalName="Prelude.MutableList.fun" />
+    <EmbeddedResource Include="..\..\Prelude\Queue.fun"         LogicalName="Prelude.Queue.fun" />
+    <EmbeddedResource Include="..\..\Prelude\StringBuilder.fun" LogicalName="Prelude.StringBuilder.fun" />
+    <EmbeddedResource Include="..\..\Prelude\List.fun"          LogicalName="Prelude.List.fun" />
+    <EmbeddedResource Include="..\..\Prelude\Array.fun"         LogicalName="Prelude.Array.fun" />
+  </ItemGroup>
+
 </Project>

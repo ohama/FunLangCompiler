@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.4] - 2026-04-13
+
+### Added
+- **Prelude embedded in compiler binary** (Phase 103) — 14개 Prelude 파일을 `<EmbeddedResource>` 로 내장. `/tmp/` 등 Prelude 디렉토리가 없는 위치에서도 Prelude 함수(`char_to_int`, `List.map`, `String.trim` 등) 사용 가능. 파일시스템 `Prelude/` 디렉토리가 있으면 우선 사용 (개발 중 핫 에디팅 지원).
+- **`printf` / `eprintf` 빌트인** (Phase 104) — stdout/stderr 포맷 출력 (개행 없음). `printfn`/`eprintfn`과 대칭.
+- **`log` / `logf` 빌트인** (Phase 104) — 디버그 로그 함수. 기본 비활성화, `--log` CLI 플래그로 활성화 시 stderr + 개행. 비활성화 시 argument 평가 없이 unit 반환 (no-op).
+- **`--log` CLI 플래그** (Phase 104) — `log`/`logf` 출력 활성화.
+- **`-h` / `--help` CLI 플래그** (Phase 104) — 상세 사용법, CLI 옵션, 빌트인 함수 목록 표시.
+- **`eprintfn` N-arg 지원 확장** (Phase 104) — 이전: `%s` 1개 인자만 지원. 이제 `printfn`과 동일하게 2-arg까지 sprintf 경유하여 지원.
+- E2E 테스트 추가: `39-04-printf-eprintf`, `39-05-log-disabled`, `39-06-log-enabled`.
+
+### Changed
+- **`char_to_int` / `int_to_char` 를 컴파일러 빌트인으로 승격** (Phase 102) — Prelude의 identity 정의가 FunLang builtin scheme `TArrow(TChar, TInt)` / `TArrow(TInt, TChar)` 를 shadow하지 않음. Elaboration.fs에서 identity pass-through로 처리.
+- **Prelude/Char.fun, Prelude/String.fun 타입 어노테이션 추가** (Phase 102) — 모든 wrapper에 `(c : char) : bool`, `(s : string) : int` 등 명시적 타입.
+- **annotationMap 경로 정규화** — FunLang `typeCheckFile` 이 absolute path로 기록한 span FileName을 FunLangCompiler의 inputPath로 변환. Multi-file 프로젝트에서 FieldAccess span 조회 성공 → Issue #24 record field disambiguation 동작.
+- **`deps/FunLang` submodule**: v0.1.2 (335013c) → v0.1.3 (d62b566) — FunLang#22 type alias 해소 포함.
+- 테스트 `35-05-option-module`, `35-06-result-module`: Prelude 내장으로 Option/Result 모듈 충돌 발생. 테스트 모듈명을 MyOption/MyResult로 변경.
+
+### Fixed
+- **Issue #24 multi-file record field disambiguation** — FunLang 타입 체커가 absolute path로 annotationMap을 기록하여 FunLangCompiler의 relative path span과 매칭 실패하던 버그 수정. 별도 파일에 선언된 동일 필드명의 record 타입들이 올바르게 구분됨.
+
 ## [0.1.3] - 2026-04-13
 
 ### Fixed

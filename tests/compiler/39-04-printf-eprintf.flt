@@ -1,0 +1,11 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+let _ = printf "A%d" 1
+let _ = printf "B%s" "x"
+let _ = println ""
+let _ = eprintf "dropped-%d" 99
+let _ = eprintf "dropped-%s" "z"
+let _ = eprintln ""
+// --- Output:
+A1Bx
+0

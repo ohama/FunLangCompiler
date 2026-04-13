@@ -59,6 +59,8 @@ type ElabEnv = {
     StringFields: Set<string>
     // Phase 67: Typed AST annotation map from FunLang type inference (Span → Type)
     AnnotationMap: Map<Ast.Span, Type.Type>
+    // Phase 104: `--log` CLI flag — enables log/logf builtin output (default false = silent)
+    LogEnabled: bool
 }
 
 let emptyEnv () : ElabEnv =
@@ -68,7 +70,7 @@ let emptyEnv () : ElabEnv =
       TypeEnv = Map.empty; RecordEnv = Map.empty; ExnTags = Map.empty
       MutableVars = Set.empty; ArrayVars = Set.empty; CollectionVars = Map.empty
       BoolVars = Set.empty; StringVars = Set.empty; StringFields = Set.empty
-      AnnotationMap = Map.empty }
+      AnnotationMap = Map.empty; LogEnabled = false }
 
 /// Phase 44: Raise an error with source location in "file:line:col: message" format.
 /// Uses Printf.ksprintf to support format strings like failwithf.

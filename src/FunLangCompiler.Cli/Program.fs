@@ -116,11 +116,15 @@ let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<
 /// inputPath: path to the .fun source file
 /// outputPath: path for the output binary
 /// optLevel: optimization level 0-3
-let compileFile (preludeDir: string option) (inputPath: string) (outputPath: string) (optLevel: int) (traceEnabled: bool) : int =
+let compileFile (preludeDir: string option) (inputPath: string) (outputPath: string) (optLevel: int) (traceEnabled: bool) (logEnabled: bool) : int =
     try
         let src = File.ReadAllText(inputPath)
 
         // Phase 35: Auto-load Prelude modules
+        // Phase 103: Fall back to embedded resources when filesystem Prelude/ is not found.
+        let preludeOrder = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun"; "Int.fun";
+                              "Hashtable.fun"; "HashSet.fun"; "MutableList.fun"; "Queue.fun";
+                              "StringBuilder.fun"; "List.fun"; "Array.fun" |]
         let preludeSrc =
             let findPreludeDir () =
                 match preludeDir with
@@ -129,9 +133,6 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                     if Directory.Exists dir then dir else ""
                 | None ->
                     // Search for Prelude/ starting from the input file's directory and walking up.
-                    // This ensures prelude loading is scoped to the project that owns the input file,
-                    // not the arbitrary CWD. Users place Prelude/ in their project root; tools
-                    // that compile temp files in /tmp/ do not pick up a project's Prelude/.
                     let inputDir = Path.GetDirectoryName(Path.GetFullPath(inputPath))
                     let rec walkUp (dir: string) =
                         if dir = null || dir = "" then ""
@@ -140,28 +141,30 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                             if Directory.Exists candidate then candidate
                             else
                                 let parent = Path.GetDirectoryName(dir)
-                                if parent = dir then ""  // reached filesystem root
+                                if parent = dir then ""
                                 else walkUp parent
-                    let fromInput = walkUp inputDir
-                    if fromInput <> "" then fromInput
+                    walkUp inputDir
+            let loadEmbedded () =
+                // Phase 103: Load from embedded resources in the assembly.
+                let asm = Reflection.Assembly.GetExecutingAssembly()
+                preludeOrder
+                |> Array.choose (fun f ->
+                    let resourceName = "Prelude." + f
+                    use stream = asm.GetManifestResourceStream(resourceName)
+                    if isNull stream then None
                     else
-                        // Fallback: check assembly directory/Prelude
-                        let asmDir = Path.GetDirectoryName(Reflection.Assembly.GetEntryAssembly().Location)
-                        let asmCandidate = Path.Combine(asmDir, "Prelude")
-                        if Directory.Exists asmCandidate then asmCandidate
-                        else ""
+                        use reader = new IO.StreamReader(stream)
+                        Some (reader.ReadToEnd()))
+                |> String.concat "\n"
             let dir = findPreludeDir ()
-            if dir = "" then ""
-            else
-                // Explicit load order: Option/Result before List (List uses None/Some constructors)
-                let ordered = [| "Typeclass.fun"; "Core.fun"; "Option.fun"; "Result.fun"; "String.fun"; "Char.fun"; "Int.fun";
-                                 "Hashtable.fun"; "HashSet.fun"; "MutableList.fun"; "Queue.fun";
-                                 "StringBuilder.fun"; "List.fun"; "Array.fun" |]
-                ordered
+            if dir <> "" then
+                // Filesystem Prelude takes priority (enables hot-editing without rebuild)
+                preludeOrder
                 |> Array.choose (fun f ->
                     let path = Path.Combine(dir, f)
                     if File.Exists path then Some (File.ReadAllText path) else None)
                 |> String.concat "\n"
+            else loadEmbedded ()
 
         let ast =
             if preludeSrc = "" then
@@ -216,7 +219,20 @@ let compileFile (preludeDir: string option) (inputPath: string) (outputPath: str
                 finally
                     System.Console.SetError(savedErr)
             with _ -> Map.empty
-        let mlirMod = ElabProgram.elaborateProgram tcAst annotationMap
+        // Phase 102/103: FunLang's typeCheckFile uses absolute paths in span FileNames,
+        // but FunLangCompiler's AST uses the user-supplied path (typically relative).
+        // Rewrite annotationMap keys to use inputPath so FieldAccess span lookups match.
+        let fullInputPath = Path.GetFullPath(inputPath)
+        let annotationMap =
+            annotationMap
+            |> Map.toSeq
+            |> Seq.map (fun (span, ty) ->
+                let normalized =
+                    if span.FileName = fullInputPath then { span with FileName = inputPath }
+                    else span
+                (normalized, ty))
+            |> Map.ofSeq
+        let mlirMod = ElabProgram.elaborateProgram tcAst annotationMap logEnabled
         let mlirMod = ElabProgram.insertCallStack mlirMod
         let mlirMod = if traceEnabled then ElabProgram.insertTraceEntries mlirMod else mlirMod
         match Pipeline.compile mlirMod outputPath optLevel with
@@ -281,7 +297,7 @@ let private handleBuild (optLevel: int) (args: string list) : int =
                     else
                         let outputPath = Path.Combine(config.ProjectDir, "build", target.Name)
                         let sw = Stopwatch.StartNew()
-                        let result = compileFile preludeDir srcPath outputPath optLevel false
+                        let result = compileFile preludeDir srcPath outputPath optLevel false false
                         if result = 0 then
                             printfn "OK: %s -> build/%s (%.1fs)" target.Name target.Name sw.Elapsed.TotalSeconds
                         else
@@ -330,7 +346,7 @@ let private handleTest (optLevel: int) (args: string list) : int =
                 else
                     let outputPath = Path.Combine(config.ProjectDir, "build", target.Name)
                     let sw = Stopwatch.StartNew()
-                    let compileResult = compileFile preludeDir srcPath outputPath optLevel false
+                    let compileResult = compileFile preludeDir srcPath outputPath optLevel false false
                     if compileResult <> 0 then
                         printfn "FAIL: %s (compile error)" target.Name
                     else
@@ -354,22 +370,63 @@ let private handleTest (optLevel: int) (args: string list) : int =
 let private mainImpl (argv: string[]) =
     let args = argv |> Array.toList
 
-    // Parse flags: -o <output>, -O0/-O1/-O2/-O3, --trace
-    let rec parseArgs args outputOpt optLevel traceEnabled =
+    // Parse flags. Order-independent; unknown tokens fall through to positional args.
+    let rec parseArgs args outputOpt optLevel traceEnabled logEnabled helpRequested =
         match args with
-        | "-o" :: out :: rest -> parseArgs rest (Some out) optLevel traceEnabled
-        | "-O0" :: rest -> parseArgs rest outputOpt 0 traceEnabled
-        | "-O1" :: rest -> parseArgs rest outputOpt 1 traceEnabled
-        | "-O2" :: rest -> parseArgs rest outputOpt 2 traceEnabled
-        | "-O3" :: rest -> parseArgs rest outputOpt 3 traceEnabled
-        | "--trace" :: rest -> parseArgs rest outputOpt optLevel true
+        | "-o" :: out :: rest -> parseArgs rest (Some out) optLevel traceEnabled logEnabled helpRequested
+        | "-O0" :: rest -> parseArgs rest outputOpt 0 traceEnabled logEnabled helpRequested
+        | "-O1" :: rest -> parseArgs rest outputOpt 1 traceEnabled logEnabled helpRequested
+        | "-O2" :: rest -> parseArgs rest outputOpt 2 traceEnabled logEnabled helpRequested
+        | "-O3" :: rest -> parseArgs rest outputOpt 3 traceEnabled logEnabled helpRequested
+        | "--trace" :: rest -> parseArgs rest outputOpt optLevel true logEnabled helpRequested
+        | "--log" :: rest -> parseArgs rest outputOpt optLevel traceEnabled true helpRequested
+        | ("-h" | "--help") :: rest -> parseArgs rest outputOpt optLevel traceEnabled logEnabled true
         | x :: rest ->
-            let (o, ol, t, r) = parseArgs rest outputOpt optLevel traceEnabled
-            (o, ol, t, x :: r)
-        | [] -> (outputOpt, optLevel, traceEnabled, [])
+            let (o, ol, t, l, h, r) = parseArgs rest outputOpt optLevel traceEnabled logEnabled helpRequested
+            (o, ol, t, l, h, x :: r)
+        | [] -> (outputOpt, optLevel, traceEnabled, logEnabled, helpRequested, [])
 
-    let (outputOpt, optLevel, traceEnabled, remaining) = parseArgs args None 2 false
+    let (outputOpt, optLevel, traceEnabled, logEnabled, helpRequested, remaining) =
+        parseArgs args None 2 false false false
 
+    let printHelp () =
+        printfn "fnc — FunLangCompiler: FunLang source → native binary"
+        printfn ""
+        printfn "USAGE"
+        printfn "  fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3] [--trace] [--log]"
+        printfn "  fnc build [<target>] [-O0|-O1|-O2|-O3]"
+        printfn "  fnc test  [<target>] [-O0|-O1|-O2|-O3]"
+        printfn ""
+        printfn "OPTIONS"
+        printfn "  -o <output>       Output binary path (default: input basename without extension)"
+        printfn "  -O0..-O3          Optimization level (default: -O2)"
+        printfn "  --trace           Emit '[TRACE] @funcName' to stderr on every function entry"
+        printfn "  --log             Enable log/logf builtin output (default: silent)"
+        printfn "  -h, --help        Show this help message"
+        printfn ""
+        printfn "BUILTINS — I/O"
+        printfn "  print s           Write string to stdout (no newline)"
+        printfn "  println s         Write string to stdout with trailing newline"
+        printfn "  printf fmt ...    Formatted stdout (no newline); e.g. printf \"%%d\" 42"
+        printfn "  printfn fmt ...   Formatted stdout with trailing newline"
+        printfn "  eprint s          Write string to stderr (no newline)"
+        printfn "  eprintln s        Write string to stderr with trailing newline"
+        printfn "  eprintf fmt ...   Formatted stderr (no newline)"
+        printfn "  eprintfn fmt ...  Formatted stderr with trailing newline"
+        printfn "  sprintf fmt ...   Format to string (no output)"
+        printfn ""
+        printfn "BUILTINS — DEBUG (gated by --log flag)"
+        printfn "  log s             stderr + newline IF --log, else no-op (argument discarded)"
+        printfn "  logf fmt ...      Formatted stderr + newline IF --log, else no-op"
+        printfn ""
+        printfn "BUILTINS — DIAGNOSTICS"
+        printfn "  dbg e             Prints '[file:line] value' to stderr, returns e unchanged"
+        printfn "  failwith msg      Abort with message + backtrace"
+
+    if helpRequested then
+        printHelp ()
+        0
+    else
     match remaining with
     | "build" :: rest -> handleBuild optLevel rest
     | "test" :: rest  -> handleTest optLevel rest
@@ -387,11 +444,12 @@ let private mainImpl (argv: string[]) =
             eprintfn "Error: file not found: %s" inputPath
             1
         else
-            compileFile None inputPath outputPath optLevel traceEnabled
+            compileFile None inputPath outputPath optLevel traceEnabled logEnabled
     | [] ->
-        eprintfn "Usage: fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3]"
+        eprintfn "Usage: fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3] [--trace] [--log]"
         eprintfn "       fnc build [<target>] [-O0|-O1|-O2|-O3]"
         eprintfn "       fnc test [<target>] [-O0|-O1|-O2|-O3]"
+        eprintfn "       fnc --help   (for full documentation)"
         1
 
 [<EntryPoint>]
