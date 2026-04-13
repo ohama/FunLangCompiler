@@ -6,7 +6,7 @@
 # Build
 dotnet build src/FunLangCompiler.Cli
 
-# Run all E2E tests (263 tests)
+# Run all E2E tests (267 tests)
 dotnet run --project deps/fslit/FsLit/FsLit.fsproj -- tests/compiler/
 
 # Run a specific test
@@ -51,6 +51,20 @@ fnc --trace myapp.fun -o myapp
 ./myapp 2>trace.log   # 모든 함수 진입 기록
 tail -20 trace.log    # 마지막 20줄 확인
 ```
+
+`log` / `logf` — 조건부 디버그 로그 (stderr + 개행). 기본 비활성화. `--log` 컴파일 플래그로 활성화.
+
+```fun
+let _ = log "init complete"           // 비활성화 시: no-op
+let _ = logf "count=%d" n             // 활성화 시: stderr 출력
+```
+
+```bash
+fnc app.fun -o app                    # log/logf 모두 컴파일러가 제거
+fnc --log app.fun -o app              # log/logf가 stderr로 출력
+```
+
+`fnc --help` — 모든 CLI 옵션 및 빌트인 함수 목록 표시.
 
 Match failure diagnostics — non-exhaustive match 시 소스 위치 + 콜 스택 출력.
 

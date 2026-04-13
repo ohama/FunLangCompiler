@@ -1,6 +1,6 @@
 # FunLangCompiler
 
-[![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.5-blue.svg)](CHANGELOG.md)
 
 FunLang 소스 코드를 네이티브 x86-64 바이너리로 컴파일하는 컴파일러 백엔드.
 
@@ -34,6 +34,12 @@ fnc hello.fun -O3    # aggressive
 fnc --trace hello.fun -o hello
 ./hello 2>trace.log  # stderr에 [TRACE] @funcName 출력
 
+# Conditional debug logging (log/logf builtins emit to stderr only with --log)
+fnc --log hello.fun -o hello
+
+# Show all CLI options and builtin functions
+fnc --help
+
 # Run the compiled binary
 ./hello
 
@@ -49,7 +55,6 @@ dotnet run --project src/FunLangCompiler.Cli -- hello.fun -o hello
 # funproj.toml
 [project]
 name = "myproject"
-prelude = "Prelude"
 
 [[executable]]
 name = "myapp"
@@ -59,6 +64,8 @@ main = "src/main.fun"
 name = "unit"
 main = "tests/unit.fun"
 ```
+
+> Prelude는 컴파일러 바이너리에 내장되어 있어 별도 설정이 필요 없다. 개발 중 Prelude 수정 시 프로젝트 루트의 `Prelude/` 디렉토리가 우선 사용된다 (hot-edit).
 
 ```bash
 fnc build              # 모든 executable → build/ 네이티브 바이너리
@@ -92,8 +99,8 @@ fnc test unit          # 특정 테스트만
 | Tagged Values | OCaml-style LSB 1-bit tagging (int=2n+1, ptr=LSB 0) for runtime type dispatch |
 | Heap Tags | Slot-0 type tag (STRING=1, TUPLE=2, RECORD=3, LIST=4, ADT=5) for generic hash/equality |
 | Collections | Hashtable, HashSet, Queue, MutableList, StringBuilder, Array — all with unified LSB dispatch |
-| I/O | `print`, `println`, `printf`, `sprintf`, file I/O (14 builtins) |
-| Debugging | `dbg expr` — prints `[file:line] value` to stderr, returns value (pass-through); `--trace` flag for function entry tracing; match failure shows source location + backtrace |
+| I/O | `print`/`println`/`printf`/`printfn`, `eprint`/`eprintln`/`eprintf`/`eprintfn`, `sprintf`, file I/O (14 builtins) |
+| Debugging | `dbg expr` — prints `[file:line] value` to stderr, returns value (pass-through); `log`/`logf` — gated by `--log` CLI flag (no-op when disabled); `--trace` flag for function entry tracing; match failure shows source location + backtrace |
 | GC | Boehm GC (`libgc`) for all heap allocation |
 
 ## Architecture
@@ -124,15 +131,15 @@ clang + libgc         -- Native binary linking
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `MlirIR.fs` | ~130 | Typed IR: `MlirModule`, `FuncOp`, `MlirOp` DU (~25 cases), `MlirType`, `MlirValue` |
-| `MatchCompiler.fs` | ~150 | Decision tree pattern matching compiler ([Jacobs algorithm](#pattern-matching-compilation)) |
-| `Printer.fs` | ~180 | Pure serializer: MlirIR -> `.mlir` text |
-| `ElabHelpers.fs` | ~800 | Helpers: coerce, tag/untag, string/char predicates |
-| `Elaboration.fs` | ~3600 | AST -> MlirIR recursive pass with `ElabEnv` |
+| `MlirIR.fs` | ~140 | Typed IR: `MlirModule`, `FuncOp`, `MlirOp` DU (~25 cases), `MlirType`, `MlirValue` |
+| `MatchCompiler.fs` | ~270 | Decision tree pattern matching compiler ([Jacobs algorithm](#pattern-matching-compilation)) |
+| `Printer.fs` | ~235 | Pure serializer: MlirIR -> `.mlir` text |
+| `ElabHelpers.fs` | ~820 | Helpers: coerce, tag/untag, string/char predicates |
+| `Elaboration.fs` | ~3700 | AST -> MlirIR recursive pass with `ElabEnv` |
 | `Pipeline.fs` | ~130 | Shell pipeline: `mlir-opt` -> `mlir-translate` -> `clang` (-O0~O3) |
-| `ProjectFile.fs` | ~100 | funproj.toml TOML subset parser |
-| `lang_runtime.c` | ~1600 | C runtime: string, array, hashtable, collection, I/O, generic hash/equality, call stack |
-| `Program.fs` | ~400 | CLI entry point: build/test/single-file modes, --trace flag |
+| `ProjectFile.fs` | ~140 | funproj.toml TOML subset parser |
+| `lang_runtime.c` | ~1640 | C runtime: string, array, hashtable, collection, I/O, generic hash/equality, call stack |
+| `Program.fs` | ~450 | CLI entry point: build/test/single-file modes, `--trace`/`--log`/`--help` flags, embedded Prelude loader |
 
 ## Dependencies
 
@@ -167,7 +174,7 @@ sudo apt install libgc-dev
 
 ## Testing
 
-263개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
+267개의 fslit E2E 테스트. 테스트 러너는 submodule(`deps/fslit`)로 포함되어 있다.
 
 ```bash
 # Run all tests
