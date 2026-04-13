@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.7] - 2026-04-13
+
+### Added
+- **Prelude Full Type Annotations** (Phase 106) — Phase 102에서 누락된 11개 Prelude 파일에 명시적 타입 어노테이션 일괄 추가:
+  - `Core.fun` — 17개 함수 (id, const, compose, flip, apply, ^^, |>, >>, <<, <|, not, min, max, abs, fst, snd, ignore)
+  - `Int.fun` — parse, toString
+  - `Array.fun` — 12개 함수 (`'a array` postfix 형식)
+  - `HashSet.fun` — 6개 함수 (`'a hashset` postfix 형식)
+  - `Hashtable.fun` — 8개 함수 (`hashtable<'k, 'v>` 형식; tryGetValue는 컴파일러 transform 차이로 untyped 유지)
+  - `MutableList.fun` — 6개 함수 (`'a mutablelist`)
+  - `Queue.fun` — 4개 함수 (`'a queue`)
+  - `StringBuilder.fun` — 3개 함수 (`stringbuilder`)
+  - `List.fun` — 50+ 함수 (모두 `'a list`/`'a option` 등)
+  - `Option.fun` — 12개 함수 (`'a option` postfix)
+  - `Result.fun` — 10개 함수 (`result<'a, 'b>` 형식)
+
+### Changed
+- 모든 Prelude 어노테이션 syntax를 FunLang 캐노니컬 형식으로 통일:
+  - postfix lowercase: `'a hashset`, `'a queue`, `'a mutablelist`, `'a array`, `'a option`
+  - lowercase angle brackets: `hashtable<'k, 'v>`, `result<'a, 'b>`
+  - generic 없음: `stringbuilder`
+  - unit 인자: `let f () = ...` (어노테이션 없이)
+
+### Notes
+- 시행착오: 처음 `HashSet<'a>` (PascalCase 각괄호) 형식 사용 → FunLang 타입 체커 reject. FunLang의 `deps/FunLang/Prelude/` 참조하여 lowercase로 통일.
+- `fnc --check`로 Prelude 타입 체크 clean 확인.
+- 전체 E2E 271/271 통과.
+
 ## [0.1.6] - 2026-04-13
 
 ### Added

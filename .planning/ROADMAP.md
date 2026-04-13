@@ -373,4 +373,5 @@ let annotationMap =
 | 102. Prelude Type Annotations | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
 | 103. Embed Prelude into Binary | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
 | 104. printf/eprintf/log/logf + CLI flags | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
-| 105. Type Check Diagnostic CLI Modes | v23.0 | 0/TBD | Not started | - |
+| 105. Type Check Diagnostic CLI Modes | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
+| 106. Prelude Full Type Annotations | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
