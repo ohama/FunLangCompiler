@@ -1,0 +1,6 @@
+// --- Command: bash -c 'dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- --check %input >/dev/null 2>&1; echo $?'
+// --- Input:
+let f (x : int) : string = x + 1
+let _ = printfn "%s" (f 5)
+// --- Output:
+1

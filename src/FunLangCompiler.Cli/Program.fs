@@ -112,12 +112,59 @@ let rec private expandImports (visitedFiles: System.Collections.Generic.HashSet<
         | other -> [other])
 
 /// Compile a single .fun file to a native binary.
+/// Phase 105: Type check diagnostic options (Issue #25).
+/// All default to false → existing silent fallback behaviour preserved.
+type TypeCheckOptions = {
+    /// Print type errors as warnings to stderr but continue compiling (annotationMap empty fallback).
+    ShowTypecheck: bool
+    /// Halt compilation on any type error (exit 1, no codegen).
+    StrictTypecheck: bool
+    /// Emit `[Diag] annotationMap entries: N (status)` to stderr after type check.
+    DiagnosticAnnotations: bool
+}
+
+let defaultTypeCheckOptions = {
+    ShowTypecheck = false
+    StrictTypecheck = false
+    DiagnosticAnnotations = false
+}
+
+/// Phase 105: Run FunLang type check, optionally suppressing stderr.
+/// Returns Ok annotationMap on success or Error message on failure.
+/// When `suppressStderr` is true, stderr from typeCheckFile is discarded.
+let private runTypeCheck (suppressStderr: bool) (inputPath: string) : Result<Map<Ast.Span, Type.Type>, string> =
+    let savedErr = System.Console.Error
+    if suppressStderr then System.Console.SetError(System.IO.TextWriter.Null)
+    try
+        try
+            let typedModule = ExportApi.typeCheckFile (Path.GetFullPath(inputPath))
+            Ok typedModule.AnnotationMap
+        with ex ->
+            Error ex.Message
+    finally
+        if suppressStderr then System.Console.SetError(savedErr)
+
+/// Phase 105: --check mode — run type check only, skip codegen and linking.
+/// Exit 0 on clean type check, 1 on error.
+let checkOnly (inputPath: string) : int =
+    if not (File.Exists inputPath) then
+        eprintfn "Error: file not found: %s" inputPath
+        1
+    else
+        match runTypeCheck false inputPath with
+        | Ok annotationMap ->
+            printfn "OK: %s (%d annotation entries)" inputPath (annotationMap |> Map.count)
+            0
+        | Error msg ->
+            eprintfn "%s" msg
+            1
+
 /// Prelude loading: walkUp from input path finds filesystem Prelude/ (enables hot-editing
 /// during development). Falls back to embedded resources (Phase 103).
 /// inputPath: path to the .fun source file
 /// outputPath: path for the output binary
 /// optLevel: optimization level 0-3
-let compileFile (inputPath: string) (outputPath: string) (optLevel: int) (traceEnabled: bool) (logEnabled: bool) : int =
+let compileFile (inputPath: string) (outputPath: string) (optLevel: int) (traceEnabled: bool) (logEnabled: bool) (tcOpts: TypeCheckOptions) : int =
     try
         let src = File.ReadAllText(inputPath)
 
@@ -203,19 +250,30 @@ let compileFile (inputPath: string) (outputPath: string) (optLevel: int) (traceE
             | Ast.NamedModule(n, ds, s) -> Ast.NamedModule(n, ElabProgram.elaborateTypeclasses ds, s)
             | Ast.EmptyModule s -> Ast.EmptyModule s
         // Phase 67: Run FunLang type inference to get per-expression type annotations.
-        // Type errors are currently non-fatal (issue #21) because FunLang parser changes
-        // (if-then-else Expr fix) cause parse regressions on some valid code patterns.
-        // TODO: Make fatal after FunLang parser is fixed.
+        // Phase 105 (Issue #25): Diagnostic CLI modes control stderr suppression and error handling.
+        //   Default                    : silent fallback (suppress stderr, swallow errors → empty map)
+        //   --show-typecheck           : surface stderr + warning, continue with empty map fallback
+        //   --strict-typecheck         : surface stderr, halt with exit 1 on any type error
+        //   --diagnostic-annotations   : append entry-count + status line to stderr
+        let suppress = not (tcOpts.ShowTypecheck || tcOpts.StrictTypecheck)
+        let tcResult = runTypeCheck suppress inputPath
         let annotationMap =
-            try
-                let savedErr = System.Console.Error
-                System.Console.SetError(System.IO.TextWriter.Null)
-                try
-                    let typedModule = ExportApi.typeCheckFile (Path.GetFullPath(inputPath))
-                    typedModule.AnnotationMap
-                finally
-                    System.Console.SetError(savedErr)
-            with _ -> Map.empty
+            match tcResult with
+            | Ok m -> m
+            | Error msg ->
+                if tcOpts.StrictTypecheck then
+                    eprintfn "%s" msg
+                    eprintfn "[strict-typecheck] aborting due to type errors"
+                    exit 1
+                if tcOpts.ShowTypecheck then
+                    eprintfn "[Warning] type check failed; continuing with empty annotationMap"
+                Map.empty
+        if tcOpts.DiagnosticAnnotations then
+            let status =
+                match tcResult with
+                | Ok _ -> "typecheck clean"
+                | Error _ -> "typecheck failed — field disambiguation will use fallback"
+            eprintfn "[Diag] annotationMap entries: %d (%s)" (Map.count annotationMap) status
         // Phase 102/103: FunLang's typeCheckFile uses absolute paths in span FileNames,
         // but FunLangCompiler's AST uses the user-supplied path (typically relative).
         // Rewrite annotationMap keys to use inputPath so FieldAccess span lookups match.
@@ -290,7 +348,7 @@ let private handleBuild (optLevel: int) (args: string list) : int =
                     else
                         let outputPath = Path.Combine(config.ProjectDir, "build", target.Name)
                         let sw = Stopwatch.StartNew()
-                        let result = compileFile srcPath outputPath optLevel false false
+                        let result = compileFile srcPath outputPath optLevel false false defaultTypeCheckOptions
                         if result = 0 then
                             printfn "OK: %s -> build/%s (%.1fs)" target.Name target.Name sw.Elapsed.TotalSeconds
                         else
@@ -335,7 +393,7 @@ let private handleTest (optLevel: int) (args: string list) : int =
                 else
                     let outputPath = Path.Combine(config.ProjectDir, "build", target.Name)
                     let sw = Stopwatch.StartNew()
-                    let compileResult = compileFile srcPath outputPath optLevel false false
+                    let compileResult = compileFile srcPath outputPath optLevel false false defaultTypeCheckOptions
                     if compileResult <> 0 then
                         printfn "FAIL: %s (compile error)" target.Name
                     else
@@ -360,29 +418,48 @@ let private mainImpl (argv: string[]) =
     let args = argv |> Array.toList
 
     // Parse flags. Order-independent; unknown tokens fall through to positional args.
-    let rec parseArgs args outputOpt optLevel traceEnabled logEnabled helpRequested =
-        match args with
-        | "-o" :: out :: rest -> parseArgs rest (Some out) optLevel traceEnabled logEnabled helpRequested
-        | "-O0" :: rest -> parseArgs rest outputOpt 0 traceEnabled logEnabled helpRequested
-        | "-O1" :: rest -> parseArgs rest outputOpt 1 traceEnabled logEnabled helpRequested
-        | "-O2" :: rest -> parseArgs rest outputOpt 2 traceEnabled logEnabled helpRequested
-        | "-O3" :: rest -> parseArgs rest outputOpt 3 traceEnabled logEnabled helpRequested
-        | "--trace" :: rest -> parseArgs rest outputOpt optLevel true logEnabled helpRequested
-        | "--log" :: rest -> parseArgs rest outputOpt optLevel traceEnabled true helpRequested
-        | ("-h" | "--help") :: rest -> parseArgs rest outputOpt optLevel traceEnabled logEnabled true
-        | x :: rest ->
-            let (o, ol, t, l, h, r) = parseArgs rest outputOpt optLevel traceEnabled logEnabled helpRequested
-            (o, ol, t, l, h, x :: r)
-        | [] -> (outputOpt, optLevel, traceEnabled, logEnabled, helpRequested, [])
+    // Phase 105: typecheck mode flags carried in a mutable record for simplicity.
+    let mutable outputOpt: string option = None
+    let mutable optLevel = 2
+    let mutable traceEnabled = false
+    let mutable logEnabled = false
+    let mutable helpRequested = false
+    let mutable checkOnlyRequested = false
+    let mutable tcShow = false
+    let mutable tcStrict = false
+    let mutable tcDiag = false
+    let mutable remaining: string list = []
 
-    let (outputOpt, optLevel, traceEnabled, logEnabled, helpRequested, remaining) =
-        parseArgs args None 2 false false false
+    let rec consume = function
+        | [] -> ()
+        | "-o" :: out :: rest -> outputOpt <- Some out; consume rest
+        | "-O0" :: rest -> optLevel <- 0; consume rest
+        | "-O1" :: rest -> optLevel <- 1; consume rest
+        | "-O2" :: rest -> optLevel <- 2; consume rest
+        | "-O3" :: rest -> optLevel <- 3; consume rest
+        | "--trace" :: rest -> traceEnabled <- true; consume rest
+        | "--log" :: rest -> logEnabled <- true; consume rest
+        | ("-h" | "--help") :: rest -> helpRequested <- true; consume rest
+        | "--check" :: rest -> checkOnlyRequested <- true; consume rest
+        | "--show-typecheck" :: rest -> tcShow <- true; consume rest
+        | ("--strict" | "--strict-typecheck") :: rest -> tcStrict <- true; consume rest
+        | "--diagnostic-annotations" :: rest -> tcDiag <- true; consume rest
+        | x :: rest -> remaining <- remaining @ [x]; consume rest
+
+    consume args
+
+    let tcOpts = {
+        ShowTypecheck = tcShow
+        StrictTypecheck = tcStrict
+        DiagnosticAnnotations = tcDiag
+    }
 
     let printHelp () =
         printfn "fnc — FunLangCompiler: FunLang source → native binary"
         printfn ""
         printfn "USAGE"
         printfn "  fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3] [--trace] [--log]"
+        printfn "  fnc --check <file.fun>"
         printfn "  fnc build [<target>] [-O0|-O1|-O2|-O3]"
         printfn "  fnc test  [<target>] [-O0|-O1|-O2|-O3]"
         printfn ""
@@ -392,6 +469,14 @@ let private mainImpl (argv: string[]) =
         printfn "  --trace           Emit '[TRACE] @funcName' to stderr on every function entry"
         printfn "  --log             Enable log/logf builtin output (default: silent)"
         printfn "  -h, --help        Show this help message"
+        printfn ""
+        printfn "DIAGNOSTICS — TYPE CHECK CONTROL (default: silent fallback)"
+        printfn "  --check                       Type-check only; skip codegen and linking"
+        printfn "                                  Exit 0 on clean type check, 1 on type errors"
+        printfn "  --show-typecheck              Surface type errors as warnings; continue compile"
+        printfn "                                  with empty annotationMap fallback"
+        printfn "  --strict-typecheck, --strict  Halt compilation (exit 1) on any type error"
+        printfn "  --diagnostic-annotations      Emit '[Diag] annotationMap entries: N' to stderr"
         printfn ""
         printfn "BUILTINS — I/O"
         printfn "  print s           Write string to stdout (no newline)"
@@ -415,6 +500,12 @@ let private mainImpl (argv: string[]) =
     if helpRequested then
         printHelp ()
         0
+    elif checkOnlyRequested then
+        match remaining with
+        | inputPath :: _ -> checkOnly inputPath
+        | [] ->
+            eprintfn "Usage: fnc --check <file.fun>"
+            1
     else
     match remaining with
     | "build" :: rest -> handleBuild optLevel rest
@@ -433,9 +524,10 @@ let private mainImpl (argv: string[]) =
             eprintfn "Error: file not found: %s" inputPath
             1
         else
-            compileFile inputPath outputPath optLevel traceEnabled logEnabled
+            compileFile inputPath outputPath optLevel traceEnabled logEnabled tcOpts
     | [] ->
         eprintfn "Usage: fnc <file.fun> [-o <output>] [-O0|-O1|-O2|-O3] [--trace] [--log]"
+        eprintfn "       fnc --check <file.fun>   (type-check only)"
         eprintfn "       fnc build [<target>] [-O0|-O1|-O2|-O3]"
         eprintfn "       fnc test [<target>] [-O0|-O1|-O2|-O3]"
         eprintfn "       fnc --help   (for full documentation)"

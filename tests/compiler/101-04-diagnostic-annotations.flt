@@ -1,0 +1,5 @@
+// --- Command: bash -c 'OUT=$(mktemp /tmp/fnc_XXXXXX); dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- --diagnostic-annotations %input -o $OUT 2>&1 >/dev/null | grep -c "annotationMap entries"; rm -f $OUT'
+// --- Input:
+let _ = printfn "hello %d" 42
+// --- Output:
+1

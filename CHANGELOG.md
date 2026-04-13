@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.6] - 2026-04-13
+
+### Added
+- **Type Check Diagnostic CLI Modes** (Phase 105, Issue #25) — 4가지 진단 옵션 추가:
+  - `--check` : type-check 전용 모드. codegen/링크 스킵. clean이면 exit 0 + annotation 수 출력, type error 시 stderr에 메시지 + exit 1.
+  - `--show-typecheck` : 컴파일은 진행하되 typeCheck 에러를 stderr에 warning으로 노출. annotationMap fallback 유지.
+  - `--strict-typecheck` (별칭 `--strict`) : 타입 에러 1개라도 있으면 codegen 중단 + exit 1. 출력 파일 미생성. 사용자 명시 요청 — type error 시 컴파일 중단.
+  - `--diagnostic-annotations` : annotationMap entry 수 + typecheck 성공/실패 상태를 stderr 1줄로 출력. Issue #24 류 진단 보조.
+- 4개 신규 E2E 테스트 (`101-01-check-clean`, `101-02-check-error`, `101-03-strict-typecheck-error`, `101-04-diagnostic-annotations`).
+- `--help` 메시지에 "DIAGNOSTICS — TYPE CHECK CONTROL" 섹션 추가, 각 옵션 사용법 명시.
+
+### Changed
+- `compileFile` 시그니처 확장: `TypeCheckOptions` record 파라미터 추가 (default = 모두 false → 기존 silent fallback 동작 유지).
+- typeCheck 호출을 `runTypeCheck` 헬퍼로 추출. stderr suppression 여부를 인자로 받음.
+- CLI parseArgs를 mutable record + `consume` 함수로 리팩터 (이전 6-tuple → 더 확장 가능).
+
+### Notes
+- 4개 신규 플래그 모두 default OFF — backward compatibility 보존.
+- 사용자 요청한 "type error 시 컴파일 중단"은 `--strict-typecheck` 로 opt-in 가능.
+- 향후 FunLang이 모든 컴파일러 builtin을 등록하면 default를 strict로 전환 검토 가능.
+
 ## [0.1.5] - 2026-04-13
 
 ### Removed

@@ -263,11 +263,102 @@ Plans:
 
 ---
 
+#### Phase 104: printf / eprintf / log / logf Builtins + CLI Flags
+
+**Goal**: 출력 빌트인 패밀리 완성 + 조건부 디버그 로그 함수 추가
+**Depends on**: Phase 103
+**Requirements**: IO-01, DEBUG-04
+**Success Criteria** (what must be TRUE):
+  1. `printf` (stdout, no newline), `eprintf` (stderr, no newline) 빌트인 동작
+  2. `eprintfn` 의 N-arg sprintf 경로가 추가되어 `printfn` 과 대칭
+  3. `log` (string -> unit) / `logf` (formatted) 빌트인 — `--log` 플래그 미지정 시 no-op (argument 평가 없음)
+  4. `--log` CLI 플래그로 `log`/`logf` 출력 활성화
+  5. `-h` / `--help` CLI 플래그로 사용법, 모든 CLI 옵션, 빌트인 함수 목록 출력
+  6. 신규 E2E 테스트 (`39-04-printf-eprintf`, `39-05-log-disabled`, `39-06-log-enabled`) 통과
+  7. 기존 264+ E2E 테스트 모두 통과
+
+**Plans**: 1 plan
+
+Plans:
+- [x] 104-01: printf/eprintf elaboration arms, log/logf gated by env.LogEnabled, CLI flag/help wiring
+
+**Details:**
+완료 시 v0.1.4 릴리스. 자세한 변경 사항은 CHANGELOG.md 참조.
+
+---
+
+#### Phase 105: Type Check Diagnostic CLI Modes (Issue #25)
+
+**Goal**: fnc에 4가지 CLI 옵션을 추가하여 FunLang 타입 체크 결과를 제어/노출하고, 사용자가 type error 발생 시 컴파일 중단을 선택할 수 있게 함
+**Depends on**: Phase 104
+**Requirements**: TC-DIAG-01..04
+**Success Criteria** (what must be TRUE):
+  1. `--check` : codegen/링크 스킵하고 typeCheckFile만 실행. 타입 에러 stderr 출력 + exit 1, clean이면 exit 0. 출력 파일 미생성.
+  2. `--show-typecheck` : 컴파일은 진행하되 typeCheck 에러도 stderr에 warning으로 출력. annotationMap fallback 유지. exit code는 컴파일 성공 여부.
+  3. `--strict-typecheck` : 타입 에러 1개라도 있으면 codegen 없이 exit 1 (사용자 명시 요청 — type error 시 컴파일 중단).
+  4. `--diagnostic-annotations` : annotationMap entry 수 + typecheck 성공/실패 상태를 stderr 1줄로 출력.
+  5. 4개 플래그 모두 default OFF — 기존 silent fallback 동작 backward-compat 보존.
+  6. `--help` 메시지에 4개 신규 플래그 명시 + 사용 시나리오 짧게 안내.
+  7. 각 플래그별 E2E 테스트 추가 (clean / type error 두 케이스).
+  8. 기존 267+ E2E 테스트 모두 통과.
+
+**Plans**: 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 105 to break down)
+
+**Details:**
+배경:
+- Issue #25: typeCheck 결과 제어 도구 부재 — 진단 시 fnc 소스 임시 수정 또는 외부 `fn --check` 사용해야 함
+- Issue #21: type errors silently ignored — runtime crash로 나타남
+- Issue #24: annotationMap empty fallback이 record disambiguation 폴백 오동작 유발
+
+현재 코드 (`Program.fs:209-218`):
+```fsharp
+let annotationMap =
+    try
+        let savedErr = System.Console.Error
+        System.Console.SetError(System.IO.TextWriter.Null)
+        try
+            let typedModule = ExportApi.typeCheckFile (Path.GetFullPath(inputPath))
+            typedModule.AnnotationMap
+        finally
+            System.Console.SetError(savedErr)
+    with _ -> Map.empty
+```
+
+문제:
+- stderr 리다이렉트 → 타입 에러 메시지 사용자에게 보이지 않음
+- `with _ -> Map.empty` → 모든 예외 무시 → 타입 에러로 인한 annotationMap 부재가 silent
+- 진단/CI/strict 빌드 모두 불가능
+
+작업:
+- CLI 파싱: `--check`, `--show-typecheck`, `--strict-typecheck`, `--diagnostic-annotations` 4개 플래그 추가
+- typeCheckFile 호출을 함수로 추출 (성공 시 annotationMap, 실패 시 ex 메시지 반환)
+- 모드별 분기 처리:
+  - `--check`: typeCheckFile만 실행, 결과로 exit (codegen 스킵)
+  - `--show-typecheck`: 에러 메시지 stderr로 노출 + 기존 컴파일 계속
+  - `--strict-typecheck`: 에러 시 codegen 중단 + exit 1
+  - `--diagnostic-annotations`: annotationMap entry 수 출력
+- `--help` 업데이트 (DIAGNOSTICS 섹션 추가)
+- E2E 테스트 추가:
+  - `40-01-check-clean.flt` (clean 파일 → exit 0)
+  - `40-02-check-error.flt` (type error 파일 → exit 1, stderr 메시지)
+  - `40-03-strict-typecheck.flt` (strict 모드 + clean → 정상 컴파일)
+  - `40-04-diagnostic-annotations.flt` (entry count 출력 검증)
+
+추가 메모:
+- 향후 Phase에서 default를 strict로 전환 가능 (FunLang이 모든 컴파일러 builtin을 등록하면)
+- 현재는 backward-compat 우선 — 모든 신규 동작은 opt-in
+- Issue #24 진단 자동화 가능: `fnc --diagnostic-annotations file.fun` 로 annotationMap 빈 상태 즉시 감지
+
+---
+
 ## Progress
 
-**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99 → 100 → 101 → 103 → 102
+**Execution Order:** 94 → 95 → 96 → 97 → 98 → 99 → 100 → 101 → 103 → 102 → 104 → 105
 
-(Phase 103 먼저: Prelude embed으로 임시 위치 테스트 가능. Phase 102: 타입 어노테이션 추가 및 검증.)
+(Phase 103 먼저: Prelude embed으로 임시 위치 테스트 가능. Phase 102: 타입 어노테이션 추가 및 검증. Phase 104: 출력/디버그 빌트인 + CLI 확장. Phase 105: 타입 체크 진단 옵션.)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -281,3 +372,5 @@ Plans:
 | 101. failwith/exception Backtrace | v23.0 | 0/TBD | Not started | - |
 | 102. Prelude Type Annotations | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
 | 103. Embed Prelude into Binary | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
+| 104. printf/eprintf/log/logf + CLI flags | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
+| 105. Type Check Diagnostic CLI Modes | v23.0 | 0/TBD | Not started | - |
