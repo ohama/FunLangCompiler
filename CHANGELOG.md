@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.10] - 2026-04-14
+
+### Fixed
+- **Issue #27** — Import 체인에서 imported library 함수의 FieldAccess가 annotation 을 잃어 strict disambig 가 spurious Ambiguous 에러를 내던 문제. FunLang#26 (`typeCheckFile` 이 imported file span 을 AnnotationMap 에 포함하도록) 해결로 자동 해소. Library 레이어를 사용하는 모든 multi-file 프로젝트에서 strict disambig 가 정상 동작.
+
+### Changed
+- `deps/FunLang` submodule: `7b9d252` (v0.1.5) → `df965f4` (v0.1.6) — FunLang#26 (`fix(#26): populate imported file spans in AnnotationMap`) 포함.
+
+### Improved
+- Imported file 의 에러 위치 정확도 개선 — 이전에는 `:0:0-1:0` 로 표시되던 imported file 타입 에러가 이제 정확한 `file.fun:line:col` 로 표시됨. 진단 UX 크게 개선.
+
 ## [0.1.9] - 2026-04-14
 
 ### Fixed
