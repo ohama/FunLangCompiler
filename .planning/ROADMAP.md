@@ -375,3 +375,4 @@ let annotationMap =
 | 104. printf/eprintf/log/logf + CLI flags | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
 | 105. Type Check Diagnostic CLI Modes | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
 | 106. Prelude Full Type Annotations | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
+| 107. Strict Field Disambiguation | v23.0 | 1/1 | ✓ Complete | 2026-04-14 |

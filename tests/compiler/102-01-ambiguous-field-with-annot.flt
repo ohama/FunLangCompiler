@@ -1,0 +1,20 @@
+// --- Command: bash -c 'OUTBIN=$(mktemp /tmp/fnc_XXXXXX) && dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUTBIN 2>&1 >/dev/null && $OUTBIN; echo $?; rm -f $OUTBIN'
+// --- Input:
+type Foo = { items : int list; start : int }
+type Bar = { start : int; name : string }
+
+let getFooStart (f : Foo) : int = f.start
+let getBarStart (b : Bar) : int = b.start
+let getBarName  (b : Bar) : string = b.name
+
+let _ =
+    let f : Foo = { items = [1; 2; 3]; start = 42 }
+    let b : Bar = { start = 99; name = "hi" }
+    println (to_string (getFooStart f))
+    println (to_string (getBarStart b))
+    println (getBarName b)
+// --- Output:
+42
+99
+hi
+0

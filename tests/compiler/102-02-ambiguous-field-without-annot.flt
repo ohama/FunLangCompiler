@@ -1,0 +1,10 @@
+// --- Command: bash -c 'dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o /tmp/fnc_ambig 2>&1 | grep -c "Ambiguous field access"'
+// --- Input:
+type Foo = { items : int list; start : int }
+type Bar = { start : int; name : string }
+
+// `r` has no type annotation → compile error
+let getStart r = r.start
+let _ = println (to_string (getStart { items = [1]; start = 7 }))
+// --- Output:
+1

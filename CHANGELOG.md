@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.8] - 2026-04-14
+
+### Changed
+- **Strict Field Disambiguation** (Phase 107) — `FieldAccess` 경로에서 last-wins fallback 제거. 여러 record 타입이 동일 필드명을 공유할 때 record expression의 타입이 annotationMap에 없으면 **컴파일 에러**로 처리 (이전: 가장 늦게 선언된 record 타입으로 silently fallback).
+- 에러 메시지에 친절한 수정 예시 포함:
+  ```
+  Ambiguous field access: 'start' is defined in multiple record types [Bar, Foo].
+  Add a type annotation to the record expression (e.g. `(x : Bar).start`)
+  so the compiler can select the correct field.
+  ```
+- annotation이 있으나 candidates에 없는 타입을 가리키는 경우도 명확한 에러로 구분.
+
+### Added
+- E2E 테스트 `102-01-ambiguous-field-with-annot.flt` — 명시 type annotation으로 정상 disambiguation 검증.
+- E2E 테스트 `102-02-ambiguous-field-without-annot.flt` — annotation 없는 경우 에러 메시지 방출 검증.
+
+### Notes
+- 기존 271개 E2E 테스트 모두 통과 (fallback에 의존한 테스트 없음 확인).
+- 신규 테스트 2개 추가 → 총 **273/273 통과**.
+- FunLang 수정 없이 FunLangCompiler 단독 구현 완료. 구현 중 annotation gap 발견되지 않음.
+
 ## [0.1.7] - 2026-04-13
 
 ### Added

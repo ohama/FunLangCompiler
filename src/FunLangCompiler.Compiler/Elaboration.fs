@@ -2909,10 +2909,10 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | FieldAccess(recExpr, fieldName, faSpan) ->
         let (recVal, recOps) = elaborateExpr env recExpr
         let slotIdx =
-            // Phase 30: Disambiguate field access when multiple record types share a field name.
-            // 1. Try annotationMap to get the record expression's type (most reliable).
-            // 2. If ambiguous, use the LAST declared record type (matches ML shadowing semantics).
-            // 3. If only one record type has the field, use it directly.
+            // Phase 107: Strict field disambiguation (Option A).
+            // When multiple record types share a field name, require the record expression's
+            // type to be known via the annotationMap. No last-wins fallback — ambiguous access
+            // without a type annotation is a compile error.
             let candidates =
                 env.RecordEnv
                 |> Map.toList
@@ -2921,17 +2921,21 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
             match candidates with
             | [(_, idx)] -> idx   // unique — no ambiguity
             | _ when candidates.Length > 1 ->
-                // Try annotationMap for record expression type
-                let inferredIdx =
-                    match Map.tryFind (Ast.spanOf recExpr) env.AnnotationMap with
-                    | Some (Type.TData(typeName, _)) ->
-                        candidates |> List.tryPick (fun (tn, idx) -> if tn = typeName then Some idx else None)
-                    | _ -> None
-                match inferredIdx with
-                | Some idx -> idx
-                | None ->
-                    // Fallback: pick the LAST candidate (approximates "most recent declaration wins")
-                    snd (List.last candidates)
+                let annot = Map.tryFind (Ast.spanOf recExpr) env.AnnotationMap
+                match annot with
+                | Some (Type.TData(typeName, _)) ->
+                    match candidates |> List.tryPick (fun (tn, idx) -> if tn = typeName then Some idx else None) with
+                    | Some idx -> idx
+                    | None ->
+                        let candNames = candidates |> List.map fst |> String.concat ", "
+                        failWithSpan faSpan
+                            "Field access: inferred record type '%s' does not contain field '%s'. Candidates with this field: [%s]."
+                            typeName fieldName candNames
+                | _ ->
+                    let candNames = candidates |> List.map fst |> String.concat ", "
+                    failWithSpan faSpan
+                        "Ambiguous field access: '%s' is defined in multiple record types [%s]. Add a type annotation to the record expression (e.g. `(x : %s).%s`) so the compiler can select the correct field."
+                        fieldName candNames (List.head (candidates |> List.map fst)) fieldName
             | _ ->
                 let hint =
                     env.RecordEnv |> Map.toList
