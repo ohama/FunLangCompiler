@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.13] - 2026-04-14
+
+### Fixed
+- **Issue #30** — `Hashtable<'k, hashset<'v> >` (or any heap-valued generic hashtable) 값 조회 시 대규모 컴파일 유닛에서 garbage/SIGSEGV 발생하던 문제. 근본 원인: FunLang builtin scheme 이 tuple `(bool * 'v)` 반환으로 선언됐으나 FunLangCompiler 런타임은 `'v option` ADT 반환 (Phase 100) — slot offset 불일치.
+- 해결: FunLang#28 으로 builtin scheme 을 `'v option` 으로 통일. `deps/FunLang` v0.1.7 → v0.1.8.
+
+### Changed
+- `deps/FunLang` submodule: `324e097` (v0.1.7) → `027dc1c` (v0.1.8) — `fix(#28): hashtable_trygetvalue returns 'v option instead of (bool * 'v)` 포함.
+- `Prelude/Hashtable.fun`: `tryGetValue` 에 명시 annotation `(ht : hashtable<'k, 'v>) (key : 'k) : 'v option` 추가. 이제 tuple-pattern 사용자 코드가 typecheck 에서 **정확한 에러**로 잡힘 (silent SIGSEGV → compile-time catch).
+
+### Migration Note
+기존 `let (found, v) = Hashtable.tryGetValue ht k` 또는 `snd (Hashtable.tryGetValue ht k)` 패턴은 typecheck 에러를 발생시킴:
+
+```
+error[E0301]: Type mismatch: expected Option<int> but got 'a * 'b
+```
+
+다음으로 migrate:
+
+```fun
+match Hashtable.tryGetValue ht k with
+| Some v -> ...
+| None -> ...
+```
+
+Alternative: `Hashtable.containsKey ht k` + `Hashtable.get ht k` 분리 호출.
+
+### Notes
+- 전체 E2E **275/275 통과**.
+- 관련: ohama/FunLexYacc#3 (Symtab/FirstFollow/Lalr 등 tuple→option migration)
+- Phase 100 (Issue #23 fix) 결정이 드디어 FunLang 측과 완전 동기화.
+
 ## [0.1.12] - 2026-04-14
 
 ### Added

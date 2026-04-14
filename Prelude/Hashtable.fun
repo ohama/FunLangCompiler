@@ -5,7 +5,7 @@ module Hashtable =
     let containsKey (ht : hashtable<'k, 'v>) (key : 'k) : bool = hashtable_containsKey ht key
     let keys (ht : hashtable<'k, 'v>) : 'k list = hashtable_keys ht
     let remove (ht : hashtable<'k, 'v>) (key : 'k) : unit = hashtable_remove ht key
-    // Note: FunLang's tryGetValue returns (bool * 'v), but FunLangCompiler transforms it
-    // into 'v option (Phase 100/Issue #23). Left without annotation to avoid type conflict.
-    let tryGetValue ht key  = hashtable_trygetvalue ht key
+    // FunLang#28 (v0.1.8): builtin scheme unified to `'v option` — matches
+    // FunLangCompiler's runtime (Phase 100/Issue #23). Safe to annotate now.
+    let tryGetValue (ht : hashtable<'k, 'v>) (key : 'k) : 'v option = hashtable_trygetvalue ht key
     let count (ht : hashtable<'k, 'v>) : int = hashtable_count ht
