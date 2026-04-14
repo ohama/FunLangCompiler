@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <ctype.h>
+#include <signal.h>
 #include <gc.h>
 #include "lang_runtime.h"
 
@@ -98,6 +99,59 @@ void lang_failwith(const char* msg, const char* location) {
     fprintf(stderr, "Fatal: %s at %s\n", msg, location);
     lang_print_backtrace();
     exit(1);
+}
+
+/* Phase 110 (Issue #29): Signal handler for SIGSEGV/SIGBUS/SIGFPE/SIGILL.
+ * Prints a fatal message + FunLang-level backtrace, then re-raises the signal
+ * so the OS still records the abnormal termination. This gives users the same
+ * diagnostic UX as match-failure/failwith even for hardware faults (stack
+ * overflow, null deref, division by zero, etc.). */
+static const char* lang_signal_name(int sig) {
+    switch (sig) {
+        case SIGSEGV: return "SIGSEGV (segmentation fault — likely stack overflow, null deref, or invalid memory access)";
+        case SIGBUS:  return "SIGBUS (bus error — misaligned memory access)";
+        case SIGFPE:  return "SIGFPE (arithmetic fault — division by zero, integer overflow)";
+        case SIGILL:  return "SIGILL (illegal instruction — corrupted code pointer)";
+        case SIGABRT: return "SIGABRT (abort)";
+        default: return "unknown";
+    }
+}
+
+static void lang_signal_handler(int sig) {
+    /* Only async-signal-safe operations would be strictly correct, but since
+     * we're about to terminate and prefer diagnostic clarity, use fprintf. */
+    fprintf(stderr, "Fatal: runtime signal %d: %s\n", sig, lang_signal_name(sig));
+    lang_print_backtrace();
+    /* Restore default handler and re-raise so the OS exit code reflects the
+     * crash (e.g., 139 for SIGSEGV). This preserves core-dump behaviour. */
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+/* Alt-stack backing buffer: allocated once; signal handlers run here when
+ * the primary stack is exhausted (stack overflow -> SIGSEGV). Without this
+ * the handler would itself overflow and the process dies silently. */
+#define LANG_ALTSTACK_SIZE (128 * 1024)
+static char lang_altstack_buf[LANG_ALTSTACK_SIZE];
+
+void lang_install_signal_handlers(void) {
+    /* Install alternate signal stack so handlers can run even on stack overflow. */
+    stack_t ss;
+    ss.ss_sp = lang_altstack_buf;
+    ss.ss_size = LANG_ALTSTACK_SIZE;
+    ss.ss_flags = 0;
+    sigaltstack(&ss, NULL);
+
+    struct sigaction sa;
+    sa.sa_handler = lang_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_ONSTACK | SA_RESETHAND;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS,  &sa, NULL);
+    sigaction(SIGFPE,  &sa, NULL);
+    sigaction(SIGILL,  &sa, NULL);
+    /* SIGABRT intentionally NOT caught — user abort() and library assertions
+     * should pass through without our diagnostic. */
 }
 
 /* Internal helper: raw (untagged) start/len arguments */
@@ -1632,5 +1686,6 @@ LangCons* lang_get_args(void) {
 extern int64_t _fnc_entry(int64_t argc, char** argv);
 
 int main(int argc, char** argv) {
+    lang_install_signal_handlers();
     return (int)_fnc_entry((int64_t)argc, argv);
 }

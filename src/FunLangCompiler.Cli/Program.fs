@@ -121,12 +121,15 @@ type TypeCheckOptions = {
     StrictTypecheck: bool
     /// Emit `[Diag] annotationMap entries: N (status)` to stderr after type check.
     DiagnosticAnnotations: bool
+    /// Phase 109: Promote duplicate top-level definition warnings to hard errors (exit 1).
+    StrictDuplicates: bool
 }
 
 let defaultTypeCheckOptions = {
     ShowTypecheck = false
     StrictTypecheck = false
     DiagnosticAnnotations = false
+    StrictDuplicates = false
 }
 
 /// Phase 105: Run FunLang type check, optionally suppressing stderr.
@@ -287,7 +290,7 @@ let compileFile (inputPath: string) (outputPath: string) (optLevel: int) (traceE
                     else span
                 (normalized, ty))
             |> Map.ofSeq
-        let mlirMod = ElabProgram.elaborateProgram tcAst annotationMap logEnabled
+        let mlirMod = ElabProgram.elaborateProgram tcAst annotationMap logEnabled tcOpts.StrictDuplicates
         let mlirMod = ElabProgram.insertCallStack mlirMod
         let mlirMod = if traceEnabled then ElabProgram.insertTraceEntries mlirMod else mlirMod
         match Pipeline.compile mlirMod outputPath optLevel with
@@ -428,6 +431,7 @@ let private mainImpl (argv: string[]) =
     let mutable tcShow = false
     let mutable tcStrict = false
     let mutable tcDiag = false
+    let mutable strictDuplicates = false
     let mutable remaining: string list = []
 
     let rec consume = function
@@ -444,6 +448,7 @@ let private mainImpl (argv: string[]) =
         | "--show-typecheck" :: rest -> tcShow <- true; consume rest
         | ("--strict" | "--strict-typecheck") :: rest -> tcStrict <- true; consume rest
         | "--diagnostic-annotations" :: rest -> tcDiag <- true; consume rest
+        | "--strict-duplicates" :: rest -> strictDuplicates <- true; consume rest
         | x :: rest -> remaining <- remaining @ [x]; consume rest
 
     consume args
@@ -452,6 +457,7 @@ let private mainImpl (argv: string[]) =
         ShowTypecheck = tcShow
         StrictTypecheck = tcStrict
         DiagnosticAnnotations = tcDiag
+        StrictDuplicates = strictDuplicates
     }
 
     let printHelp () =
@@ -477,6 +483,8 @@ let private mainImpl (argv: string[]) =
         printfn "                                  with empty annotationMap fallback"
         printfn "  --strict-typecheck, --strict  Halt compilation (exit 1) on any type error"
         printfn "  --diagnostic-annotations      Emit '[Diag] annotationMap entries: N' to stderr"
+        printfn "  --strict-duplicates           Treat duplicate top-level definitions as errors"
+        printfn "                                  (default: warning only)"
         printfn ""
         printfn "BUILTINS — I/O"
         printfn "  print s           Write string to stdout (no newline)"

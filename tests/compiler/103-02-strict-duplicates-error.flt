@@ -1,0 +1,7 @@
+// --- Command: bash -c 'OUT=$(mktemp /tmp/fnc_XXXXXX); dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- --strict-duplicates %input -o $OUT >/dev/null 2>&1; ec=$?; sz=$(wc -c < $OUT); rm -f $OUT; echo $ec $sz'
+// --- Input:
+let myFunc (n : int) : int = n + 1
+let myFunc (n : int) : int = n - 1
+let _ = printfn "%d" (myFunc 10)
+// --- Output:
+1 0

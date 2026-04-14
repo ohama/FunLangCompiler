@@ -1,0 +1,7 @@
+// --- Command: bash -c 'OUT=$(mktemp /tmp/fnc_XXXXXX); dotnet run --project %S/../../src/FunLangCompiler.Cli/FunLangCompiler.Cli.fsproj -- %input -o $OUT 2>&1 >/dev/null | grep -c "Duplicate top-level definition"; rm -f $OUT'
+// --- Input:
+let myFunc (n : int) : int = n + 1
+let myFunc (n : int) : int = n - 1
+let _ = printfn "%d" (myFunc 10)
+// --- Output:
+1

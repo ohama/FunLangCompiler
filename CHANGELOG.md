@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.12] - 2026-04-14
+
+### Added
+- **Phase 109: Duplicate Top-level Definition Warning** — 동일 이름의 top-level `let`/`let rec` 정의가 여러 파일/위치에 있을 때 stderr 로 경고 emit. ML last-wins shadowing 으로 인한 silent 버그 (FunLangCompiler#28 funyacc variant, FunLexYacc#2) 를 조기 발견. Prelude 내부의 typeclass instance 중복 (`show`/`eq`) 은 자동 제외.
+  - `--strict-duplicates` CLI 플래그: warning → hard error (exit 1) 승격
+  - 2개 신규 E2E 테스트 (`103-01-duplicate-def-warning`, `103-02-strict-duplicates-error`)
+- **Phase 110: Runtime SIGSEGV/SIGBUS/SIGFPE/SIGILL Backtrace (Issue #29)** — Hardware fault 발생 시 native binary 가 silent exit 가 아니라 **fatal 메시지 + FunLang backtrace** 출력. 기존 match-failure/failwith diagnostic 과 동일 UX.
+  - `sigaltstack` 128KB alternate stack — stack overflow 상황에서도 핸들러 실행
+  - 핸들러 실행 후 기본 핸들러로 복원 + 재발생 → exit code 139 (SIGSEGV) 보존, core dump 동작 유지
+  - Issue #29 에서 요청된 1차 개선 사항 (stack overflow 감지 + backtrace)
+
+### Notes
+- 전체 E2E 275/275 통과 (신규 103-01/02 포함).
+- Phase 109 는 향후 naming conflict 유형 버그 예방. Phase 110 은 모든 runtime crash 에 즉시 효과.
+- Phase 110 으로 이제 `./binary` 크래시 시 `fnc --trace` 재빌드 없이 바로 backtrace 확인 가능.
+
 ## [0.1.11] - 2026-04-14
 
 ### Fixed

@@ -442,13 +442,53 @@ let rec elaborateTypeclasses (decls: Ast.Decl list) : Ast.Decl list =
                 | _ -> [])
         | other -> [other])
 
+// Phase 109: Scan flattened top-level decls for duplicate definition names.
+// Emits a warning per duplicate group to stderr; optionally aborts compilation in strict mode.
+// Excludes "_" bindings and compiler-internal names starting with "__".
+let private checkDuplicateDefs (strictMode: bool) (decls: Ast.Decl list) : unit =
+    let moduleMembers = collectModuleMembers decls
+    let flatDecls = flattenDecls moduleMembers "" decls
+    let entries = System.Collections.Generic.List<string * Ast.Span>()
+    let isEligible (name: string) (span: Ast.Span) =
+        // Skip underscore bindings and compiler-internals.
+        name <> "_" && not (name.StartsWith "__") &&
+        // Skip Prelude-sourced entries (typeclass instances legitimately redefine
+        // `show`/`eq` for each instance; those are dispatched by the typeclass
+        // machinery, not by last-wins shadowing).
+        span.FileName <> "<prelude>"
+    for decl in flatDecls do
+        match decl with
+        | Ast.Decl.LetDecl(name, _, span) when isEligible name span ->
+            entries.Add((name, span))
+        | Ast.Decl.LetRecDecl(bindings, _) ->
+            for (name, _, _, _, _, span) in bindings do
+                if isEligible name span then entries.Add((name, span))
+        | _ -> ()
+    let duplicates =
+        entries
+        |> Seq.groupBy fst
+        |> Seq.filter (fun (_, g) -> Seq.length g > 1)
+        |> Seq.toList
+    let mutable hasDuplicate = false
+    for (name, occurrences) in duplicates do
+        hasDuplicate <- true
+        eprintfn "[Warning] Duplicate top-level definition '%s':" name
+        for (_, span) in occurrences do
+            eprintfn "  %s:%d:%d" span.FileName span.StartLine span.StartColumn
+        eprintfn "  The latter will shadow the former."
+    if hasDuplicate && strictMode then
+        eprintfn "[strict-duplicates] aborting due to duplicate top-level definitions"
+        exit 1
+
 // Phase 16: elaborateProgram — new entry point accepting Ast.Module.
 // Runs prePassDecls to populate TypeEnv/RecordEnv/ExnTags, then elaborates the program body.
-let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>) (logEnabled: bool) : MlirModule =
+let elaborateProgram (ast: Ast.Module) (annotationMap: Map<Ast.Span, Type.Type>) (logEnabled: bool) (strictDuplicates: bool) : MlirModule =
     let decls =
         match ast with
         | Ast.Module(decls, _) | Ast.NamedModule(_, decls, _) -> decls
         | Ast.EmptyModule _ -> []
+    // Phase 109: Warn about duplicate top-level `let` definitions (opt-in strict mode).
+    checkDuplicateDefs strictDuplicates decls
     let (typeEnv, recordEnv, exnTags, stringFields) = prePassDecls (ref 0) decls
     let mainExpr = extractMainExpr (Ast.moduleSpanOf ast) decls
     // Lambda lifting: nested LetRec captures → explicit parameters (MLIR-style AST rewrite)

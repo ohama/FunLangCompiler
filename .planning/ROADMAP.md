@@ -376,3 +376,6 @@ let annotationMap =
 | 105. Type Check Diagnostic CLI Modes | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
 | 106. Prelude Full Type Annotations | v23.0 | 1/1 | ✓ Complete | 2026-04-13 |
 | 107. Strict Field Disambiguation | v23.0 | 1/1 | ✓ Complete | 2026-04-14 |
+| 108. Heap-aware Equal/NotEqual Coercion | v23.0 | 1/1 | ✓ Complete | 2026-04-14 |
+| 109. Duplicate Top-level Definition Warning | v23.0 | 1/1 | ✓ Complete | 2026-04-14 |
+| 110. SIGSEGV/SIGBUS Runtime Backtrace | v23.0 | 1/1 | ✓ Complete | 2026-04-14 |
