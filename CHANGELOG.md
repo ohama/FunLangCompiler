@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.11] - 2026-04-14
+
+### Fixed
+- **Issue #28 (Phase 108)** — `string = string` 이 false 를 반환하던 문제 해결. Elaboration 의 `Equal`/`NotEqual` coercion 로직이 Ptr vs I64 mismatch 시 **Ptr → I64 로 demote** 하여 raw 포인터 주소 비교로 귀결되던 버그.
+  - 이제 한쪽이 Ptr 이거나 `isStringExpr` 이 true 면 양쪽을 **Ptr 로 promote** 후 `lang_generic_eq` 로 structural 비교.
+  - 주요 영향: 라이브러리 함수가 반환한 string 이 closure env 를 경유하여 I64 로 받아들여진 상태에서 literal 과 비교할 때 항상 false 반환.
+- **Issue #28 root cause (FunLang 측)** — FunLang#27 (v0.1.7) 해결로 typeCheckFile AnnotationMap 이 모든 imported file span 을 포함. 이전 v0.1.6 에서는 main + 마지막 import 만 반환하여 중간 파일의 타입 정보 누락.
+
+### Changed
+- `deps/FunLang` submodule: `df965f4` (v0.1.6) → `324e097` (v0.1.7) — `fix(#27): preserve all import files' spans in AnnotationMap` 포함.
+
+### Notes
+- FunLexYacc 빌드 검증: `ident[0]=114` ✓, `ident = "rule"` → `eq=1` ✓, lexer 생성 정상 (`tmp/out.fun` 1401 bytes).
+- 전체 E2E **273/273 통과**.
+- 이중 해결 구조: FunLang 측 (annotation propagation) + FunLangCompiler 측 (equality coercion). 어느 한쪽만 수정해도 Issue #28 반 해결에 그침.
+
 ## [0.1.10] - 2026-04-14
 
 ### Fixed

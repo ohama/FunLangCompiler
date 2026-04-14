@@ -597,16 +597,23 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | Equal (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
-        // Phase 62: Coerce mismatched types before comparison (e.g., I64 vs Ptr from null list)
+        // Phase 108: If either operand is a known heap value (string from annotationMap,
+        // or MLIR Ptr type), promote both to Ptr and use structural equality. Previously
+        // we demoted Ptr→I64 on mismatch, which broke string equality when one side was
+        // loaded as I64 from a closure env while the other was a Ptr literal.
+        let lhsIsStr = isStringExpr env.StringVars env.StringFields env.AnnotationMap lhs
+        let rhsIsStr = isStringExpr env.StringVars env.StringFields env.AnnotationMap rhs
+        let heapCompare = lv.Type = Ptr || rv.Type = Ptr || lhsIsStr || rhsIsStr
         let (lv, lops, rv, rops) =
-            if lv.Type = Ptr && rv.Type = I64 then
-                let c = { Name = freshName env; Type = I64 }
-                (c, lops @ [LlvmPtrToIntOp(c, lv)], rv, rops)
-            elif lv.Type = I64 && rv.Type = Ptr then
-                let c = { Name = freshName env; Type = I64 }
-                (lv, lops, c, rops @ [LlvmPtrToIntOp(c, rv)])
+            if heapCompare then
+                let toPtr v ops =
+                    if v.Type = Ptr then (v, ops)
+                    else let p = { Name = freshName env; Type = Ptr } in (p, ops @ [LlvmIntToPtrOp(p, v)])
+                let (l', lops') = toPtr lv lops
+                let (r', rops') = toPtr rv rops
+                (l', lops', r', rops')
             else (lv, lops, rv, rops)
-        if lv.Type = Ptr then
+        if heapCompare then
             // Phase 93: Generic structural equality via lang_generic_eq
             let cmpResult  = { Name = freshName env; Type = I64 }
             let zero64     = { Name = freshName env; Type = I64 }
@@ -623,16 +630,20 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
     | NotEqual (lhs, rhs, _) ->
         let (lv, lops) = elaborateExpr env lhs
         let (rv, rops) = elaborateExpr env rhs
-        // Phase 62: Coerce mismatched types before comparison
+        // Phase 108: Same heap-aware coercion as Equal above.
+        let lhsIsStr = isStringExpr env.StringVars env.StringFields env.AnnotationMap lhs
+        let rhsIsStr = isStringExpr env.StringVars env.StringFields env.AnnotationMap rhs
+        let heapCompare = lv.Type = Ptr || rv.Type = Ptr || lhsIsStr || rhsIsStr
         let (lv, lops, rv, rops) =
-            if lv.Type = Ptr && rv.Type = I64 then
-                let c = { Name = freshName env; Type = I64 }
-                (c, lops @ [LlvmPtrToIntOp(c, lv)], rv, rops)
-            elif lv.Type = I64 && rv.Type = Ptr then
-                let c = { Name = freshName env; Type = I64 }
-                (lv, lops, c, rops @ [LlvmPtrToIntOp(c, rv)])
+            if heapCompare then
+                let toPtr v ops =
+                    if v.Type = Ptr then (v, ops)
+                    else let p = { Name = freshName env; Type = Ptr } in (p, ops @ [LlvmIntToPtrOp(p, v)])
+                let (l', lops') = toPtr lv lops
+                let (r', rops') = toPtr rv rops
+                (l', lops', r', rops')
             else (lv, lops, rv, rops)
-        if lv.Type = Ptr then
+        if heapCompare then
             // Phase 93: Generic structural inequality via lang_generic_eq
             let cmpResult  = { Name = freshName env; Type = I64 }
             let zero64     = { Name = freshName env; Type = I64 }
