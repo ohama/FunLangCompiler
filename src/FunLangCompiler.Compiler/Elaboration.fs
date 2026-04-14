@@ -2933,9 +2933,16 @@ let rec elaborateExpr (env: ElabEnv) (expr: Expr) : MlirValue * MlirOp list =
                             typeName fieldName candNames
                 | _ ->
                     let candNames = candidates |> List.map fst |> String.concat ", "
+                    let firstCand = List.head (candidates |> List.map fst)
+                    // If the annotation map is empty, type check likely failed — surface that as
+                    // the root cause so users run `--check` instead of chasing a disambig message.
+                    let rootCauseHint =
+                        if Map.isEmpty env.AnnotationMap then
+                            " [NOTE] annotationMap is empty — FunLang type check likely failed. Run `fnc --check <file>` to see the underlying type error."
+                        else ""
                     failWithSpan faSpan
-                        "Ambiguous field access: '%s' is defined in multiple record types [%s]. Add a type annotation to the record expression (e.g. `(x : %s).%s`) so the compiler can select the correct field."
-                        fieldName candNames (List.head (candidates |> List.map fst)) fieldName
+                        "Ambiguous field access: '%s' is defined in multiple record types [%s]. Add a type annotation to the record expression (e.g. `(x : %s).%s`) so the compiler can select the correct field.%s"
+                        fieldName candNames firstCand fieldName rootCauseHint
             | _ ->
                 let hint =
                     env.RecordEnv |> Map.toList

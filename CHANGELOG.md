@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.9] - 2026-04-14
+
+### Fixed
+- **Issue #26** — v0.1.8의 strict field disambiguation이 동일 필드 집합을 가진 여러 record 타입 사용 시 spurious Ambiguous 에러를 냈던 문제. 근본 원인은 FunLang의 RecordExpr 처리 버그 (outer type annotation 무시, `DuplicateFieldName` 오발화)였음. FunLang#25 해결로 자동 해소.
+
+### Changed
+- `deps/FunLang` submodule: `d62b566` (v0.1.3) → `7b9d252` (v0.1.5) — 다음 수정 포함:
+  - FunLang#25: RecordExpr disambiguation via outer expected type
+  - FunLang#23 revert: `s.[i]` 를 다시 `char` 타입으로 (char 리터럴과 통일)
+
+### Added
+- Ambiguous field access 에러에 annotationMap 비어있을 때 root cause 힌트 추가:
+  > `[NOTE] annotationMap is empty — FunLang type check likely failed. Run \`fnc --check <file>\` to see the underlying type error.`
+  
+  타입 체크 실패로 disambig fallback이 불가능한 상황을 즉시 진단 가능.
+
 ## [0.1.8] - 2026-04-14
 
 ### Changed
