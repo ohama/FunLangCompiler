@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.14] - 2026-04-15
+
+### Fixed
+- **Issue #31** — `log` / `logf` 빌트인이 FunLang typecheck builtinEnv에 누락되어 `fnc --check` 실패 및 **annotationMap cascading 손상** 유발 (한 파일의 `logf` 사용이 같은 컴파일 단위 내 무관한 파일의 필드 디스앰비규에이션까지 깨뜨림).
+- 해결: FunLang#29 으로 `log`/`logf` 스킴 등록 (`log : string -> unit`, `logf : string -> 'a`). `deps/FunLang` v0.1.8 → v0.1.9.
+
+### Changed
+- `deps/FunLang` submodule: `027dc1c` (v0.1.8) → `51926e0` (v0.1.9).
+
 ## [0.1.13] - 2026-04-14
 
 ### Fixed
